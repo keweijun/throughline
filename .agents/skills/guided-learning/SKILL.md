@@ -12,3 +12,5 @@ For course creation, material registration, source retrieval and saving a positi
 Save the current goal, explanation progress and next step before leaving the main teaching line or ending a session. Registration retains exact source bytes by revision; Markdown line numbers and PDF page numbers are distinct locators. Preserve this distinction when citing material.
 
 For cross-document concepts, prerequisite routes, notation/exercise mappings, coverage auditing and focused teaching context, read [curriculum operations](references/curriculum.md).
+
+When teaching, handling a sidequestion or resuming a session, read [teaching operations](references/teaching.md). Record actual interactions and use route context to choose response depth; optional background work does not block the explanation.

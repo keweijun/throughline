@@ -1,11 +1,8 @@
-import json
-import subprocess
-import sys
+from support import call_cli
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 
 class CurriculumCLI(unittest.TestCase):
     def setUp(self):
@@ -21,15 +18,8 @@ class CurriculumCLI(unittest.TestCase):
             source = self.call('source.register', path=str(path))['source']
             self.refs.append({'source_id': source['id'], 'revision': source['revision'], 'unit_id': 'line-1'})
 
-    def call(self, op, error=None, **fields):
-        process = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', str(self.workspace)], input=json.dumps({'op': op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
-        response = json.loads(process.stdout)
-        if error:
-            self.assertEqual(response['error']['code'], error, response)
-            self.assertNotEqual(process.returncode, 0)
-            return response
-        self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
-        return response['result']
+    def call(self, op, error=None, workspace=None, **fields):
+        return call_cli(self, workspace or self.workspace, op, error=error, **fields)
 
     def model(self):
         return {'concepts': [

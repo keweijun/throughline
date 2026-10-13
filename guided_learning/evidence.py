@@ -46,6 +46,9 @@ def record(store, request):
                 if assessment.get('session_id') == item['session_id'] and assessment.get('exercise_id') == item['exercise_id'] and assessment['concept_id'] == cid and 'answer_id' in assessment:
                     if store.get('interactions', iid)['sequence'] <= store.get('interactions', assessment['answer_id'])['sequence']:
                         raise OperationError('invalid_evidence', 'Record assistance before assessing its answer')
+    previous = store.get('evidence', item['id'])
+    if previous is None or 'source_refs' in previous:
+        item['source_refs'] = store.get('interactions', iid).get('source_refs', [])
     return {'evidence': immutable(store, 'evidence', item)}
 
 
@@ -87,6 +90,10 @@ def assess(store, request):
             raise OperationError('invalid_evidence', 'Retest answer must follow prior assessment')
         if item['kind'] == 'independent':
             item['kind'] = 'retest_passed'
+    existing = store.get('evidence', item['id'])
+    if existing is None or 'answer_source_refs' in existing:
+        item['answer_source_refs'] = answer.get('source_refs', [])
+        item['assessment_source_refs'] = assessment.get('source_refs', [])
     return {'evidence': immutable(store, 'evidence', item)}
 
 OPERATIONS['evidence.assess'] = assess
@@ -120,7 +127,10 @@ def resolve(store, request):
     deferred = store.get('evidence_deferred', item['deferred_id'])
     if not deferred:
         raise OperationError('invalid_reference', 'Unknown deferred item')
-    interaction(store, item['interaction_id'], 'user', deferred['concept_id'])
+    confirmation = store.get('interactions', item['interaction_id'])
+    allowed_contexts = {None, deferred['concept_id'], deferred.get('target_concept_id')}
+    if not confirmation or confirmation['role'] != 'user' or confirmation.get('concept_id') not in allowed_contexts:
+        raise OperationError('invalid_evidence', 'Confirmation must be a learner message at the deferred concept or scheduled target')
     return {'resolution': immutable(store, 'evidence_resolutions', item)}
 
 OPERATIONS['evidence.resolve'] = resolve

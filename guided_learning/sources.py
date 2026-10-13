@@ -67,4 +67,3 @@ def read(store, request):
     return snapshot
 
 OPERATIONS = {'source.register': register, 'source.read': read}
-

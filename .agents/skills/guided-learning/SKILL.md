@@ -10,3 +10,5 @@ Use the course workspace as the official state. Keep course files outside tracke
 For course creation, material registration, source retrieval and saving a position, read [course operations](references/course-operations.md). The operation entrypoint persists each request transactionally. Read failures and pending verification are visible outcomes to report to the learner. Extracted text alone does not establish complete content coverage or formula/image accuracy.
 
 Save the current goal, explanation progress and next step before leaving the main teaching line or ending a session. Registration retains exact source bytes by revision; Markdown line numbers and PDF page numbers are distinct locators. Preserve this distinction when citing material.
+
+For cross-document concepts, prerequisite routes, notation/exercise mappings, coverage auditing and focused teaching context, read [curriculum operations](references/curriculum.md).

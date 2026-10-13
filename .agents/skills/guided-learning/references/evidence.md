@@ -20,7 +20,7 @@
 
 - `evidence.defer` 接收 `id, concept_id, reason`，以及 `target_concept_id` 或 `section_id`（可同时提供）。跳过仅登记暂缓，保持原有证据。
 - 在进入目标知识点或小节复盘时调用 `evidence.review {concept_id, section_id?, recap?}`。仅在复盘时设 `recap:true`。`due` 提供到点暂缓项；每轮答疑无需再读或重复催促。
-- 重开时结合 `teaching.resume`、`evidence.review` 简短恢复目标和未解问题，然后接续；`quiz_required:false`，不强制测验。用户选择继续仍可推进。
+- 重开时结合 `session.resume`、`evidence.review` 简短恢复目标和未解问题，然后接续；`quiz_required:false`，不强制测验。用户选择继续仍可推进。
 - 学习者确认已回访后，将其真实回应记录为交互，再调用 `evidence.resolve {id, deferred_id, interaction_id}`。这结束提醒但不会升级掌握，历史保留在 `deferred_history` 与 `resolutions`。
 
 同 ID 同内容重试返回原记录，改写既有记录返回 `id_conflict`。为纠错创建明确的新事件，保留原始证据。材料更新后证据仍保留，教师结合新来源判断是否安排复测。

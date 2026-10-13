@@ -18,8 +18,8 @@ These are teacher judgments, not text-matching rules. Record the rationale. A ca
 
 Use the course JSON CLI. Each mutation is atomic.
 
-- `interaction.record`: `{id, role:"user"|"assistant", text, concept_id?}` returns `{interaction}`. Concept is optional; role is the actual speaker. Identical retries succeed, conflicting ID reuse fails. Records contain a monotonic `sequence`.
-- `mainline.enter`: `{concept_id, goal, next_step, progress?}` saves the current position and returns `due_explanations`. No mastery gate prevents the learner choosing the next concept. Close an active branch through `sidequestion.continue` when the learner chooses to continue.
+- `interaction.record`: `{id, role:"user"|"assistant", text, concept_id?, source_refs?}` returns `{interaction}`. Concept is optional; role is the actual speaker. Identical retries succeed, conflicting ID reuse fails. Records contain a monotonic `sequence`.
+- `mainline.enter`: `{request_id, concept_id, goal, next_step, progress?}` saves the current position and returns `due_explanations`. No mastery gate prevents the learner choosing the next concept. Close an active branch through `sidequestion.continue` when the learner chooses to continue.
 - `sidequestion.open`: `{id, interaction_id, category, depth:"short"|"long", rationale, strategy, explicit_deepen?, target_concept_id?}` saves the exact mainline restore point. Categories are `local`, `prerequisite`, `future`, `repeated`, `extension`. `interaction_id` must identify the actual user question. Future questions require a valid target. `explicit_deepen:true` forces long depth even if short was proposed.
 - `sidequestion.answer`: `{id, answer_interaction_id}` links a subsequently recorded assistant message. Short answers restore the mainline; long answers become `waiting`. A short future answer creates a pending full explanation. Long future answers are the immediate full explanation, so the teacher must actually provide it.
 - `sidequestion.continue`: `{id}` after the learner chooses to resume. Unanswered questions stay visible as unanswered; continuing never pretends they were solved. Record the learner's continue message with `interaction.record` as usual.
@@ -31,4 +31,12 @@ A single active branch keeps a stable mainline. Follow-up questions inside a lon
 
 ## Integration contract
 
-Namespaces: `interactions` keyed by message ID; `sidequestions` by branch ID; `teaching/active_branch` stores its ID; `deferred_explanations` by unique promise ID (the originating branch ID for auto-created future branches). Interaction records are immutable `{id,role,text,concept_id,sequence}`. Evidence operations may link them and check roles but should not mutate raw messages. Summary or background output never replaces these messages.
+Namespaces: `interactions` keyed by message ID; `sidequestions` by branch ID; `teaching/active_branch` stores its ID; `deferred_explanations` by unique promise ID (the originating branch ID for auto-created future branches). Interaction records are immutable `{id,role,text,concept_id,sequence,source_refs,source_context_concept_id}`. Evidence operations may link them and check roles but should not mutate raw messages. Summary or background output never replaces these messages.
+
+## Historical audit and checkpoint retries
+
+`interaction.read {id}` retrieves one original message by ID, including its speaker, wording and immutable source references. Use IDs from evidence, sidequestions or deferred explanations when relevant messages are older than the recent window. Keep routine context bounded; audit only the cited messages you need.
+
+New interactions snapshot exact source/unit/revision triples from the tagged concept (or current mainline concept when untagged), including its links, notation and exercise references. Supply `source_refs` explicitly when the message concerns a narrower selection or earlier material; each triple must identify a registered source unit. The snapshot is provenance, not proof that the message is correct. Retries preserve the original snapshot even after curriculum links change. Legacy messages without source refs have unknown provenance; never fill them with the latest curriculum retroactively.
+
+Every new `mainline.enter` and `position.save` requires a new `request_id`; an identical retry reuses it. A replay returns `replayed:true` and the current position; the earlier response is under `original_result` for audit only. Resume to refresh due items rather than presenting the original response as current.

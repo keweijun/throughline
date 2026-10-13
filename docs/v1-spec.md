@@ -1,6 +1,6 @@
 # 个人跨文档导学：第一版方案
 
-状态：用户已要求进入实现准备；本方案描述预期行为，不表示功能已实现。实现规格与任务拆分草稿见 implementation-spec.md 和 implementation-plan.md。
+状态：第一版已实现并完成分层验收，见 acceptance-v1.md。本文件保留确认后的设计范围；实现规格与任务拆分见 implementation-spec.md 和 implementation-plan.md。
 
 ## 目标与交付
 

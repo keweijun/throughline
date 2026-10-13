@@ -19,6 +19,18 @@ def execute(workspace, request):
             store.db.execute('BEGIN IMMEDIATE')
             if request['op'] != 'course.init' and store.get('course', 'metadata') is None:
                 raise OperationError('course_not_initialized', 'Run course.init first')
+            if request['op'] in ('position.save', 'mainline.enter'):
+                request_id = request.get('request_id')
+                if not isinstance(request_id, str) or not request_id.strip():
+                    raise OperationError('invalid_request', 'Checkpoint mutations require request_id')
+                receipt = store.get('checkpoint_receipts', request_id)
+                if receipt:
+                    if receipt['request'] != request:
+                        raise OperationError('id_conflict', request_id)
+                    return {'replayed': True, 'position': store.get('course', 'position'), 'original_result': receipt['result']}
+                result = handler(store, request)
+                store.put('checkpoint_receipts', request_id, {'request': request, 'result': result})
+                return {**result, 'replayed': False}
             return handler(store, request)
     finally:
         store.db.close()

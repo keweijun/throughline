@@ -1,11 +1,8 @@
-import json
-import subprocess
-import sys
+from support import call_cli
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 
 class BackgroundCLI(unittest.TestCase):
     def setUp(self):
@@ -17,15 +14,8 @@ class BackgroundCLI(unittest.TestCase):
         self.call('mainline.enter', concept_id='state', goal='States', next_step='Normalize')
         self.call('interaction.record', id='u1', role='user', text='A wavefunction represents a state.', concept_id='state')
 
-    def call(self, op, error=None, **fields):
-        process = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', str(self.workspace)], input=json.dumps({'op':op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
-        response = json.loads(process.stdout)
-        if error:
-            self.assertEqual(response['error']['code'], error, response)
-            self.assertNotEqual(process.returncode, 0)
-            return response
-        self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
-        return response['result']
+    def call(self, op, error=None, workspace=None, **fields):
+        return call_cli(self, workspace or self.workspace, op, error=error, **fields)
 
     def test_queue_survives_unavailable_host_and_retries_without_duplicate_claims(self):
         first = self.call('background.enqueue', id='job', interaction_ids=['u1'], concept_id='state')

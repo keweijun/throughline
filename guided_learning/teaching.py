@@ -19,14 +19,31 @@ def record_interaction(store, request):
     if role not in ('user', 'assistant'):
         raise OperationError('invalid_request', 'role must be user or assistant')
     concept_id = request.get('concept_id')
-    if concept_id is not None:
-        validate_concept(store, concept_id)
     value = {'id': identifier, 'role': role, 'text': text, 'concept_id': concept_id}
     previous = store.get('interactions', identifier)
     if previous:
         if any(previous[k] != v for k, v in value.items()):
             raise OperationError('id_conflict', identifier)
+        if 'source_refs' in request and request['source_refs'] != previous.get('supplied_source_refs', previous.get('source_refs', [])):
+            raise OperationError('id_conflict', identifier)
         return {'interaction': previous}
+    if concept_id is not None:
+        validate_concept(store, concept_id)
+    context_id = concept_id or (store.get('course', 'position') or {}).get('concept_id')
+    concept = next((c for c in curriculum.view(store, {})['concepts'] if c['id'] == context_id), {})
+    candidate_refs = request.get('source_refs', concept.get('links', []) + concept.get('exercises', []) + concept.get('notations', []))
+    if not isinstance(candidate_refs, list):
+        raise OperationError('invalid_reference', 'source_refs must be a list')
+    refs = []
+    for ref in candidate_refs:
+        curriculum.source_unit(store, ref)
+        exact = {key: ref[key] for key in ('source_id', 'revision', 'unit_id')}
+        if exact not in refs:
+            refs.append(exact)
+    if 'source_refs' in request:
+        value['supplied_source_refs'] = request['source_refs']
+    value['source_refs'] = refs
+    value['source_context_concept_id'] = context_id
     value['sequence'] = max((item['sequence'] for item in store.list('interactions')), default=0) + 1
     store.put('interactions', identifier, value)
     return {'interaction': value}
@@ -172,3 +189,11 @@ def create_deferred(store, request):
     return {'deferred_explanation': value}
 
 OPERATIONS['deferred.create'] = create_deferred
+
+def read_interaction(store, request):
+    value = store.get('interactions', require_text(request, 'id'))
+    if value is None:
+        raise OperationError('invalid_interaction', 'Unknown interaction ID')
+    return {'interaction': value}
+
+OPERATIONS['interaction.read'] = read_interaction

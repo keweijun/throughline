@@ -1,11 +1,8 @@
-import json
-import subprocess
-import sys
+from support import call_cli
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 
 class EvidenceCLI(unittest.TestCase):
     def setUp(self):
@@ -15,14 +12,8 @@ class EvidenceCLI(unittest.TestCase):
         self.call('course.init', title='Quantum')
         self.call('curriculum.save', concepts=[{'id':'state','title':'State'}, {'id':'projection','title':'Projection'}], route=['state','projection'])
 
-    def call(self, op, error=None, **fields):
-        proc = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', self.workspace], input=json.dumps({'op':op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
-        response = json.loads(proc.stdout)
-        if error:
-            self.assertEqual(response['error']['code'], error, response)
-            return response
-        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-        return response['result']
+    def call(self, op, error=None, workspace=None, **fields):
+        return call_cli(self, workspace or self.workspace, op, error=error, **fields)
 
     def say(self, id, role, text):
         return self.call('interaction.record', id=id, role=role, text=text, concept_id='state')

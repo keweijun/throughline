@@ -22,4 +22,3 @@ def execute(workspace, request):
             return handler(store, request)
     finally:
         store.db.close()
-

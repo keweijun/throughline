@@ -109,7 +109,7 @@ def answer(store, request):
     if branch['status'] != 'open':
         raise OperationError('invalid_transition', 'Only an open question can be answered')
     if branch['category'] == 'future' and branch['depth'] == 'short':
-        store.put('deferred_explanations', branch['id'], {'id': branch['id'], 'interaction_id': branch['interaction_id'], 'target_concept_id': branch['target_concept_id'], 'provisional_answer_interaction_id': answer_value['id'], 'status': 'pending'})
+        create_deferred(store, {'id': branch['id'], 'interaction_id': branch['interaction_id'], 'target_concept_id': branch['target_concept_id'], 'provisional_answer_interaction_id': answer_value['id']})
     branch['answer_interaction_id'] = answer_value['id']
     branch['status'] = 'resumed' if branch['depth'] == 'short' else 'waiting'
     store.put('sidequestions', branch['id'], branch)
@@ -151,3 +151,24 @@ def resolve_deferred(store, request):
     return {'deferred_explanation': item}
 
 OPERATIONS['deferred.resolve'] = resolve_deferred
+
+
+def create_deferred(store, request):
+    identifier = require_text(request, 'id')
+    question = interaction(store, require_text(request, 'interaction_id'), 'user')
+    provisional = interaction(store, require_text(request, 'provisional_answer_interaction_id'), 'assistant')
+    target = require_text(request, 'target_concept_id')
+    validate_concept(store, target)
+    if provisional['sequence'] <= question['sequence']:
+        raise OperationError('invalid_interaction', 'Provisional answer must follow the question')
+    value = {'id': identifier, 'interaction_id': question['id'], 'target_concept_id': target, 'provisional_answer_interaction_id': provisional['id']}
+    previous = store.get('deferred_explanations', identifier)
+    if previous:
+        if any(previous[k] != v for k, v in value.items()):
+            raise OperationError('id_conflict', identifier)
+        return {'deferred_explanation': previous}
+    value['status'] = 'pending'
+    store.put('deferred_explanations', identifier, value)
+    return {'deferred_explanation': value}
+
+OPERATIONS['deferred.create'] = create_deferred

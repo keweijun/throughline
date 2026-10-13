@@ -16,3 +16,5 @@ For cross-document concepts, prerequisite routes, notation/exercise mappings, co
 When teaching, handling a sidequestion or resuming a session, read [teaching operations](references/teaching.md). Record actual interactions and use route context to choose response depth; optional background work does not block the explanation.
 
 For section-end practice, assessment of learner evidence, deferral or review, read [evidence operations](references/evidence.md).
+
+After a small section, if optional note consolidation is useful, read [background jobs](references/background.md). Use an available host Luna subagent with minimal context; preserve pending work when unavailable and keep foreground teaching independent.

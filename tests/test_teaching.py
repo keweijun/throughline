@@ -1,11 +1,8 @@
-import json
-import subprocess
-import sys
+from support import call_cli
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 
 class TeachingCLI(unittest.TestCase):
     def setUp(self):
@@ -15,15 +12,8 @@ class TeachingCLI(unittest.TestCase):
         self.call('course.init', title='Quantum')
         self.call('curriculum.save', concepts=[{'id':'state','title':'State'},{'id':'projection','title':'Projection','prerequisites':['state']}], route=['state','projection'], coverage=[])
 
-    def call(self, op, error=None, **fields):
-        process = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', str(self.workspace)], input=json.dumps({'op':op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
-        response = json.loads(process.stdout)
-        if error:
-            self.assertEqual(response['error']['code'], error, response)
-            self.assertNotEqual(process.returncode, 0)
-            return response
-        self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
-        return response['result']
+    def call(self, op, error=None, workspace=None, **fields):
+        return call_cli(self, workspace or self.workspace, op, error=error, **fields)
 
     def test_raw_interaction_retries_are_immutable_and_resume_returns_bounded_history(self):
         first = self.call('interaction.record', id='u1', role='user', text='Why a function?', concept_id='state')['interaction']

@@ -22,8 +22,11 @@ python -m venv .venv
 
 ```powershell
 '{"op":"course.init","title":"我的课程"}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
+'{"op":"position.save","request_id":"demo-checkpoint-1","position":{"goal":"准备课程","next_step":"登记材料"}}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
 '{"op":"session.resume"}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
 ```
+
+修改位置的 `position.save` 和 `mainline.enter` 必须提供唯一 `request_id`；重试复用同一个 ID，旧请求不会覆盖新进度。可用 `interaction.read {id}` 核查超出近期窗口的原始问答。
 
 成功返回 `{ok:true,result:...}`，失败返回 `{ok:false,error:...}` 与非零退出码。`--request` 参数接收 JSON **文件路径**。使用 `--request work/request.json` 可避免复杂公式或长文本的 shell 转义。
 

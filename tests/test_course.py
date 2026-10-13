@@ -1,11 +1,8 @@
-import json
-import subprocess
-import sys
+from support import call_cli
 import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
 
 class CourseCLI(unittest.TestCase):
     def setUp(self):
@@ -14,12 +11,8 @@ class CourseCLI(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.course = self.base / 'course'
 
-    def call(self, op, workspace=None, **fields):
-        process = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', str(workspace or self.course)], input=json.dumps({'op': op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
-        self.assertEqual(process.returncode, 0, process.stderr + process.stdout)
-        response = json.loads(process.stdout)
-        self.assertTrue(response['ok'], response)
-        return response['result']
+    def call(self, op, error=None, workspace=None, **fields):
+        return call_cli(self, workspace or self.course, op, error=error, **fields)
 
     def test_course_reopens_in_new_process_with_saved_position_and_isolation(self):
         created = self.call('course.init', title='Quantum')

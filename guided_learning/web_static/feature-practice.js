@@ -6,7 +6,9 @@ export async function setup(app){
   function button(label,handler){const b=document.createElement('button');b.textContent=label;b.onclick=async()=>{b.disabled=true;error.textContent='';try{await handler();await app.refresh();await refresh()}catch(e){error.textContent=e.message}finally{b.disabled=false}};return b}
   function renderText(el,text){if(app.renderMarkdown)app.renderMarkdown(el,text);else el.textContent=text}
   async function act(task,action,answer){await app.api('/api/practice/action',{id:task.id,action,answer})}
-  let updating=false;
+  let updating=false,showAll=false;
+  const historyToggle=button('查看全部练习',()=>{showAll=!showAll;historyToggle.textContent=showAll?'仅显示当前与未完成练习':'查看全部练习'});
+  status.after(historyToggle);
   async function refresh(){
     if(updating||!app.state)return;updating=true;
     try{
@@ -21,9 +23,11 @@ export async function setup(app){
           actions.append(button('给点提示',()=>act(task,'hint')),button('关键步骤',()=>act(task,'steps')),button('完整解答',()=>act(task,'solution')),button('提交作答',()=>act(task,'assess',answer.value)),button('稍后做',()=>act(task,'defer')));
           node.append(title,state,question,answer,actions,history);list.append(node);card={node,title,question,history,answer,state,signature:''};cards.set(task.id,card);
         }
-        card.node.hidden=task.concept_id!==current&&task.status!=='deferred';
-        card.title.textContent=(task.origin==='source'?'来源练习':'教师自编练习')+' · '+task.concept_id;
-        card.state.textContent=task.status==='deferred'?'已暂缓，仍保留待办':task.status==='attempted'?'已作答，掌握情况以教师评估为准':'待作答';
+        const lastAssessment=task.history.filter(h=>h.action==='assess').at(-1);
+        const unresolved=task.status==='pending'||task.status==='deferred'||lastAssessment?.outcome==='needs_work';
+        card.node.hidden=!showAll&&task.concept_id!==current&&!unresolved;
+        card.title.textContent=(task.origin==='source'?'来源练习':'教师自编练习')+' · '+(app.state.curriculum.concepts.find(c=>c.id===task.concept_id)?.title||task.concept_id);
+        card.state.textContent=task.status==='deferred'?'已暂缓，仍保留待办':lastAssessment?.outcome==='needs_work'?'仍需练习，保留待办':task.status==='attempted'?'已作答，掌握情况以教师评估为准':'待作答';
         renderText(card.question,task.question+(task.source_refs.length?'\n\n'+task.source_refs.map(r=>`[来源 ${r.source_id} / ${r.unit_id}]`).join(' '):''));
         const signature=JSON.stringify(task.history);
         if(signature!==card.signature){card.history.replaceChildren();for(const h of task.history){const details=document.createElement('details'), summary=document.createElement('summary'), body=document.createElement('div');summary.textContent=({hint:'提示',steps:'关键步骤',solution:'完整解答',assess:'教师评估'}[h.action])+(h.kind?' · '+({hinted:'有帮助作答',independent:'独立作答',needs_work:'仍需练习'}[h.kind]||h.kind):'');details.open=h===task.history.at(-1);renderText(body,h.feedback);details.append(summary,body);card.history.append(details)}card.signature=signature}

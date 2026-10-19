@@ -60,7 +60,8 @@ class Navigation(unittest.TestCase):
     def test_first_lecture_requests_substantive_overview_in_same_generation(self):
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
-                self.prompt=prompt
+                if not hasattr(self, "prompt"):
+                    self.prompt=prompt  # Capture mainline before automatic practice starts.
                 emit({'kind':'final','text':'## 单元导览\n从波的叠加走向测量概率。'})
                 emit({'kind':'complete'})
         runner=Runner();self.server.app.runner=runner

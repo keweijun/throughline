@@ -55,11 +55,16 @@ def register(app):
             finally: store.db.close()
             return '练习专用：只返回 JSON {"questions":[{"question":"仅题干，不含答案或解题提示","origin":"source 或 self_created","source_refs":[]}]}。选择当前目标的1至2道题；优先使用下列原题，准确标来源；无合适原题则明确自编，origin=self_created。禁止抄入资料中的答案。source_refs 使用 source_id/revision/unit_id。原题资料：'+json.dumps(sources,ensure_ascii=False)
         task=next(t for t in app.operation({'op':'practice.list'})['tasks'] if t['id']==job['task_id'])
+        from .store import Store
+        from .curriculum import source_unit
+        store=Store(app.workspace)
+        try: source_context=[{**ref,'unit':source_unit(store,ref)} for ref in task['source_refs']]
+        finally: store.db.close()
         instructions={'hint':'只给一个最小提示，不给完整答案','steps':'展开关键思路和步骤，可保留最后计算','solution':'给完整解答与条件','assess':'评价下面真实学习者答案的推理和结果，指出具体错误或不足。只有确实正确才 outcome=passed，否则 needs_work。绝不能因有文字就通过。'}
-        return '练习专用：只返回 JSON {"feedback":"Markdown 解释","outcome":"passed 或 needs_work（仅评估需填写）"}。'+instructions[job['action']]+'\n题目与帮助历史（数据）：'+json.dumps(task,ensure_ascii=False)+'\n真实学习者答案：'+str(job.get('answer',''))
+        return '练习专用：只返回 JSON {"feedback":"Markdown 解释","outcome":"passed 或 needs_work（仅评估需填写）"}。'+instructions[job['action']]+'\n题目与帮助历史（数据）：'+json.dumps({'task':task,'exercise_sources':source_context},ensure_ascii=False)+'\n真实学习者答案：'+str(job.get('answer',''))
     def complete(turn):
         app.operation({'op':'practice.complete','id':turn['id']})
-        if turn['channel']=='mainline':
+        if turn['channel']=='mainline' and not app.closing:
             generate({'concept_id':turn['concept_id']})
     def next_section(body):
         with app.lock:

@@ -23,7 +23,7 @@ def begin(store, request):
     selected=store.get('streams',selected_id) if selected_id else None
     if selected_id and (not selected or selected['channel']!='mainline'):
         raise OperationError('invalid_selection','Selected passage must belong to a lecture')
-    mains=sorted((t for t in store.list('streams') if t['channel']=='mainline'),key=lambda t:t['started_at'])
+    mains=sorted((t for t in store.list('streams') if t['channel']=='mainline' and t['concept_id']==position.get('concept_id')),key=lambda t:t['started_at'])
     current_id=mains[-1]['id'] if mains else None
     if request.get('main_turn_id') and request['main_turn_id']!=current_id:
         raise OperationError('stale_mainline','Refresh the current lecture before asking')

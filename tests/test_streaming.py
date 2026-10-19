@@ -50,3 +50,28 @@ class StreamingCourse(unittest.TestCase):
         self.call('stream.recover')
         self.assertEqual(self.call('stream.read',id='lecture')['turn']['status'],'interrupted')
         self.assertEqual([i for i in self.call('session.resume')['recent_interactions'] if i['role']=='assistant'],[])
+
+    def test_source_snapshot_stays_bound_to_prompt_and_record_after_revision_change(self):
+        from pathlib import Path
+        from guided_learning.web import LearningApp
+        path=Path(self.workspace)/'lesson.md'
+        path.write_text('OLD_SOURCE_FACT',encoding='utf-8')
+        old=self.call('source.register',path=str(path))['source']
+        ref={'source_id':old['id'],'revision':old['revision'],'unit_id':'line-1'}
+        self.call('curriculum.save',concepts=[{'id':'state','title':'States','links':[ref]}],route=['state'],coverage=[])
+        turn=self.call('stream.start',id='lesson',concept_id='state',prompt='Teach this source')['turn']
+        path.write_text('NEW_SOURCE_FACT',encoding='utf-8')
+        new=self.call('source.register',path=str(path))['source']
+        newref={**ref,'revision':new['revision']}
+        self.call('curriculum.save',concepts=[{'id':'state','title':'States','links':[newref]}],route=['state'],coverage=[])
+        app=LearningApp(self.workspace)
+        try:
+            prompt=app.build_prompt(turn)
+            self.assertIn('OLD_SOURCE_FACT',prompt)
+            self.assertNotIn('NEW_SOURCE_FACT',prompt)
+        finally: app.close()
+        self.call('stream.resume',id='lesson',request_id='regenerate')
+        self.call('stream.event',id='lesson',attempt=2,sequence=1,kind='final',text='Explanation of the old source.')
+        self.call('stream.event',id='lesson',attempt=2,sequence=2,kind='complete')
+        self.assertEqual(self.call('interaction.read',id='stream:lesson')['interaction']['source_refs'],[ref])
+        self.assertEqual(self.call('stream.read',id='lesson')['turn']['attempts'][0]['source_refs'],[ref])

@@ -95,3 +95,15 @@ class Branches(unittest.TestCase):
             execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
             execute(tmp,{'op':'stream.start','id':'auto','concept_id':'a','prompt':'Host explanation instructions','channel':'sidequestion','record_user':False})
             self.assertEqual(execute(tmp,{'op':'session.resume'})['recent_interactions'],[])
+
+    def test_return_does_not_overwrite_newer_course_position(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Q'})
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'},{'id':'b','title':'B'}],'route':['a','b'],'coverage':[]})
+            execute(tmp,{'op':'mainline.enter','concept_id':'a','goal':'A','next_step':'B','request_id':'p'})
+            execute(tmp,{'op':'branch.begin','id':'q','question':'Why?','anchor':{'scroll_y':320}})
+            execute(tmp,{'op':'mainline.enter','concept_id':'b','goal':'B','next_step':'practice','request_id':'p2'})
+            returned=execute(tmp,{'op':'branch.return','id':'q'})
+            self.assertEqual(returned['position']['concept_id'],'b')
+            self.assertEqual(returned['branch']['restore_point']['concept_id'],'a')
+            self.assertEqual(returned['branch']['status'],'unanswered')

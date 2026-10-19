@@ -54,6 +54,10 @@ class Navigation(unittest.TestCase):
         with urlopen(self.base+view['pdf_url'].split('#')[0]) as response:
             self.assertEqual(response.headers.get_content_type(),'application/pdf')
             self.assertEqual(response.read(),original)
+        self.assertIsNotNone(view['image_url'])
+        with urlopen(self.base+view['image_url']) as response:
+            self.assertEqual(response.headers.get_content_type(),'image/png')
+            self.assertTrue(response.read().startswith(b'\x89PNG\r\n\x1a\n'))
         saved=self.root/'sources'/source['id']/source['revision'];saved.write_bytes(b'tampered snapshot')
         with self.assertRaises(HTTPError) as error:self.get('/api/navigation/source?'+urlencode(ref))
         self.assertEqual(error.exception.code,409);error.exception.close()
@@ -70,3 +74,17 @@ class Navigation(unittest.TestCase):
         self.assertIn('核心问题',runner.prompt)
         self.assertIn('目标能力',runner.prompt)
         self.assertIn('单元导览',runner.prompt)
+
+    def test_missing_pdf_renderer_is_explicit_and_original_remains_available(self):
+        from pypdf import PdfWriter
+        from unittest.mock import patch
+        path=self.root/'plain.pdf';writer=PdfWriter();writer.add_blank_page(width=300,height=400)
+        with path.open('wb') as file:writer.write(file)
+        source=execute(self.root,{'op':'source.register','path':str(path)})['source']
+        ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'page-1'}
+        with patch('guided_learning.web_navigation.importlib.util.find_spec',return_value=None):
+            view=self.get('/api/navigation/source?'+urlencode(ref))
+            self.assertIsNone(view['image_url']);self.assertIn('未显示',view['render_message'])
+            with urlopen(self.base+view['pdf_url'].split('#')[0]) as response:self.assertEqual(response.read(),path.read_bytes())
+            with self.assertRaises(HTTPError) as error:self.get('/api/navigation/source?'+urlencode({**ref,'image':'1'}))
+            self.assertEqual(json.load(error.exception)['code'],'renderer_unavailable');error.exception.close()

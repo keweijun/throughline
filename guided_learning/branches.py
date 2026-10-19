@@ -36,6 +36,7 @@ def decide(store,request):
     turn=store.get('streams',branch['turn_id'])
     if not turn or turn['status']!='completed': raise OperationError('incomplete_answer','Complete reply required')
     decision=request.get('decision',{})
+    if not isinstance(decision,dict): raise OperationError('invalid_decision','Teacher decision must be an object')
     if (decision.get('depth') not in ('short','long') or decision.get('category') not in ('local','prerequisite','future','repeated','extension')
             or not isinstance(decision.get('rationale'),str) or not decision['rationale'].strip()
             or not isinstance(decision.get('suggest_supplement'),bool)):

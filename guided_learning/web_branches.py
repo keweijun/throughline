@@ -34,7 +34,7 @@ def register(app):
 普通局部/后续才需深入的问题简答并点明后续位置；当前推理必需或明确要求深入的问题详细解释。重复困惑换例子或表示法。
 先给面向学习者的自然讲解，再在唯一回复末尾追加一个 <teaching-decision>JSON</teaching-decision>。
 JSON 必须含 depth("short"或"long"), category("local","prerequisite","future","repeated","extension"), rationale(简短路径理由), suggest_supplement(boolean), supplement_goal(字符串)。future 且 short 时必须提供 target_concept_id（课程路线中后续知识点的真实 ID），并在正文说明完整解释安排在哪一节。
-只有继续主线确实缺必要基础时才建议补讲；当前回复先给足够理解建议的回答，不代替用户接受建议。普通旁支不暂停主线。
+只有继续主线确实缺必要基础时才建议补讲；若建议补讲，本次正文最多约250汉字，只解释卡点、给一个最小澄清和补讲范围；完整基础讲解必须等待用户接受，不在建议阶段提前讲完。普通旁支不暂停主线。
 如果发现正在讲解本身有确定错误，增加 mainline_error=true 并说明纠正，宿主会暂停主线。不要把学习者疑问当成主线错误。
 不要输出整个回答的 JSON 副本，不调用工具写记录，不伪造课程进度。'''
 

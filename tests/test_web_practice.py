@@ -19,6 +19,7 @@ class PracticeFlow(unittest.TestCase):
             self.assertEqual(len(state['tasks']),1)
             self.assertIn('doubling',state['tasks'][0]['question'])
             self.assertNotIn('solution',state['tasks'][0])
+            self.assertTrue(all(i['role']=='assistant' for i in app.snapshot()['session']['recent_interactions']))
             self.assertFalse(execute(path,{'op':'evidence.view','concept_id':'light'})['independently_verified'])
             app.close()
             reopened=LearningApp(path,runner=Runner())
@@ -102,3 +103,35 @@ class PracticeFlow(unittest.TestCase):
             self.assertNotIn('E=hf',state['tasks'][0]['question'])
             self.assertIn('Answer: E=hf',runner.prompt)
             app.close()
+
+    def test_correction_feedback_counts_as_help_on_a_retry(self):
+        class Runner:
+            reply=''
+            def run(self,prompt,cwd,emit,cancel):
+                emit({'kind':'final','text':self.reply});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            runner=Runner();app=LearningApp(path,runner=runner)
+            def run(endpoint,body,text):
+                runner.reply=text;r=app.routes[('POST','/api/practice/'+endpoint)](body);t=app.wait(r['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
+                return app.routes[('GET','/api/practice')]('')
+            s=run('generate',{'concept_id':'a'},'{"questions":[{"question":"2+2?","origin":"self_created","source_refs":[]}]}');self.assertTrue(s['tasks'], s);tid=s['tasks'][0]['id']
+            run('action',{'id':tid,'action':'assess','answer':'5'},'{"feedback":"No: 2+2=4.","outcome":"needs_work"}')
+            s=run('action',{'id':tid,'action':'assess','answer':'4'},'{"feedback":"Correct.","outcome":"passed"}')
+            self.assertEqual(s['tasks'][0]['history'][-1]['kind'],'hinted')
+            app.close()
+
+
+
+    def test_closed_host_rejects_new_model_work(self):
+        from guided_learning.store import OperationError
+        class Runner:
+            def run(self,*args):raise AssertionError('closed host must never call model')
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            app=LearningApp(path,runner=Runner());app.close()
+            with self.assertRaises(OperationError) as result:
+                app.start_turn({'concept_id':'a','prompt':'Explain','channel':'mainline'})
+            self.assertEqual(result.exception.code,'host_closing')

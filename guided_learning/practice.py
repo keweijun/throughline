@@ -52,6 +52,8 @@ def complete(store, request):
             base={'id':'practice-evidence:'+value['id'],'concept_id':task['concept_id'],'session_id':'practice:'+task['id'],'exercise_id':task['id']}
             if value['action']=='assess':
                 item=evidence.assess(store,{**base,'answer_id':'practice-answer:'+value['id'],'assessment_id':iid,'outcome':result['outcome']})['evidence']
+                # Corrective feedback may reveal a method/answer; subsequent retries are assisted.
+                evidence.record(store,{**base,'id':'practice-feedback-help:'+value['id'],'interaction_id':iid,'kind':'hint','level':'assessment_feedback'})
                 task['status']='attempted'
                 task['history'].append({'action':'assess','feedback':feedback,'outcome':result['outcome'],'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer']})
             else:

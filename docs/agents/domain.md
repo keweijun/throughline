@@ -1,14 +1,14 @@
 # Domain Docs
 
-## 布局
+## Layout
 
-本项目采用单一领域布局：根目录 `GLOSSARY.md` 与 `docs/adr/`。通用教学规则和课程数据的分离不等于多领域仓库。
+This project uses a single-domain layout: `GLOSSARY.md` at the root and `docs/adr/`. Separating generic teaching rules from course data does not make this a multi-domain repository.
 
-## 使用规则
+## Usage
 
-- 探索或修改项目之前，读取 `GLOSSARY.md` 和与本次任务相关的 ADR。
-- 若未来存在 `GLOSSARY-MAP.md`，按其指向读取涉及领域的术语表与 ADR。
-- 文件缺失时直接继续；术语或设计决定真正形成后再由 domain-modeling 工作流按需创建。
-- 在任务、设计、实现和验证中使用术语表中的名称，避免已明确排除的同义词。
-- 发现真实术语缺口时记录并澄清，再更新术语表。
-- 方案与已有 ADR 冲突时，明确指出冲突及重新讨论的理由，不静默改写决定。
+- Before exploring or changing the project, read `GLOSSARY.md` and the ADRs relevant to the task.
+- If `GLOSSARY-MAP.md` exists in the future, follow its pointers to the relevant glossaries and ADRs.
+- Continue if files are missing; create them through the domain-modeling workflow only when actual terminology or decisions emerge.
+- Use glossary names in tasks, design, implementation, and validation; avoid explicitly excluded synonyms.
+- Record and clarify real terminology gaps before updating the glossary.
+- If a proposal conflicts with an existing ADR, identify the conflict and reason for reconsideration rather than silently rewriting the decision.

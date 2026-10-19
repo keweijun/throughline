@@ -21,7 +21,7 @@ execute(root,{'op':'stream.start','id':'supplement:recovery','concept_id':'b','p
 execute(root,{'op':'stream.event','id':'supplement:recovery','attempt':1,'sequence':1,'kind':'delta','text':'Partial supplement before host crash.'})
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
-  if '学习者已接受补讲' in prompt:
+  if 'The learner accepted the supplement' in prompt:
    emit({'kind':'delta','text':'Regenerated supplement is still running.'});cancel.wait(20);return
   emit({'kind':'final','text':'Answer about the selected passage.'});emit({'kind':'complete'})
 server=create_server(root,port=0,runner=Runner());print(server.server_port,flush=True)

@@ -1,72 +1,74 @@
-# 实现规格：个人跨文档导学第一版
+# Implementation specification: personal cross-document guided learning V1
 
-状态：用户已确认测试边界，已发布 GitHub 规格与实施任务；第一版本地实现及分层验收见 acceptance-v1.md。
+Status: testing boundaries confirmed and GitHub specification/tasks published. See acceptance-v1.md for local implementation and layered acceptance.
 
 ## Problem Statement
 
-学习者使用多份课件与习题进行长期学习时，聊天容易偏离教学主线，遗漏知识点，或将听过讲解当作掌握。笔记整理与反复读取历史又增加等待。学习者希望教师结合路线决定旁支回答深度，尊重其推进选择，并在跨次学习时准确接续。
+Long-term study across lectures and exercises can drift from the mainline, miss concepts, or confuse hearing an explanation with mastery. Note consolidation and rereading history add waiting. Learners need route-aware answer depth, control over advancement, and accurate continuity across sessions.
 
 ## Solution
 
-以可复用的 Codex skill 配合独立课程工作区开展学习。系统保留来源可追溯的覆盖台账、先修路线、主线恢复点和作答证据。教师即时讲解与处理旁支，Luna 可选地批量整理；辅助模型故障不阻塞正常教学。先完整覆盖已有八份材料，再通过一条代表性跨文档学习链验证体验。
+Combine a reusable Codex skill with an independent course workspace. Retain a source-traceable coverage ledger, prerequisite route, restore points, and answer evidence. The teacher explains and handles branches immediately; Luna optionally consolidates in batches, without blocking teaching on failure. Cover all eight initial documents and validate a representative cross-document learning chain.
 
 ## User Stories
 
-1. 作为学习者，我希望导入多份课件与习题，以便围绕同一目标学习。
-2. 作为学习者，我希望看到每份资料的读取结果，以便发现遗漏或损坏页面。
-3. 作为学习者，我希望知识点能定位到原文，以便核对解释。
-4. 作为学习者，我希望重复概念合并但不同细节保留，以便避免无效重复和漏学。
-5. 作为学习者，我希望按先修关系跨文档组织路线，以便连贯理解。
-6. 作为学习者，我希望看到整体路线和有争议的取舍，以便调整学习方向。
-7. 作为学习者，我希望小节对应一个完整目标，以便在自然闭合处练习。
-8. 作为学习者，我希望简短符号问题得到简答后接回主线，以便不中断思路。
-9. 作为学习者，我希望阻碍当前理解的问题得到充分解释，以便不带着关键困惑推进。
-10. 作为学习者，我希望未来知识先得到足够当前使用的回答，以便理解眼前内容。
-11. 作为学习者，我希望到达相关节点时主动补全先前问题，以便不用自己记住所有疑问。
-12. 作为学习者，我希望反复困惑时换例子或补概念桥梁，以便获得不同角度的解释。
-13. 作为学习者，我希望旁支后保留原目标与接续位置，以便继续原来的学习。
-14. 作为学习者，我希望明确要求深入时立即展开，以便保持自己的选择权。
-15. 作为学习者，我希望小节末集中练习，以便不被频繁小测打断。
-16. 作为学习者，我希望卡住时先获得必要提示，以便仍有自行思考的机会。
-17. 作为学习者，我希望可以直接看解答或跳过，以便调整节奏。
-18. 作为学习者，我希望听过、自述理解和独立完成分别记录，以便了解真实进展。
-19. 作为学习者，我希望中断后恢复当前目标、未解问题和证据，以便长期接续。
-20. 作为学习者，我希望材料变更保留既有证据，以便不丢失学习成果。
-21. 作为学习者，我希望非必要整理交给 Luna，以便主教师专注教学。
-22. 作为学习者，我希望 Luna 不可用时仍能继续，以便学习不受辅助任务影响。
-23. 作为学习者，我希望旧结果与重试不改变较新状态，以便记录可靠。
-24. 作为学习者，我希望不自动调用额外付费 API，以便掌握开销。
-25. 作为学习者，我希望不同课件的符号有对应关系，以便减少不必要的理解障碍。
+As a learner, I want to:
+
+1. Import multiple lecture and exercise documents around one goal.
+2. See each source's reading result to discover missing or damaged pages.
+3. Locate concepts in original sources to check explanations.
+4. Merge duplicate concepts while retaining distinct details.
+5. Follow prerequisite-based routes across documents.
+6. Review the overall route and disputed choices to adjust direction.
+7. Use sections with complete goals and practice at natural closure.
+8. Receive brief notation answers followed by a return to the mainline.
+9. Fully resolve questions blocking current understanding.
+10. Get enough explanation of future concepts for current use.
+11. Have earlier questions completed proactively at relevant nodes.
+12. Receive different examples or bridges for repeated difficulty.
+13. Retain the original goal and resume point after a branch.
+14. Get depth immediately when explicitly requested.
+15. Practice at section ends without frequent quiz interruptions.
+16. Get necessary hints first while retaining a chance to reason independently.
+17. View solutions or skip to control pace.
+18. Distinguish taught, self-reported, and independent evidence.
+19. Restore goals, unresolved questions, and evidence after interruption.
+20. Keep existing evidence when materials change.
+21. Delegate optional consolidation to Luna so the main teacher can teach.
+22. Continue when Luna is unavailable.
+23. Have retries and stale results leave newer state intact.
+24. Avoid automatic additional paid API calls and retain spending control.
+25. Compare notation across lectures to reduce unnecessary confusion.
 
 ## Implementation Decisions
 
-- 通用 skill 与课程工作区分离，课程工作区持有唯一正式状态，遵守已接受的状态归属 ADR。
-- 使用一个课程操作入口作为主要程序边界，提供建课、材料登记、路线、学习交互、恢复、覆盖检查与整理任务操作；具体内部模块保持可调整。
-- 程序负责来源标识、稳定知识点标识、先修关系有效性、状态持久化与更新校验；教师负责概念提取、讲解与语境判断。
-- 原始问答和当前学习位置及时保存；派生摘要不能替代原始证据。按唯一操作标识处理重试，后台候选更新携带依据与版本，冲突时保持新状态。
-- 先修关系应能检查无效引用和循环。覆盖检查验证每项资料内容有明确去向，不将模型提取结果或文件读取成功直接等同于完整教学覆盖。
-- 首批实际材料已确认同时存在 PDF 和 Markdown 转写。作为普通本地文件导入，不依赖其原存储应用。页码映射与公式、图像读取无法验证时标为待核验，不伪造定位。
-- 主线恢复点、旁支、待补解释、暂缓项和作答证据以独立概念保存。短答自动接续，长答等待，后续问题绑定回访节点。
-- 路径感知答疑不是关键词分类器：程序提供上下文并校验状态转换，主教师结合真实提问与路线作判断。
-- 小节末集中练习；听过、自述理解、提示完成、独立完成与复测通过分别保留证据；跳过不升级掌握状态。
-- Luna 通过宿主提供的子代理能力按需协助，不让课程脚本假设自身可以直接调用 Codex 模型。没有该能力时记录待处理任务；不模拟一次成功的模型调用。
-- 初期后台为会话内可选任务，允许离开后暂停并恢复；不存在常驻服务或自动付费 API 回退。
-- 小范围路线修订保持证据，大幅改变学习顺序需要用户确认。
+- Separate the generic skill from course data; the workspace owns official state, following the accepted ADR.
+- Use one course-operation entrypoint for creation, source registration, routes, interactions, recovery, coverage, and consolidation. Internal modules remain adjustable.
+- The program owns stable source/concept IDs, prerequisite validation, persistence, and update checks; the teacher owns extraction, explanation, and contextual judgment.
+- Save original exchanges and position promptly. Derived summaries cannot replace evidence. Unique operation IDs handle retries; background candidates carry evidence and versions, preserving newer state on conflict.
+- Reject invalid prerequisite references and cycles. Check explicit dispositions for content rather than equating successful reading or model extraction with complete teaching coverage.
+- Initial materials include PDFs and Markdown transcriptions. Import ordinary local files independently of their original application. Unverified page mappings, formulas, and images remain pending, without invented locations.
+- Keep restore points, branches, pending explanations, deferred items, and evidence distinct. Resume after brief answers, wait after long answers, and bind future questions to revisit nodes.
+- Route-aware answering is not keyword classification: the program supplies context and validates transitions; the teacher judges the real question and route.
+- Group practice at section ends. Retain taught, self-reported, hinted, independent, and retest evidence separately; skipping does not upgrade mastery.
+- Luna assistance uses host-provided subagents. Course scripts do not assume direct Codex model access. Record pending work when unavailable rather than simulating successful calls.
+- Initial background work is optional within a session and may pause/resume; no persistent service or automatic paid API fallback.
+- Small route revisions preserve evidence; major learning-order changes require confirmation.
 
 ## Testing Decisions
 
-- 仓库当前没有实现代码或现成测试框架。使用课程操作入口作为主要自动化测试边界，输入操作后检查外部可见结果，并从新进程重开验证持久化。
-- 测试真实行为：材料读取失败可见、来源可追溯、先修环被拒绝、旁支后恢复、待补解释到点出现、跳过不升级、证据与来源关联、旧后台结果不会覆盖新状态、重试不重复记录。
-- 不通过直接修改内部存储凑测试，不为 Markdown 排版或函数内部调用顺序写镜像测试。
-- 自动化使用小型可复现材料；真实八份课程材料用于本地验收，原始课程文件和个人学习记录不默认纳入 Git 提交。
-- 教学质量单独用固定对话场景回放：同一主线下的符号问题、关键先修问题、后续知识问题、重复困惑、明确深入和跳过。检查回答深度与接续行为；不以程序测试通过宣称教师质量通过。
-- 宿主 Luna 可用时做一次有记录的实际调用验证；不可用时演示降级并明确实测范围。不得把任务登记成功当作后台模型成功运行。
-- 完成后分别报告程序自动化、材料覆盖核验、宿主集成与教学回放的结果及未通过项。
+- At specification time there was no implementation or test framework. Use the public course-operation boundary, check visible results, and reopen from a new process to verify persistence.
+- Test visible reading failures, source traceability, cycle rejection, branch recovery, due explanations, skipping without evidence upgrades, evidence/source links, stale-result protection, and idempotent retries.
+- Do not create passing states by changing internal storage or mirror Markdown layout/internal call order in tests.
+- Use small reproducible fixtures in automation. Keep the actual eight-document acceptance materials and personal records out of Git by default.
+- Separately replay fixed teaching scenarios: notation, key prerequisites, future knowledge, repeated difficulty, explicit depth, and skipping, all within the same mainline. Program success does not establish teaching quality.
+- Make a recorded real Luna call when available; otherwise demonstrate fallback and state the tested limits. Registering a task is not successful model execution.
+- Report automation, material coverage, host integration, teaching replay, and failures separately.
 
 ## Out of Scope
 
-Obsidian 兼容、导出或同步；专用 UI；公开插件分发；多用户账户；常驻后台服务；自动付费 API 降级；全格式文档解析平台；强制通过测试才能继续学习；把学习者未作答的问题自动记为已掌握。
+Obsidian compatibility/export/sync; dedicated UI; public plugins; multi-user accounts; an always-on service; automatic paid API fallback; a universal document parser; mandatory test passing before advancing; automatic mastery for unanswered questions.
 
 ## Further Notes
 
-GitHub 仓库为私有，规格和六个实施任务已按用户确认发布。实现采用同一集成分支，各任务按测试驱动的小步方式交付，最后进行标准与规格双轴审查。通过验收后再考虑插件封装。
+The private GitHub repository contains the confirmed specification and six implementation tasks. Work uses one integration branch, small test-driven steps, and a final standards/spec review. Consider plugin packaging after acceptance.

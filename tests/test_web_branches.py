@@ -18,10 +18,10 @@ class Branches(unittest.TestCase):
         from guided_learning.web import LearningApp
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
-                if '旁支决策协议' not in prompt:
+                if 'Branch decision protocol' not in prompt:
                     cancel.wait(3)
                     return
-                text='概率是幅的模平方。\n<teaching-decision>{"depth":"long","category":"prerequisite","rationale":"投影依赖幅与概率的区别","suggest_supplement":true,"supplement_goal":"幅与概率"}</teaching-decision>'
+                text='Probability is the squared magnitude of the amplitude.\n<teaching-decision>{"depth":"long","category":"prerequisite","rationale":"Projection depends on distinguishing amplitudes from probabilities","suggest_supplement":true,"supplement_goal":"Amplitudes and probabilities"}</teaching-decision>'
                 emit({'kind':'final','text':text}); emit({'kind':'complete'})
         with tempfile.TemporaryDirectory() as tmp:
             execute(tmp, {'op':'course.init','title':'Quantum'})
@@ -59,8 +59,8 @@ class Branches(unittest.TestCase):
         from guided_learning.web import LearningApp
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
-                if '旁支决策协议' not in prompt:cancel.wait(3);return
-                emit({'kind':'final','text':'先说明区别。<teaching-decision>{"depth":"short","category":"prerequisite","rationale":"当前目标需要","suggest_supplement":true,"supplement_goal":"基础"}</teaching-decision>'})
+                if 'Branch decision protocol' not in prompt:cancel.wait(3);return
+                emit({'kind':'final','text':'First explain the distinction.<teaching-decision>{"depth":"short","category":"prerequisite","rationale":"Required for the current goal","suggest_supplement":true,"supplement_goal":"Foundations"}</teaching-decision>'})
                 emit({'kind':'complete'})
         with tempfile.TemporaryDirectory() as tmp:
             execute(tmp, {'op':'course.init','title':'Quantum'})

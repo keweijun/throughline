@@ -27,13 +27,13 @@ def reconcile(store, request):
     for job in store.list('preparation_jobs'):
         if job['status'] not in ('running','ready'): continue
         if job['concept_id'] not in (current,upcoming) or capture(store,job['concept_id'])['fingerprint'] != job['snapshot']['fingerprint']:
-            job.update(status='stale',reason='路线或来源已改变；主教师自行准备')
+            job.update(status='stale',reason='Route or sources changed; the main teacher will prepare independently')
             job.pop('content',None)
         elif job['status']=='running':
             turn=store.get('streams',job['id'])
             if turn and turn['status']=='completed': job.update(status='ready',content=turn['final_text'])
             elif turn and turn['status'] in ('failed','interrupted','paused'):
-                job.update(status='deferred' if turn['status']=='paused' else 'failed',reason=turn.get('error','前台学习优先'))
+                job.update(status='deferred' if turn['status']=='paused' else 'failed',reason=turn.get('error','Foreground learning takes priority'))
         store.put('preparation_jobs',job['id'],job)
     return {'jobs':sorted(store.list('preparation_jobs'),key=lambda j:j.get('created_at',0))}
 
@@ -63,7 +63,7 @@ def view(store, request):
 def recover(store, request):
     for job in store.list('preparation_jobs'):
         if job['status']=='running' and store.get('streams',job['id']) is None:
-            job.update(status='failed',reason='备课启动被中断；主教师自行准备')
+            job.update(status='failed',reason='Preparation startup interrupted; the main teacher will prepare independently')
             store.put('preparation_jobs',job['id'],job)
     return reconcile(store,{})
 

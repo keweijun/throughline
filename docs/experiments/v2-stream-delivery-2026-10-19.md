@@ -1,45 +1,45 @@
-# #10：单次流式授课与恢复验证
+# #10: single streaming lesson and recovery validation
 
-2026-10-19，隔离课程副本验证，未改真实 quantum-v1 状态。
+2026-10-19. Used an isolated course copy without changing real quantum-v1 state.
 
-## 自动验证
+## Automated checks
 
-新增课程操作、实际 JSON-RPC 子进程边界及本地 HTTP 边界测试：
-- 只有 final_answer 权威正文且 turn 成功完成，才原子写入正式 assistant interaction；重复事件不重复记录。
-- partial 输出、暂停、断连不算完成；迟到事件和旧 attempt 不覆盖当前状态；事件缺号拒绝。
-- commentary-only 回复和 EOF 不伪装成课程正文。
-- 暂停后的全节重生成请求幂等；旧主线不能与新主线并发。
-- 第二个宿主不能抢占同一课程并把活跃任务标为 interrupted（OS 文件锁）。
-- HTTP Host/Origin 限制 loopback，跨站请求拒绝；源文件不任意暴露。
+Added course-operation, real JSON-RPC subprocess, and local HTTP boundary tests:
 
-## 真实配置通道
+- Atomically record an official assistant interaction only for authoritative final_answer text and successful turn completion; repeated events do not duplicate it.
+- Partial output, pause, and disconnect are unfinished. Late events/old attempts cannot overwrite current state; missing sequence numbers are rejected.
+- Commentary-only replies and EOF do not masquerade as lessons.
+- Full-section regeneration after pause is idempotent; older/newer mainlines cannot overlap.
+- An OS file lock prevents a second host from taking the same course and marking live work interrupted.
+- HTTP Host/Origin checks restrict loopback and reject cross-site requests; arbitrary source files are not exposed.
 
-使用当前配置 Codex App Server，显式 gpt-6.1-sol / medium，read-only sandbox、never approval。
-输入来自复制量子课程当前位置 bohr-spectrum，包含关联课件文本、未核验标识、路线与近期教学历史。
+## Real configured channel
 
-| 项目 | 实测 |
-| --- | --- |
-| 暂停前正文 | 223 字符 |
-| 暂停轮前 200 字 | 11.26 秒 |
-| 重开后正式完整正文 | 3259 字符 |
-| 完整轮前 200 字 | 12.25 秒 |
-| 完整轮全文 | 45.39 秒 |
-| interaction 写入耗时（不含事务提交） | 0.0068 秒 |
+Used configured Codex App Server, explicit gpt-6.1-sol / medium, read-only sandbox, never approval. Input came from bohr-spectrum in a copied quantum course, with linked lecture text, pending flags, route, and recent history.
 
-暂停、等待模型结束、关闭宿主再重开，仍恢复 paused 和部分内容；用户触发重新生成本节，得到新 attempt 的完整正文。正式 interaction 与完成正文逐字相同；重试原请求未重复生成或保存。样本包含玻尔假设、半径/能级推导、谱线关系与例子，并明确 pending 来源尚未完整核验。
+| Measurement | Result |
+|---|---|
+| Text before pause | 223 characters |
+| Paused turn first 200 | 11.26 s |
+| Full text after reopening | 3259 characters |
+| Complete turn first 200 | 12.25 s |
+| Complete turn full time | 45.39 s |
+| Interaction write, excluding commit | 0.0068 s |
 
-复现材料（忽略目录）：`work/v2-acceptance/stream-delivery/check.py`、`result.json`、`final.md` 和独立 `course/` 副本。指标从宿主发起到持久流事件；前 200 字按字符计数，不是原生 Codex UI 实际绘制时间。
+After pause, waiting for model exit, host shutdown, and reopening, paused state/partial text remained. User regeneration produced a complete new attempt. Official interaction matched authoritative text exactly; retrying the original request did not regenerate or duplicate records. The lesson covered Bohr assumptions, radius/level derivations, spectra, and examples, explicitly retaining pending source limits.
 
-## 边界
+Reproduction: ignored `work/v2-acceptance/stream-delivery/check.py`, `result.json`, `final.md`, and independent `course/`. Metrics span host initiation to persistent stream events; first 200 counts characters rather than native UI painting.
 
-- 暂停无法冻结服务端推理；取消后“重新生成本节”开启新模型 turn，保留旧部分内容供查看。界面明确说明重新生成，不声称从字符断点无缝续写。
-- 单次真实样本说明通道可用，不是速度保证。此运行先于缩减 prompt 中全量覆盖台账的修正，当前仅传路线摘要和当前来源。
-- 基础界面安全地显示正文文本；Markdown/数学排版、课程导航与旁支由后续任务集成验证。
-- `save_s` 衡量 interaction 调用，事务提交包含在 API 总耗时内但未单独计时。
+## Limits
 
-## 集成后的正确性补充
+- Pause cannot freeze server reasoning. Regeneration starts a new model turn and retains earlier partial text for inspection; it is not seamless continuation at an offset.
+- One real sample establishes availability, not speed. This run preceded removing the full coverage ledger from prompts; current prompts use route summaries/current sources.
+- The initial UI rendered safe text; later tasks integrate Markdown/math, navigation, and branches.
+- save_s measures the interaction call; commit is in total API duration but not separately timed.
 
-- `stream.start` 在同一课程事务中固定当前来源原文、准确 revision/unit 引用、路线摘要与会话上下文。模型提示和完成后的 interaction 使用同一快照；重新生成保留原目标及原来源快照，旧 attempt 保留来源归属。要使用后来更新的材料，发起新的讲解请求。
-- 新测试在生成前改变资料内容和课程映射，验证提示仍使用原文，完成记录仍归属原 revision。
-- 20 次 64 KB 跨站 POST 重现 Windows 未读请求体导致连接重置的问题。对普通有界请求先读取请求体再拒绝，稳定返回 403；保留 Host/Origin 检查，限制请求体 1 MB、读取超时 3 秒，拒绝 chunked 请求。
-- 集成后全部 60 项测试通过（37.9 秒），包括上述回归；本轮未追加真实模型调用。
+## Integration correctness additions
+
+- stream.start freezes original source text, precise revision/unit references, route summary, and session context in one transaction. Prompts and completion records use that snapshot. Regeneration retains its goal/sources; old attempts retain provenance. Start a new lesson to use updated materials.
+- A regression changes source content/mappings before generation and checks that prompt text and final provenance retain the original revision.
+- Twenty 64 KB cross-site POSTs reproduced Windows connection resets caused by unread bodies. Reading ordinary bounded bodies before rejection now returns 403 reliably. Retain Host/Origin checks, a 1 MB limit, three-second read timeout, and chunked-request rejection.
+- All 60 tests passed after integration (37.9 s), including these regressions. No additional real-model call in this round.

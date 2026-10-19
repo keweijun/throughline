@@ -1,45 +1,45 @@
-# 单次输出与程序记录：三组配对机制验证
+# Single output and host recording: three paired mechanism checks
 
-日期：2026-10-14（用户时区）。用户授权测试后，仅创建隔离测量脚本与实验材料，未修改生产skill、UI、认证配置或真实课程进度。
+Date: 2026-10-14 (user timezone). After user authorization, only isolated measurement scripts/materials were created. Production skill, UI, authentication, and real-course progress were unchanged.
 
-## 结论
+## Conclusion
 
-本样本中，直接流式输出、由程序记录同一份文本，比模型先写整篇记录再输出更快。三组的前200字符到达时间均明显提前，完整讲解也均更快；单次输出讲稿反而略长。可以将该机制列为下一版优先候选，但不能把本次百分比当作原生桌面聊天的性能保证。
+In this sample, streaming directly and recording the same text programmatically was faster than asking the model to write a full record before replying. All three pairs delivered the first 200 characters earlier and completed faster; Single lessons were slightly longer. This supports prioritizing the mechanism, without a native-desktop performance guarantee.
 
-## 设计与边界
+## Design and limits
 
-- 请求模型 gpt-6.1-sol、medium，两组均使用同一当前custom Responses提供方及本机App Server stdio协议。每个样本使用全新的ephemeral会话，串行运行；顺序 S/D、D/S、S/D。
-- 两组输入相同原始页、背景、教学目标，没有提前备课包。唯一干预为记录方式：Double要求模型先写完整 answer-record.md，再原样最终回复；Single由宿主保存权威 item/completed 文本，模型只输出一次。
-- 长度约1600–2200字符是软参考，明确不通过工具凑字数；实际均超过参考区间。记录实际长度，独立评审判断必需内容是否减少，不将它们说成逐字相同讲稿。
-- 计时为Python单调时钟记录流事件到达；主要指标是属于最终讲解的前200字符到达时间与完整回合结束时间。准备性commentary不计入。原始模型内部首token时间和真实UI渲染时间未测量。
-- 所有最终消息均带 final_answer phase；流文本拼接与权威完成item一致；host-record.md与final.md字节一致。Double的模型记录与最终答复文本也一致；Single均无模型预写记录文件。
-- 教师阶段配置修改时间保持一致，未收到model/rerouted事件。不能据此独立认证自定义中转服务背后的模型权重身份。
-- 本轮不是原生桌面现有聊天的接管实验，没有更改其消息保存机制，也未测试断线、崩溃或接入真实课程后的事务一致性。
+- Both conditions requested gpt-6.1-sol / medium through the same configured custom Responses provider and local App Server stdio. Fresh ephemeral sessions, serial order S/D, D/S, S/D.
+- Both received identical pages, background, and goals without preparation packages. Only recording differed: Double writes full answer-record.md before repeating it; Single lets the host save authoritative item/completed text with one model output.
+- The 1600–2200-character target was a soft guide; tools were explicitly not to pad length. All actual outputs exceeded it. Record actual length and independently check required content rather than claiming identical scripts.
+- Python monotonic timing measures stream-event arrival, chiefly the first 200 final-answer characters and full-turn completion. Preparation commentary is excluded. Internal first-token and actual UI rendering times were not measured.
+- All final messages had final_answer phase; concatenated stream and authoritative items matched; host-record.md and final.md were byte-identical. Double's model record matched its reply; Single had no model-prewritten file.
+- Teacher-stage configuration timestamps stayed constant, with no model/rerouted events. This does not authenticate routed backend model weights.
+- This was not a native desktop conversation takeover. It changed no native persistence and did not test disconnect/crash/course transaction consistency.
 
-## 实测数据
+## Measurements
 
-| 小节 | Double前200字符 | Single前200字符 | Double完成 | Single完成 | Double/Single字符数 |
+| Section | Double first 200 | Single first 200 | Double complete | Single complete | Double/Single characters |
 |---|---:|---:|---:|---:|---:|
-| 光电效应 | 94.9秒 | 34.1秒 | 127.1秒 | 69.6秒 | 2417 / 2694 |
-| 玻尔模型 | 90.1秒 | 31.5秒 | 122.4秒 | 83.8秒 | 2375 / 2669 |
-| 三角波函数投影 | 85.1秒 | 28.9秒 | 116.6秒 | 76.7秒 | 2498 / 2920 |
+| Photoelectric effect | 94.9 s | 34.1 s | 127.1 s | 69.6 s | 2417 / 2694 |
+| Bohr model | 90.1 s | 31.5 s | 122.4 s | 83.8 s | 2375 / 2669 |
+| Triangular wavefunction projection | 85.1 s | 28.9 s | 116.6 s | 76.7 s | 2498 / 2920 |
 
-前200字符平均由90.0秒变为31.5秒。完整回合合计由366.1秒变为230.1秒，本次观测减少37.1%。Single可见讲稿合计比Double长约13.6%，不是通过缩短讲解取得这一结果。
+Mean first-200 time fell from 90.0 to 31.5 s. Aggregate full time fell from 366.1 to 230.1 s, a 37.1% observed reduction. Single visible text was about 13.6% longer overall; shorter explanations did not produce the result.
 
-服务报告的总输出token合计由11,851变为6,503，减少约45.1%；该计数包含中间工具相关生成，不等同于可见讲稿token。原图查看次数Single为5/5/2，Double为3/3/2，Single没有通过少看原图取得优势。两组仍存在自然执行差异，不能将所有时间差精确分解到某一步。
+Reported output tokens totaled 11,851 versus 6,503, about 45.1% lower, including intermediate tool-related generation rather than just visible text. Original-image views were 5/5/2 for Single versus 3/3/2 for Double; Single did not gain by viewing fewer originals. Natural execution differences prevent precise attribution of every time difference.
 
-## 独立内容检查
+## Independent content checks
 
-六份讲稿重命名为R编号，评审不读取条件、计时或映射表。根据各自原始目标与原页检查后，六份均通过：未发现重要物理错误或必需推导遗漏，同主题配对没有明显内容缩水。全部首200字符均为实质教学内容。投影小节一份开头可以更明确地区分波函数图与概率密度图，属于不阻断理解的措辞改进。
+All six scripts were renamed with R identifiers; reviewers did not read conditions, timing, or mappings. Original goals/pages supported passing all six without important physics errors, missing required derivations, or obvious paired-content reductions. Every first-200 segment was substantive teaching. One projection opening could distinguish wavefunction and probability-density plots more explicitly, a nonblocking wording improvement.
 
-这是正确性和覆盖检查，不是对真人理解、疲劳或学习效果的测量。每个条件每个小节仅一次，未作显著性检验或稳定延迟承诺。
+These checks measure correctness/coverage, not human understanding, fatigue, or outcomes. There was one run per condition/section, without significance testing or a stable-latency claim.
 
-## 对设计的意义
+## Design implications
 
-相较上一轮备课材料实验的混合结果，本轮观察更一致，且机制上直接减少重复文本生成与额外模型往返。建议优先验证正式回复的程序捕获适配，而不是简单删除原文记录要求。保留学习证据与来源信息仍是设计约束。
+Unlike the mixed preparation experiment, this result was consistent and directly reduces repeated generation/model round trips. Prioritize adapting authoritative-reply capture rather than simply removing original-text recording requirements. Evidence and source retention remain constraints.
 
-下一步需要单独确认：如何在当前原生Codex聊天中取得权威最终消息并关联到课程，或者是否在后续自建客户端中完成这一步。本次证明实验客户端能够收取流、正确区分最终消息并原样保存；不证明原生桌面已具备所需接入。
+Next, establish how to capture authoritative final messages and associate courses in native chat, or do so in a custom client. This proves the experimental client can collect streams, identify final messages, and save them exactly; it does not establish native desktop integration.
 
-## 原始材料
+## Raw materials
 
-本地 work/output-benchmark 内保留 PROTOCOL.md、harness/run.py、从安装版本生成的协议schema、6组逐事件JSONL、提示、生效设置、讲稿、记录文件、metrics、analysis.json及quality盲评。材料与日志只在被忽略的work目录，未上传原课件或个人学习数据。
+Ignored `work/output-benchmark` retains PROTOCOL.md, harness/run.py, installed-version protocol schemas, six event JSONLs, prompts, effective settings, lessons, records, metrics, analysis.json, and blinded quality checks. Original lectures and personal learning data were not uploaded.

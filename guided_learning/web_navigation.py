@@ -14,7 +14,7 @@ _PDF_LOCK=threading.Lock()
 
 def render_pdf_page(data,page_number):
     if importlib.util.find_spec('pypdfium2') is None or importlib.util.find_spec('PIL') is None:
-        raise OperationError('renderer_unavailable','原页图像未显示：请安装项目 pdf 扩展，或使用原 PDF 链接。')
+        raise OperationError('renderer_unavailable','Original page image unavailable: install the project pdf extra, or use the original PDF link.')
     # PDFium forbids concurrent API calls, even for different documents.
     with _PDF_LOCK:
         import pypdfium2
@@ -36,7 +36,7 @@ def render_pdf_page(data,page_number):
                 finally: page.close()
         except OperationError: raise
         except Exception as exc:
-            raise OperationError('render_failed','原页图像渲染失败；可通过原 PDF 链接核对。') from exc
+            raise OperationError('render_failed','Original page rendering failed; check the original PDF link.') from exc
 
 
 def register(app):
@@ -51,12 +51,12 @@ def register(app):
         following=next((c for c in route['concepts'] if c['id']==context['next_concept_id']),None)
         overview=concept.get('overview',{})
         if not isinstance(overview,dict): overview={}
-        target=concept.get('objective') or concept.get('goal') or '能够解释'+concept['title']+'，并应用到相关问题'
+        target=concept.get('objective') or concept.get('goal') or 'Explain '+concept['title']+' and apply it to related problems'
         context['overview']={
-            'core_problem':overview.get('core_problem') or concept.get('core_question') or '如何理解'+concept['title']+'，它解决了什么问题？',
-            'steps':overview.get('steps') or ['建立'+concept['title']+'的直观图像','明确关键关系、符号和适用条件','用例子检验理解，再尝试练习'],
-            'prior':overview.get('prior') or ('建立在'+ '、'.join(c['title'] for c in context['prerequisites'])+'之上' if context['prerequisites'] else ('接续'+previous['title'] if previous else '从本课程的基础问题开始')),
-            'next':overview.get('next') or ('为后续'+following['title']+'做准备' if following else '回顾本单元，将概念用于综合问题'),
+            'core_problem':overview.get('core_problem') or concept.get('core_question') or 'How can we understand '+concept['title']+' and what problem does it solve?',
+            'steps':overview.get('steps') or ['Develop an intuitive picture of '+concept['title'],'Identify key relationships, notation, and conditions','Check understanding with an example, then try exercises'],
+            'prior':overview.get('prior') or ('Builds on '+ ', '.join(c['title'] for c in context['prerequisites']) if context['prerequisites'] else ('Continues from '+previous['title'] if previous else 'Start with the fundamental questions of this course')),
+            'next':overview.get('next') or ('Prepares for '+following['title'] if following else 'Review this unit and apply the concepts to combined problems'),
             'target_ability':overview.get('target_ability') or target,
             'origin':'teacher' if overview else 'route_summary'}
         for source in context['sources']:
@@ -92,15 +92,15 @@ def register(app):
         current=next((s for s in app.operation({'op':'course.status'})['sources'] if s['id']==ref['source_id']),{})
         available=importlib.util.find_spec('pypdfium2') is not None and importlib.util.find_spec('PIL') is not None
         return {**ref,**unit,'image_url':('/api/navigation/source?'+urlencode({**ref,'image':'1'})) if kind=='.pdf' and unit.get('locator',{}).get('page') and available else None,
-                'render_message':None if available else '原页图像未显示：需要安装项目 pdf 扩展。仍可打开原 PDF 核对。','title':Path(snapshot['path']).name,'kind':kind,'verification':mapping.get('verification','pending'),'stale':current.get('revision')!=ref['revision'],
+                'render_message':None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.','title':Path(snapshot['path']).name,'kind':kind,'verification':mapping.get('verification','pending'),'stale':current.get('revision')!=ref['revision'],
                 'pdf_url':('/api/navigation/source?'+urlencode({**ref,'raw':'1'})+'#page='+str(unit['locator']['page'])) if kind=='.pdf' and unit.get('locator',{}).get('page') else None}
     app.routes[('GET','/api/navigation/source')]=source_view
     def overview_prompt(turn,context):
         if turn['channel']!='mainline': return ''
         prior=[t for t in app.operation({'op':'stream.list'})['turns'] if t['id']!=turn['id'] and t['channel']=='mainline' and t['concept_id']==turn['concept_id'] and t['status']=='completed']
         if prior:
-            return '本小节已有讲解。开头用一两句接续当前目标和未完成步骤，避免重复完整单元导览。'
-        return '''这是本小节在学习界面的首次正式授课。请把有实质内容的「## 单元导览」放在正式回复最前面，然后直接开始本节讲解，无需学习者再确认。
-导览用简短具体语言说明：核心问题（本单元究竟解释什么现象或解决什么矛盾）、主要步骤（约三步，每步必须有本主题的具体概念，不能只写“直观—公式—练习”）、与已学先修及后续内容的联系、目标能力（学完能解释或计算什么）。
-利用给定课程路线、来源与实际主线目标组织；不把待核验资料写成已确认事实。不机械复述目录，不插入“正在准备”状态话术。导览与完整讲解在同一次回复中生成和保存，保留后续讲解所需的推导、条件与例子。'''
+            return 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full unit overview.'
+        return '''This is the first formal lesson for this section in the learning interface. Begin the reply with a substantive "## Unit overview", then teach the section directly without asking the learner to confirm.
+Use brief, concrete language to describe the core problem (the phenomenon or contradiction this unit explains), main steps (about three, each naming specific concepts rather than just intuition, formulas, and practice), connections to learned prerequisites and later topics, and target ability (what the learner can explain or calculate afterward).
+Organize the lesson using the supplied route, sources, and actual mainline goal. Keep unverified material explicitly uncertain. Avoid mechanically repeating the contents or inserting preparation status messages. Generate and save the overview and full explanation in the same reply, retaining the necessary derivations, conditions, and examples.'''
     app.prompt_hooks.append(overview_prompt)

@@ -62,7 +62,7 @@ def complete(store, request):
             store.put('practice_tasks',task['id'],task)
         value['processed']=True
     except (ValueError,KeyError,TypeError) as exc:
-        value['error']='教师输出未通过格式校验，未记为掌握：'+str(exc)
+        value['error']='Teacher output failed format validation; no mastery recorded: '+str(exc)
         value['processed']=True
     store.put('practice_jobs',value['id'],value)
     return {'job':value}
@@ -70,7 +70,7 @@ def complete(store, request):
 def defer(store, request):
     task=store.get('practice_tasks',request['id'])
     if not task: raise OperationError('unknown_exercise','Unknown exercise')
-    evidence.defer(store,{'id':'practice-defer:'+task['id'],'concept_id':task['concept_id'],'reason':'学习者选择稍后练习','section_id':task['concept_id']})
+    evidence.defer(store,{'id':'practice-defer:'+task['id'],'concept_id':task['concept_id'],'reason':'Learner chose to practice later','section_id':task['concept_id']})
     task['status']='deferred'
     store.put('practice_tasks',task['id'],task)
     return {'task':task}

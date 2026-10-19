@@ -11,7 +11,7 @@ def capture(store, cid):
     context = curriculum.context(store, {'concept_id': cid})
     context.pop('position', None)
     data = {'context': context, 'curriculum': curriculum.view(store, {}),
-            'sources': store.list('sources'), 'revisions': store.list('source_revisions')}
+            'sources': store.list('sources')}
     return {'fingerprint': hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest(), 'context':context}
 
 
@@ -60,4 +60,11 @@ def view(store, request):
     ready=next((j for j in reversed(jobs) if j['concept_id']==cid and j['status']=='ready'),None)
     return {'jobs':jobs,'next_concept_id':target(store),'ready':ready}
 
-OPERATIONS={'preparation.enqueue':enqueue,'preparation.reconcile':reconcile,'preparation.view':view}
+def recover(store, request):
+    for job in store.list('preparation_jobs'):
+        if job['status']=='running' and store.get('streams',job['id']) is None:
+            job.update(status='failed',reason='备课启动被中断；主教师自行准备')
+            store.put('preparation_jobs',job['id'],job)
+    return reconcile(store,{})
+
+OPERATIONS={'preparation.recover':recover,'preparation.enqueue':enqueue,'preparation.reconcile':reconcile,'preparation.view':view}

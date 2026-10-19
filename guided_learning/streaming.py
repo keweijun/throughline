@@ -16,15 +16,17 @@ def start(store, request):
     concept = require_text(request, 'concept_id')
     validate_concept(store, concept)
     prompt = require_text(request, 'prompt')
-    identity = {'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
+    if not isinstance(request.get('record_user', True), bool):
+        raise OperationError('invalid_request','record_user must be boolean')
+    identity = {'record_user':request.get('record_user',True), 'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
     if identity['channel'] not in ('mainline','sidequestion','practice','preparation'):
         raise OperationError('invalid_channel','Unknown teaching channel')
     old = store.get('streams', identifier)
     if old:
-        if any(old[k] != v for k,v in identity.items()):
+        if any(old.get(k, True if k=='record_user' else None) != v for k,v in identity.items()):
             raise OperationError('id_conflict', identifier)
         return {'turn':old, 'created':False}
-    record_interaction(store, {'id':'stream-user:'+identifier, 'role':'user', 'text':prompt, 'concept_id':concept})
+    if identity['record_user']: record_interaction(store, {'id':'stream-user:'+identifier, 'role':'user', 'text':prompt, 'concept_id':concept})
     turn = {**identity, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
             'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
     store.put('streams', identifier, turn)

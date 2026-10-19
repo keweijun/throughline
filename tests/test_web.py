@@ -40,3 +40,34 @@ class WebLearning(unittest.TestCase):
             ctx.exception.close()
             server.shutdown()
             server.server_close()
+
+    def test_two_mainline_generations_cannot_overlap_even_when_resuming(self):
+        from guided_learning.web import LearningApp
+        from guided_learning.store import OperationError
+        class BlockingRunner:
+            def run(self,prompt,cwd,emit,cancel): cancel.wait(3)
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Quantum'})
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'state','title':'States'}],'route':['state'],'coverage':[]})
+            app=LearningApp(tmp,runner=BlockingRunner())
+            try:
+                app.start_turn({'id':'old','concept_id':'state','prompt':'Lesson'})
+                app.pause_turn('old');app.wait('old',2)
+                app.start_turn({'id':'new','concept_id':'state','prompt':'Other lesson'})
+                with self.assertRaises(OperationError): app.resume_turn('old','r1')
+            finally: app.close()
+
+    def test_second_host_cannot_mark_a_live_host_interrupted(self):
+        from guided_learning.web import LearningApp
+        from guided_learning.store import OperationError
+        class BlockingRunner:
+            def run(self,prompt,cwd,emit,cancel): cancel.wait(3)
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Quantum'})
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'state','title':'States'}],'route':['state'],'coverage':[]})
+            app=LearningApp(tmp,runner=BlockingRunner())
+            try:
+                app.start_turn({'id':'one','concept_id':'state','prompt':'Lesson'})
+                with self.assertRaises(OperationError): LearningApp(tmp,runner=BlockingRunner())
+                self.assertEqual(app.operation({'op':'stream.read','id':'one'})['turn']['status'],'running')
+            finally: app.close()

@@ -19,17 +19,25 @@ export async function setup(app){
     for(const ref of data.sources){const b=el('button',(ref.locator?.page?'原页 '+ref.locator.page:ref.locator?.line?'原文第 '+ref.locator.line+' 行':'定位未提供')+' · '+(ref.verification==='verified'?'已核验':'待核验'),'secondary');b.onclick=()=>openSource(ref).catch(app.showError);box.append(b)}container.append(box);
   }
   function overviewContent(container,data,previewOnly=false){
-    const o=data.overview;container.append(el('small',previewOnly?'只预览 · 不改变学习位置':o.origin==='teacher'?'单元导览':'路线摘要 · 具体导览将在讲解开头展开'),el('h2',data.concept.title),el('p',o.core_problem,'core-question'));
-    if(o.origin==='route_summary')container.append(el('p','这是依据课程路线的摘要；具体的单元导览会随首次讲解展开。','muted'));
-    const steps=el('ol');for(const step of o.steps)steps.append(el('li',String(step)));container.append(steps);
-    container.append(el('p',o.prior+'；'+o.next,'muted'),el('p','学完能够：'+o.target_ability));
-    if(data.prerequisites.length)container.append(el('p','先修 → '+data.prerequisites.map(x=>x.title).join(' → ')+' → '+data.concept.title,'local-flow'));
+    const o=data.overview;
+    container.append(el('small',previewOnly?'只预览 · 不改变学习位置':o.origin==='teacher'?'单元导览':'路线摘要'),el('h2',data.concept.title));
+    if(o.origin==='teacher'){
+      container.append(el('p',o.core_problem,'core-question'));
+      const steps=el('ol');for(const step of o.steps)steps.append(el('li',String(step)));container.append(steps);
+      container.append(el('p',o.prior+'；'+o.next,'muted'),el('p','学完能够：'+o.target_ability));
+    }else{
+      container.append(el('p','路线摘要；具体单元导览会在首次讲解开头展开。','muted'));
+      const next=app.state?.curriculum.concepts.find(c=>c.id===data.next_concept_id);
+      container.append(el('p','先修：'+(data.prerequisites.length?data.prerequisites.map(x=>x.title).join('、'):'未指定先修知识')),
+        el('p','接下来：'+(next?.title||'本课程路线的最后一节')));
+    }
     sources(container,data);
   }
   async function showPreview(id){const data=await app.api('/api/navigation/preview?concept_id='+encodeURIComponent(id));preview.replaceChildren();overviewContent(preview,data,true);app.showView('preview');if(matchMedia('(max-width:850px)').matches){nav.hidden=true;document.querySelector('#toggle-nav').setAttribute('aria-expanded','false')}}
   async function update(state){
     const current=state.position?.concept_id||state.curriculum.route[0];
-    const key=JSON.stringify([state.course.id,state.position,state.curriculum,state.sources]);
+    const hasLesson=state.turns.some(t=>t.channel==='mainline'&&t.concept_id===current&&['completed','running'].includes(t.status));
+    const key=JSON.stringify([state.course.id,state.position,state.curriculum,state.sources,hasLesson]);
     if(key===contextKey)return;contextKey=key;const version=++requestVersion;
     nav.replaceChildren(el('small','学习路线'),el('h2','课程目录'),el('p','点击知识点只预览','muted'));
     for(const [i,id] of state.curriculum.route.entries()){
@@ -42,7 +50,7 @@ export async function setup(app){
     overview.replaceChildren();
     const summary=el('div',null,'position-bar');summary.append(el('small','当前目标'),el('strong',state.position?.goal||data.overview.target_ability),el('span','下一步：'+(state.position?.next_step||'阅读讲解，再尝试练习'),'muted'));overview.append(summary);if(state.position?.progress){const progress=el('details'), title=el('summary','上次学到哪里');progress.append(title,el('p',state.position.progress));overview.append(progress)}
     const details=el('details',null,'unit-overview'), keySeen='overview:'+state.course.id+':'+current;
-    details.open=!localStorage.getItem(keySeen);const summaryTitle=el('summary',data.concept.title+(data.overview.origin==='teacher'?' · 单元导览':' · 路线与来源'));details.append(summaryTitle);
+    details.open=!hasLesson&&!localStorage.getItem(keySeen);const summaryTitle=el('summary',data.concept.title+(data.overview.origin==='teacher'?' · 单元导览':' · 路线与来源'));details.append(summaryTitle);
     const content=el('div');overviewContent(content,data);details.append(content);details.addEventListener('toggle',()=>{if(!details.open)localStorage.setItem(keySeen,'seen')});overview.append(details);
     if(state.session.recent_interactions.length){const unanswered=state.session.unanswered_questions.length;overview.prepend(el('p','接着学习「'+data.concept.title+'」'+(unanswered?' · '+unanswered+' 个问题待解答':'')+'。你的阅读记录和未完成讲解已保留。','resume-note'))}
   }

@@ -6,6 +6,7 @@ from .store import OperationError
 
 
 def register(app):
+    app.operation({'op':'preparation.recover'})
     def state(_=''):
         return app.operation({'op':'preparation.view'})
 
@@ -45,7 +46,11 @@ def register(app):
             result=app.operation({'op':'preparation.enqueue','id':'preparation-'+str(uuid.uuid4())})
             if not result['created']:return {'scheduled':False,'reason':'existing'}
             job=result['job']
-            return app.start_turn({'id':job['id'],'concept_id':cid,'channel':'preparation','record_user':False,'prompt':'内部备课任务：为下一学习小节准备材料，标明不确定之处。'})
+            try:
+                return app.start_turn({'id':job['id'],'concept_id':cid,'channel':'preparation','record_user':False,'prompt':'内部备课任务：为下一学习小节准备材料，标明不确定之处。'})
+            except Exception:
+                app.operation({'op':'preparation.recover'})
+                raise
 
     def loop():
         while not app.preparation_stop.wait(.35):

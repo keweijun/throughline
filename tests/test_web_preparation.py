@@ -109,3 +109,14 @@ class PreparationState(unittest.TestCase):
             count=len(runner.prompts);time.sleep(.5)
             self.assertEqual(len(runner.prompts),count)
             self.assertFalse(app.routes[('POST','/api/preparation/schedule')]({})['scheduled'])
+
+    def test_orphaned_preparation_recovers_as_failed(self):
+        from guided_learning.web import LearningApp
+        with tempfile.TemporaryDirectory() as path:
+            def op(**kw):return execute(path,kw)
+            op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
+            op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            op(op='preparation.enqueue',id='crashed-before-launch')
+            app=LearningApp(path)
+            try:self.assertEqual(app.routes[('GET','/api/preparation')]('')['jobs'][0]['status'],'failed')
+            finally:app.close()

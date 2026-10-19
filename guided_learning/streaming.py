@@ -57,7 +57,8 @@ def event(store, request):
         if not turn['final_text']:
             raise OperationError('missing_final','No authoritative final answer')
         begin = time.perf_counter()
-        record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id']})
+        if turn['channel'] != 'preparation':
+            record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id']})
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'
         turn['metrics'].update(full_s=elapsed, save_s=time.perf_counter()-begin)

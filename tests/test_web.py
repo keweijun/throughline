@@ -71,3 +71,24 @@ class WebLearning(unittest.TestCase):
                 with self.assertRaises(OperationError): LearningApp(tmp,runner=BlockingRunner())
                 self.assertEqual(app.operation({'op':'stream.read','id':'one'})['turn']['status'],'running')
             finally: app.close()
+
+    def test_cross_origin_posts_consistently_receive_403_without_applying_operations(self):
+        from guided_learning.web import create_server
+        from http.client import HTTPConnection
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Quantum'})
+            server=create_server(tmp,port=0)
+            threading.Thread(target=server.serve_forever,daemon=True).start()
+            try:
+                for _ in range(20):
+                    connection=HTTPConnection('127.0.0.1',server.server_port,timeout=5)
+                    try:
+                        connection.request('POST','/api/operation',json.dumps({'op':'course.init','title':'x'*65536}),
+                                           {'Content-Type':'application/json','Origin':'https://evil.example'})
+                        response=connection.getresponse()
+                        self.assertEqual(response.status,403)
+                        self.assertEqual(json.loads(response.read())['error'],'Invalid local origin')
+                    finally: connection.close()
+                self.assertEqual(server.app.snapshot()['course']['title'],'Quantum')
+            finally:
+                server.shutdown();server.server_close()

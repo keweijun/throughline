@@ -20,7 +20,7 @@ export async function setup(app) {
       card.querySelector('h3').textContent=branch.question;card.querySelector('blockquote').textContent=branch.selection;
       const turn=app.state?.turns.find(t=>t.id===branch.turn_id);
       display(card.querySelector('.answer'),turn?.text);
-      card.querySelector('.decision').textContent=branch.decision?`${branch.decision.depth==='short'?'简答':'展开'} · ${branch.decision.rationale}`:'等待教师回答及路径判断；问题已保存。';
+      card.querySelector('.decision').textContent=branch.decision?`${branch.decision.depth==='short'?'简答':'展开'} · ${branch.decision.rationale}`:(turn?.status==='completed'?'回答已保存，但路径判断缺失；该问题仍列为未解决。':'等待教师回答及路径判断；问题已保存。');
       const controls=card.querySelector('.actions');controls.replaceChildren();
       const button=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.onclick=async()=>{try{b.disabled=true;await action();await app.refresh();await load();}catch(e){status.textContent=e.message;b.disabled=false;}};controls.append(b);};
       if(branch.status==='suggested'){button('先补一下',()=>app.api('/api/branches/choose',{id:branch.id,choice:'accept'}));button('继续当前内容',()=>app.api('/api/branches/choose',{id:branch.id,choice:'decline'}));}

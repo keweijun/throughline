@@ -40,6 +40,13 @@ def start(store, request):
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
     snapshot = {'context':context,'route':route,'session':session_resume(store,{})}
+    branch=next((b for b in store.list('web_branches') if identifier in (b['turn_id'],b.get('supplement_turn_id'))),None)
+    if branch:
+        snapshot['branch']=branch
+        selected=branch.get('selected_lecture')
+        if selected:
+            for ref in selected.get('source_refs',[]):
+                if ref not in source_refs: source_refs.append(ref)
     turn = {**identity, 'source_refs':source_refs, 'prompt_snapshot':snapshot, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
             'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
     store.put('streams', identifier, turn)

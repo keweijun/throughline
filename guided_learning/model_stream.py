@@ -34,7 +34,8 @@ class CodexRunner:
         try:
             send({'id':1,'method':'initialize','params':{'clientInfo':{'name':'guided_learning','version':'0.2.0'},'capabilities':{'experimentalApi':True}}})
             while time.monotonic()-started < self.timeout:
-                if cancel.is_set() and interrupted_at is None and thread_id and turn_id:
+                if cancel.is_set() and interrupted_at is None:
+                    if not (thread_id and turn_id): return
                     send({'id':4,'method':'turn/interrupt','params':{'threadId':thread_id,'turnId':turn_id}})
                     interrupted_at = time.monotonic()
                 if interrupted_at and time.monotonic()-interrupted_at > 10:
@@ -91,6 +92,7 @@ class CodexRunner:
             raise TimeoutError('Model generation exceeded time limit')
         finally:
             try:
+                if cancel.is_set() and process.poll() is None: process.terminate()
                 process.stdin.close()
                 process.wait(timeout=2)
             except (OSError,subprocess.TimeoutExpired):

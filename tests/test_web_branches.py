@@ -107,3 +107,73 @@ class Branches(unittest.TestCase):
             self.assertEqual(returned['position']['concept_id'],'b')
             self.assertEqual(returned['branch']['restore_point']['concept_id'],'a')
             self.assertEqual(returned['branch']['status'],'unanswered')
+
+    def test_older_selected_lecture_freezes_context_and_attribution_separate_from_recovery(self):
+        from pathlib import Path
+        from guided_learning.web import LearningApp
+        class Runner:
+            def run(self,prompt,cwd,emit,cancel):
+                emit({'kind':'final','text':'A saved explanation'});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Q'})
+            refs=[]
+            for name in ('old','new'):
+                p=Path(tmp)/(name+'.md');p.write_text(name+' source text',encoding='utf-8')
+                source=execute(tmp,{'op':'source.register','path':str(p)})['source']
+                refs.append({'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'})
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'Old','links':[refs[0]]},{'id':'b','title':'New','links':[refs[1]]}],'route':['a','b'],'coverage':[]})
+            app=LearningApp(tmp,runner=Runner())
+            try:
+                for concept in ('a','b'):
+                    execute(tmp,{'op':'mainline.enter','concept_id':concept,'goal':concept,'next_step':'practice','request_id':concept})
+                    app.start_turn({'id':concept,'concept_id':concept,'prompt':'Explain '+concept});app.wait(concept,3)
+                ask=app.routes[('POST','/api/branches/ask')]
+                branch=ask({'id':'q','question':'Old passage?','selection':'saved','selected_turn_id':'a','main_turn_id':'b'})['branch']
+                app.wait('branch:q',3)
+                self.assertEqual(branch['selected_turn_id'],'a')
+                self.assertEqual(branch['selected_lecture']['prompt_snapshot']['context']['concept']['id'],'a')
+                self.assertEqual(branch['restore_point']['concept_id'],'b')
+                turn=app.operation({'op':'stream.read','id':'branch:q'})['turn']
+                self.assertIn('old source text',app.build_prompt(turn))
+                self.assertCountEqual(turn['source_refs'],refs)
+                answer=next(x for x in app.snapshot()['session']['recent_interactions'] if x['id']=='stream:branch:q')
+                self.assertCountEqual(answer['source_refs'],refs)
+                with self.assertRaises(ValueError):ask({'id':'bad','question':'?','selected_turn_id':'branch:q','main_turn_id':'b'})
+                with self.assertRaises(ValueError):ask({'id':'stale','question':'?','main_turn_id':'a'})
+                with self.assertRaises(ValueError):ask({'id':'q','question':'Old passage?','selection':'saved','selected_turn_id':'b','main_turn_id':'b'})
+                execute(tmp,{'op':'mainline.enter','concept_id':'a','goal':'later','next_step':'practice','request_id':'later'})
+                app.routes[('POST','/api/branches/return')]({'id':'q'})
+                self.assertEqual(app.snapshot()['position']['goal'],'later')
+                self.assertEqual(app.operation({'op':'branch.read','id':'q'})['branch']['selected_lecture'],branch['selected_lecture'])
+            finally:app.close()
+
+    def test_interrupted_supplement_reopens_and_completes_once(self):
+        from guided_learning.web import LearningApp
+        class Runner:
+            def run(self,prompt,cwd,emit,cancel):
+                emit({'kind':'final','text':'Recovered complete supplement'});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Q'})
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            execute(tmp,{'op':'mainline.enter','concept_id':'a','goal':'Original goal','next_step':'practice','request_id':'p'})
+            execute(tmp,{'op':'branch.begin','id':'q','question':'Need foundation'})
+            execute(tmp,{'op':'stream.start','id':'branch:q','concept_id':'a','prompt':'Need foundation','channel':'sidequestion'})
+            execute(tmp,{'op':'stream.event','id':'branch:q','attempt':1,'sequence':1,'kind':'final','text':'Accept supplement?'})
+            execute(tmp,{'op':'stream.event','id':'branch:q','attempt':1,'sequence':2,'kind':'complete'})
+            execute(tmp,{'op':'branch.decide','id':'q','decision':{'depth':'short','category':'prerequisite','rationale':'Foundation needed','suggest_supplement':True,'supplement_goal':'Foundation'}})
+            execute(tmp,{'op':'branch.choose','id':'q','choice':'accept'})
+            execute(tmp,{'op':'stream.start','id':'supplement:q','concept_id':'a','prompt':'Explain foundation','channel':'sidequestion','record_user':False})
+            execute(tmp,{'op':'stream.event','id':'supplement:q','attempt':1,'sequence':1,'kind':'delta','text':'Partial explanation'})
+            app=LearningApp(tmp,runner=Runner())
+            try:
+                self.assertEqual(app.operation({'op':'stream.read','id':'supplement:q'})['turn']['status'],'interrupted')
+                app.resume_turn('supplement:q','retry');app.wait('supplement:q',3)
+                app.resume_turn('supplement:q','retry')
+                result=app.operation({'op':'stream.read','id':'supplement:q'})['turn']
+                self.assertEqual(result['status'],'completed');self.assertEqual(result['attempt'],2)
+                self.assertEqual(result['attempts'][0]['text'],'Partial explanation')
+                self.assertEqual(len(app.operation({'op':'branch.list'})['branches']),1)
+                saved=[i for i in app.snapshot()['session']['recent_interactions'] if i['id']=='stream:supplement:q']
+                self.assertEqual(len(saved),1);self.assertEqual(saved[0]['text'],'Recovered complete supplement')
+                self.assertEqual(app.snapshot()['position']['goal'],'Original goal')
+            finally:app.close()

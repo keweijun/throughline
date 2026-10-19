@@ -8,9 +8,31 @@ export async function setup(app) {
   app.elements.overview.before(entry);
   let selection='',anchor={};let branches=[];const cards=new Map();
   const status=panel.querySelector('[role=status]');
-  function capture(){const s=window.getSelection();if(s && s.toString().trim()){selection=s.toString();anchor={scroll_y:window.scrollY};panel.querySelector('blockquote').textContent=selection;}}
-  document.addEventListener('mouseup',()=>{const s=window.getSelection();if(s?.anchorNode?.parentElement?.closest('#lessons'))capture();});
-  entry.onclick=()=>{capture();open();};
+  const contextual=document.createElement('button');contextual.type='button';contextual.textContent='就这句提问';contextual.hidden=true;
+  Object.assign(contextual.style,{position:'fixed',zIndex:'20',maxWidth:'180px'});document.body.append(contextual);
+  const clear=document.createElement('button');clear.type='button';clear.textContent='清除引用，另问一个问题';panel.querySelector('blockquote').after(clear);
+  function clearSelection(){selection='';anchor={};panel.querySelector('blockquote').textContent='';contextual.hidden=true;}
+  clear.onclick=clearSelection;
+  function capture(){
+    const selected=window.getSelection();
+    if(!selected?.rangeCount||!selected.toString().trim())return;
+    const start=selected.anchorNode?.parentElement,end=selected.focusNode?.parentElement;
+    if(!start?.closest('#lessons')||!end?.closest('#lessons'))return;
+    const formula=start.closest('.katex');
+    // KaTeX contains both MathML and visual glyphs: preserve its original TeX for a formula-only selection.
+    selection=formula&&formula===end.closest('.katex')?(formula.querySelector('annotation[encoding="application/x-tex"]')?.textContent||selected.toString()):selected.toString();
+    anchor={scroll_y:window.scrollY};panel.querySelector('blockquote').textContent=selection;
+    const rect=selected.getRangeAt(0).getBoundingClientRect();
+    contextual.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-190))+'px';
+    contextual.style.top=Math.max(8,Math.min(rect.bottom+8,window.innerHeight-48))+'px';contextual.hidden=false;
+  }
+  document.addEventListener('mouseup',capture);
+  document.addEventListener('keyup',event=>{if(event.key==='Shift'||event.key.startsWith('Arrow'))capture();});
+  contextual.onpointerdown=event=>event.preventDefault();
+  contextual.onclick=()=>{contextual.hidden=true;open();};
+  window.addEventListener('scroll',()=>{contextual.hidden=true;},{passive:true});
+  // Opening the top entry must never replace a selection-time anchor after scrolling.
+  entry.onclick=()=>{contextual.hidden=true;open();};
   function display(node,text){const body=(text||'').split('<teaching-decision>')[0];if(app.renderMarkdown)app.renderMarkdown(node,body);else node.textContent=body;}
   async function load(){branches=(await app.api('/api/branches')).branches;render();}
   function render(){
@@ -29,7 +51,7 @@ export async function setup(app) {
       if(branch.supplement_turn_id){const supplement=app.state?.turns.find(t=>t.id===branch.supplement_turn_id);display(card.querySelector('.supplement'),supplement?.text);}
     }
   }
-  panel.querySelector('button').onclick=async()=>{try{const q=panel.querySelector('textarea');if(!q.value.trim())return;status.textContent='';const turns=app.state.turns.filter(t=>t.channel==='mainline');const main=turns.at(-1);await app.api('/api/branches/ask',{id:crypto.randomUUID(),question:q.value,selection,anchor:{...anchor,scroll_y:anchor.scroll_y??window.scrollY},main_turn_id:main?.id,pause:panel.querySelector('input').checked});q.value='';await app.refresh();await load();}catch(e){status.textContent=e.message;}};
+  panel.querySelector('label').nextElementSibling.onclick=async()=>{try{const q=panel.querySelector('textarea');if(!q.value.trim())return;status.textContent='';const turns=app.state.turns.filter(t=>t.channel==='mainline');const main=turns.at(-1);await app.api('/api/branches/ask',{id:crypto.randomUUID(),question:q.value,selection,anchor:{...anchor,scroll_y:anchor.scroll_y??window.scrollY},main_turn_id:main?.id,pause:panel.querySelector('input').checked});q.value='';clearSelection();await app.refresh();await load();}catch(e){status.textContent=e.message;}};
   app.events.addEventListener('state',()=>load().catch(e=>status.textContent=e.message));
   app.events.addEventListener('turn',e=>{const turn=e.detail;const branch=branches.find(b=>turn.id===b.turn_id||turn.id===b.supplement_turn_id);if(!branch)return;const card=cards.get(branch.id);if(card)display(card.querySelector(turn.id===branch.turn_id?'.answer':'.supplement'),turn.text);if(turn.status!=='running')load().catch(e=>status.textContent=e.message);});
 }

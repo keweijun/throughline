@@ -1,6 +1,8 @@
 """Durable model delivery state; partial text never becomes teaching evidence."""
 import time
 from .store import OperationError
+from . import curriculum
+from .teaching import resume as session_resume
 from .teaching import require_text, validate_concept, record_interaction
 
 
@@ -27,7 +29,18 @@ def start(store, request):
             raise OperationError('id_conflict', identifier)
         return {'turn':old, 'created':False}
     if identity['record_user']: record_interaction(store, {'id':'stream-user:'+identifier, 'role':'user', 'text':prompt, 'concept_id':concept})
-    turn = {**identity, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
+    context = curriculum.context(store, {'concept_id':concept})
+    source_refs = []
+    for field in ('links','exercises','notations'):
+        for ref in context['concept'].get(field,[]):
+            exact = {k:ref[k] for k in ('source_id','revision','unit_id')}
+            if exact not in source_refs: source_refs.append(exact)
+    context['sources'] = [{**ref, **curriculum.source_unit(store,ref), 'stale':curriculum.is_stale(store,ref)} for ref in source_refs]
+    model = curriculum.view(store,{})
+    route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
+             for cid in model['route'] for c in model['concepts'] if c['id']==cid]
+    snapshot = {'context':context,'route':route,'session':session_resume(store,{})}
+    turn = {**identity, 'source_refs':source_refs, 'prompt_snapshot':snapshot, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
             'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
     store.put('streams', identifier, turn)
     return {'turn':turn, 'created':True}
@@ -58,7 +71,7 @@ def event(store, request):
             raise OperationError('missing_final','No authoritative final answer')
         begin = time.perf_counter()
         if turn['channel'] != 'preparation':
-            record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id']})
+            record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'
         turn['metrics'].update(full_s=elapsed, save_s=time.perf_counter()-begin)
@@ -90,7 +103,7 @@ def resume(store, request):
         return {'turn':turn,'created':False}
     if turn['status'] not in ('paused','interrupted','failed'):
         raise OperationError('invalid_transition','Only incomplete turns can be regenerated')
-    turn['attempts'].append({k:turn.get(k) for k in ('attempt','text','status','metrics','error')})
+    turn['attempts'].append({k:turn.get(k) for k in ('attempt','text','status','metrics','error','source_refs','prompt_snapshot')})
     turn.update(attempt=turn['attempt']+1,status='running',text='',final_text=None,sequence=0,started_at=time.time(),metrics={})
     turn.pop('error',None)
     turn['resume_requests'].append(request_id)

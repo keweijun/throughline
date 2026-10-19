@@ -48,3 +48,24 @@ for line in sys.stdin:
                 with self.assertRaises(RuntimeError):
                     CodexRunner(command=[sys.executable,str(script)]).run('teach',tmp,events.append,threading.Event())
                 self.assertEqual(events,[])
+
+    def test_cancel_stalled_handshake_terminates_owned_process_promptly(self):
+        import time
+        from unittest.mock import patch
+        import subprocess
+        from guided_learning.model_stream import CodexRunner
+        for stalled in ('initialize','thread/start','turn/start'):
+            with self.subTest(stalled=stalled), tempfile.TemporaryDirectory() as tmp:
+                script=Path(tmp)/'server.py'
+                script.write_text("import sys,json,time\nfor line in sys.stdin:\n r=json.loads(line); m=r.get('method'); i=r.get('id')\n if m=="+repr(stalled)+": time.sleep(60)\n if m=='initialize': print(json.dumps({'id':i,'result':{}}),flush=True)\n if m=='thread/start': print(json.dumps({'id':i,'result':{'thread':{'id':'t'}}}),flush=True)\n",encoding='utf-8')
+                cancel=threading.Event(); timer=threading.Timer(.3,cancel.set); timer.start()
+                owned=[]; real_popen=subprocess.Popen
+                def launch(*args,**kwargs):
+                    process=real_popen(*args,**kwargs);owned.append(process);return process
+                started=time.monotonic()
+                try:
+                    with patch('guided_learning.model_stream.subprocess.Popen',side_effect=launch):
+                        CodexRunner(command=[sys.executable,str(script)],timeout=2).run('teach',tmp,lambda e:None,cancel)
+                    self.assertLess(time.monotonic()-started,1.5)
+                    self.assertIsNotNone(owned[0].poll())
+                finally:timer.cancel()

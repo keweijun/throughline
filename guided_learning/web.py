@@ -246,7 +246,7 @@ def create_server(workspace, host='127.0.0.1', port=8765, runner=None, model=Non
             except TimeoutError: return self.reply({'error':'Request body timeout'},408)
             except OperationError as exc: return self.reply({'error':str(exc),'code':exc.code},409)
             except (ValueError,KeyError,TypeError) as exc: return self.reply({'error':str(exc)},400)
-            except (BrokenPipeError,ConnectionResetError): return
+            except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError): return
         def do_GET(self): self.handle_request()
         def do_POST(self): self.handle_request(True)
     server = LearningServer((host,port),Handler)

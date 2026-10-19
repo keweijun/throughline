@@ -41,6 +41,10 @@ python -m venv .venv
 
 独立后台常驻、专门学习界面和公开插件分发不在第一版范围。会话内子代理不是退出聊天后继续工作的服务。
 
+### V2 原页显示依赖
+
+本地学习界面使用 `pdf` 扩展中的 pypdfium2 和 Pillow，把已注册的 PDF 精确版本渲染为原页图像；不依赖浏览器内置 PDF 插件。更新环境运行 `.\.venv\Scripts\python.exe -m pip install -e ".[pdf]"`。缺少渲染器时页面会明确提示原页图像未显示，仍提供原 PDF 链接。
+
 ## 已准备的本地量子课程
 
 `work/courses/quantum-v1` 已登记实际 6 份课件和 2 份习题，共 231 页，建立 45 个候选知识点、23 个习题子要求和 8 条来源关联符号说明。输入副本位于 `work/course-inputs/quantum`，运行时不依赖原笔记应用目录。

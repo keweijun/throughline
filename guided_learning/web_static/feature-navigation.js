@@ -8,7 +8,7 @@ export async function setup(app){
     const data=await app.api('/api/navigation/source?'+new URLSearchParams({source_id:ref.source_id,revision:ref.revision,unit_id:ref.unit_id}));
     sourceView.replaceChildren(el('h2',data.title),el('p',(data.verification==='verified'?'已核验':'待核验 · 请以原页为准')+(data.stale?' · 历史版本':''),'source-status'));
     sourceView.append(el('p','版本 '+data.revision.slice(0,12)+' · '+(data.locator?.page?'第 '+data.locator.page+' 页':data.locator?.line?'第 '+data.locator.line+' 行':'缺少精确定位')));
-    if(data.pdf_url){const link=el('a','在新窗口打开原页');link.href=data.pdf_url;link.target='_blank';link.rel='noopener';sourceView.append(link);const frame=el('iframe');frame.title=data.title+' 原页';frame.src=data.pdf_url;sourceView.append(frame)}
+    if(data.pdf_url){const link=el('a','在新窗口打开原页');link.href=data.pdf_url;link.target='_blank';link.rel='noopener';sourceView.append(link);if(data.image_url){const status=el('p','正在渲染原页…','muted'),image=el('img');image.className='source-page';image.alt=data.title+' 第 '+data.locator.page+' 页原页';image.onload=()=>{status.textContent='原页图像 · 第 '+data.locator.page+' 页'};image.onerror=()=>{image.hidden=true;status.textContent='原页图像未显示：渲染失败或缺少 pdf 扩展，请使用上方原 PDF 链接。'};image.src=data.image_url;sourceView.append(status,image)}else sourceView.append(el('p',data.render_message||'原页图像未显示：缺少有效页码。','source-status'))}
     else {const text=el('pre',data.text||'该位置未提取到文字');sourceView.append(text)}
     app.showView('sources');
   }

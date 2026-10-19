@@ -17,3 +17,6 @@ guided-learning = "guided_learning.__main__:main"
 
 [tool.setuptools.packages.find]
 include = ["guided_learning*"]
+
+[tool.setuptools.package-data]
+guided_learning = ["web_static/*"]

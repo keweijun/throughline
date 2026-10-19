@@ -1,73 +1,73 @@
-# 个人跨文档导学：第一版方案
+# Personal cross-document guided learning: V1 proposal
 
-状态：访谈决定已确认，整体方案待最终确认；本文描述预期行为，不表示功能已实现。
+Status: interview decisions confirmed; overall proposal awaiting final confirmation. This describes intended behavior rather than implemented functionality.
 
-## 目标与交付
+## Goal and deliverables
 
-以 Codex 聊天为学习入口，为个人提供跨文档连贯教学、内容覆盖检查和路径感知答疑。交付通用导学 skill、独立课程工作区及必要辅助脚本。
+Use Codex chat for personal, coherent cross-document teaching, coverage checks, and route-aware question answering. Deliver a generic guided-learning skill, independent course workspace, and necessary helpers.
 
-优先验证教学质量。第一版不做 Obsidian 兼容、导出或同步，不做专用学习界面、公开插件分发或常驻后台服务。允许未来扩展，但不预先引入相应依赖。
+Validate teaching quality first. V1 excludes Obsidian compatibility/export/sync, a dedicated learning UI, public plugin distribution, and an always-on service. Future extensions remain possible without adding their dependencies now.
 
-## 材料与路线
+## Materials and route
 
-- 首批材料为已有的 6 份量子课件与 2 份习题，建立全材料覆盖图。
-- 后台按页定位定义、关键结论、推导及例题；前台按知识点呈现。
-- 相同概念合并，保留所有来源与新增细节；符号差异建立对应关系。
-- 按先修关系组织跨文档学习路线，不能把文件顺序当作唯一教学顺序。
-- 每项内容有明确去向；解析失败显式列出，不宣称失败页面已覆盖。用户审核整体路线及有争议的取舍。
-- 材料更新时检查受影响知识点，保留原有作答证据；大幅改变路线前征求意见。
+- Start with six quantum lecture documents and two exercise documents, building a complete coverage map.
+- Locate definitions, key conclusions, derivations, and examples by page in the background; present concepts in the foreground.
+- Merge shared concepts while preserving all sources and additional details; map notation differences.
+- Organize cross-document routes by prerequisites rather than file order alone.
+- Give every content item an explicit disposition. Expose parsing failures without claiming coverage of failed pages. The user reviews the overall route and disputed choices.
+- Recheck affected concepts when materials change, preserve answer evidence, and ask before major route changes.
 
-## 教学与旁支
+## Teaching and branches
 
-- 按完整学习目标划分小节，可以跨资料、分多轮讲解，小节末集中练习。
-- 主教师根据问题对当前理解的必要性、后续课程位置、重复困惑与用户明确要求决定回答深度。
-- 小问题简答后接回主线；关键概念讲清楚；长解释后提示接续位置并等待。
-- 后续知识先给足够当前使用且明确局限的解释，完整解释绑定后续节点并主动回访；用户明确要求深入则展开。
-- 保存主线恢复点，旁支问题不自动变成新的主学习目标。
-- 重复困惑时换例子或补短概念桥梁；较大的重排先问用户。
-- 用户有最终推进权：提醒先修缺口后仍可继续，缺口保留为暂缓项。
+- Organize sections around complete learning goals, potentially across sources and turns, with grouped practice at the end.
+- Choose answer depth using necessity for current understanding, future placement, repeated difficulty, and explicit user requests.
+- Answer small questions briefly and return to the mainline; explain key concepts fully; name the resume point and wait after long explanations.
+- For later knowledge, provide enough for current use with clear limits, link the full explanation to a later node, and revisit proactively. Expand immediately on explicit request.
+- Save a mainline restore point; a side question does not automatically become the main goal.
+- Use new examples or short bridges for repeated difficulties; ask before major rearrangement.
+- The learner controls advancement: flag prerequisite gaps, then allow continuation with the gaps retained as deferred items.
 
-## 练习与学习证据
+## Practice and learning evidence
 
-- 小节末集中练习；答错时指出具体卡点并提供最少必要提示。
-- 用户要求直接讲解时提供完整示范，不将其记为用户独立完成。
-- 已讲解、自述理解、提示下完成、独立完成、延后复测通过分别记录。
-- 暂缓项在后续需要、约定节点或小节复盘时回访，不每轮催促。
-- 重开会话时短回顾并恢复任务，不强制考试。
+- Group practice at section ends; identify specific obstacles and give minimal necessary hints after errors.
+- Demonstrate full solutions on request without recording independent learner completion.
+- Record taught, self-reported, hinted, independent, and delayed-retest evidence separately.
+- Revisit deferred items when needed, at agreed nodes, or during section recap, without reminders every turn.
+- Resume with a brief recap and restore the task without a mandatory exam.
 
-## 状态与模型分工
+## State and model roles
 
-- 课程工作区是唯一正式学习状态来源，通用 skill 与课程数据分离。
-- 持久保存实际交互、当前目标、主线恢复点、待补解释与作答证据。不能仅依靠一个不断改写的长摘要。
-- 主教师负责即时解释、深度选择与教学决策；不为每个小问题等待辅助模型。
-- 优先使用 Codex gpt-6-luna 子代理进行批量整理、资料定位与候选证据抽取。
-- Luna 不可用时，暂缓非必要整理，保留任务；主教师使用当前状态和最新交互继续教学。
-- 离开时允许任务暂停，下次恢复；不承诺关闭聊天或应用后持续运行。
-- 后台更新须关联原始证据，重试不能重复计入进度，旧结果不得覆盖新状态。具体存储与校验实现保持简单可逆。
-- 第一版不自动切换额外付费 API。用户接受未来使用 API，但供应商、预算与开销规则尚未配置。
+- The course workspace is the sole official learning state; generic skill instructions stay separate from course data.
+- Persist actual interactions, current goals, restore points, pending explanations, and answer evidence, rather than relying only on a continually rewritten summary.
+- The main teacher explains and makes depth/instructional decisions immediately, without waiting for an auxiliary model on every small question.
+- Prefer a Codex gpt-6-luna subagent for batch consolidation, source location, and candidate evidence extraction.
+- When unavailable, retain and defer optional work; teach from current state and recent interactions.
+- Tasks may pause on departure and resume later; no guarantee of continued execution after closing chat or the app.
+- Background updates reference original evidence; retries do not double-count progress and stale results cannot overwrite newer state. Keep storage and validation simple and reversible.
+- V1 does not automatically switch to an additional paid API. Future API use is acceptable, but providers, budgets, and spending rules are not configured.
 
-## 验收
+## Acceptance
 
-先核对全部 8 份材料的覆盖台账，再以“波函数→本征态→投影”进行教学场景验证。
+Check the coverage ledger for all eight documents, then validate the wavefunctions → eigenstates → projection teaching chain.
 
-| 场景 | 通过条件 |
+| Scenario | Passing behavior |
 |---|---|
-| 询问局部符号 | 给必要解释并接回原主线，不展开无关章节 |
-| 询问关键基础 | 补清楚当前内容所依赖的概念，不机械推进 |
-| 询问后续知识 | 先解当前疑问，保留完整解释的回访位置，到达时主动回应 |
-| 重复困惑 | 采用替代解释或短桥梁，保留原目标 |
-| 要求跳过或直接看解答 | 尊重选择，同时保留未验证状态 |
-| 中断并重开 | 恢复正确目标、位置、未解疑问与学习证据 |
-| Luna 不可用 | 教学可继续，整理任务保留，记录不丢失或倒退 |
-| 读取失败或资料改变 | 缺口可见，不静默标完成；更新保留已有证据 |
+| Local notation question | Explain what is needed and return to the mainline without unrelated chapters. |
+| Key foundation question | Explain concepts needed by the current material rather than mechanically advancing. |
+| Future knowledge question | Address the immediate issue, retain a full-explanation node, and revisit on arrival. |
+| Repeated difficulty | Use an alternative explanation or short bridge while preserving the goal. |
+| Skip or request a solution | Respect the choice while preserving unverified status. |
+| Interrupt and reopen | Restore the correct goal, position, unresolved questions, and evidence. |
+| Luna unavailable | Teaching continues; consolidation tasks remain, without lost or regressed records. |
+| Read failure or changed materials | Expose gaps without silently completing them; retain existing evidence on update. |
 
-不以笔记数量、输出长度或单次模型自评判定成功。脚本检查状态与覆盖一致性，教学行为用上述固定场景和用户实际体验验证。模型延迟需实测，不预先承诺加速比例。
+Notes count, output length, and one model self-assessment do not establish success. Scripts check state and coverage consistency; fixed scenarios and actual learner experience validate teaching behavior. Measure latency rather than promising a speedup in advance.
 
-## 实现顺序
+## Implementation order
 
-1. 设计最小课程状态与辅助脚本，验证保存、恢复、覆盖检查及重复更新处理。
-2. 编写导学 skill 与必要参考材料，明确路线上下文及旁支处理。
-3. 接入可选 Luna 分工和不可用时的恢复流程。
-4. 以现有材料建立覆盖图并回放验收场景；修正后再用于持续学习。
+1. Design minimal state and helpers; verify save/resume, coverage checks, and duplicate-update handling.
+2. Write the skill and references, including route context and branch handling.
+3. Add optional Luna support and unavailable-host recovery.
+4. Build the real-material coverage map and replay acceptance scenarios; fix issues before ongoing use.
 
-详细选择见 design-interview.md；领域术语见项目根目录 GLOSSARY.md。
+See design-interview.md for detailed choices and root GLOSSARY.md for terminology.

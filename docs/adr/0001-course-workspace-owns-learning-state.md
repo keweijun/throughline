@@ -1,5 +1,5 @@
-# 课程工作区持有正式学习状态
+# The course workspace owns official learning state
 
-跨文档导学需要在更换聊天、更新材料和延后整理后仍保持一致的学习证据与主线位置。采用独立课程工作区作为唯一正式状态，通用导学 skill 读取和更新该状态；不依赖聊天历史作为唯一记忆，也不与 Obsidian 同步。
+Cross-document guided learning needs consistent learning evidence and mainline position across chat changes, source updates, and deferred consolidation. An independent course workspace is the sole official state; the generic guided-learning skill reads and updates it. Chat history is not the sole memory, and there is no Obsidian synchronization.
 
-这是对显式持久记录的选择：增加少量状态维护与校验工作，以换取教学连续性，并避免通用规则更新影响课程数据、多个系统互相覆盖进度。
+This choice favors explicit persistent records: a small amount of state maintenance and validation buys teaching continuity and prevents generic rule updates from affecting course data or multiple systems from overwriting progress.

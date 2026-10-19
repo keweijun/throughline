@@ -1,18 +1,18 @@
 # Codex Guided Learning
 
-个人跨文档导学项目，第一版采用 Codex skill、独立课程工作区和辅助脚本，优先验证教学连续性、资料覆盖和路径感知答疑。
+Personal cross-document guided learning using a Codex skill, an independent course workspace, and helper scripts. V1 prioritizes teaching continuity, material coverage, and route-aware question answering.
 
-当前处于设计与工程配置阶段，教学功能尚未实现。
+This branch is at the design and engineering-configuration stage; teaching functionality is not implemented here.
 
-## 文档
+## Documents
 
-- [第一版方案](docs/v1-spec.md)：教学行为、状态边界和验收场景。
-- [设计访谈](docs/design-interview.md)：已确认的需求与选择。
-- [领域术语](GLOSSARY.md)：项目统一用语。
-- [架构决定](docs/adr/0001-course-workspace-owns-learning-state.md)：课程工作区持有正式学习状态。
-- [前期研究](docs/research/)：现成框架对比及工作流分析，历史建议以第一版方案为准。
-- [早期设计归档](docs/archive/initial-design/)：保留的初始设计记录。
+- [V1 proposal](docs/v1-spec.md): teaching behavior, state boundaries, and acceptance scenarios.
+- [Design interview](docs/design-interview.md): confirmed requirements and choices.
+- [Domain glossary](GLOSSARY.md): shared project terminology.
+- [Architecture decision](docs/adr/0001-course-workspace-owns-learning-state.md): the course workspace owns official learning state.
+- [Earlier research](docs/research/): framework comparisons and workflow analysis; the V1 proposal supersedes historical suggestions.
+- [Initial design archive](docs/archive/initial-design/): preserved early records.
 
-项目统一保存在 `F:\Projects\codex-guided-learning`。第一版独立于 Obsidian，不提供兼容、导出或同步。
+The project lives at `F:\Projects\codex-guided-learning`. V1 is independent of Obsidian, with no compatibility, export, or synchronization integration.
 
-任务采用 GitHub Issues 管理。工程技能从 [AGENTS.md](AGENTS.md) 读取入口，具体规则在 [docs/agents/](docs/agents/)；之后可直接编辑这些配置文件。
+Tasks use GitHub Issues. Start with [AGENTS.md](AGENTS.md) for engineering instructions and [docs/agents/](docs/agents/) for their rules; these configuration files can be edited directly.

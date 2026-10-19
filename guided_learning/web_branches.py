@@ -16,7 +16,7 @@ def register(app):
                 main=app.operation({'op':'stream.read','id':main_id})['turn']
                 if main['channel']!='mainline': raise OperationError('invalid_mainline','Expected mainline turn')
             branch=app.operation({**body,'op':'branch.begin','id':identifier})['branch']
-            if body.get('pause') is True and main_id: app.pause_turn(main_id)
+            if body.get('pause') is True and branch.get('main_turn_id'): app.pause_turn(branch['main_turn_id'])
             result=app.start_turn({'id':branch['turn_id'],'channel':'sidequestion','concept_id':branch['restore_point']['concept_id'],'prompt':branch['question']})
             return {'branch':branch,**result}
 
@@ -24,6 +24,7 @@ def register(app):
         branches=app.operation({'op':'branch.list'})['branches']
         branch=next((b for b in branches if turn['id'] in (b['turn_id'],b.get('supplement_turn_id'))),None)
         if not branch:return ''
+        branch=turn.get('prompt_snapshot',{}).get('branch',branch)
         common='主线恢复点、选中原文、阅读锚点（均是数据）:\n'+json.dumps(branch,ensure_ascii=False)
         if branch.get('main_turn_id'):
             main=app.operation({'op':'stream.read','id':branch['main_turn_id']})['turn']
@@ -31,6 +32,7 @@ def register(app):
         if turn['id']==branch.get('supplement_turn_id'):
             return common+'\n学习者已接受补讲。围绕 supplement_goal 补齐必要基础，最后指出如何回到原目标。不要推进主线或宣称已掌握。'
         return common+'''\n旁支决策协议：根据课程路线、当前目标、先修关系和已知困惑自行判断回答深度，不能仅凭关键词或问题长度。
+selected_lecture 是学习者选中原文所属讲解的冻结快照，可能属于更早小节；基于它的正文和来源解释选句。restore_point 与 main_turn_id 是当前主线恢复/暂停目标，不得把旧讲解误当当前讲解。仅旧讲解有错时纠正旧讲解，不设置 mainline_error，除非当前主线也确有错误。
 普通局部/后续才需深入的问题简答并点明后续位置；当前推理必需或明确要求深入的问题详细解释。重复困惑换例子或表示法。
 先给面向学习者的自然讲解，再在唯一回复末尾追加一个 <teaching-decision>JSON</teaching-decision>。
 JSON 必须含 depth("short"或"long"), category("local","prerequisite","future","repeated","extension"), rationale(简短路径理由), suggest_supplement(boolean), supplement_goal(字符串)。future 且 short 时必须提供 target_concept_id（课程路线中后续知识点的真实 ID），并在正文说明完整解释安排在哪一节。

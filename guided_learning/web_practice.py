@@ -53,7 +53,7 @@ def register(app):
             store=Store(app.workspace)
             try: sources=[{**ref,'unit':source_unit(store,ref)} for ref in context['concept'].get('exercises',[])]
             finally: store.db.close()
-            return '练习专用：只返回 JSON {"questions":[{"question":"仅题干，不含答案或解题提示","origin":"source 或 self_created","source_refs":[]}]}。选择当前目标的1至2道题；优先使用下列原题，准确标来源；无合适原题则明确自编，origin=self_created。禁止抄入资料中的答案。source_refs 使用 source_id/revision/unit_id。原题资料：'+json.dumps(sources,ensure_ascii=False)
+            return '练习专用：只返回 JSON {"questions":[{"question":"仅题干，不含答案或解题提示","origin":"source 或 self_created","source_refs":[]}]}。选择当前目标的1至2道题；优先使用下列原题，准确标来源；无合适原题则明确自编，origin=self_created。禁止抄入资料中的答案。核对近期讲解和补讲中的已解例题，优先选择需要迁移思路的新情境或新数值，不把刚刚完整演示过的同题再次当作独立练习；若原题已讲解，另选未演示原题，无合适题则自编变式并明确 origin=self_created。source_refs 使用 source_id/revision/unit_id。原题资料：'+json.dumps(sources,ensure_ascii=False)
         task=next(t for t in app.operation({'op':'practice.list'})['tasks'] if t['id']==job['task_id'])
         from .store import Store
         from .curriculum import source_unit

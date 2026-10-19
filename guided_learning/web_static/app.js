@@ -18,7 +18,8 @@ const labels={running:'讲解生成中 · 内容自动保存',completed:'讲解�
 function renderTurn(turn){
   if(turn.channel!=='mainline')return;
   let card=document.getElementById('turn-'+turn.id);
-  if(!card){card=document.createElement('article');card.id='turn-'+turn.id;card.innerHTML='<div class="turn-status"></div><div class="lesson-body"></div><div class="turn-controls"></div><details class="past"><summary>之前未完成的内容</summary><div></div></details>';document.querySelector('#lessons').append(card)}
+  if(!card){card=document.createElement('article');card.id='turn-'+turn.id;card.innerHTML='<h2 class="lesson-title"></h2><div class="turn-status"></div><div class="lesson-body"></div><div class="turn-controls"></div><details class="past"><summary>之前未完成的内容</summary><div></div></details>';document.querySelector('#lessons').append(card)}
+  card.querySelector('.lesson-title').textContent=turn.prompt_snapshot?.context?.concept?.title||state?.curriculum.concepts.find(c=>c.id===turn.concept_id)?.title||turn.concept_id;
   card.classList.toggle('incomplete',turn.status!=='completed');
   card.querySelector('.turn-status').textContent=labels[turn.status]+(turn.error?' — '+turn.error:'');
   const body=card.querySelector('.lesson-body');renderMarkdown(body,turn.text||'老师正在整理当前目标和资料…');events.dispatchEvent(new CustomEvent('rendered',{detail:{node:body,turn}}));

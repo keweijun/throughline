@@ -1,9 +1,42 @@
 """Read-only course navigation and exact-revision source access."""
 import hashlib
+import importlib.util
+import io
+import threading
 import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse, urlencode
 from .store import OperationError
+
+
+_PDF_LOCK=threading.Lock()
+
+
+def render_pdf_page(data,page_number):
+    if importlib.util.find_spec('pypdfium2') is None or importlib.util.find_spec('PIL') is None:
+        raise OperationError('renderer_unavailable','原页图像未显示：请安装项目 pdf 扩展，或使用原 PDF 链接。')
+    # PDFium forbids concurrent API calls, even for different documents.
+    with _PDF_LOCK:
+        import pypdfium2
+        try:
+            with pypdfium2.PdfDocument(data) as document:
+                if not isinstance(page_number,int) or not 1<=page_number<=len(document):
+                    raise OperationError('invalid_reference','Invalid PDF page')
+                page=document[page_number-1]
+                try:
+                    width,height=page.get_size()
+                    scale=min(2.0,1800/max(width,height))
+                    bitmap=page.render(scale=scale)
+                    try:
+                        image=bitmap.to_pil()
+                        try:
+                            output=io.BytesIO();image.save(output,format='PNG');return output.getvalue()
+                        finally: image.close()
+                    finally: bitmap.close()
+                finally: page.close()
+        except OperationError: raise
+        except Exception as exc:
+            raise OperationError('render_failed','原页图像渲染失败；可通过原 PDF 链接核对。') from exc
 
 
 def register(app):
@@ -48,13 +81,18 @@ def register(app):
         if hashlib.sha256(data).hexdigest()!=ref['revision']:
             raise OperationError('unavailable_source','Source snapshot integrity check failed')
         kind=Path(snapshot['path']).suffix.lower()
+        if query.get('image')==['1']:
+            if kind!='.pdf': raise OperationError('invalid_reference','Only PDF pages have rendered previews')
+            return render_pdf_page(data,unit.get('locator',{}).get('page')),'image/png'
         if query.get('raw')==['1']:
             if kind!='.pdf': raise OperationError('invalid_reference','Only registered PDF snapshots can be opened directly')
             return data,'application/pdf'
         route=app.operation({'op':'curriculum.view'})
         mapping=next((m for m in route['coverage'] if all(m.get(k)==v for k,v in ref.items())),{})
         current=next((s for s in app.operation({'op':'course.status'})['sources'] if s['id']==ref['source_id']),{})
-        return {**ref,**unit,'title':Path(snapshot['path']).name,'kind':kind,'verification':mapping.get('verification','pending'),'stale':current.get('revision')!=ref['revision'],
+        available=importlib.util.find_spec('pypdfium2') is not None and importlib.util.find_spec('PIL') is not None
+        return {**ref,**unit,'image_url':('/api/navigation/source?'+urlencode({**ref,'image':'1'})) if kind=='.pdf' and unit.get('locator',{}).get('page') and available else None,
+                'render_message':None if available else '原页图像未显示：需要安装项目 pdf 扩展。仍可打开原 PDF 核对。','title':Path(snapshot['path']).name,'kind':kind,'verification':mapping.get('verification','pending'),'stale':current.get('revision')!=ref['revision'],
                 'pdf_url':('/api/navigation/source?'+urlencode({**ref,'raw':'1'})+'#page='+str(unit['locator']['page'])) if kind=='.pdf' and unit.get('locator',{}).get('page') else None}
     app.routes[('GET','/api/navigation/source')]=source_view
     def overview_prompt(turn,context):

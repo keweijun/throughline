@@ -25,6 +25,7 @@ class LearningApp:
         self.closing = False
         self.workers = {}
         self.routes = {}
+        self.start_hooks = []
         self.prompt_hooks = []
         self.completion_hooks = []
         self.operation({'op':'course.status'})
@@ -67,7 +68,7 @@ class LearningApp:
 小问题按当前目标简答，明确要求深入则展开；不擅自推进下一小节。
 '''
         prompt += '\n课程路径与来源:\n'+json.dumps(snapshot,ensure_ascii=False)
-        prompt += '\n本次学习者要求:\n'+turn['prompt']
+        prompt += ('\n内部任务要求（非学习者交互）:\n' if turn['channel']=='preparation' else '\n本次学习者要求:\n')+turn['prompt']
         if turn['attempt']>1:
             prompt += '\n先前讲解被中断。本次从同一目标重新生成完整讲解，不假定上次部分内容已完成。'
         for hook in self.prompt_hooks:
@@ -84,6 +85,7 @@ class LearningApp:
                 for existing in self.operation({'op':'stream.list'})['turns']:
                     if existing['channel']=='mainline' and existing['status']=='running' and existing['id']!=request['id']:
                         raise OperationError('active_turn','Pause the current lecture before starting another')
+            for hook in self.start_hooks: hook(request)
             result = self.operation({**request,'op':'stream.start'})
             if result['created']: self._launch(result['turn'])
             return result
@@ -128,6 +130,7 @@ class LearningApp:
             worker = self.workers.get((identifier,previous['attempt']))
             if worker and worker[0].is_alive():
                 raise OperationError('stopping','Model is stopping; retry shortly')
+            for hook in self.start_hooks: hook(previous)
             result = self.operation({'op':'stream.resume','id':identifier,'request_id':request_id})
             if result['created']: self._launch(result['turn'])
             return result
@@ -142,12 +145,14 @@ class LearningApp:
         with self.lock:
             if self.closing: return
             self.closing = True
+            if hasattr(self, 'preparation_stop'): self.preparation_stop.set()
             workers = list(self.workers.items())
             for (identifier,_),(_,cancel) in workers:
                 self.pause_turn(identifier)
                 cancel.set()
         # No new workers can enter while shutdown joins the owned processes.
         for _,(thread,_) in workers: thread.join(12)
+        if hasattr(self, 'preparation_thread'): self.preparation_thread.join(2)
         self._lease.close()
 
 

@@ -14,15 +14,24 @@ def begin(store, request):
     question=require_text(request,'question')
     previous=store.get('web_branches',identifier)
     if previous:
-        if previous['question'] != question or previous['selection'] != request.get('selection',''):
+        if previous['question'] != question or previous['selection'] != request.get('selection','') or previous.get('selected_turn_id') != request.get('selected_turn_id'):
             raise OperationError('id_conflict',identifier)
         return {'branch':previous}
     position=store.get('course','position')
     if not position: raise OperationError('missing_mainline','Start a lesson before asking a side question')
+    selected_id=request.get('selected_turn_id')
+    selected=store.get('streams',selected_id) if selected_id else None
+    if selected_id and (not selected or selected['channel']!='mainline'):
+        raise OperationError('invalid_selection','Selected passage must belong to a lecture')
+    mains=sorted((t for t in store.list('streams') if t['channel']=='mainline'),key=lambda t:t['started_at'])
+    current_id=mains[-1]['id'] if mains else None
+    if request.get('main_turn_id') and request['main_turn_id']!=current_id:
+        raise OperationError('stale_mainline','Refresh the current lecture before asking')
     anchor=request.get('anchor',{})
     if not isinstance(anchor,dict): raise OperationError('invalid_request','anchor must be an object')
     branch={'id':identifier,'question':question,'selection':request.get('selection',''), 'anchor':anchor,
-            'restore_point':position,'main_turn_id':request.get('main_turn_id'), 'turn_id':'branch:'+identifier,
+            'restore_point':position,'main_turn_id':current_id,
+            'selected_turn_id':selected_id,'selected_lecture':selected, 'turn_id':'branch:'+identifier,
             'status':'unanswered','decision':None,'choice':None}
     store.put('web_branches',identifier,branch)
     return {'branch':branch}

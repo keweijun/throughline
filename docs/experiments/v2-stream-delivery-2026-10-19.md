@@ -28,7 +28,7 @@
 
 暂停、等待模型结束、关闭宿主再重开，仍恢复 paused 和部分内容；用户触发重新生成本节，得到新 attempt 的完整正文。正式 interaction 与完成正文逐字相同；重试原请求未重复生成或保存。样本包含玻尔假设、半径/能级推导、谱线关系与例子，并明确 pending 来源尚未完整核验。
 
-复现材料（忽略目录）：`work/worktrees/v2-stream/work/live-stream/check.py`、`result.json`、`final.md` 和独立 `course/` 副本。指标从宿主发起到持久流事件；前 200 字按字符计数，不是原生 Codex UI 实际绘制时间。
+复现材料（忽略目录）：`work/v2-acceptance/stream-delivery/check.py`、`result.json`、`final.md` 和独立 `course/` 副本。指标从宿主发起到持久流事件；前 200 字按字符计数，不是原生 Codex UI 实际绘制时间。
 
 ## 边界
 

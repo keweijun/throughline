@@ -19,4 +19,4 @@ guided-learning = "guided_learning.__main__:main"
 include = ["guided_learning*"]
 
 [tool.setuptools.package-data]
-guided_learning = ["web_static/*"]
+guided_learning = ["web_static/*", "web_static/vendor/*", "web_static/vendor/*/*", "web_static/vendor/katex/fonts/*"]

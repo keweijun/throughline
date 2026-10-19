@@ -1,11 +1,11 @@
-# 个人跨文档导学
+# Personal cross-document guided learning
 
-描述同一学习目标下，多份材料之间的教学组织与学习者推进选择。
+Concepts for organizing multiple materials around one learning goal and preserving learner control over advancement.
 
 ## Language
 
-**跨文档导学**：围绕同一学习目标，结合多份资料的知识联系组织并持续推进学习的过程。
-_Avoid_：将多文件问答或同时选择多份资料直接称为跨文档导学。
+**Cross-document guided learning**: Organizing and continually advancing one learning goal through knowledge connections across multiple sources.
+_Avoid_: Treating multi-file question answering or selecting several files alone as cross-document guided learning.
 
-**暂缓项**：学习者选择暂时跳过、仍保留在后续学习或检查范围内的内容。
-_Avoid_：已掌握、已完成、永久排除。
+**Deferred item**: Content temporarily skipped by the learner that remains in scope for later study or checking.
+_Avoid_: Mastered, completed, permanently excluded.

@@ -15,6 +15,6 @@
 | 直接请求完整解答 | 15.3 | Kmax=hν-W，单光子条件、电子数/光电流区别 |
 | 提交正确理由 | 8.6 | passed，但证据是 hinted，未计独立掌握 |
 
-原始输出位于忽略的 work/practice-live/results.json 与 evidence.json（v2-practice 工作树）。这是一次功能回放，不能当作性能承诺。该回放早于共享 record_user=false 补丁合入；练习实际答案始终另有独立记录，补丁后机器请求不再创建伪学习者交互。
+原始输出位于忽略的 work/v2-acceptance/practice-live/results.json 与 evidence.json。这是一次功能回放，不能当作性能承诺。该回放早于共享 record_user=false 补丁合入；练习实际答案始终另有独立记录，补丁后机器请求不再创建伪学习者交互。
 
 浏览器模块提供题目、自由选择帮助、作答、暂缓和下一节；节点更新保留草稿与阅读位置。完整浏览器联调由集成验收记录，本文不以静态代码作为浏览器通过证据。

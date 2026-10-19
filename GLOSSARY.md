@@ -1,44 +1,44 @@
-# 个人跨文档导学
+# Personal cross-document guided learning
 
-描述围绕同一学习目标组织多份材料，并在交互中保持教学连续性的概念。
+Concepts for organizing multiple materials around one learning goal and preserving teaching continuity through interaction.
 
 ## Language
 
-**跨文档导学**：结合多份资料的知识联系与先修关系，组织并持续推进同一学习目标的过程。
-_Avoid_：把多文件问答或多文件选择直接称为跨文档导学。
+**Cross-document guided learning**: Organizing and advancing one learning goal using knowledge connections and prerequisites across multiple sources.
+_Avoid_: Calling multi-file question answering or file selection alone cross-document guided learning.
 
-**暂缓项**：学习者选择暂时跳过、仍保留在后续学习或检查范围内的内容。
-_Avoid_：已掌握、已完成、永久排除。
+**Deferred item**: Content the learner chooses to skip temporarily that remains in scope for later learning or review.
+_Avoid_: Mastered, completed, permanently excluded.
 
-**教学主线**：当前正在推进的学习目标及为达成它而组织的讲解和练习进程。
-_Avoid_：聊天记录、课件文件顺序。
+**Teaching mainline**: The active learning goal and the sequence of explanations and practice organized to achieve it.
+_Avoid_: Chat history, slide file order.
 
-**旁支问题**：学习者在教学主线中提出的局部疑问或延伸问题，其回答范围需要结合当前目标和课程路径判断。
-_Avoid_：跑题、无关问题。
+**Side question**: A local question or extension raised during the teaching mainline, whose scope depends on the current goal and course route.
+_Avoid_: Off-topic, irrelevant question.
 
-**路径感知答疑**：根据当前学习目标、先修关系、后续安排和已知困惑，决定旁支问题回答深度并保持教学连续性的答疑方式。
-_Avoid_：统一简答、统一展开、按问题字数决定深度。
+**Route-aware question answering**: Choosing side-question depth using the current goal, prerequisites, upcoming topics, and known difficulties while preserving teaching continuity.
+_Avoid_: Always brief, always detailed, depth determined by question length.
 
-**待补解释**：已经给出足够当前使用的回答，但完整解释被明确安排到后续知识点的内容。
-_Avoid_：已解决、忽略的问题。
+**Pending explanation**: Content answered sufficiently for current use whose full explanation is explicitly scheduled for a later concept.
+_Avoid_: Resolved, ignored question.
 
-**主线恢复点**：进入旁支前尚未完成的教学位置，包括当前目标、讲解进展与待续步骤。
-_Avoid_：聊天末尾、最新消息。
+**Mainline restore point**: The unfinished teaching position before a branch, including the current goal, explanation progress, and remaining steps.
+_Avoid_: End of chat, latest message.
 
-**学习小节**：围绕一个可解释或可应用的完整目标组织的教学单元，可以跨多份材料和多轮对话，结束时集中练习。
-_Avoid_：单条回复、固定页数、课件小标题。
+**Learning section**: A teaching unit organized around a complete goal that can be explained or applied; it may span sources and turns and ends with grouped practice.
+_Avoid_: Single reply, fixed page count, slide subheading.
 
-**覆盖台账**：记录资料中各项教学内容对应知识点、来源位置及纳入或暂缓情况的清单；不表示学习者已经掌握。
-_Avoid_：掌握度、已读进度。
+**Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
+_Avoid_: Mastery, reading progress.
 
-**单元导览**：开始一组相关学习内容时，说明核心问题、主要步骤、前后联系及目标能力的整体介绍。
-_Avoid_：仅列课件目录、逐项知识点清单。
+**Unit overview**: An introduction to related learning content explaining its core problem, main steps, connections, and target ability.
+_Avoid_: Contents alone, a list of concepts alone.
 
-**学习伴随面板**：与教学对话并列，持续呈现课程结构、当前位置及相关材料的学习视图。
-_Avoid_：独立维护进度的第二套课程、完整聊天镜像。
+**Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.
+_Avoid_: A second course with separate progress, a complete chat mirror.
 
-**备课材料**：为某个学习小节准备的目标、来源核对、讲解要点、例子、练习和疑点记录，供教师在实际教学中使用。
-_Avoid_：必须照读的最终讲稿、学习者掌握证据。
+**Preparation material**: Goals, source checks, teaching points, examples, exercises, and uncertainty notes prepared for a learning section and used by the teacher during instruction.
+_Avoid_: A final script that must be read verbatim, evidence of learner mastery.
 
-**备课就绪**：某个小节的备课材料已达到开始该小节教学所需的准备程度。
-_Avoid_：学习完成、已掌握、所有来源永久有效。
+**Preparation readiness**: The preparation material for a section is sufficient to begin teaching it.
+_Avoid_: Learning completed, mastered, all sources permanently valid.

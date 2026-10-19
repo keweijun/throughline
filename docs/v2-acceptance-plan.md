@@ -1,26 +1,26 @@
-# V2 验收执行计划
+# V2 acceptance execution plan
 
-基线：集成分支从 V1 提交 deeea3e 开始，原有 33 项测试在 2026-10-19 全部通过。规格 #9，子任务 #10–#15。本文是执行计划，不是通过报告。
+Baseline: the integration branch starts at V1 commit deeea3e; all 33 existing tests passed on 2026-10-19. Specification #9, tasks #10–#15. This is a plan, not a passing report.
 
-## 自动化与课程状态
+## Automation and course state
 
-每个任务在既定公开边界先写失败测试，再实现对应行为。最终完整运行原有及新增测试，验证幂等、暂停后迟到事件、断线、重开、路线切换和旧备课结果。不得通过直接写数据库凑验收状态。
+For each task, write failing tests at the agreed public boundary before implementation. Run the full existing/new suite at the end, checking idempotency, late events after pause, disconnect, reopen, route switches, and stale preparation. Do not manufacture acceptance state by writing directly to the database.
 
-## 真实通道
+## Real channel
 
-使用当前已配置的 Codex 通道，模型 gpt-6.1-sol、medium；不改用户凭据，不新增付费回退。真实调用在可追踪的独立任务中运行。基础性能比较串行执行；并发场景单独标明，避免混淆负载。
+Use the configured Codex channel with gpt-6.1-sol / medium. Preserve credentials and avoid new paid fallbacks. Run traceable isolated real calls. Run baseline comparisons serially and label concurrent workloads separately.
 
-1. 完整讲解：保存请求、完成状态、前 200 字时间、全文时间、字符数、记录一致性。
-2. 暂停恢复：暂停运行中的请求，确认部分内容不记完成；恢复后形成有效完成记录，迟到内容不污染新任务。
-3. 主线和旁支并发：主线生成时提交局部问题，检查各自记录、回答范围和恢复点。
-4. 下一节备课：验证实际备课结果、故障降级及版本失效；对照前台问题在无备课与有备课场景的延迟，报告样本数。
+1. Full lesson: save request, completion status, first-200-character time, full time, character count, and record equality.
+2. Pause/recovery: pause a running request, keep partial text unfinished, then regenerate a valid completion; late content must not pollute a new attempt.
+3. Mainline/branch concurrency: submit a local question while the mainline generates; check separate records, answer scope, and restore point.
+4. Next-section preparation: validate real output, fallback, and version invalidation; compare foreground-question latency with/without preparation and report sample counts.
 
-## 浏览器
+## Browser
 
-使用真实服务与真实课程副本，验证整课目录、当前位置、单元导览、只预览不跳转、来源原页、选句提问、补讲接受/拒绝、暂停返回、练习提示/解答/暂缓和主动下一节。桌面与窄屏各检查一次；检查内容增长不强制滚动，辅助视图切换保留位置。
+Use the actual service and a real course copy. Check course contents, position, overview, preview isolation, original pages, selected-passage questions, accepting/declining supplements, pause/return, hints/solutions/deferral, and voluntary next-section entry. Check desktop and narrow layouts, stable scrolling during growth, and position retention across auxiliary views.
 
-## 教学与数据
+## Teaching and data
 
-真实量子课程从现有 SQLite 数据库只读备份至隔离目录，复制来源快照。测试不改原课程，不把示范答案写成独立掌握。来源既有待核验状态必须可见，不能因 UI 接入而宣称全材料已审核。
+Create an isolated read-only SQLite backup of the existing quantum course and copy source snapshots. Do not modify the original or record demonstrations as independent mastery. Keep pending source verification visible; UI integration does not establish full-material review.
 
-验收报告分开记录程序、真实模型、浏览器、教学质量、性能以及未解决问题。单次输出此前三组收益只作为依据，不作为稳定性能保证。
+Report program, real-model, browser, teaching, performance, and unresolved results separately. Earlier single-output results inform the approach without guaranteeing stable performance.

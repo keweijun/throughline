@@ -1,57 +1,57 @@
-# 第一版任务拆分
+# V1 task breakdown
 
-状态：用户已确认粒度、依赖与测试边界，已发布为 GitHub Issues。每个任务完成一条可演示的路径，并提供对应 skill 操作说明及必要验证，不按数据库、脚本、skill 等横向层拆分。
+Status: task size, dependencies, and testing boundaries confirmed and published as GitHub Issues. Each task delivers a demonstrable path, skill instructions, and necessary validation rather than horizontal database/script/skill layers.
 
-## 1. 建课、登记材料并恢复课程
+## 1. Create a course, register materials, and resume
 
-依赖：无。
+Dependencies: none.
 
-交付：通过 skill 指导的统一操作入口创建课程，登记普通本地 PDF/Markdown 来源及读取结果，保存基本学习位置；新进程打开同一课程能接续。
+Deliver a unified skill-guided operation entrypoint for creation, ordinary local PDF/Markdown registration and read results, position saving, and reopening the same course from a new process.
 
-验收：稳定来源标识；来源位置可追溯；读取失败与待核验可见；不同课程隔离；重复登记与中断重开不丢记录；至少一个小材料贯通建立、读取、保存和恢复。此任务不声称完成全课程知识点提取。
+Acceptance: stable source IDs and traceable locations; visible failures/pending verification; course isolation; no lost records on duplicate registration or reopen; one small fixture spans creation, reading, saving, and resuming. This does not establish full-course extraction.
 
-## 2. 生成可审计的跨文档学习路线
+## 2. Build an auditable cross-document route
 
-依赖：1。
+Depends on 1.
 
-交付：教师将来源内容整理为知识点、先修关系、符号对照与习题映射，系统检查覆盖与路线有效性，并提供当前目标所需上下文。
+The teacher organizes concepts, prerequisites, notation comparisons, and exercise mappings; the system validates coverage/routes and provides focused context.
 
-验收：多个来源可以指向同一概念并保留增量细节；未知引用与先修循环明确报错；页面内容能映射、暂缓或标待核验；整体路线可查看；材料变更使受影响内容重新检查，保留既有证据，大幅改序需确认。
+Acceptance: multiple sources can map to one concept while retaining added details; reject unknown references and cycles; map, defer, or mark page content for review; expose the route; recheck affected content after updates while retaining evidence; confirm major reordering.
 
-## 3. 路径感知答疑与主线接续
+## 3. Route-aware answers and mainline continuity
 
-依赖：2。
+Depends on 2.
 
-交付：围绕当前目标处理短答、关键基础、后续知识和重复困惑，保留主线恢复点与待补解释；到达关联节点时回访。
+Handle brief answers, key foundations, future knowledge, and repeated difficulties around the current goal. Retain restore points and pending explanations; revisit linked nodes.
 
-验收：短旁支后能接回；长解释后能停下；用户明确深入优先；旁支中断后仍能恢复；重复困惑改变解释策略；每个真实交互有记录；程序状态检查和教师回放分别验证。
+Acceptance: resume after brief branches, wait after long ones, prioritize explicit depth, recover interrupted branches, change strategy for repeated difficulty, record actual interactions, and validate program state separately from teaching replay.
 
-## 4. 小节练习、学习证据与暂缓回访
+## 4. Section practice, evidence, and deferred review
 
-依赖：2。
+Depends on 2.
 
-交付：小节末集中练习、提示、完整示范与跳过，并根据真实证据区分学习状态；重开时短回顾，按约定回访暂缓项。
+Support grouped practice, hints, full demonstrations, and skipping, distinguishing learning states by actual evidence. Resume with a brief recap and revisit deferred work at agreed points.
 
-验收：自述理解和教师答案不等同于独立作答；提示次数或程度与证据关联；用户可继续；重复提交不重复计入；只有合法证据能支持对应进展；回访适时出现而非每轮催促。独立于任务 3 的旁支实现可先完成。
+Acceptance: self-reports and teacher answers are not independent learner work; link hint count/degree to evidence; allow continuation; prevent duplicate counting; require valid evidence for progress; show timely review rather than reminders every turn. This can precede the independent branch implementation in task 3.
 
-## 5. 可恢复的 Luna 整理任务与降级
+## 5. Recoverable Luna consolidation and fallback
 
-依赖：3、4。
+Depends on 3 and 4.
 
-交付：从真实教学和练习交互发起可选整理任务，宿主可调用 Luna 时生成候选更新；不可用时保留待办，主教师照常使用最新状态。
+Create optional consolidation tasks from real teaching/practice interactions. Host-provided Luna may produce candidates; otherwise preserve pending tasks while the teacher uses current state.
 
-验收：提交、暂停、恢复与重试可演示；结果携带依据和版本；旧结果不覆盖新交互，重试不重复计入；无自动付费 API；对宿主真实调用和不可用两种情形分别诚实记录。依赖 3、4 是为了针对两类实际状态验证冲突处理，而非只验证空任务队列。
+Acceptance: demonstrate submit, pause, resume, and retry; results carry evidence and versions; stale results preserve newer interactions and retries are idempotent; no automatic paid API calls; report real-host and unavailable-host cases honestly. Dependencies ensure conflict checks cover actual teaching and evidence states rather than an empty queue.
 
-## 6. 八份材料接入与完整教学验收
+## 6. Import eight documents and complete teaching acceptance
 
-依赖：1–5。
+Depends on 1–5.
 
-交付：在本地以真实八份材料建立完整覆盖图，贯通波函数→本征态→投影的跨文档路线，完善安装/使用说明并生成验收报告。
+Build a local coverage map from the actual eight documents and validate wavefunctions → eigenstates → projection. Finish installation/usage documentation and acceptance reporting.
 
-验收：每份资料有明确读取与覆盖状态；公式、图像和页码映射抽查；未核验内容不标完成；回放局部符号、关键基础、后续知识、重复困惑、跳过与重开；模拟 Luna 不可用；运行全部程序测试并完成规格/标准审查。教学功能、真实模型集成和材料验证的未通过项单独列出，不用合成数据代替真实材料验收。
+Acceptance: explicit read/coverage status per source; spot-check formulas, images, and page mappings; do not complete unverified content; replay notation, key foundations, future knowledge, repeated difficulty, skipping, and reopen; simulate missing Luna; run all tests and standards/spec review. List teaching, real-model, and material-validation failures separately; synthetic fixtures do not replace real-material acceptance.
 
-## 依赖关系
+## Dependencies
 
-1 → 2 → {3, 4} → 5 → 6。
+1 → 2 → {3, 4} → 5 → 6.
 
-用户已确认上述粒度、依赖及测试边界。六项任务对应 GitHub #2–#7，已按依赖实施；程序、真实材料、教学回放和模型集成结果分别记录于 acceptance-v1.md。
+The user confirmed this scope, graph, and testing boundary. The six tasks correspond to GitHub #2–#7 and were implemented in dependency order. Program, materials, teaching replay, and model integration results are separate in acceptance-v1.md.

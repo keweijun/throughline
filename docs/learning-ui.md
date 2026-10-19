@@ -1,34 +1,36 @@
-# 学习界面使用与恢复
+# Learning interface usage and recovery
 
-在项目根目录安装 `python -m pip install -e ".[pdf]"`（应使用项目虚拟环境内的 Python），然后运行：
+From the project root, install `python -m pip install -e ".[pdf]"` using the project virtual environment, then run:
 
 ```powershell
 .\.venv\Scripts\python.exe -m guided_learning.web --workspace work/courses/quantum-v1 --port 8765 --model gpt-6.1-sol --effort medium
 ```
 
-只监听本机回环地址；访问 http://127.0.0.1:8765。保留终端，Ctrl+C 关闭。无需 Node 构建或 CDN，Markdown、KaTeX、DOMPurify 和 WOFF2 字体随包分发。Codex CLI 必须在 PATH，且当前配置通道能调用指定模型；PDF 显示依赖 pypdfium2/Pillow，包含在 `pdf` 安装扩展内。
+The host listens only on loopback; open [the interface](http://127.0.0.1:8765). Keep the terminal open; Ctrl+C stops it. No Node build or CDN is needed: Markdown, KaTeX, DOMPurify, and WOFF2 fonts are bundled. Codex CLI must be on PATH with a configured provider supporting the requested model. PDF rendering uses pypdfium2/Pillow from the `pdf` extra.
 
-## 学习
+The UI and teaching default to English. Explicitly request another language in your lesson or question prompt when needed. Sources and saved learning records keep their original language.
 
-- 左侧目录点击只预览，不移动主线；当前位置由中间目标和小节状态说明。首次授课正文先给具体单元导览，再直接讲解。
-- 正文流式出现并自动保存。已讲解与已掌握分别记录；无需让教师再写一份讲稿。
-- 选中一句话或公式后点击“就这句提问”，或使用旁支答疑入口。普通问题保留主线；先修补讲建议由你接受，补讲后返回原目标。
-- 来源按钮打开精确登记版本的 PDF 原页。pending 表示尚未核验，不因模型引用就变为已核验。
-- 小节结束自动准备练习。提示、关键步骤和完整答案可自由选；“稍后做”保留待办，“进入下一小节”由你控制。看过答案或接受帮助后的正确作答不记为独立掌握。
-- 下一小节备课在空闲时进行。前台讲解、答疑和练习优先，备课失败不阻止教师自行准备。就绪只表示内部材料可用。
+## Learning
 
-## 暂停、关闭与重新打开
+- Left-side concepts preview without moving the mainline; the central goal and section state show your position. The first lesson begins with a concrete unit overview and then teaches directly.
+- Text streams and saves automatically. Taught content and mastery remain separate; the teacher does not need to write a second script.
+- Select a sentence/formula and click "Ask about this passage," or open "Side questions." Ordinary questions preserve the mainline. Choose whether to accept foundation supplements and return to the original goal afterward.
+- Source buttons open the exact registered PDF revision. Pending verification stays pending even when a model cites it.
+- Exercises are prepared at section completion. Freely request hints, steps, or full solutions. "Do later" retains pending work; you choose "Enter next section." Correct answers after viewing a solution or receiving help are not independent mastery.
+- Next-section preparation runs when idle. Teaching, questions, and practice take priority; failed preparation does not block the teacher from preparing independently. Ready means internal material is available.
 
-“停一下”停止当前生成请求，保留收到的部分内容但不当成完整讲解。“重新生成本节”保留旧尝试并发起新的一节，不是从字符断点继续。等待模型取消完成后再试。
+## Pause, close, and reopen
 
-关闭浏览器不会关闭宿主；终端仍运行时，生成和备课可以继续。关闭终端宿主则停止后台工作。重新运行同一工作区会恢复正式记录，并将意外中断的请求标明；不把部分讲解升级为完成。一个课程只能由一个宿主占用。
+"Pause" stops the current generation request, retaining partial text as unfinished. "Regenerate section" retains the old attempt and starts a complete new lesson rather than continuing from a character offset. Wait for model cancellation to finish before retrying.
 
-更换机器时复制完整课程目录，包括 course.sqlite3 和 sources 中的版本快照；请先关闭宿主再复制。学习材料、课程状态和模型日志不包含在 Git 仓库里。
+Closing the browser does not stop the host; generation/preparation can continue while the terminal runs. Closing the host stops background work. Reopening the same workspace restores official records and marks unexpectedly interrupted requests without completing partial lessons. Only one host may own a course.
 
-## 常见问题
+To change machines, copy the full course directory, including `course.sqlite3` and revision snapshots under `sources`, after stopping the host. Materials, state, and model logs are outside Git.
 
-- 端口被占用：更换 `--port`，并访问对应 URL。若提示同一课程已有宿主，回到原窗口，勿并行启动第二份。
-- 模型失败：检查终端能否使用自己的 Codex 配置；失败状态和部分内容会保留，不应连续盲目重试。此应用不会替你修改认证。
-- 原页未显示：在相同虚拟环境重新安装 `.[pdf]`，或使用界面提供的原 PDF 链接。
-- 备课失败：可在界面显式重试；无需等它成功才学习。
-- 报告问题：提供操作、可见状态和错误文本即可；不要粘贴 Codex 配置密钥。
+## Troubleshooting
+
+- Port occupied: change `--port` and use its URL. If the course already has a host, return to that window rather than starting a second host.
+- Model failure: check the terminal's Codex configuration. Failed state and partial text are retained; inspect before repeated retries. The app does not change authentication.
+- Page image unavailable: reinstall `.[pdf]` in the same environment or use the original PDF link.
+- Preparation failure: retry explicitly in the UI; learning can continue without it.
+- Report problems with the action, visible state, and error text. Keep configuration secrets out of reports.

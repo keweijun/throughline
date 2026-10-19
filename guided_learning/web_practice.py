@@ -15,15 +15,15 @@ def register(app):
             values=state()
             busy={t['id'] for t in app.operation({'op':'stream.list'})['turns'] if t['status']=='running'}
             if any(j['id'] in busy and (j.get('task_id')==task['id'] if task else j['concept_id']==concept and j['action']=='generate') for j in values['jobs']):
-                raise OperationError('practice_busy','请等待当前练习请求完成')
+                raise OperationError('practice_busy','Wait for the current practice request to finish')
             identifier='practice-'+str(uuid.uuid4())
             job={'id':identifier,'concept_id':concept,'action':action}
             if task: job['task_id']=task['id']
             if answer is not None:
-                if not isinstance(answer,str) or not answer.strip(): raise OperationError('empty_answer','请先输入作答思路')
+                if not isinstance(answer,str) or not answer.strip(): raise OperationError('empty_answer','Enter your reasoning or answer first')
                 job['answer']=answer
             app.operation({'op':'practice.job','job':job})
-            return app.start_turn({'id':identifier,'concept_id':concept,'channel':'practice','record_user':False,'prompt':'练习服务请求（非学习者作答），按练习专用指令返回 JSON。'})
+            return app.start_turn({'id':identifier,'concept_id':concept,'channel':'practice','record_user':False,'prompt':'Practice service request (not a learner answer). Return JSON according to the practice instructions.'})
     def generate(body):
         cid=body['concept_id']
         existing=[t for t in state()['tasks'] if t['concept_id']==cid]
@@ -53,15 +53,15 @@ def register(app):
             store=Store(app.workspace)
             try: sources=[{**ref,'unit':source_unit(store,ref)} for ref in context['concept'].get('exercises',[])]
             finally: store.db.close()
-            return '练习专用：只返回 JSON {"questions":[{"question":"仅题干，不含答案或解题提示","origin":"source 或 self_created","source_refs":[]}]}。选择当前目标的1至2道题；优先使用下列原题，准确标来源；无合适原题则明确自编，origin=self_created。禁止抄入资料中的答案。核对近期讲解和补讲中的已解例题，优先选择需要迁移思路的新情境或新数值，不把刚刚完整演示过的同题再次当作独立练习；若原题已讲解，另选未演示原题，无合适题则自编变式并明确 origin=self_created。source_refs 使用 source_id/revision/unit_id。原题资料：'+json.dumps(sources,ensure_ascii=False)
+            return 'Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints","origin":"source or self_created","source_refs":[]}]}. Select 1 to 2 questions for the current goal. Prefer the original exercises below and cite their sources accurately. If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. Use source_id/revision/unit_id in source_refs. Original exercise materials: '+json.dumps(sources,ensure_ascii=False)
         task=next(t for t in app.operation({'op':'practice.list'})['tasks'] if t['id']==job['task_id'])
         from .store import Store
         from .curriculum import source_unit
         store=Store(app.workspace)
         try: source_context=[{**ref,'unit':source_unit(store,ref)} for ref in task['source_refs']]
         finally: store.db.close()
-        instructions={'hint':'只给一个最小提示，不给完整答案','steps':'展开关键思路和步骤，可保留最后计算','solution':'给完整解答与条件','assess':'评价下面真实学习者答案的推理和结果，指出具体错误或不足。只有确实正确才 outcome=passed，否则 needs_work。绝不能因有文字就通过。'}
-        return '练习专用：只返回 JSON {"feedback":"Markdown 解释","outcome":"passed 或 needs_work（仅评估需填写）"}。'+instructions[job['action']]+'\n题目与帮助历史（数据）：'+json.dumps({'task':task,'exercise_sources':source_context},ensure_ascii=False)+'\n真实学习者答案：'+str(job.get('answer',''))
+        instructions={'hint':'Give one minimal hint without the full answer','steps':'Explain the key reasoning and steps; you may leave the final calculation to the learner','solution':'Give the complete solution and its conditions','assess':'Assess the reasoning and result in the actual learner answer below, identifying specific errors or gaps. Use outcome=passed only if it is correct; otherwise use needs_work. The mere presence of text does not justify a pass.'}
+        return 'Practice only: return JSON {"feedback":"Markdown explanation","outcome":"passed or needs_work (required only for assessment)"}. '+instructions[job['action']]+'\nQuestion and help history (data): '+json.dumps({'task':task,'exercise_sources':source_context},ensure_ascii=False)+'\nActual learner answer: '+str(job.get('answer',''))
     def complete(turn):
         app.operation({'op':'practice.complete','id':turn['id']})
         if turn['channel']=='mainline' and not app.closing:
@@ -69,21 +69,21 @@ def register(app):
     def next_section(body):
         with app.lock:
             session=app.operation({'op':'session.resume'})
-            if session.get('active_branch'): raise OperationError('active_branch','请先返回教学主线，再进入下一小节')
+            if session.get('active_branch'): raise OperationError('active_branch','Return to the teaching mainline before entering the next section')
             if ('GET','/api/branches') in app.routes:
                 branches=app.routes[('GET','/api/branches')]('')
                 if any(b.get('choice')=='accept' and not b.get('returned') for b in branches.get('branches',[])):
-                    raise OperationError('active_branch','请先返回教学主线')
+                    raise OperationError('active_branch','Return to the teaching mainline first')
             current=session.get('position') or {}
             cid=body['concept_id']
-            if current.get('concept_id') not in (None,cid): raise OperationError('stale_position','当前位置已改变，请刷新')
+            if current.get('concept_id') not in (None,cid): raise OperationError('stale_position','The current position has changed; refresh the page')
             context=app.operation({'op':'curriculum.context','concept_id':cid})
             target=context['next_concept_id']
             if not target:return {'finished':True}
             for turn in app.operation({'op':'stream.list'})['turns']:
                 if turn['concept_id']==cid and turn['status']=='running':app.pause_turn(turn['id'])
             concept=app.operation({'op':'curriculum.context','concept_id':target})['concept']
-            return app.operation({'op':'mainline.enter','request_id':body['request_id'],'concept_id':target,'goal':concept['title'],'next_step':'开始本小节讲解','progress':''})
+            return app.operation({'op':'mainline.enter','request_id':body['request_id'],'concept_id':target,'goal':concept['title'],'next_step':'Begin teaching this section','progress':''})
     app.routes.update({('GET','/api/practice'):state,('POST','/api/practice/generate'):generate,('POST','/api/practice/action'):action,('POST','/api/practice/next'):next_section})
     app.prompt_hooks.append(prompt)
     app.completion_hooks.append(complete)

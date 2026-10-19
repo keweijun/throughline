@@ -1,106 +1,102 @@
-# 第二轮设计：实战反馈、课程导览与伴随面板
+# Second design round: field feedback, course overviews, and companion panel
 
-状态：讨论阶段。仅记录设计与事实，不修改实现或真实课程状态，不启动服务或原型。
+Status at interview start: discussion only. Record design/facts without implementation changes, real-course writes, services, or prototypes. Later sections record subsequent authorization and progress.
 
-## 实战依据
+## Field evidence
 
-用户指定聊天：`01a13495-be40-74a3-bddd-30cc34e53310`，标题“开始 quantum-v1 课程”。用户反馈完整讲解通常等待约两分钟，小问题相对较快；对当前位置不够清楚，希望大节前有 big picture，并考虑 UI。
+User-specified chat `01a13495-be40-74a3-bddd-30cc34e53310`, whose title translates as "Start the quantum-v1 course," reported roughly two-minute waits for full explanations, faster small questions, unclear position, and a desire for a big picture before major units and possibly a UI.
 
-读取最近 10 个回合的工具摘要：总耗时中位数约 142.5 秒，范围 88.5–227.6 秒；各回合已记录的命令运行时间合计约 1.3–2.7 秒。回合总耗时不是首字延迟，命令耗时也没有包含全部读图、模型与工具往返成本，不能据此精确归因。
+Tool summaries for ten recent turns showed median total duration about 142.5 s, range 88.5–227.6 s; recorded command runtimes totaled about 1.3–2.7 s per turn. Total turn time is not first-character latency, and command totals omit some image/model/tool round trips, so precise attribution is unavailable.
 
-观察到进入新内容时读取和查看多张原页；完整长回答先作为脚本文本保存，再在最终回复中输出。是否以及多大程度影响等待仍需分段测量。
+Entering new content involved reading/viewing several original pages. Full answers were first saved as script text and then output in the final reply. Segment measurements were needed to establish the effect on waiting.
 
-## 已确认偏好
+## Confirmed preferences
 
-- 保留当前完整讲解长度，不以缩短内容作为默认提速方式。
-- 保留小问题较快回应的体验。
-- 当前先采用 Codex 原生聊天旁的伴随面板；未来可考虑将聊天接入自有学习界面。
-- 面板与教师共用正式课程状态，延续现有课程工作区归属决定。
-- 用户要求先讨论，不直接修复；本轮通过 ask-matt 接续设计流程。
-- Q1：默认整课目录加当前大单元的简短流程图，详细知识依赖按需展开。
-- Q2：点击知识点只预览，不直接改变教学位置。
-- Q3：用户接受主教师、同档独立备课代理与 Luna 整理的分工，并提出以小节为细粒度、按流水线提前备课。整单元先规划、小节逐步产出的方向成立；提前窗口与备课未就绪时的行为仍待选择。
-- Q4：用户接受缓冲未就绪时由主教师接管必要备课、显示准备状态，不因辅助代理失效阻塞教学，也不省略必要核对。
-- 用户明确提出：已有备课资料是否真能加快主教师响应仍不确定，应以对照测试验证，不能预设有效。
+- Preserve full explanation length; shortening is not the default speed strategy.
+- Preserve quick responses to small questions.
+- Initially use a companion panel alongside native Codex chat; potentially move chat into a custom interface later.
+- Panel and teacher share official workspace state, preserving the ownership decision.
+- Discuss first rather than directly fix; continue the design process through ask-matt.
+- Q1: default to course contents plus a short flowchart for the current major unit; expand detailed dependencies on demand.
+- Q2: clicking a concept previews only, without moving teaching position.
+- Q3: accept main teacher, independent preparation agent of the same model tier, and Luna consolidation. Plan the unit and pipeline preparation by section; the look-ahead window and unavailable-preparation behavior still needed selection.
+- Q4: accept the main teacher taking over necessary preparation when the buffer is unready, with visible status. Auxiliary failures must neither block teaching nor eliminate source checks.
+- Explicitly test whether preparation actually accelerates the teacher; do not assume it works.
 
-## 尚未确认的建议
+## Suggestions not yet confirmed at this stage
 
-- 在大单元开始时提供一屏单元导览，学习中持续显示当前位置。
-- 已接受的分工：主教师确定当前单元目标、学习者相关约束与路线；独立的同档备课代理准备来源、关键推导、例子、练习及疑点；Luna 可处理索引和候选记录整理。主教师审阅后使用备课结果，避免每轮重做全部资料核验。尚未运行。
-- 整单元备课应产出可按小节使用的备课材料，而不是预先锁定整章最终讲稿；实时问题和教学深度仍由主教师处理。
-- 流水线建议：首次先形成单元导览并备好第一节，教学期间滚动准备后续 1–2 节；先限制一个活跃备课代理，避免抢占教学资源。备课只写独立的备课材料，不改变主线位置或掌握证据。来源版本或路线发生相关变化时使备课结果待复核。
-- 必须分别呈现“备课已就绪”和“学习者已学过/掌握”，两者不可互推。切换路线时可保留可复用材料，停止或降低无关待办优先级。
-- 减少长回答重复生成，但当前桌面聊天能否由程序自动收取最终文本尚待验证。
-- 伴随面板优先显示课程结构、当前目标、资料和未完成事项，未来复用为学习客户端。
+- Show a one-screen overview at a major unit's start and retain current position during learning.
+- Accepted role direction: main teacher sets unit goals, learner constraints, and route; independent same-tier preparation agent checks sources, derivations, examples, exercises, and uncertainties; Luna may index/consolidate candidates. The teacher reviews preparation rather than repeating every check each turn. Not yet run.
+- Unit planning should produce section-level materials rather than lock in a final chapter script; the teacher handles live questions and depth.
+- Suggested pipeline: create the overview and prepare section one initially, then roll ahead 1–2 sections during teaching, with one active preparation agent initially. Preparation writes separate material, never position/mastery. Relevant route/source changes require re-review.
+- Distinguish preparation ready from studied/mastered. Keep reusable material on route switches and stop or deprioritize irrelevant tasks.
+- Reduce duplicate full-answer generation; automatic capture from desktop chat remained unverified.
+- Prioritize structure, goals, sources, and unfinished work in the panel, with future learning-client reuse.
 
-## 设计树与本轮前沿
+## Design tree and frontier
 
-1. 已定：当前伴随面板。
-   - Q1 已定：目录与局部流程。
-   - Q2 已定：点击只预览。
-2. 已定：保留讲解长度，改善等待。
-   - Q3 已定方向：整单元规划、小节粒度备课、同档独立代理执行。
-   - Q4 已定：主教师按需接管必要备课。
-   - 核心待证假设：经过核对的备课材料能否在保留讲解长度与质量的前提下，缩短主教师交付讲解的时间？
-   - 运行生命周期、原始回答捕获与能力可用性由只读探索确认，事实未定前不承诺后台行为。
-3. 上述决定形成后：用界面原型回答布局问题，再整理规格与任务；本轮尚未授权启动原型。
+1. Companion panel accepted initially; contents/local flow and preview-only clicks decided.
+2. Preserve explanation length while improving waiting. Unit planning, section preparation, same-tier independent execution, and teacher takeover accepted in direction. Core hypothesis: can checked preparation shorten delivery while preserving length and quality? Read-only exploration must establish lifecycle, authoritative-answer capture, and availability before promising background behavior.
+3. After those decisions, use an interface prototype for layout questions, then specifications/tasks. No prototype was authorized at that point.
 
-## 技术背景边界
+## Technical boundaries
 
-OpenAI 官方 App Server 文档提供自建客户端接入方向（会话、流式事件、审批等）：https://learn.chatgpt.com/docs/app-server 。这不是对当前桌面对话能被另一个界面无缝接管、或完整桌面插件能力均可迁移的保证。今后需要通过针对性验证确认。
+Official [App Server documentation](https://learn.chatgpt.com/docs/app-server) describes custom-client sessions, streaming, approvals, and related integration. It does not guarantee seamless takeover of desktop conversations or migration of all desktop plugin capabilities.
 
-只读探索见 work/v2-feasibility.md：现有 background 操作仅服务笔记整理，没有备课缓存或流水线调度，也没有桌面最终回复自动捕获。官方子代理文档确认并行委派与模型选择，但典型流程会收集结果后统一答复（https://learn.chatgpt.com/docs/agent-configuration/subagents）。尚未本机验证父回合结束、用户下一次发言、停止或应用退出后的子代理生命周期。需小型隔离运行实验确认是否能持续填充备课缓冲，不能直接承诺跨用户回合无阻塞运行；本轮仅讨论，没有启动实验。
+Read-only exploration in `work/v2-feasibility.md` found background operations only for note consolidation: no preparation cache, pipeline scheduler, or automatic desktop-final capture. [Subagent documentation](https://learn.chatgpt.com/docs/agent-configuration/subagents) describes concurrency/model selection, but typical flows collect results before a combined reply. Local lifecycle after a parent turn, new user message, stop, or app exit was untested. An isolated experiment was needed before promising a preparation buffer across user turns; discussion alone started none.
 
-## 备课收益对照测试
+## Preparation benefit comparison
 
-用户已授权初筛，完成3组A/B配对，详见 experiments/preparation-latency-2026-10-13.md。模型为当前CLI自定义通道的 gpt-6.1-sol / medium。六份讲稿独立内容检查均通过；本样本教师阶段合计快22.4%，但一组反而慢15.4%，加上准备后总工作时间增加。结果仅为初步信号；尚未验证跨回合流水线，也未实现备课缓存或UI。
+The user authorized screening. Three A/B pairs used the current CLI custom provider with gpt-6.1-sol / medium; see experiments/preparation-latency-2026-10-13.md. All six scripts passed independent content checks. Aggregate teacher-stage time fell 22.4%, but one pair was 15.4% slower, and total work increased when preparation was included. This was an initial signal, without a pipeline, cache, or UI implementation.
 
-以下为执行前记录的实验原则：
+Pre-execution principles:
 
-先把模型备课收益与子代理生命周期拆为两个问题。先验证备课收益，避免为一个无效优化建设调度系统。
+Separate preparation benefit from subagent lifecycle; test the benefit before building scheduling for an ineffective optimization.
 
-- A：给定同一小节目标、学习者背景和原材料，按现有流程准备并讲解。
-- B：相同条件，额外给出经过核对、精简且可溯源的备课材料；保留必要回查原文的能力。
-- 固定主模型、推理档位、目标内容、讲解长度要求及记录流程；第一轮不同时改 UI、模型、输出长度或记录机制。
-- 选择少量不同类型的小节作配对筛查；顺序交错、使用独立上下文，避免前一条件内容污染后一条件。初始少量结果只决定是否值得重复测试，不作为稳定加速结论。
-- 记录首段有用教学内容的可见时间（宿主能够可靠采集时）、完整讲解交付时间、工具/图片调用次数、输出长度与可取得的 token 用量。准备性状态提示不算教学内容。无法获取精确首段时间时明确缺失，不估造。
-- 单独记录备课耗时与额外用量，分别报告冷启动总成本和备课就绪后的前台等待。
-- 对照检查概念覆盖、公式与条件、前后衔接、来源正确性；缩短内容或省略核对不计作合格提速。
-- 若准备后仍反复读图、重推同样内容，或备课包增加处理开销，记录为失败/混合结果；若未明显缩短等待，不默认继续建设复杂流水线。
-- 完整回答双重生成应作为另一个独立变量后续验证，避免与备课收益混在同一实验中。
+- A: same goal, learner background, and original materials; prepare and teach as before.
+- B: same conditions plus checked, concise, traceable preparation, retaining original-source access.
+- Fix teacher model, reasoning, content target, length requirement, and recording. Do not simultaneously change UI, model, length, or persistence.
+- Screen a few different section types using alternating order and fresh contexts. Small initial samples determine whether repetition is worthwhile, not stable acceleration.
+- Measure first useful content when reliable, full delivery, tool/image calls, length, and available usage. Preparation messages are not teaching. Mark missing first-content timing rather than inventing it.
+- Record preparation time/usage separately and distinguish cold-start cost from ready-preparation foreground waiting.
+- Compare concepts, formulas/conditions, continuity, and sources. Shortening or omitting checks is not a valid speedup.
+- Record mixed/failing outcomes when repeated image reading/rederivation or larger packages add overhead. Do not default to a complex pipeline without improvement.
+- Test duplicate full-answer generation later as a separate variable.
 
-## 单次输出机制实验（已执行）
+## Single-output experiment (executed)
 
-用户同意另行测试后，通过隔离App Server客户端比较模型双重输出与宿主程序记录一次输出，未改变备课条件或生产实现。详见 experiments/single-output-2026-10-14.md。
+After separate user authorization, an isolated App Server client compared double model output with one reply recorded by the host, without changing preparation or production. See experiments/single-output-2026-10-14.md.
 
-三组Single的最终讲解前200字符平均31.5秒传来，Double为90.0秒；全文总完成时间本样本减少37.1%，Single讲稿反而略长。六份讲稿独立内容检查通过，程序保存与最终item字节一致。样本量不足以承诺稳定百分比，但支持优先研究程序捕获正式回复。当前原生聊天适配、崩溃恢复和真实课程事务关联仍未验证；未启动伴随UI或备课流水线实现。
+Across three pairs, Single delivered the first 200 final-answer characters in 31.5 s on average versus Double's 90.0 s; aggregate full time fell 37.1% despite slightly longer Single scripts. All six passed independent content checks, and saved text matched authoritative items byte-for-byte. The small sample supports prioritizing capture without a stable percentage promise. Native-chat adaptation, crash recovery, and real-course transactions remained unverified; no companion UI or pipeline was implemented at this stage.
 
-## 实验后的设计续谈（2026-10-14）
+## Post-experiment discussion (2026-10-14)
 
-用户接受继续讨论单次输出方向，并明确：如果 Codex 原生无法实现，可以把授课迁到新 UI。因此，先前“当前仅伴随面板”的选择不再是硬约束；尚未决定直接迁移，也未授权生产实现。
+The user accepted continuing single-output design and explicitly allowed teaching to move to a new UI if native Codex could not support it. The earlier companion-only preference stopped being a hard constraint, without immediately deciding migration or authorizing production.
 
-本轮待讨论：首版授课入口的优先方向；流式讲解期间插问如何影响正在生成的主线；单元导览的出现时机与默认展开程度。既定的目录点击仅预览、课程工作区拥有正式状态、保留讲解长度继续有效。技术可行性未定时不承诺原生聊天可被完整镜像。
+Pending choices were teaching-entry priority, side questions during generation, and overview timing/default expansion. Preview-only clicks, workspace ownership, and lesson length remained fixed. Native mirroring was not promised without feasibility evidence.
 
-## 本轮已确认与下一轮前沿
+## Confirmed direction and next frontier
 
-用户确认本轮全部按推荐：
-- Q1：优先设计独立学习 UI，将流式授课、课程导览与自动保存统一考虑；替代此前当前仅伴随面板的优先顺序。仍处于设计阶段。
-- Q2：生成期间的小问题默认进入旁支，主线继续生成并保留阅读位置；提供显式暂停重讲入口。影响后续讲解的困惑应允许暂停调整，自动判断与用户控制边界待定。
-- Q3：大单元开始自动展示简短单元导览，随后直接进入首节，不额外确认；学习中保留当前位置摘要，跨天恢复时给简短接续提醒。
+The user accepted all recommendations:
 
-下一轮独立决策：小节之间的推进门槛；教师判断旁支暴露先修缺口时是否自动暂停；备课的默认提前窗口。原生能力迁移与并发性能仍需技术验证，不能由本次偏好确认推定可用。
+- Q1: prioritize an independent learning UI integrating streaming, orientation, and autosave, replacing the earlier companion-only priority. Still design-stage.
+- Q2: ordinary questions during generation become branches while mainline generation and reading position remain; provide explicit pause/reteach. Difficulties affecting later explanation may pause/adjust, with automated/user-control boundaries still pending.
+- Q3: show a short major-unit overview automatically, then start section one without confirmation. Retain position summaries and brief cross-day reminders.
 
-## 学习节奏已确认
+Next independent choices: section progression gates, automatic pause for prerequisite gaps, and preparation look-ahead. Native-capability migration and concurrency still required technical validation.
 
-用户确认 Q4–Q6 全部按推荐：
-- Q4：学习者控制小节推进；小节末集中练习，可作答、追问或先继续并保留待完成项。后台准备不自动切换屏幕，讲过不等于掌握。
-- Q5：旁支暴露先修缺口时教师主动建议补讲，由学习者选择是否切换；明确要求暂停时直接暂停。发现当前讲解本身有错误时停止错误展开并纠正。
-- Q6：默认提前准备下一小节，最多一个活跃备课任务；主线和即时提问优先，未就绪时主教师接管必要准备。单元整体计划保留，不默认准备整章；性能与资源竞争待实测。
+## Confirmed learning pace
 
-下一轮前沿：练习中提示与答案的默认呈现；来源原页与旁支视图如何共用阅读空间。仍未启动生产实现。
+The user accepted Q4–Q6 recommendations:
 
-## 练习与资料交互已确认（2026-10-19）
+- Q4: learners advance sections; grouped practice allows answers, follow-ups, or continuation with pending work. Background preparation does not switch screens. Taught does not mean mastered.
+- Q5: teachers suggest missing-foundation supplements and learners choose whether to switch. Explicit pause acts directly. Confirmed errors stop the incorrect explanation and are corrected.
+- Q6: default one section ahead, one active preparation task, foreground teaching/questions first, main teacher takeover if unready. Keep the unit plan without preparing whole chapters by default; measure contention/performance.
 
-用户确认 Q7–Q8 按推荐：题目先展示、答案默认收起，可自由请求提示、步骤或完整解答；看答案不算掌握，暂缓不阻塞继续。采用左侧导航、中间学习、右侧按需辅助的方向；右侧支持旁支和原页，默认收起，窄屏用抽屉；保留阅读位置。
+Next frontier: hint/answer presentation and shared reading space for sources/branches. Production implementation had not begun.
 
-开始交互逻辑原型 work/prototypes/learning-flow.prototype.html，回答“旁支、补讲和暂缓练习是否保持教学连续性”。模拟内容、内存状态、没有模型调用或课程写入。包含插问返回、先修缺口、备课与学习状态分离三组可点击走查。当前是逻辑验证而非最终 UI，真实资料跳转、流式并发、选择文本提问和跨会话恢复尚未实现；等待用户体验反馈后再形成结论及保存原型分支，不将其视作已验证产品。
+## Confirmed practice and source interaction (2026-10-19)
+
+Q7–Q8 recommendations accepted: show questions first with answers hidden, freely request hints/steps/solutions, never treat viewed answers as mastery, and allow deferral without blocking. Use left navigation, central learning, optional right assistance; sources and branches share the initially closed right area, with a narrow-screen drawer and stable reading position.
+
+Started `work/prototypes/learning-flow.prototype.html` to answer whether branches, supplements, and deferred practice preserve continuity. It used simulated content and memory-only state, without models or course writes. Three clickable walkthroughs cover question/return, prerequisite gaps, and separate preparation/learning state. It was a logic prototype, not final UI. Real-source jumps, streaming concurrency, selected-text questions, and cross-session recovery were unimplemented. Await user feedback before conclusions and prototype-branch preservation; do not describe it as a validated product.

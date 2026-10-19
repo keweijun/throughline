@@ -1,20 +1,20 @@
-# V2 小节练习验收（2026-10-19）
+# V2 section practice acceptance (2026-10-19)
 
-实现 #13：主线完成后准备当前概念的练习；优先来源原题，缺题时教师明确自编；题干与提示/步骤/完整解答分开。真实学习者答案独立记录，只有完成并通过格式验证的教师评估才能进入 evidence.assess。看解答、请求提示、评估反馈后的重做都计为有帮助；暂缓不升级掌握，保留待办。下一节由学习者操作，无通过门槛，接受中的补讲须先返回。
+Implementation #13 prepares current-concept practice after mainline completion. Prefer source questions, explicitly label teacher-created alternatives, and separate questions from hints/steps/solutions. Record actual learner answers separately; only completed, format-valid teacher assessments enter evidence.assess. Viewing solutions, requesting hints, and retrying after feedback count as assisted work. Deferral retains pending work without mastery upgrades. Learners advance without a passing gate; return from an accepted supplement first.
 
-课程操作/模型宿主边界测试覆盖：重开保留题目、原题来源含 metadata、错误答案 needs_work、有帮助与独立证据区分、无 outcome 不记通过、暂缓后迟到评估不能覆盖待办、关闭宿主拒绝新模型工作。完成事件与练习归档之间的中断通过幂等完成扫描修复。
+Course/model-host tests cover persisted questions after reopen, source metadata, wrong-answer needs_work, assisted versus independent evidence, no pass without outcome, late assessments preserving deferrals, and host shutdown rejecting new model work. An idempotent completion scan repairs interruption between completion and practice archival.
 
-## 真实通道回放
+## Real channel replay
 
-独立合成光电效应课程，未修改 quantum-v1。配置模型 gpt-6.1-sol，medium，经当前 CLI 提供者。顺序调用，无并发干扰：
+Used an independent synthetic photoelectric-effect course, leaving quantum-v1 unchanged. Requested gpt-6.1-sol / medium through the configured CLI provider, serially without contention.
 
-| 请求 | 完成秒数 | 结果 |
-| --- | ---: | --- |
-| 从含答案的原资料生成题目 | 5.4 | 原题题干保留来源，无答案泄漏 |
-| 提交“光强加倍使最大初动能加倍” | 8.1 | needs_work，明确指出混淆光强与单光子能量 |
-| 直接请求完整解答 | 15.3 | Kmax=hν-W，单光子条件、电子数/光电流区别 |
-| 提交正确理由 | 8.6 | passed，但证据是 hinted，未计独立掌握 |
+| Request | Completion | Result |
+|---|---:|---|
+| Generate from source containing an answer | 5.4 s | Source-linked question without answer leakage |
+| Submit "doubling intensity doubles maximum kinetic energy" | 8.1 s | needs_work; identifies confusion between intensity and photon energy |
+| Request a full solution | 15.3 s | Kmax=hν-W, single-photon conditions, electron-count/photocurrent distinction |
+| Submit correct reasoning | 8.6 s | passed, but hinted evidence rather than independent mastery |
 
-原始输出位于忽略的 work/v2-acceptance/practice-live/results.json 与 evidence.json。这是一次功能回放，不能当作性能承诺。该回放早于共享 record_user=false 补丁合入；练习实际答案始终另有独立记录，补丁后机器请求不再创建伪学习者交互。
+Raw output: ignored `work/v2-acceptance/practice-live/results.json` and `evidence.json`. This is one functional replay, not a performance promise. It preceded the shared record_user=false patch; actual practice answers always had separate records, and machine requests no longer create artificial learner interactions after that patch.
 
-浏览器模块提供题目、自由选择帮助、作答、暂缓和下一节；节点更新保留草稿与阅读位置。完整浏览器联调由集成验收记录，本文不以静态代码作为浏览器通过证据。
+The browser module offers questions, free help selection, answers, deferral, and next-section controls while preserving drafts/position across updates. Integrated browser evidence is recorded separately; static code is not browser acceptance.

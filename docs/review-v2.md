@@ -1,27 +1,27 @@
-# V2 最终审查与修正
+# V2 final review and fixes
 
-2026-10-19。基线 deeea3e，首次审查集成 7e6748d；修正提交 2c01a11、2091ede，最终代码集成 2b5192d。
+2026-10-19. Baseline deeea3e; initial integration 7e6748d; fixes 2c01a11 and 2091ede; final code integration 2b5192d.
 
 ## Standards
 
-独立审查未发现硬性工程规则违反；第三方静态资源与 manifest 哈希一致且许可保留。发现一项 P2 正确性问题：模型尚未返回 thread/turn ID 时取消无效，可能使重新生成等待默认 600 秒。
+The independent review found no hard engineering-rule violations. Vendor assets matched manifest hashes and retained licenses. It found one P2 correctness issue: cancellation before model thread/turn IDs arrived could leave regeneration waiting for the default 600 seconds.
 
-已修正：初始化、建线程、创建 turn 的三个阶段均支持立即退出并清理所属子进程。独立复核运行三个传输测试通过，该发现已解决。
+Initialization, thread creation, and turn creation now support prompt exit and cleanup of owned child processes. Independent recheck passed three transport tests; the finding is resolved.
 
 ## Spec
 
-独立审查发现两项 P2：选中历史讲解却绑定最新讲解，导致上下文/来源混淆；中断的补讲没有自己的未完成状态与恢复入口。
+The independent review found two P2 issues: selected historical text was associated with the latest lesson, mixing context/sources; interrupted supplements lacked their own unfinished state and recovery action.
 
-已修正：选中讲解身份、冻结正文与来源独立于当前主线恢复/暂停目标；补讲显示生命周期并可暂停、重新生成、重开恢复。独立复核九项旁支测试通过，并检查了对应浏览器回归。
+Selected-lesson identity, frozen text, and sources are now separate from current mainline restore/pause targets. Supplements display lifecycle state and support pause, regeneration, and reopen recovery. Independent recheck passed nine branch tests and inspected the browser regressions.
 
-## 集成走查补充
+## Integration walkthrough fixes
 
-- 旧 pending/deferred/needs_work 练习在切节后持续可见，已完成练习通过全部历史切换访问；不改变掌握证据。
-- 默认收起已有讲解的准备面板，保持当前位置；历史讲解卡显示其知识点标题。
-- 内嵌浏览器 PDF 空白改为精确快照的本地原页图像；仍保留原始 PDF。
-- 练习提示要求避免重复刚完整讲解的同题；一次真实回放生成新的跃迁与电离阈值题，不能据此保证所有未来出题质量。
-- 来源原文与引用在请求开始时冻结；跨站 POST 确定性拒绝；预期客户端断连不输出异常栈。
+- Old pending/deferred/needs_work exercises remain visible after section changes; completed exercises are available through all-history view, without evidence changes.
+- Collapse preparation/composer panels for saved lessons while retaining current position; historical cards show their concept title.
+- Replace blank embedded browser PDFs with local images of exact source snapshots, retaining original PDFs.
+- Exercise prompts avoid just-demonstrated questions. One real replay generated new transition and ionization-threshold problems; this does not guarantee all future quality.
+- Freeze original sources/references at request start; reject cross-site POST deterministically; suppress expected client-disconnect traces.
 
-## 最终验证
+## Final validation
 
-最终代码运行 69 项 Python 测试与五套浏览器回归全部通过。真实模型测试、教学内容检查、性能样本、课程原数据保护及分发资源检查详见 [验收报告](acceptance-v2.md)。两条审查线原发现均已解决，无已知未处理审查项。审查通过不是模型永远无误或稳定延迟的证明。
+All 69 Python tests and five browser regressions passed on the final code. See [acceptance](acceptance-v2.md) for real models, content review, performance samples, original-course protection, and packaged resources. Both review tracks' findings were resolved with no known outstanding items. Review success does not establish infallible models or stable latency.

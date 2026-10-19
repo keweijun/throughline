@@ -1,59 +1,59 @@
-# V2 验收：独立学习界面
+# V2 acceptance: independent learning interface
 
-日期：2026-10-19（America/Los_Angeles）。对应规格 #9 与任务 #10–#15。以下区分程序行为、真实模型和内容检查；单次成功不构成速度或教学效果承诺。
+Date: 2026-10-19 (America/Los_Angeles). Specification #9; tasks #10–#15. Program behavior, real models, and content checks are reported separately; one success is not a speed or learning-effect guarantee.
 
-## 程序与浏览器
+## Program and browser
 
-最终代码提交 2b5192d：69 项 Python 测试通过（49.5 秒），五套浏览器场景全部通过。后续 40bc5fc 仅合并验收文档。覆盖课程状态与证据、来源精确版本、流式保存与重复/迟到事件、暂停恢复、旁支、练习、备课版本失效、前台优先及失败降级。三套浏览器场景分别覆盖导航/原页/响应布局、选句与公式/旁支恢复、备课状态。练习暂缓与推进另由下文实际浏览器人工操作验收，未混计为第三套自动浏览器场景。新增回归覆盖旧讲解选择身份、补讲中断恢复与跨节未完成练习。标准与规格两条独立审查线的发现均已修复并复核，见 [审查记录](review-v2.md)。
+Final code commit 2b5192d passed 69 Python tests (49.5 s) and five browser suites. Later 40bc5fc only merged acceptance documentation. Coverage includes state/evidence, exact source revisions, streaming save and duplicate/late events, pause/recovery, branches, practice, preparation invalidation, foreground priority, and fallback. The original three browser suites cover navigation/sources/responsiveness, sentence/formula selection and return, and preparation status. The manual defer/advance walkthrough below was separate from those automated suites. New regressions cover older-lesson identity, interrupted supplements, and unfinished exercises across sections. Both independent review tracks were fixed and rechecked; see [review](review-v2.md).
 
-真实量子课程原页也在浏览器检查：预览不移动 bohr-spectrum 主线，原 PDF 图像显示。截图保留在本机 `work/v2-acceptance/navigation-pdf/actual-source-page.png`。浏览器公式选中和主线滚动恢复的具体结果见[旁支选择检查](experiments/v2-branch-selection-2026-10-19.md)。
+The real quantum course's original PDF image was checked in-browser; preview left bohr-spectrum position unchanged. Screenshot: `work/v2-acceptance/navigation-pdf/actual-source-page.png`. See [selection checks](experiments/v2-branch-selection-2026-10-19.md) for formula selection and scroll restoration.
 
-## 最终完整真实流程
+## Final real end-to-end flow
 
-使用原始 `work/courses/quantum-v1` 的完整副本 `work/v2-acceptance/final-flow/course`，本地 HTTP 宿主端口 8771；指定当前配置通道的 gpt-6.1-sol / medium。没有修改原课程。原数据库在复制前与授课完成后 SHA-256 相同。
+Used a full copy of `work/courses/quantum-v1` at `work/v2-acceptance/final-flow/course`, HTTP host port 8771, configured gpt-6.1-sol / medium. The original course was unchanged; its database SHA-256 matched before copying and after teaching.
 
-通过实际公开 HTTP 入口启动该副本的首次 UI 玻尔小节讲解；经过同一应用的完成钩子自动生成练习，空闲调度随后使下一节 wave-particle 备课就绪。未手工注入完成状态或备课正文。
+The public HTTP entrypoint started this copy's first UI Bohr lesson. Completion hooks automatically generated practice, then idle scheduling prepared wave-particle. No completion state or preparation text was injected manually.
 
-| 阶段 | 实测 | 结果 |
-| --- | --- | --- |
-| 讲解前 200 字符 | 38.473 秒 | 有主题内容的单元导览，非“正在准备”话术 |
-| 完整讲解 | 77.693 秒，3529 字符 | 保存权威全文一次 |
-| 讲解保存调用 | 0.0052 秒 | 不含单独测量的事务提交耗时 |
-| 自动生成练习 | 10.975 秒 | 两道明确标为自编的题目 |
-| 下一节备课 | 31.941 秒，1511 字符 | 就绪，未成为学习者交互或掌握证据 |
+| Stage | Measurement | Result |
+|---|---|---|
+| First 200 lesson characters | 38.473 s | Substantive unit overview, not a preparation message |
+| Full lesson | 77.693 s; 3529 characters | Authoritative text saved once |
+| Save call | 0.0052 s | Transaction commit not timed separately |
+| Automatic exercises | 10.975 s | Two explicitly self-created questions |
+| Next-section preparation | 31.941 s; 1511 characters | Ready without learner interaction or mastery evidence |
 
-指标来自宿主流事件，而非屏幕绘制时刻；字符包括 Markdown/公式语法。练习与备课时间是各自请求耗时，不是从点击授课开始的累计值。启动时抢先出现的一次备课被前台讲解暂停，随后重新调度完成；保留该暂停记录，未将其藏为成功。
+Times come from host stream events rather than screen painting; characters include Markdown/formula syntax. Practice/preparation durations are per request, not cumulative from lesson start. Startup preparation was preempted by teaching, then rescheduled to completion. Its paused record remains and was not hidden as success.
 
-通过实际浏览器依次点击第一题“稍后做”和“进入下一小节”：第一题保留 deferred，主线变为 wave-particle；未要求练习通过。随后关闭宿主并用 README 中同一 CLI 启动命令重新打开，浏览器仍显示新目标、此前讲解和该暂缓题。正式 evidence 列表与副本初始化时一致，没有新增独立掌握。未暂缓的第二题仍在数据库中；本轮没有验证跨小节显示全部待办的入口，不能由数据库保留推断旧题在界面可访问。该可见性缺口随后交由集成修正并单独验证。
+In the real browser, "Do later" on question one followed by "Enter next section" left that question deferred and moved the mainline to wave-particle without requiring a pass. After stopping and reopening with the README CLI command, the browser retained the new goal, earlier lesson, and deferred question. Official evidence matched initialization, with no independent mastery added. Question two remained in the database; this initial walkthrough did not prove it was accessible across sections. That visibility gap was then fixed and independently checked.
 
-数据库中与讲解权威正文逐字相同的 assistant interaction 恰为一条。原始记录、前后快照、单次保存和 evidence 对照保留于忽略目录 `work/v2-acceptance/final-flow/`。关闭后再打开导致下一节的后续备课重调度，是生命周期检查的一部分，不计入上表性能样本。
+Exactly one assistant interaction equaled authoritative lesson text character-for-character. Raw records, snapshots, single-save checks, and evidence comparisons remain under ignored `work/v2-acceptance/final-flow/`. Reopening rescheduled further preparation as part of lifecycle testing, outside the timing sample above.
 
-## 其他真实模型证据
+## Other real-model evidence
 
-- [流式与恢复](experiments/v2-stream-delivery-2026-10-19.md)：实际暂停，重开后保留部分内容；重新生成完整小节成功。取消后重新生成不是从字符断点无缝续写。
-- 真实旁支回放 `work/v2-branch-live/report.json`：主线仍 running 时提出局部符号问题，随后完成；路径决策包括短答、延后深入和先修建议。局部问题全程约 7.12 秒；其 metadata 不能算作实质教学字符来报告前 200 字。
-- 实际量子课程浏览器操作 `work/v2-acceptance/browser-supplement.json`：提交先修疑问→接受补讲→返回主线。建议可见文本 238 字符，约 20.55 秒；补讲 2871 字符，约 44.45 秒；返回后目标位置不变。
-- [练习真实回放](experiments/v2-practice-acceptance-2026-10-19.md)：错误推理收到 needs_work；看完整答案后正确作答只记 hinted，不记独立完成。
-- [前台优先与备课](experiments/v2-preparation-2026-10-19.md)：同一小问无备课 5.902 秒、有备课被抢占 5.928 秒。仅一对样本，不能推断稳定差异，也未证明退出后常驻。
+- [Streaming/recovery](experiments/v2-stream-delivery-2026-10-19.md): real pause, retained partial text after reopen, successful complete regeneration. Regeneration does not continue seamlessly at a character offset.
+- `work/v2-branch-live/report.json`: submitted a local notation question while mainline was running; both later completed. Decisions included brief answers, later depth, and prerequisite suggestions. The local question took about 7.12 s. Metadata does not count as substantive first-200-character teaching content.
+- `work/v2-acceptance/browser-supplement.json`: asked a prerequisite question, accepted the supplement, and returned. Suggestion: 238 visible characters, about 20.55 s; supplement: 2871 characters, about 44.45 s. Goal position was unchanged on return.
+- [Practice replay](experiments/v2-practice-acceptance-2026-10-19.md): wrong reasoning received needs_work; a correct answer after viewing the full solution recorded hinted rather than independent evidence.
+- [Preparation/priority](experiments/v2-preparation-2026-10-19.md): the same small question took 5.902 s without preparation and 5.928 s while preparation was preempted. One pair cannot establish a stable difference or always-on execution after exit.
 
-## 教学内容检查
+## Teaching content review
 
-对最终玻尔讲解逐段核查：导览明确“氢原子为什么只在特定波长有谱线”，列出定态/角动量量子化→半径与能级→跃迁与谱线，连接光子关系和后续波函数。正文包含经典原子稳定性矛盾、固定核和非相对论条件、库仑向心关系、角动量量子化、半径及能级推导、负能量参照、能级不等间距、吸收/发射符号、里德伯公式、系列极限和模型局限。4→2 的 2.55 eV / 约 486 nm 例子正确；没有把圆轨道等同现代轨道，保留来源 pending 和未核验页边界。
+Paragraph-level review of the final Bohr lesson found a concrete overview asking why hydrogen has specific spectral wavelengths. Its steps connect stationary states/angular-momentum quantization to radii/levels and then transitions/spectra, linking photon relations and later wavefunctions. It includes classical stability, fixed-nucleus/nonrelativistic conditions, Coulomb centripetal balance, angular-momentum quantization, radius/energy derivations, the negative-energy reference, unequal level spacing, absorption/emission signs, the Rydberg relation, series limits, and model limitations. The 4→2 example correctly gives 2.55 eV / about 486 nm. It distinguishes circular paths from modern orbitals and retains pending/unverified source limits.
 
-两题覆盖跃迁计算、能量差比较和离散谱线。第一题重复本节已演算的 4→2 例子，适合复现但不能单独证明迁移；第二题换为 5→2 与 5→1 比较。两题题干没有内嵌答案。这一初始重复促使练习提示增加核对近期已解例题、优先采用新情境或数值变式的要求。
+Two answer-free questions cover transition calculations, energy comparisons, and discrete spectra. The first reused the worked 4→2 example, useful for reproduction but insufficient alone for transfer; the second compared 5→2 and 5→1. This repetition prompted an instruction to check recent worked examples and prefer new situations or values.
 
-修正提交 8d2d877 后做了一次独立真实练习回放：复制初始量子课程，经公开 interaction.record 原样登记上面实际玻尔讲解及原 source_refs，明确将其作为历史教学夹具，不把重放说成新讲解推理；仅调用一次真实练习生成，停用该验收宿主的备课调度以隔离请求。18.726 秒完成，得到两道 self_created 题，均无答案泄漏：一题为 5→3 跃迁能量/波长/系列，一题比较 n=2 与 n=3 的电离阈值及 2.00 eV 光子的能量条件。两者均未重复已演算的 4→2。物理检查：前题应发射约 0.9671 eV、1282 nm 的帕邢系光子；后题阈值分别为 3.40 和约 1.511 eV，仅 n=3 在能量上允许被该光子电离。原始结果位于 work/v2-acceptance/exercise-transfer/result.json。该单次回放支持提示修正有效，不保证所有自动出题都会产生足够迁移，也不等于实际学生掌握测验已通过。
+After fix 8d2d877, an independent real practice replay copied the initial course and used public interaction.record to retain the actual lesson/source_refs as a historical teaching fixture, without presenting it as fresh lesson reasoning. Only one real practice request ran; preparation scheduling was disabled to isolate it. It completed in 18.726 s with two answer-free self_created questions: a 5→3 transition (energy, wavelength, series), and n=2 versus n=3 ionization thresholds for a 2.00 eV photon. Neither repeated 4→2. Physics checks give about 0.9671 eV and 1282 nm in the Paschen series; thresholds are 3.40 and about 1.511 eV, so only n=3 is energetically ionizable by that photon. Raw result: `work/v2-acceptance/exercise-transfer/result.json`. One replay supports the prompt change without guaranteeing all future transfer questions or establishing learner mastery.
 
-这些是模型输出的内容与覆盖检查，不是实际学习者学习效果实验。沿用已有审阅记录不等于全课 231 页新近核验；候选覆盖图仍需教师逐步审核。
+These are output correctness/coverage checks, not real-learner effectiveness experiments. Existing review records do not establish fresh verification of all 231 pages; teachers must progressively review the candidate map.
 
-## 安装与分发检查
+## Installation and distribution
 
-在当前工作树实际构建 wheel；首次 `--no-build-isolation` 因环境缺少 setuptools.build_meta 失败，改用正常隔离构建成功，没有修改用户模型认证。压缩包包含 36 个静态资源、20 个 WOFF2 字体，以及 marked、DOMPurify、KaTeX 脚本/样式/许可与 manifest。客户端排版无需 CDN。构建证明资源入包，未声明在一台全新机器完成安装回放。
+A wheel was built from the working tree. Initial --no-build-isolation failed because setuptools.build_meta was missing; normal isolated build succeeded without changing model credentials. The archive includes 36 static assets, 20 WOFF2 fonts, and marked/DOMPurify/KaTeX scripts, styles, licenses, and manifest. Client rendering needs no CDN. This establishes packaging, not a clean-machine installation replay.
 
-[README](../README.md)提供真实课程启动命令，[使用说明](learning-ui.md)覆盖依赖、课程路径、暂停、重开、后台生命周期和故障。课程材料与个人进度只留本机，不随仓库或 wheel 分发。
+[README](../README.md) provides the real-course launch command; [usage](learning-ui.md) covers dependencies, course paths, pause/reopen, lifecycle, and failures. Course materials/personal progress stay local and outside Git/wheels.
 
-## 剩余边界
+## Remaining limits
 
-当前为个人本机使用；没有多用户账号、远程部署、退出后服务、原生 Codex 聊天镜像。基于少量真实请求确认通道与完整工作流可用，不提供延迟 SLA。教师评估仍可能判断错误；错误/未知结果不能由程序测试证明永远不会发生。已知候选资料与未核验页状态继续保留，不能把 UI 完成度当作课程知识覆盖完成度。
+Personal local use only: no multi-user accounts, remote deployment, post-exit service, or native Codex chat mirror. A small number of real requests establish channel/workflow availability without a latency SLA. Teacher assessment can still be wrong; tests cannot establish that errors or unknowns never occur. Candidate/unverified source status remains; completed UI implementation does not mean completed knowledge coverage.
 
-最终五套浏览器回归为 navigation、branches、preparation、branch_recovery、practice_continuity。最终运行没有预期断连的异常栈；单测中无效 PDF 测试夹具的解析提示属于预期。当前复测覆盖未完成题持续可见、全部练习历史切换、补讲暂停/恢复、选中旧讲解的来源与当前主线分别保存。
+The final five suites are navigation, branches, preparation, branch_recovery, and practice_continuity. Final runs had no expected-disconnect exception traces; invalid-PDF fixture parser messages are expected. Regression checks cover unfinished exercise visibility, all-history toggles, supplement pause/recovery, and separate historical-source/current-mainline identities.

@@ -33,7 +33,11 @@ class WebLearning(unittest.TestCase):
             self.assertEqual(state['turns'][0]['status'],'completed')
             self.assertEqual(state['session']['recent_interactions'][-1]['text'],'Authoritative lesson.')
             self.assertIn('States',runner.prompt)
-            self.assertIn('来源',runner.prompt)
+            self.assertIn('sources',runner.prompt)
+            self.assertIn('Teach in English by default',runner.prompt)
+            self.assertIn('Use another language when the learner explicitly requests it',runner.prompt)
+            with urlopen(base) as response:
+                self.assertIn('<html lang="en">',response.read().decode('utf-8'))
             with self.assertRaises(HTTPError) as ctx:
                 post('/api/turns',{'id':'evil','concept_id':'state','prompt':'x'},'https://evil.example')
             self.assertEqual(ctx.exception.code,403)

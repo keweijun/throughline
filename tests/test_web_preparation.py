@@ -51,7 +51,7 @@ class PreparationState(unittest.TestCase):
             prompts=[]
             def run(self,prompt,cwd,emit,cancel):
                 self.prompts.append(prompt)
-                if '内部备课任务' in prompt:
+                if 'Internal preparation task' in prompt:
                     self.entered.set()
                     while not self.release.wait(.01):
                         if cancel.is_set():self.cancelled.set();return
@@ -88,7 +88,7 @@ class PreparationState(unittest.TestCase):
             prompts=[]
             def run(self,prompt,cwd,emit,cancel):
                 self.prompts.append(prompt)
-                if '内部备课任务' in prompt:raise RuntimeError('preparation provider unavailable')
+                if 'Internal preparation task' in prompt:raise RuntimeError('preparation provider unavailable')
                 emit({'kind':'final','text':'Teacher fallback'});emit({'kind':'complete'})
         with tempfile.TemporaryDirectory() as path:
             def op(**kw):return execute(path,kw)
@@ -105,7 +105,7 @@ class PreparationState(unittest.TestCase):
             self.assertEqual(len(app.routes[('GET','/api/preparation')]('')['jobs']),1)
             op(op='mainline.enter',request_id='next',concept_id='b',goal='B',next_step='explain')
             turn=app.start_turn({'concept_id':'b','channel':'sidequestion','prompt':'Explain'})['turn'];self.assertEqual(app.wait(turn['id'],3)['final_text'],'Teacher fallback')
-            self.assertIn('自行完成必要来源核对',runner.prompts[-1]);app.close()
+            self.assertIn('Complete the necessary source checks',runner.prompts[-1]);app.close()
             count=len(runner.prompts);time.sleep(.5)
             self.assertEqual(len(runner.prompts),count)
             self.assertFalse(app.routes[('POST','/api/preparation/schedule')]({})['scheduled'])

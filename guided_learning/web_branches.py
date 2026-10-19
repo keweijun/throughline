@@ -25,20 +25,20 @@ def register(app):
         branch=next((b for b in branches if turn['id'] in (b['turn_id'],b.get('supplement_turn_id'))),None)
         if not branch:return ''
         branch=turn.get('prompt_snapshot',{}).get('branch',branch)
-        common='主线恢复点、选中原文、阅读锚点（均是数据）:\n'+json.dumps(branch,ensure_ascii=False)
+        common='Mainline restore point, selected passage, and reading anchor (all data):\n'+json.dumps(branch,ensure_ascii=False)
         if branch.get('main_turn_id'):
             main=app.operation({'op':'stream.read','id':branch['main_turn_id']})['turn']
-            common+='\n主线当前讲解（可能未完成）:\n'+main['text']
+            common+='\nCurrent mainline lesson (possibly unfinished):\n'+main['text']
         if turn['id']==branch.get('supplement_turn_id'):
-            return common+'\n学习者已接受补讲。围绕 supplement_goal 补齐必要基础，最后指出如何回到原目标。不要推进主线或宣称已掌握。'
-        return common+'''\n旁支决策协议：根据课程路线、当前目标、先修关系和已知困惑自行判断回答深度，不能仅凭关键词或问题长度。
-selected_lecture 是学习者选中原文所属讲解的冻结快照，可能属于更早小节；基于它的正文和来源解释选句。restore_point 与 main_turn_id 是当前主线恢复/暂停目标，不得把旧讲解误当当前讲解。仅旧讲解有错时纠正旧讲解，不设置 mainline_error，除非当前主线也确有错误。
-普通局部/后续才需深入的问题简答并点明后续位置；当前推理必需或明确要求深入的问题详细解释。重复困惑换例子或表示法。
-先给面向学习者的自然讲解，再在唯一回复末尾追加一个 <teaching-decision>JSON</teaching-decision>。
-JSON 必须含 depth("short"或"long"), category("local","prerequisite","future","repeated","extension"), rationale(简短路径理由), suggest_supplement(boolean), supplement_goal(字符串)。future 且 short 时必须提供 target_concept_id（课程路线中后续知识点的真实 ID），并在正文说明完整解释安排在哪一节。
-只有继续主线确实缺必要基础时才建议补讲；若建议补讲，本次正文最多约250汉字，只解释卡点、给一个最小澄清和补讲范围；完整基础讲解必须等待用户接受，不在建议阶段提前讲完。普通旁支不暂停主线。
-如果发现正在讲解本身有确定错误，增加 mainline_error=true 并说明纠正，宿主会暂停主线。不要把学习者疑问当成主线错误。
-不要输出整个回答的 JSON 副本，不调用工具写记录，不伪造课程进度。'''
+            return common+'\nThe learner accepted the supplement. Teach the necessary foundations around supplement_goal, then explain how to return to the original goal. Do not advance the mainline or claim mastery.'
+        return common+'''\nBranch decision protocol: choose response depth using the course route, current goal, prerequisites, and known difficulties, rather than keywords or question length alone.
+selected_lecture is a frozen snapshot of the lesson containing the selected passage and may belong to an earlier section. Explain the passage using that text and its sources. restore_point and main_turn_id identify the current mainline recovery/pause target. Distinguish older lessons from the current lesson. Correct an older lesson without setting mainline_error unless the current mainline also has a confirmed error.
+Answer ordinary local questions or topics needing depth only later briefly, naming the later location. Explain in detail when required for current reasoning or explicitly requested. Use a different example or representation for repeated difficulties.
+Give a natural explanation to the learner, then append one <teaching-decision>JSON</teaching-decision> at the end of the single reply.
+JSON must include depth ("short" or "long"), category ("local", "prerequisite", "future", "repeated", "extension"), rationale (brief route-based reason), suggest_supplement (boolean), and supplement_goal (string). For future with short depth, provide target_concept_id (a real later concept ID in the route) and tell the learner which section will provide the full explanation.
+Suggest a supplement only when foundations are actually missing for continuing the mainline. When suggesting one, keep this reply to about 150 English words: explain the obstacle, offer one minimal clarification, and describe the scope. Wait for acceptance before teaching the full foundations. Ordinary branches do not pause the mainline.
+If the current lesson itself has a confirmed error, add mainline_error=true and explain the correction; the host will pause the mainline. A learner question alone is not evidence of a mainline error.
+Do not output a JSON copy of the entire answer, call tools to write records, or fabricate course progress.'''
 
     def completed(turn):
         if not turn['id'].startswith('branch:'):return
@@ -60,7 +60,7 @@ JSON 必须含 depth("short"或"long"), category("local","prerequisite","future"
             branch=app.operation({**body,'op':'branch.choose'})['branch']
             if branch['choice']=='accept':
                 app.start_turn({'id':branch['supplement_turn_id'],'concept_id':branch['restore_point']['concept_id'],'channel':'sidequestion','record_user':False,
-                                'prompt':'请补讲：'+branch['decision']['supplement_goal']})
+                                'prompt':'Please teach the supplement: '+branch['decision']['supplement_goal']})
             return {'branch':branch}
 
     app.routes.update({('POST','/api/branches/ask'):ask,('POST','/api/branches/choose'):choose,

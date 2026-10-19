@@ -22,6 +22,7 @@ class LearningApp:
         self.workspace = Path(workspace).resolve()
         self.runner = runner or CodexRunner(model=model,effort=effort)
         self.lock = threading.RLock()
+        self.closing = False
         self.workers = {}
         self.routes = {}
         self.prompt_hooks = []
@@ -77,6 +78,7 @@ class LearningApp:
 
     def start_turn(self, request):
         with self.lock:
+            if self.closing: raise OperationError('host_closing','Learning server is closing')
             request = {**request,'id':request.get('id') or str(uuid.uuid4())}
             channel = request.get('channel','mainline')
             if channel == 'mainline':
@@ -118,6 +120,7 @@ class LearningApp:
 
     def resume_turn(self, identifier, request_id):
         with self.lock:
+            if self.closing: raise OperationError('host_closing','Learning server is closing')
             previous = self.operation({'op':'stream.read','id':identifier})['turn']
             if previous['channel']=='mainline':
                 for other in self.operation({'op':'stream.list'})['turns']:
@@ -137,12 +140,17 @@ class LearningApp:
         return self.operation({'op':'stream.read','id':identifier})['turn']
 
     def close(self):
-        if self._lease.closed: return
-        for (identifier,_),(_,cancel) in list(self.workers.items()):
-            self.pause_turn(identifier)
-            cancel.set()
-        for thread,_ in self.workers.values(): thread.join(12)
+        with self.lock:
+            if self.closing: return
+            self.closing = True
+            workers = list(self.workers.items())
+            for (identifier,_),(_,cancel) in workers:
+                self.pause_turn(identifier)
+                cancel.set()
+        # No new workers can enter while shutdown joins the owned processes.
+        for _,(thread,_) in workers: thread.join(12)
         self._lease.close()
+
 
 
 class LearningServer(ThreadingHTTPServer):

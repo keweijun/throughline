@@ -1,11 +1,11 @@
 # Triage Labels
 
-| 技能角色 | GitHub 标签 | 含义 |
+| Skill role | GitHub label | Meaning |
 |---|---|---|
-| needs-triage | needs-triage | 需要评估与分流 |
-| needs-info | needs-info | 等待补充信息 |
-| ready-for-agent | ready-for-agent | 需求已明确，可由 AI 执行 |
-| ready-for-human | ready-for-human | 需要人工实施 |
-| wontfix | wontfix | 决定不处理 |
+| needs-triage | needs-triage | Needs assessment and triage |
+| needs-info | needs-info | Waiting for more information |
+| ready-for-agent | ready-for-agent | Requirements are clear and AI can implement them |
+| ready-for-human | ready-for-human | Requires human implementation |
+| wontfix | wontfix | Decision not to address |
 
-技能提到角色时使用对应标签。标签表示分流结果，不会单独触发执行，也不代表学习进度。
+Use the corresponding label when a skill refers to a role. Labels record triage outcomes; they do not trigger execution by themselves or represent learning progress.

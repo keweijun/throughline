@@ -1,22 +1,22 @@
-# 第一版双轴代码审查
+# V1 code review: standards and specification
 
-基线为 main 的 `ce0e0a1`，范围为第一版集成分支。两个独立代理分别检查标准与规格；初审后统一修复，再由原代理复查。最终功能审查点为 `6b02923`，后续仅更新验收记录。
+Baseline: main at `ce0e0a1`; scope: V1 integration branch. Two independent agents reviewed standards and specification. Findings were fixed together, then rechecked by the original reviewers. Final functional review point: `6b02923`; later changes only update acceptance records.
 
 ## Standards
 
-未发现违反 AGENTS.md、领域术语或状态归属 ADR 的问题。初审有一项可选的维护建议：五个测试套件重复实现 CLI 调用断言，且错误退出码检查存在差异。现已统一为小型测试辅助函数，保留各场景的独立断言。复查无剩余标准发现。
+No violations of AGENTS.md, domain terminology, or the state-ownership ADR. One optional maintenance suggestion concerned repeated CLI assertions across five suites with differing error-exit checks. A small shared helper now handles those calls while preserving scenario-specific assertions. No remaining standards findings after recheck.
 
 ## Spec
 
-初审通过公开操作复现了四个问题，均已加入回归测试并修复：
+Four issues were reproduced through public operations, fixed, and covered by regressions:
 
-| 级别 | 问题 | 修复与复查 |
+| Priority | Issue | Fix and recheck |
 |---|---|---|
-| P1 | 旧检查点重试覆盖新进度 | 写入要求稳定 request_id；重试返回当前位置和原结果，不再恢复旧位置；冲突内容拒绝 |
-| P2 | 材料更新后评价失去原来源版本 | 原交互保存来源单元与版本快照，评价引用原回答/反馈的来源；旧记录来源未知时保持未知 |
-| P2 | 暂缓项在约定目标节点无法确认 | 接受原知识点或约定目标节点的真实用户确认，继续拒绝无关节点 |
-| P2 | 历史作答超出近期窗口后无法公开读取 | 提供按 ID 的 interaction.read，支持原文和来源审计，不扩大每轮上下文 |
+| P1 | Old checkpoint retries overwrote newer progress | Require stable request_id; retries return current position and original result without restoring old position; reject conflicting content. |
+| P2 | Assessment lost original source revisions after updates | Snapshot source units/revisions on interactions and reference original answer/feedback sources; unknown historical provenance stays unknown. |
+| P2 | Deferred items could not be acknowledged at the agreed target | Accept real user confirmation on the original or agreed target concept; continue rejecting unrelated concepts. |
+| P2 | Answers beyond recent history were inaccessible publicly | Add interaction.read by ID for original text/source auditing without enlarging every-turn context. |
 
-规格复查在新的隔离工作区重新执行原场景与负例，四项均通过，未发现这些修复引入的回归。33 项程序测试通过；独立教学回放另行记录。
+The specification reviewer reran original and negative scenarios in a fresh isolated workspace. All four passed without detected regressions. All 33 tests passed; independent teaching replay is recorded separately.
 
-最终未解决项：Standards 0，Spec 0。完整课程的逐项语义核验、真人学习效果和速度基准仍属于明确保留的验证边界，不将其冒充已通过测试。
+Remaining findings: Standards 0, Spec 0. Full semantic review, real learner outcomes, and speed benchmarks remain explicit validation limits rather than passing claims.

@@ -5,6 +5,8 @@ description: Build and resume a personal course from multiple local documents, p
 
 # Guided learning
 
+Teach in English by default. Follow explicit learner requests for another language, and preserve original source text and existing learning records in their original language.
+
 Use the course workspace as the official state. Keep course files outside tracked code (for example `work/courses/<name>`). On entering an existing course, read its status before teaching; recover its saved goal and next step rather than infer them from the latest message.
 
 For course creation, material registration, source retrieval and saving a position, read [course operations](references/course-operations.md). The operation entrypoint persists each request transactionally. Read failures and pending verification are visible outcomes to report to the learner. Extracted text alone does not establish complete content coverage or formula/image accuracy.

@@ -1,61 +1,59 @@
-# 个人导学工作流设计访谈
+# Personal guided-learning workflow: design interview
 
-状态：各项设计选择已确认，第一版已完成实现和分层验收，见 acceptance-v1.md；下文保留访谈决定。
+Status: design choices confirmed; V1 implementation and layered acceptance are complete, as recorded in acceptance-v1.md. This document preserves the interview decisions.
 
-本文件承接此前项目的设计访谈，早期记录归档于 docs/archive/initial-design/。项目统一位于 F:\Projects\codex-guided-learning，原工作目录仅保留历史副本。
+This continues the earlier interview, archived under docs/archive/initial-design/. The project is now at F:\Projects\codex-guided-learning; the former directory retains only a historical copy.
 
-## 已确认
+## Confirmed decisions
 
-| 编号 | 决定 |
+| ID | Decision |
 |---|---|
-| Q1 | 个人使用 |
-| Q2 | 第一优先级为跨文档教学连贯、覆盖检查 |
-| Q3 | 发现先修缺口时提醒；用户要求继续就继续，保留待补测项，不强制解锁 |
-| Q4 | 接受本地后台服务和额外模型 API |
-| Q5 | 课件内容全部纳入教学范围，允许用户主动跳过；覆盖粒度见 Q16，具体讲解深度由路径与需要决定 |
-| Q6 | 按先修关系跨文档重排教学顺序，并保留来源 |
-| Q7 | 连续讲完一个小节后集中练习；不默认每个概念后插入小测 |
-| Q8 | 第一版保持聊天交互，先验证导学质量，专用界面以后决定 |
-| Q9 | 对外部模型使用学习资料不额外限制；此偏好不等于已执行上传 |
-| Q10 | 短旁支答完自动接回主线；较长解释后指出接续位置，停下等待回应 |
-| Q11 | 后续知识先给足够当前使用、标明局限的解释；完整推导进入待补项，到对应节点主动回访；明确要求深入时当场展开 |
-| Q12 | 重复困惑时主动换例子、补短概念桥梁；较大的教学重排先征求意见 |
-| Q13 | 第一版优先加入旧问题回访、针对困惑调整解释、跨课件符号与概念对照 |
-| Q14 | 按完整学习目标划分小节，可跨课件、分多轮讲；自然闭合后集中练习 |
-| Q15 | 卡住时指出具体问题并给最少必要提示；明确要求完整讲解时提供示范，但不计为独立完成 |
-| Q16 | 后台逐页登记定义、结论、推导与例题，前台按知识点展示；重复合并保留来源，解析失败显式列出；用户审核整体路线与有争议取舍 |
-| Q17 | 第一版允许离开后暂停、下次恢复；原始问答和主线位置及时保存，整理可延后；不要求常驻后台 |
-| Q18 | 优先 Codex Luna；不可用时暂缓非必要整理，教学继续；不自动切换额外付费 API |
-| Q19 | 第一版为通用导学 skill、独立课程工作区与辅助脚本；暂不做专用界面、常驻服务或插件封装 |
-| Q20 | 分开记录已讲解、提示下完成、独立完成、延后复测通过；自述理解单独记录；暂缓项按后续需要、约定节点或小节复盘回访；重开时短回顾，不强制考试 |
-| Q21 | 课程工作区为唯一正式状态；不兼容 Obsidian，不做导出或同步；资料变化仅重查受影响知识点并保留证据；大幅改序先确认；后台失败保留任务且不得覆盖新记录 |
-| Q22 | 以已有 6 份课件与 2 份习题建立完整覆盖图，用波函数→本征态→投影验证跨文档教学；验收旁支分流、后续回访、中断恢复及 Luna 不可用时继续教学 |
+| Q1 | Personal use. |
+| Q2 | First priority: cross-document teaching continuity and coverage checks. |
+| Q3 | Flag prerequisite gaps; continue if requested, retaining pending checks without mandatory unlocking. |
+| Q4 | Local background services and additional model APIs are acceptable. |
+| Q5 | All lecture content is in teaching scope, with voluntary skips; Q16 defines coverage granularity, while the route and need determine depth. |
+| Q6 | Reorder teaching across documents by prerequisites and retain sources. |
+| Q7 | Teach a continuous section, then group practice; no default quiz after every concept. |
+| Q8 | V1 stays in chat to validate teaching quality; decide on a dedicated interface later. |
+| Q9 | No additional restrictions on using learning materials with external models; this preference does not establish that an upload occurred. |
+| Q10 | Resume automatically after brief branches; after long explanations, name the resume point and wait. |
+| Q11 | Give enough explanation for current use, mark limits, and bind the full derivation to a later node for proactive review; expand immediately when explicitly requested. |
+| Q12 | Use different examples or short conceptual bridges for repeated difficulties; ask before major rearrangement. |
+| Q13 | Prioritize revisiting old questions, adapting explanations to difficulties, and cross-document notation/concept comparisons. |
+| Q14 | Define sections by complete goals, potentially across lectures and multiple turns; practice at natural closure. |
+| Q15 | Identify the obstacle and give minimal necessary hints; provide a full demonstration on request without counting independent completion. |
+| Q16 | Register definitions, conclusions, derivations, and examples by page in the background; present concepts in the foreground. Merge duplicates with sources, expose parsing failures, and ask the user to review the overall route and disputed choices. |
+| Q17 | V1 may pause when the learner leaves and resume later. Save original exchanges and mainline position promptly; consolidation may wait. No always-on background requirement. |
+| Q18 | Prefer Codex Luna. If unavailable, defer optional consolidation and continue teaching; no automatic paid API fallback. |
+| Q19 | V1 delivers a generic skill, independent course workspace, and helpers; no dedicated UI, persistent service, or plugin packaging yet. |
+| Q20 | Separate taught, hinted, independent, and delayed-retest evidence, with self-reports separate. Revisit deferred items when needed, at agreed nodes, or section review. Resume with a short recap, without a mandatory test. |
+| Q21 | The course workspace is the sole official state. No Obsidian compatibility, export, or sync. Recheck affected concepts after source changes while retaining evidence. Confirm major reordering. Preserve failed background tasks and prevent stale overwrites. |
+| Q22 | Build a complete coverage map from six lectures and two exercise documents; validate wavefunctions → eigenstates → projection, branch routing, later review, recovery, and continued teaching without Luna. |
 
-新增核心需求：学习者插入一个局部问题时，教师应结合课程路径决定简答或详答，并保持当前教学主线。用户也希望探索其他更贴近真人教师的行为。
+A new core requirement is route-aware depth selection for local questions while preserving the mainline. The user also wants to explore behavior closer to a human teacher.
 
-## 已查明能力与边界
+## Established capabilities and limits
 
-当前会话工具可选择 gpt-6-luna 作为子代理模型。官方文档支持指定子代理模型与推理强度，也允许适用 skill 请求委派：<https://learn.chatgpt.com/docs/agent-configuration/subagents>。
+At the time of the interview, session tools could select gpt-6-luna for a subagent. Official documentation described model/reasoning selection and delegation requested by applicable skills: https://learn.chatgpt.com/docs/agent-configuration/subagents.
 
-尚未运行 Luna 实测，未建立后台服务；会话内子代理不能据此视为回复结束或应用退出后仍可靠运行的服务。不假定任何 API 的同名模型或额度与 Codex 通用。
+At that stage Luna had not been tested and no background service existed. Session subagents could not be treated as reliable services after a reply or application exit. API model names and quotas were not assumed interchangeable with Codex.
 
-## 已确认的教学行为
+## Confirmed teaching behavior
 
-- 路径感知答疑：根据当前理解是否依赖该点、是否在后续路径中、是否重复困惑、用户是否明确要求深入来决定深度。
-- 主线恢复点：保留当前目标、已讲到的步骤、下一步和未完成练习；旁支答疑结束后恢复。
-- 未来知识点先给最低限度直觉，记录到对应节点；到达该节点时回应此前问题。
-- 短旁支回答后自动接续；长解释后保留接续位置并等待。
-- 重复困惑时自主做局部补救，较大重排先询问。
-- 第一版优先旧问题回访、替代解释、跨课件符号对照。
+- Route-aware question answering considers current necessity, later placement, repeated difficulty, and explicit depth requests.
+- Preserve the mainline goal, explanation step, next step, and unfinished practice before branching.
+- Give minimal intuition for future concepts, bind the question to its node, and revisit it on arrival.
+- Resume after brief branches; retain the resume point and wait after long explanations.
+- Perform local remediation autonomously for repeated difficulty; ask before major reorganization.
+- Prioritize old-question review, alternative explanations, and cross-document notation comparisons.
 
-## 实现约束
+## Implementation constraints
 
-- 明确区分已经讲解、用户表示理解、有作答证据、独立通过。
-- 小节末集中练习、最少必要提示；重开时短回顾，不强制测试。
-- 主教师即时决定回答深度；Luna 处理非阻塞的证据抽取、资料定位和笔记候选更新，避免每次小问题都等待其他模型。
+Separate taught, self-reported understanding, answered, and independently passed evidence. Practice at section ends, give minimal hints, and resume with a short recap rather than a compulsory test. The main teacher decides depth immediately; Luna may extract evidence, locate materials, or propose note updates without delaying every small question.
 
-## 访谈收敛
+## Interview convergence
 
-决策前沿为空。第一版边界见 v1-spec.md。用户已通过 ask-matt 要求进入实现准备，接续 to-spec、to-tickets 流程。
+No decision frontier remained. V1 scope is in v1-spec.md. The user requested implementation preparation through ask-matt, followed by to-spec and to-tickets.
 
-上述边界确认后，汇总整体方案请用户确认共同理解；若无新增分支，再进入实现。具体技术选型以满足已定规则的最简可逆方案为原则，不把所有内部实现细节转为访谈问题。
+After confirming these boundaries, summarize the proposal for shared understanding; proceed to implementation if no new branches arise. Choose the simplest reversible technical approach that satisfies the agreed rules rather than turning every internal detail into another interview question.

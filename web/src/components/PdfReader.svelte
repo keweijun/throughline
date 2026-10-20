@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { onDestroy, onMount, tick } from 'svelte';
   import type { PDFDocumentProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
   import { openPdf, pdfjs } from '../lib/pdf';
@@ -150,42 +151,42 @@
 </script>
 
 <div class="reader">
-  <div class="toolbar" role="toolbar" aria-label="PDF reader">
+  <div class="toolbar" role="toolbar" aria-label={t("PDF reader")}>
     <div class="group">
-      <button class="btn btn-quiet btn-small" onclick={() => go(current - 1)} disabled={current <= 1} aria-label="Previous page">‹</button>
+      <button class="btn btn-quiet btn-small" onclick={() => go(current - 1)} disabled={current <= 1} aria-label={t("Previous page")}>‹</button>
       <form class="page" onsubmit={(e) => (e.preventDefault(), go(Number(pageInput)))}>
-        <input aria-label="Page number" inputmode="numeric" bind:value={pageInput} />
-        <span>of {doc?.numPages ?? '…'}</span>
+        <input aria-label={t("Page number")} inputmode="numeric" bind:value={pageInput} />
+        <span>{t("of {count}", { count: doc?.numPages ?? '…' })}</span>
       </form>
-      <button class="btn btn-quiet btn-small" onclick={() => go(current + 1)} disabled={!doc || current >= doc.numPages} aria-label="Next page">›</button>
+      <button class="btn btn-quiet btn-small" onclick={() => go(current + 1)} disabled={!doc || current >= doc.numPages} aria-label={t("Next page")}>›</button>
     </div>
     <div class="group">
-      <button class="btn btn-quiet btn-small" onclick={() => setZoom(scale - 0.15)} aria-label="Zoom out">−</button>
+      <button class="btn btn-quiet btn-small" onclick={() => setZoom(scale - 0.15)} aria-label={t("Zoom out")}>−</button>
       <span class="zoom">{Math.round(scale * 100)}%</span>
-      <button class="btn btn-quiet btn-small" onclick={() => setZoom(scale + 0.15)} aria-label="Zoom in">+</button>
-      <button class="btn btn-quiet btn-small" aria-pressed={fit} onclick={fitWidth}>Fit width</button>
+      <button class="btn btn-quiet btn-small" onclick={() => setZoom(scale + 0.15)} aria-label={t("Zoom in")}>+</button>
+      <button class="btn btn-quiet btn-small" aria-pressed={fit} onclick={fitWidth}>{t("Fit width")}</button>
     </div>
     {#if current !== target}
-      <button class="btn btn-small cited-jump" onclick={() => go(target)}>Back to cited page</button>
+      <button class="btn btn-small cited-jump" onclick={() => go(target)}>{t("Back to cited page")}</button>
     {/if}
   </div>
 
   <div class="pages" bind:this={scroller} onscroll={onScroll} data-source-label={label} tabindex="-1">
     {#if failed}
-      <p class="problem">This PDF could not be displayed here. Open the original instead.</p>
+      <p class="problem">{t("This PDF could not be displayed here. Open the original instead.")}</p>
     {/if}
     {#each pages as number (number)}
       <section
         class="pdf-page"
         class:cited={number === target}
         data-page={number}
-        aria-label="Page {number}"
+        aria-label={t("Page {page}", { page: number })}
         style:width="{base.width * scale}px"
         style:height="{base.height * scale}px"
         use:register={number}
       >
         <div class="layers"></div>
-        {#if number === target}<span class="cited-tag">Cited page</span>{/if}
+        {#if number === target}<span class="cited-tag">{t("Cited page")}</span>{/if}
       </section>
     {/each}
   </div>

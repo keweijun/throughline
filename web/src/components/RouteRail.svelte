@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
@@ -38,8 +39,8 @@
   const label = { current: 'Current section', visited: 'Visited', upcoming: 'Not started' };
 </script>
 
-<nav id="route" class="rail" class:open={app.routeOpen} aria-label="Course route">
-  <h2>Route</h2>
+<nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")}>
+  <h2>{t("Route")}</h2>
   <ol>
     {#each route as id, index (id)}
       {@const concept = app.concept(id)}
@@ -55,17 +56,17 @@
           <span class="name">{concept?.title ?? id}</span>
           {#if status === 'current' || count || prepared.has(id)}
             <span class="meta">
-              {#if status === 'current'}<span>You are here</span>{/if}
-              {#if count}<span>{count.solved}/{count.total} exercises solved</span>{/if}
-              {#if prepared.has(id) && status !== 'current'}<span>Prepared</span>{/if}
+              {#if status === 'current'}<span>{t("You are here")}</span>{/if}
+              {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
+              {#if prepared.has(id) && status !== 'current'}<span>{t("Prepared")}</span>{/if}
             </span>
           {/if}
-          <span class="visually-hidden">{label[status]}</span>
+          <span class="visually-hidden">{diagnostic(label[status])}</span>
         </button>
       </li>
     {/each}
   </ol>
-  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>Teacher settings</button>
+  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>{t("Teacher settings")}</button>
 </nav>
 
 <style>

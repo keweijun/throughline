@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
   import type { Ref, SourceView } from '../lib/types';
@@ -75,18 +76,18 @@
     onpointerenter={() => clearTimeout(hideTimer)}
   >
     {#if failed}
-      <p class="muted">This source location could not be loaded.</p>
+      <p class="muted">{t("This source location could not be loaded.")}</p>
     {:else if !view}
-      <p class="muted">Looking up the source…</p>
+      <p class="muted">{t("Looking up the source…")}</p>
     {:else}
       <p class="head">
         <span class="title">{view.title}</span>
-        <span class="where">{view.locator?.page ? `p. ${view.locator.page}` : `line ${view.locator?.line}`}</span>
+        <span class="where">{view.locator?.page ? t('p. {page}', { page: view.locator.page }) : t('line {line}', { line: view.locator?.line ?? '' })}</span>
       </p>
-      {#if excerpt}<blockquote>{excerpt}</blockquote>{:else}<p class="muted">No text was extracted at this location.</p>{/if}
+      {#if excerpt}<blockquote>{excerpt}</blockquote>{:else}<p class="muted">{t("No text was extracted at this location.")}</p>{/if}
       <p class="foot">
-        <span class="chip chip-{v.tone}">{v.label}</span>
-        <span class="muted">Click to open in the reader</span>
+        <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
+        <span class="muted">{t("Click to open in the reader")}</span>
       </p>
     {/if}
   </div>

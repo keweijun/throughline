@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import Questions from './Questions.svelte';
   import SourceViewer from './SourceViewer.svelte';
@@ -32,14 +33,14 @@
   }
 </script>
 
-<aside id="auxiliary" class="panel" aria-label="Questions and sources" hidden={!app.panelOpen}>
+<aside id="auxiliary" class="panel" aria-label={t("Questions and sources")} hidden={!app.panelOpen}>
   <!-- A focusable window splitter is interactive per WAI-ARIA, which this lint rule does not model. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div
     class="handle"
     role="separator"
     aria-orientation="vertical"
-    aria-label="Resize panel"
+    aria-label={t("Resize panel")}
     aria-valuenow={app.panelWidth}
     aria-valuemin={320}
     tabindex="0"
@@ -48,10 +49,10 @@
   ></div>
   <div class="bar">
     <div class="tabs" role="tablist">
-      <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>Questions</button>
-      <button role="tab" aria-selected={app.panelTab === 'source'} onclick={() => select('source')}>Source</button>
+      <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>{t("Questions")}</button>
+      <button role="tab" aria-selected={app.panelTab === 'source'} onclick={() => select('source')}>{t("Source")}</button>
     </div>
-    <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label="Close panel">Close</button>
+    <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label={t("Close panel")}>{t("Close")}</button>
   </div>
   <div class="body" class:fill={app.panelTab === 'source'} bind:this={body}>
     <div class="tab" hidden={app.panelTab !== 'questions'}><Questions /></div>

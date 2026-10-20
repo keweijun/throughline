@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
@@ -46,56 +47,56 @@
 
 <article class="thread" class:flash id="thread-{question.id}" bind:this={node}>
   {#if question.selection}<blockquote>{question.selection}</blockquote>{/if}
-  <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ text: question.question }}></div>
+  <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
 
   {#if answer?.text}
-    <div class="prose answer" use:markdown={{ text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
+    <div class="prose answer" use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {/if}
   {#if answer && answer.status !== 'completed'}
     <div class="state">
       <span class="chip chip-{lessonStatus[answer.status].tone}">
-        {#if answer.status === 'running'}<span class="live-dot"></span>Answering{:else}{lessonStatus[answer.status].label}{/if}
+        {#if answer.status === 'running'}<span class="live-dot"></span>{t("Answering")}{:else}{diagnostic(lessonStatus[answer.status].label)}{/if}
       </span>
-      <TurnControls turn={answer} pauseLabel="Pause" regenerateLabel="Answer again" />
+      <TurnControls turn={answer} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
     </div>
   {/if}
 
   {#if decision}
     <p class="decision">
-      {decision.depth === 'short' ? 'Short answer' : 'Detailed answer'}, {categories[decision.category] ?? decision.category}.
+      {decision.depth === 'short' ? t("Short answer") : t("Detailed answer")}, {diagnostic(categories[decision.category] ?? decision.category)}.
       <span>{decision.rationale}</span>
     </p>
   {:else if answer?.status === 'completed'}
-    <p class="decision">Answer saved, but the teacher's route note is missing, so this question stays open.</p>
+    <p class="decision">{t("Answer saved, but the teacher's route note is missing, so this question stays open.")}</p>
   {/if}
 
   {#if question.status === 'suggested' && decision}
     <div class="suggest">
-      <p>The teacher suggests studying a foundation first: <strong>{decision.supplement_goal}</strong>. The lesson pauses while you do.</p>
+      <p>{t("The teacher suggests studying a foundation first:")} <strong>{decision.supplement_goal}</strong>{t(". The lesson pauses while you do.")}</p>
       <div class="row">
-        <button class="btn btn-small btn-primary" onclick={() => choose('accept')}>Study the foundations first</button>
-        <button class="btn btn-small" onclick={() => choose('decline')}>Continue current topic</button>
+        <button class="btn btn-small btn-primary" onclick={() => choose('accept')}>{t("Study the foundations first")}</button>
+        <button class="btn btn-small" onclick={() => choose('decline')}>{t("Continue current topic")}</button>
       </div>
     </div>
   {/if}
 
   {#if supplement}
-    <section class="supplement" aria-label="Foundation supplement">
+    <section class="supplement" aria-label={t("Foundation supplement")}>
       <p class="supplement-status">
-        Foundation: {decision?.supplement_goal}
+        {t("Foundation:")} {decision?.supplement_goal}
         <span class="chip chip-{lessonStatus[supplement.status].tone}">
-          {#if supplement.status === 'running'}<span class="live-dot"></span>{/if}{lessonStatus[supplement.status].label}
+          {#if supplement.status === 'running'}<span class="live-dot"></span>{/if}{diagnostic(lessonStatus[supplement.status].label)}
         </span>
       </p>
       {#if supplement.text}
-        <div class="prose" use:markdown={{ text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose" use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
       {/if}
-      <TurnControls turn={supplement} pauseLabel="Pause supplement" regenerateLabel="Regenerate supplement" />
+      <TurnControls turn={supplement} pauseLabel={t("Pause supplement")} regenerateLabel={t("Regenerate supplement")} />
     </section>
   {/if}
 
   <div class="row end">
-    <button class="btn btn-quiet btn-small" onclick={backToLesson}>Return to the lesson</button>
+    <button class="btn btn-quiet btn-small" onclick={backToLesson}>{t("Return to the lesson")}</button>
   </div>
 </article>
 

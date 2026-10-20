@@ -1,3 +1,4 @@
+import { t, locale, type Language } from './i18n.svelte';
 import DOMPurify from 'dompurify';
 import katex from 'katex';
 import { marked } from 'marked';
@@ -74,8 +75,8 @@ function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref:
     if (!ref || !onSource) {
       const pending = document.createElement('span');
       pending.className = 'citation citation-missing';
-      pending.title = 'This citation does not match a registered source location';
-      pending.textContent = 'source unverified';
+      pending.title = t('This citation does not match a registered source location');
+      pending.textContent = t('source unverified');
       return pending;
     }
     const button = document.createElement('button');
@@ -83,8 +84,8 @@ function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref:
     button.className = 'citation';
     button.dataset.ref = JSON.stringify(ref);
     button.textContent = labelFor(ref);
-    button.title = 'Open the cited source';
-    button.setAttribute('aria-label', 'View source ' + labelFor(ref));
+    button.title = t('Open the cited source');
+    button.setAttribute('aria-label', t('View source {location}', { location: labelFor(ref) }));
     button.addEventListener('click', () => onSource(ref));
     return button;
   });
@@ -93,14 +94,14 @@ function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref:
 export function labelFor(ref: Ref) {
   const page = ref.unit_id.match(/^page-(\d+)$/);
   const line = ref.unit_id.match(/^line-(\d+)$/);
-  return page ? `p. ${page[1]}` : line ? `line ${line[1]}` : ref.unit_id;
+  return page ? t('p. {number}', { number: page[1] }) : line ? t('line {number}', { number: line[1] }) : ref.unit_id;
 }
 
-export type MarkdownOptions = { text: string; refs?: Ref[]; onSource?: (ref: Ref) => void };
+export type MarkdownOptions = { language?: Language; text: string; refs?: Ref[]; onSource?: (ref: Ref) => void };
 
 /** Renders sanitized Markdown, patching only changed blocks so streaming keeps selections and scroll. */
 export function render(node: HTMLElement, { text, refs = [], onSource }: MarkdownOptions) {
-  const key = text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
+  const key = locale.language + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
   if (node.dataset.key === key) return;
   const fragment = parse(text.replace(DECISION, ''));
   linkCitations(fragment, refs, onSource);

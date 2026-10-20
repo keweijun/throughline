@@ -1,5 +1,15 @@
 <script lang="ts">
+  import { t, locale, type Language } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+
+  let savingLanguage = $state(false);
+  async function changeLanguage(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    savingLanguage = true;
+    await app.setLanguage(select.value as Language);
+    select.value = locale.language;
+    savingLanguage = false;
+  }
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
@@ -22,7 +32,7 @@
 <header class="topbar">
   <button
     class="btn btn-quiet menu"
-    aria-label="Course contents"
+    aria-label={t("Course contents")}
     aria-expanded={app.routeOpen}
     aria-controls="route"
     onclick={() => (app.routeOpen = !app.routeOpen)}
@@ -32,40 +42,49 @@
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)" /><path d="M9 22.5V9.5h5.2c3.3 0 5.3 1.7 5.3 4.4 0 2.8-2 4.5-5.3 4.5H12.2" fill="none" stroke="var(--sheet)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /><path d="M17.5 22.5h5.5" stroke="var(--marker)" stroke-width="2.6" stroke-linecap="round" /></svg>
-    <span class="course">{app.state?.course.title ?? 'Guided Learning'}</span>
+    <span class="course">{app.state?.course.title ?? t("Guided Learning")}</span>
   </div>
 
   {#if route.length && index >= 0}
-    <div class="progress" title="Your position on the course route">
-      <span>Section {index + 1} of {route.length}</span>
+    <div class="progress" title={t("Your position on the course route")}>
+      <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
       <span class="track" aria-hidden="true"><span style:width="{((index + 1) / route.length) * 100}%"></span></span>
     </div>
   {/if}
 
   <div class="actions">
+    <label class="language" title={t('Language applies to the interface and new teaching content.')}>
+      <span class="visually-hidden">{t('Language')}</span>
+      <select aria-label={t('Language')} value={locale.language} onchange={changeLanguage} disabled={savingLanguage || !app.state}>
+        <option value="en">English</option>
+        <option value="zh-CN">简体中文</option>
+      </select>
+    </label>
     {#if app.connection !== 'live'}
       <span class="chip chip-caution" role="status">
-        {app.connection === 'connecting' ? 'Connecting…' : 'Reconnecting · your work is saved'}
+        {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
     {/if}
-    <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title="Teacher settings">
-      <span class="model-name">Codex · {app.state?.settings.model || 'default model'}</span>
+    <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title={t("Teacher settings")}>
+      <span class="visually-hidden">{t("Teacher settings")}: </span><span class="model-name">Codex · {app.state?.settings.model || t("default model")}</span>
     </button>
     <button
       class="btn btn-quiet"
       aria-pressed={app.panelOpen && app.panelTab === 'questions'}
       onclick={() => (app.panelOpen && app.panelTab === 'questions' ? (app.panelOpen = false) : app.openPanel('questions'))}
     >
-      Questions{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
+      {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
     </button>
-    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
-    <button class="btn btn-quiet icon" onclick={toggleTheme} aria-label="Switch light or dark theme">
+    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>?</button>
+    <button class="btn btn-quiet icon" onclick={toggleTheme} aria-label={t("Switch light or dark theme")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14V3Z" fill="currentColor" /><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
     </button>
   </div>
 </header>
 
 <style>
+  .language { flex: none; }
+  .language select { width: auto; max-width: 7rem; font-size: var(--step--1); padding: 0.35rem; }
   .topbar {
     position: sticky;
     top: 0;

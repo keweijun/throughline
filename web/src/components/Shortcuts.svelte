@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   let dialog: HTMLDialogElement | undefined = $state();
@@ -9,7 +10,7 @@
     else if (!app.shortcutsOpen && dialog.open) dialog.close();
   });
 
-  const keys: [string, string][] = [
+  const keys: [string, MessageKey][] = [
     ['/', 'Ask a side question'],
     ['[', 'Previous section'],
     [']', 'Next section'],
@@ -20,13 +21,13 @@
 </script>
 
 <dialog bind:this={dialog} onclose={() => (app.shortcutsOpen = false)} aria-labelledby="shortcuts-title">
-  <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+  <h2 id="shortcuts-title">{t("Keyboard shortcuts")}</h2>
   <dl>
     {#each keys as [key, action]}
-      <div><dt><kbd>{key}</kbd></dt><dd>{action}</dd></div>
+      <div><dt><kbd>{key}</kbd></dt><dd>{t(action)}</dd></div>
     {/each}
   </dl>
-  <button class="btn btn-small" onclick={() => (app.shortcutsOpen = false)}>Done</button>
+  <button class="btn btn-small" onclick={() => (app.shortcutsOpen = false)}>{t("Done")}</button>
 </dialog>
 
 <style>

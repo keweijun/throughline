@@ -68,7 +68,7 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
 
 test('teacher settings save the Codex model and effort', async ({ page, course }) => {
   const { base } = await course('demo_course_fixture');
-  await page.getByRole('button', { name: /Codex · default model/ }).click();
+  await page.getByRole('button', { name: /^Teacher settings: Codex · default model/ }).click();
   await page.getByRole('textbox', { name: 'Model' }).fill('gpt-6.1-sol');
   await page.getByRole('combobox', { name: 'Reasoning effort' }).selectOption('high');
   await page.getByRole('button', { name: 'Save' }).click();

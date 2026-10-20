@@ -4,7 +4,7 @@ Personal cross-document guided learning. A local course workspace keeps your sou
 
 The teacher makes instructional judgments from the materials. The program validates state and references; it never decides on its own that you have understood something.
 
-Documentation and the interface are in English. Teaching defaults to English; ask for another language in a lesson request or question when you want one. Imported materials and existing course records keep their original language.
+Documentation is in English. The language selector chooses English (default) or Simplified Chinese for the interface and new teaching requests. This preference is saved with the course. Imported materials and existing course records keep their original language; explicit language requests in a question are still honored.
 
 ## Install
 

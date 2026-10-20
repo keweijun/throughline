@@ -81,6 +81,7 @@ function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref:
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'citation';
+    button.dataset.ref = JSON.stringify(ref);
     button.textContent = labelFor(ref);
     button.title = 'Open the cited source';
     button.setAttribute('aria-label', 'View source ' + labelFor(ref));

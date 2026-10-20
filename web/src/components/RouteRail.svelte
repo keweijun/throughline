@@ -6,6 +6,28 @@
   const prepared = $derived(
     new Set((app.state?.preparation.jobs ?? []).filter((j) => j.status === 'ready').map((j) => j.concept_id)),
   );
+  const exercises = $derived.by(() => {
+    const counts = new Map<string, { solved: number; total: number }>();
+    for (const task of app.state?.practice.tasks ?? []) {
+      const entry = counts.get(task.concept_id) ?? { solved: 0, total: 0 };
+      entry.total += 1;
+      if (task.history.filter((h) => h.action === 'assess').at(-1)?.outcome === 'passed') entry.solved += 1;
+      counts.set(task.concept_id, entry);
+    }
+    return counts;
+  });
+
+  // The arrival animation plays only when the learner moves on, not on every page load.
+  let previous: string | null = null;
+  let arriving = $state<string | null>(null);
+  $effect(() => {
+    const id = app.currentId;
+    if (previous && id && id !== previous) {
+      arriving = id;
+      setTimeout(() => arriving === id && (arriving = null), 1400);
+    }
+    previous = id;
+  });
 
   function stateOf(id: string, index: number) {
     if (id === app.currentId) return 'current';
@@ -22,31 +44,34 @@
     {#each route as id, index (id)}
       {@const concept = app.concept(id)}
       {@const status = stateOf(id, index)}
-      <li class={status}>
+      {@const count = exercises.get(id)}
+      <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
+        <span class="node" aria-hidden="true"></span>
         <button
           class:viewing={id === app.viewingId}
           aria-current={id === app.viewingId ? 'page' : undefined}
           onclick={() => app.view(id)}
         >
-          <span class="node" aria-hidden="true"></span>
-          <span class="text">
-            <span class="name">{concept?.title ?? id}</span>
-            {#if status === 'current'}
-              <span class="meta">You are here</span>
-            {:else if prepared.has(id)}
-              <span class="meta">Prepared</span>
-            {/if}
-            <span class="visually-hidden">{label[status]}</span>
-          </span>
+          <span class="name">{concept?.title ?? id}</span>
+          {#if status === 'current' || count || prepared.has(id)}
+            <span class="meta">
+              {#if status === 'current'}<span>You are here</span>{/if}
+              {#if count}<span>{count.solved}/{count.total} exercises solved</span>{/if}
+              {#if prepared.has(id) && status !== 'current'}<span>Prepared</span>{/if}
+            </span>
+          {/if}
+          <span class="visually-hidden">{label[status]}</span>
         </button>
       </li>
     {/each}
   </ol>
-  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>Model settings</button>
+  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>Teacher settings</button>
 </nav>
 
 <style>
   .rail {
+    --node: 0.8rem;
+    --gutter: 1.75rem;
     position: sticky;
     top: var(--topbar);
     max-height: calc(100vh - var(--topbar));
@@ -55,7 +80,7 @@
   }
 
   h2 {
-    margin: 0 0 0.75rem 0.55rem;
+    margin: 0 0 0.75rem var(--gutter);
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
@@ -69,29 +94,68 @@
 
   li {
     position: relative;
+    display: grid;
+    grid-template-columns: var(--gutter) minmax(0, 1fr);
+    align-items: start;
+    padding-bottom: 0.25rem;
   }
 
-  /* The thread connecting route nodes. */
+  /* Connector from this node to the next; both share the gutter centre, so they always line up. */
   li:not(:last-child)::before {
     content: '';
     position: absolute;
-    left: 1.07rem;
-    top: 1.45rem;
-    bottom: -0.75rem;
+    left: calc(var(--gutter) / 2 - 1px);
+    top: calc(0.62rem + var(--node) / 2);
+    bottom: calc(-0.62rem - var(--node) / 2);
     width: 2px;
-    background: var(--rule);
+    background: linear-gradient(var(--accent), var(--accent)) top / 100% var(--fill, 0%) no-repeat, var(--rule);
+    transition: background-size 0.7s cubic-bezier(0.3, 0, 0.2, 1);
   }
 
-  li.visited:not(:last-child)::before {
+  li.passed::before {
+    --fill: 100%;
+  }
+
+  .node {
+    position: relative;
+    z-index: 1;
+    justify-self: center;
+    width: var(--node);
+    height: var(--node);
+    margin-top: 0.62rem;
+    border: 2px solid var(--rule-strong);
+    border-radius: 50%;
+    background: var(--ground);
+    transition: background-color 0.3s, border-color 0.3s;
+  }
+
+  .visited .node {
+    border-color: var(--accent);
     background: var(--accent);
-    opacity: 0.45;
+  }
+
+  .current .node {
+    border-color: var(--accent);
+    background: var(--marker);
+    box-shadow: 0 0 0 4px var(--marker-wash);
+  }
+
+  .arriving .node {
+    animation: arrive 0.5s 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
+  }
+
+  @keyframes arrive {
+    from {
+      transform: scale(0.4);
+      box-shadow: 0 0 0 0 var(--marker-wash);
+    }
   }
 
   button {
-    display: flex;
-    gap: 0.7rem;
-    width: 100%;
-    padding: 0.5rem 0.55rem;
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    padding: 0.4rem 0.55rem;
     border: 0;
     border-radius: var(--radius);
     background: transparent;
@@ -109,35 +173,6 @@
     color: var(--ink);
   }
 
-  .node {
-    position: relative;
-    z-index: 1;
-    flex: none;
-    width: 0.75rem;
-    height: 0.75rem;
-    margin-top: 0.32rem;
-    border: 2px solid var(--rule-strong);
-    border-radius: 50%;
-    background: var(--ground);
-  }
-
-  .visited .node {
-    border-color: var(--accent);
-    background: var(--accent);
-  }
-
-  .current .node {
-    border-color: var(--accent);
-    background: var(--marker);
-    box-shadow: 0 0 0 3px var(--marker-wash);
-  }
-
-  .text {
-    display: grid;
-    gap: 0.05rem;
-    min-width: 0;
-  }
-
   .name {
     font-size: var(--step-0);
     line-height: 1.35;
@@ -149,13 +184,16 @@
   }
 
   .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.6rem;
     font-size: var(--step--1);
     color: var(--pencil);
   }
 
   .settings {
     display: none;
-    margin-top: 1.5rem;
+    margin: 1.5rem 0 0 var(--gutter);
   }
 
   @media (max-width: 56rem) {

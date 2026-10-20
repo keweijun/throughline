@@ -3,7 +3,17 @@ import type { HostEvent, Preview, Ref, SourceView, State, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
-export type Quote = { text: string; turnId: string; scrollY: number };
+export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string };
+
+const DEFAULT_PANEL = 400;
+
+function storedWidth() {
+  try {
+    return Number(localStorage.getItem('panel-width')) || DEFAULT_PANEL;
+  } catch {
+    return DEFAULT_PANEL;
+  }
+}
 
 class AppStore {
   state = $state<State | null>(null);
@@ -22,6 +32,12 @@ class AppStore {
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
   routeOpen = $state(false);
+  shortcutsOpen = $state(false);
+  /** Question thread to scroll to and flash in the side panel. */
+  focusThread = $state<string | null>(null);
+  panelWidth = $state(storedWidth());
+  #widthChosen = storedWidth() !== DEFAULT_PANEL;
+  #sources = new Map<string, Promise<SourceView>>();
 
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
@@ -154,11 +170,36 @@ class AppStore {
     this.panelOpen = true;
   }
 
+  resizePanel(width: number, chosen = true) {
+    this.panelWidth = Math.round(Math.min(Math.max(width, 320), window.innerWidth * 0.62));
+    if (!chosen) return;
+    this.#widthChosen = true;
+    try {
+      localStorage.setItem('panel-width', String(this.panelWidth));
+    } catch {
+      // The width still applies for this visit.
+    }
+  }
+
+  /** Source revisions never change, so each location is fetched once. */
+  sourceView(ref: Ref): Promise<SourceView> {
+    const key = `${ref.source_id}/${ref.revision}/${ref.unit_id}`;
+    let view = this.#sources.get(key);
+    if (!view) {
+      view = api.get<SourceView>(`/api/sources/${ref.source_id}/${ref.revision}/${encodeURIComponent(ref.unit_id)}`);
+      view.catch(() => this.#sources.delete(key));
+      this.#sources.set(key, view);
+    }
+    return view;
+  }
+
   async openSource(ref: Ref) {
     this.openPanel('source');
     this.sourceLoading = true;
     try {
-      this.source = await api.get<SourceView>(`/api/sources/${ref.source_id}/${ref.revision}/${encodeURIComponent(ref.unit_id)}`);
+      this.source = await this.sourceView(ref);
+      // A page of a PDF needs room; widen once unless the learner has chosen a width.
+      if (this.source.pdf_url && !this.#widthChosen) this.resizePanel(Math.max(this.panelWidth, window.innerWidth * 0.42), false);
     } catch (e) {
       this.source = null;
       this.error = (e as Error).message;

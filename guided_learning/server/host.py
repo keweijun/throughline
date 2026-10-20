@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
-from ..providers import ProviderSettings
+from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
 
@@ -77,7 +77,7 @@ class Host:
     def __init__(self, workspace, runner=None, settings=None):
         from .features import Navigation, Practice, Preparation, Questions
         self.workspace = Path(workspace).resolve()
-        self.settings = settings or ProviderSettings()
+        self.settings = settings or TeacherSettings()
         self._runner = runner
         self.events = EventBus()
         self.lock = threading.RLock()

@@ -38,9 +38,12 @@ function find(root: HTMLElement, needle: string): Range | null {
   return range;
 }
 
-export function markAsked(key: string, root: HTMLElement, passages: string[]) {
-  ranges.set(key, passages.map((p) => find(root, p)).filter((r): r is Range => r !== null));
+/** Highlights each passage and returns its range (null when the passage is no longer in the text). */
+export function markAsked(key: string, root: HTMLElement, passages: string[]): (Range | null)[] {
+  const found = passages.map((p) => find(root, p));
+  ranges.set(key, found.filter((r): r is Range => r !== null));
   publish();
+  return found;
 }
 
 export function clearAsked(key: string) {

@@ -144,7 +144,8 @@ class Navigation(Feature):
                 'verification': mapping.get('verification', 'pending'), 'stale': current.get('revision') != revision,
                 'image_url': source_url(ref, 'image') if kind == '.pdf' and page and available else None,
                 'render_message': None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.',
-                'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None}
+                'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
+                'document': None if kind == '.pdf' else [{'id': u['id'], 'text': u.get('text', '')} for u in snapshot['units']]}
 
     def prompt(self, turn, context):
         if turn['channel'] != 'mainline':

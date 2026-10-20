@@ -19,6 +19,18 @@
     extension: 'an extension',
   };
 
+  let node: HTMLElement | undefined = $state();
+  let flash = $state(false);
+
+  $effect(() => {
+    if (app.focusThread !== question.id || !node || !app.panelOpen) return;
+    requestAnimationFrame(() => node!.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    flash = true;
+    app.focusThread = null;
+    const timer = setTimeout(() => (flash = false), 1600);
+    return () => clearTimeout(timer);
+  });
+
   function choose(choice: 'accept' | 'decline') {
     return app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/choice`, { choice }));
   }
@@ -32,7 +44,7 @@
   }
 </script>
 
-<article class="thread">
+<article class="thread" class:flash id="thread-{question.id}" bind:this={node}>
   {#if question.selection}<blockquote>{question.selection}</blockquote>{/if}
   <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ text: question.question }}></div>
 
@@ -88,7 +100,20 @@
 </article>
 
 <style>
+  .thread.flash {
+    animation: flash 1.6s ease-out;
+  }
+
+  @keyframes flash {
+    0%,
+    30% {
+      background: var(--marker-wash);
+      box-shadow: 0 0 0 0.6rem var(--marker-wash);
+    }
+  }
+
   .thread {
+    border-radius: 2px;
     display: grid;
     gap: 0.6rem;
     padding-bottom: 1rem;

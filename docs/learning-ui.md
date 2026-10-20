@@ -12,15 +12,19 @@ Keep the terminal open; Ctrl+C stops the host. The interface and teaching defaul
 
 - **Route** (left): your current section is marked "You are here". Selecting another section previews it without moving your learning position; "Back to current section" returns.
 - **Start lesson**: the first lesson of a section opens with a unit overview and then teaches directly. Text streams in and is saved automatically when complete. "Ask for another pass" requests a new lesson in the same section.
-- **Side questions**: select a sentence or formula in a lesson and choose "Ask about this passage", or open Questions in the top bar. The lesson keeps going unless you tick "Pause the lesson while I ask". Passages you asked about stay highlighted. If the teacher suggests studying a foundation first, you decide; "Return to the lesson" scrolls back to where you asked.
-- **Sources**: citation buttons in lessons open the exact registered revision in the Source tab: the extracted line for Markdown, a rendered page image plus the original PDF for PDFs. "Pending verification" stays visible even when the model cites the source.
+- **Side questions**: select a sentence or formula in a lesson and choose "Ask about this passage", or open Questions in the top bar. The lesson keeps going unless you tick "Pause the lesson while I ask". Passages you asked about stay highlighted, with a marker in the margin that opens the question. If the teacher suggests studying a foundation first, you decide; "Return to the lesson" scrolls back to where you asked.
+- **Sources**: hover over a citation to see the cited text. Click it to open the exact registered revision in the built-in reader: PDFs open at the cited page (outlined, with "Back to cited page" if you scroll away), with selectable text, zoom and fit-to-width; Markdown notes open at the highlighted line. Select text in the reader to ask about it. "Pending verification" stays visible even when the model cites the source. Drag the panel's left edge (or focus it and use the arrow keys) to resize it.
 - **Practice**: exercises are prepared after a lesson completes. "Check my answer" asks the teacher to assess; Hint, Key steps and Full solution are always available, but after any help a correct answer is recorded as solved with help, not on your own. "Do later" keeps an exercise open; open exercises from earlier sections follow you.
 - **Enter next section** moves your position; practice is optional.
 - **Preparation**: while nothing else runs, the next section is prepared in the background. Prepared material is teacher-only and never counts as learning. Your own requests always take priority.
 
-## Model settings
+## Teacher settings
 
-Choose the teacher in Model settings: Local Codex CLI (default) or any OpenAI-compatible provider (OpenAI, OpenRouter, Ollama, LM Studio, vLLM and others). Keys can be stored or read from an environment variable; they stay in your user config directory and are never shown in the browser. `--provider` and `--model` override the saved choice for one run.
+The teacher is the Codex CLI on this computer. In Teacher settings choose the model (empty means your Codex default) and reasoning effort. `--model` and `--effort` override the saved choice for one run.
+
+## Keyboard shortcuts
+
+`/` ask a side question · `[` and `]` previous and next section · `s` show or hide the source reader · `?` list the shortcuts · `Esc` close a drawer or popup.
 
 ## Pause, close and reopen
 
@@ -33,7 +37,7 @@ To move a course to another machine, stop the host and copy the whole course dir
 ## Troubleshooting
 
 - **Port in use**: pass `--port`. If the course already has a host, use that window instead of starting a second one.
-- **Model errors**: the lesson shows the provider's message. For Codex, check the CLI's configuration in a terminal. For OpenAI-compatible providers, check the base URL, model name and key in Model settings ("Load available models" tests the connection). Partial text is kept.
-- **Page image unavailable**: install the `pdf` extra in the same environment, or use the original PDF link.
+- **Model errors**: the lesson shows the message. Check that `codex` runs in the same terminal and that the model in Teacher settings is available to your Codex account. Partial text is kept.
+- **A PDF does not display**: use "Open original" in the reader header.
 - **Preparation failed**: choose "Retry preparation"; learning continues without it.
 - **"Reconnecting"** in the top bar: the browser lost the live connection. Your work is saved; it reconnects automatically once the host is reachable.

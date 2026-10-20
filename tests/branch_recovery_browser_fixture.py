@@ -2,7 +2,7 @@
 from pathlib import Path
 import tempfile
 from guided_learning.api import execute
-from guided_learning.providers import ProviderSettings
+from guided_learning.server.settings import TeacherSettings
 from guided_learning.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Recovery regression'})
@@ -25,5 +25,5 @@ class Runner:
   if 'The learner accepted the supplement' in prompt:
    emit({'kind':'delta','text':'Regenerated supplement is still running.'});cancel.wait(20);return
   emit({'kind':'final','text':'Answer about the selected passage.'});emit({'kind':'complete'})
-try:serve(root,port=0,runner=Runner(),settings=ProviderSettings(Path(root)/'providers.json'),on_ready=lambda port:print(port,flush=True))
+try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

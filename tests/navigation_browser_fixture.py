@@ -1,7 +1,7 @@
 from pathlib import Path
 import tempfile, threading
 from guided_learning.api import execute
-from guided_learning.providers import ProviderSettings
+from guided_learning.server.settings import TeacherSettings
 from guided_learning.server import serve
 scratch=tempfile.TemporaryDirectory()
 root=Path(scratch.name)
@@ -14,5 +14,5 @@ class Runner:
  def run(self,prompt,cwd,emit,cancel):
   text='## Unit overview\n\nUnderstand interference through superposition of two paths.\n\nAdd **probability amplitudes**, then take the squared magnitude:\n\n$$P=|a+b|^2$$\n\n| Path | Amplitude |\n| --- | --- |\n| First | $a$ |\n\n[Source '+s['id']+' / line-2]\n\nEarlier records cite like this: [来源 '+s['id']+' / line-2]\n\n<img src=x onerror="window.pwned=true"><script>window.pwned=true</script>\n\n'+('\n\nThis is a complete lesson paragraph, preserving the reading position.'*60)
   emit({'kind':'delta','text':text});emit({'kind':'final','text':text});emit({'kind':'complete'})
-try:serve(root,port=0,runner=Runner(),settings=ProviderSettings(Path(root)/'providers.json'),on_ready=lambda port:print(port,flush=True))
+try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

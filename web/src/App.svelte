@@ -7,6 +7,8 @@
   import SidePanel from './components/SidePanel.svelte';
   import SelectionAsk from './components/SelectionAsk.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
+  import CitationPeek from './components/CitationPeek.svelte';
+  import Shortcuts from './components/Shortcuts.svelte';
 
   onMount(() => {
     void app.load();
@@ -17,10 +19,28 @@
     document.title = app.state ? `${app.state.course.title} · Guided Learning` : 'Guided Learning';
   });
 
+  function step(offset: number) {
+    const route = app.state?.curriculum.route ?? [];
+    const next = route[route.indexOf(app.viewingId ?? '') + offset];
+    if (next) app.view(next);
+  }
+
   function onKey(event: KeyboardEvent) {
-    if (event.key !== 'Escape') return;
-    if (app.routeOpen) app.routeOpen = false;
-    else if (app.panelOpen && matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+    if (event.key === 'Escape') {
+      if (app.routeOpen) app.routeOpen = false;
+      else if (app.panelOpen && matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+      return;
+    }
+    const target = event.target as HTMLElement;
+    if (event.metaKey || event.ctrlKey || event.altKey || target.closest('input, textarea, select, [contenteditable], dialog')) return;
+    if (event.key === '/') {
+      event.preventDefault();
+      app.openPanel('questions');
+      requestAnimationFrame(() => document.getElementById('question-input')?.focus());
+    } else if (event.key === '[') step(-1);
+    else if (event.key === ']') step(1);
+    else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
+    else if (event.key === '?') app.shortcutsOpen = true;
   }
 </script>
 
@@ -35,7 +55,7 @@
   </div>
 {/if}
 
-<div class="layout" class:with-panel={app.panelOpen}>
+<div class="layout" class:with-panel={app.panelOpen} style:--panel="{app.panelWidth}px">
   {#if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
     <RouteRail />
@@ -54,6 +74,8 @@
 
 <SelectionAsk />
 <SettingsDialog />
+<CitationPeek />
+<Shortcuts />
 
 <style>
   .banner {
@@ -75,11 +97,12 @@
     display: grid;
     grid-template-columns: var(--rail) minmax(0, 1fr);
     align-items: start;
-    max-width: 100rem;
+    max-width: 84rem;
     margin-inline: auto;
   }
 
   .layout.with-panel {
+    max-width: none;
     grid-template-columns: var(--rail) minmax(0, 1fr) var(--panel);
   }
 

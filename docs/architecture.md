@@ -29,9 +29,9 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
 
 Rules the host enforces: one running mainline lesson at a time; side questions run alongside it unless the learner pauses it; preparation starts only when nothing else runs; partial text never becomes an interaction or evidence.
 
-## Providers (`guided_learning/providers/`)
+## Teacher (`guided_learning/codex.py`, `server/settings.py`)
 
-`CodexRunner` drives `codex app-server`; `OpenAICompatibleRunner` streams `/chat/completions`. `ProviderSettings` stores providers per user and builds the active runner on each turn, so a change in Model settings applies to the next request. See ADR 0002.
+`CodexRunner` drives `codex app-server`. `TeacherSettings` keeps the Codex model and reasoning effort per user and builds a runner for each turn, so a change in Teacher settings applies to the next request. See ADR 0002.
 
 ## HTTP API
 
@@ -42,18 +42,18 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | POST | `/api/lessons` | Start a mainline lesson (enters the first concept if there is no position) |
 | POST | `/api/turns/{id}/pause`, `/resume` | Pause, or regenerate as a new attempt |
 | GET | `/api/concepts/{id}/preview` | Overview, prerequisites and sources, without moving the position |
-| GET | `/api/sources/{source}/{revision}/{unit}?format=image\|pdf` | Exact source revision |
+| GET | `/api/sources/{source}/{revision}/{unit}?format=image\|pdf` | Exact source revision; Markdown responses include the whole document for the reader |
 | POST | `/api/questions`, `/api/questions/{id}/choice`, `/return` | Side questions and supplements |
 | POST | `/api/practice/generate`, `/api/practice/tasks/{id}/{action}` | Exercises and help |
 | POST | `/api/sections/next` | Enter the next route section |
 | POST | `/api/preparation/retry` | Retry failed preparation |
-| GET/PUT/DELETE/POST | `/api/settings…` | Providers, active model, model listing |
+| GET/PUT | `/api/settings` | Codex model and reasoning effort |
 
 The browser cannot call domain operations directly; there is no generic operation passthrough.
 
 ## Interface (`web/`)
 
-`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Components map to the page: `RouteRail`, `ConceptPage` (goal, overview, lessons, composer, practice, next section), `SidePanel` (questions, source), `SettingsDialog`.
+`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Components map to the page: `RouteRail`, `ConceptPage` (goal, overview, lessons, composer, practice, next section), `SidePanel` (questions, and `SourceViewer` with `PdfReader` and `MarkdownReader`), `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
 
 ## Adding behavior
 

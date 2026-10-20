@@ -170,7 +170,7 @@
         <label class="field">
           <span>{t("Reasoning effort")}</span>
           <select bind:value={draft.effort}>
-            <option value="">{draft.kind === 'codex' ? 'Medium' : t("Provider default")}</option>
+            <option value="">{draft.kind === 'codex' ? t('Medium') : t("Provider default")}</option>
             <option value="minimal">{t("Minimal")}</option>
             <option value="low">{t("Low")}</option>
             <option value="medium">{t("Medium")}</option>

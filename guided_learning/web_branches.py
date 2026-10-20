@@ -31,12 +31,13 @@ def register(app):
             common+='\nCurrent mainline lesson (possibly unfinished):\n'+main['text']
         if turn['id']==branch.get('supplement_turn_id'):
             return common+'\nThe learner accepted the supplement. Teach the necessary foundations around supplement_goal, then explain how to return to the original goal. Do not advance the mainline or claim mastery.'
-        return common+'''\nBranch decision protocol: choose response depth using the course route, current goal, prerequisites, and known difficulties, rather than keywords or question length alone.
+        limit='150 English words' if turn.get('language','en')=='en' else '250 Chinese characters'
+        return common+f'''\nBranch decision protocol: choose response depth using the course route, current goal, prerequisites, and known difficulties, rather than keywords or question length alone.
 selected_lecture is a frozen snapshot of the lesson containing the selected passage and may belong to an earlier section. Explain the passage using that text and its sources. restore_point and main_turn_id identify the current mainline recovery/pause target. Distinguish older lessons from the current lesson. Correct an older lesson without setting mainline_error unless the current mainline also has a confirmed error.
 Answer ordinary local questions or topics needing depth only later briefly, naming the later location. Explain in detail when required for current reasoning or explicitly requested. Use a different example or representation for repeated difficulties.
 Give a natural explanation to the learner, then append one <teaching-decision>JSON</teaching-decision> at the end of the single reply.
 JSON must include depth ("short" or "long"), category ("local", "prerequisite", "future", "repeated", "extension"), rationale (brief route-based reason), suggest_supplement (boolean), and supplement_goal (string). For future with short depth, provide target_concept_id (a real later concept ID in the route) and tell the learner which section will provide the full explanation.
-Suggest a supplement only when foundations are actually missing for continuing the mainline. When suggesting one, keep this reply to about 150 English words: explain the obstacle, offer one minimal clarification, and describe the scope. Wait for acceptance before teaching the full foundations. Ordinary branches do not pause the mainline.
+Suggest a supplement only when foundations are actually missing for continuing the mainline. When suggesting one, keep this reply to about {limit}: explain the obstacle, offer one minimal clarification, and describe the scope. Wait for acceptance before teaching the full foundations. Ordinary branches do not pause the mainline.
 If the current lesson itself has a confirmed error, add mainline_error=true and explain the correction; the host will pause the mainline. A learner question alone is not evidence of a mainline error.
 Do not output a JSON copy of the entire answer, call tools to write records, or fabricate course progress.'''
 

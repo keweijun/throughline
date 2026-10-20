@@ -4,6 +4,7 @@ from .store import OperationError
 from . import curriculum
 from .teaching import resume as session_resume
 from .teaching import require_text, validate_concept, record_interaction
+from .preferences import view as preferences, validate_language
 
 
 def read(store, request):
@@ -24,8 +25,10 @@ def start(store, request):
     if identity['channel'] not in ('mainline','sidequestion','practice','preparation'):
         raise OperationError('invalid_channel','Unknown teaching channel')
     old = store.get('streams', identifier)
+    # Omitted language on a retry means the original request, not today's preference.
+    identity['language'] = validate_language(request.get('language', old.get('language','en') if old else preferences(store,{})['preferences']['language']))
     if old:
-        if any(old.get(k, True if k=='record_user' else None) != v for k,v in identity.items()):
+        if any(old.get(k, True if k=='record_user' else 'en' if k=='language' else None) != v for k,v in identity.items()):
             raise OperationError('id_conflict', identifier)
         return {'turn':old, 'created':False}
     if identity['record_user']: record_interaction(store, {'id':'stream-user:'+identifier, 'role':'user', 'text':prompt, 'concept_id':concept})
@@ -39,7 +42,7 @@ def start(store, request):
     model = curriculum.view(store,{})
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
-    snapshot = {'context':context,'route':route,'session':session_resume(store,{})}
+    snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}
     branch=next((b for b in store.list('web_branches') if identifier in (b['turn_id'],b.get('supplement_turn_id'))),None)
     if branch:
         snapshot['branch']=branch
@@ -110,8 +113,11 @@ def resume(store, request):
         return {'turn':turn,'created':False}
     if turn['status'] not in ('paused','interrupted','failed'):
         raise OperationError('invalid_transition','Only incomplete turns can be regenerated')
-    turn['attempts'].append({k:turn.get(k) for k in ('attempt','text','status','metrics','error','source_refs','prompt_snapshot')})
-    turn.update(attempt=turn['attempt']+1,status='running',text='',final_text=None,sequence=0,started_at=time.time(),metrics={})
+    language = validate_language(request.get('language',preferences(store,{})['preferences']['language']))
+    turn['attempts'].append({k:turn.get(k) for k in ('attempt','text','status','metrics','error','source_refs','prompt_snapshot','language')})
+    turn.update(attempt=turn['attempt']+1,status='running',text='',final_text=None,sequence=0,started_at=time.time(),metrics={},language=language)
+    if turn.get('prompt_snapshot') is not None:
+        turn['prompt_snapshot']={**turn['prompt_snapshot'],'language':language}
     turn.pop('error',None)
     turn['resume_requests'].append(request_id)
     store.put('streams',turn['id'],turn)

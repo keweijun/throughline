@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import type { Provider, Settings } from '../lib/types';
@@ -16,8 +17,8 @@
   let dialog: HTMLDialogElement | undefined = $state();
   let draft = $state<Draft | null>(null);
   let models = $state<string[]>([]);
-  let modelMessage = $state('');
-  let message = $state('');
+  let modelMessage = $state<{ key: MessageKey; values?: Record<string, string | number> } | string | null>(null);
+  let message = $state<{ key: MessageKey; values?: Record<string, string | number> } | null>(null);
   let busy = $state(false);
 
   const settings = $derived(app.state?.settings);
@@ -26,14 +27,14 @@
     if (!dialog) return;
     if (app.settingsOpen && !dialog.open) {
       draft = null;
-      message = '';
+      message = null;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
 
-  async function save(fn: () => Promise<Settings>, done: string) {
+  async function save(fn: () => Promise<Settings>, done: { key: MessageKey; values?: Record<string, string | number> }) {
     busy = true;
-    message = '';
+    message = null;
     const result = await app.act(fn);
     busy = false;
     if (result) {
@@ -43,13 +44,13 @@
   }
 
   function activate(provider: Provider) {
-    return save(() => api.post<Settings>('/api/settings/active', { id: provider.id }), `Using ${provider.label} for new requests.`);
+    return save(() => api.post<Settings>('/api/settings/active', { id: provider.id }), { key: 'Using {name} for new requests.', values: { name: provider.label } });
   }
 
   function edit(provider: Provider) {
     draft = { ...provider, api_key: '', isNew: false };
     models = [];
-    modelMessage = '';
+    modelMessage = null;
   }
 
   function add(preset: Partial<Draft>) {
@@ -58,7 +59,7 @@
     for (let n = 2; taken.has(id); n++) id = `${preset.id}-${n}`;
     draft = { kind: 'openai', model: '', effort: '', api_key: '', api_key_env: '', ...preset, id, isNew: true } as Draft;
     models = [];
-    modelMessage = '';
+    modelMessage = null;
   }
 
   function submit(event: SubmitEvent) {
@@ -66,21 +67,21 @@
     if (!draft) return;
     const { isNew, has_api_key, api_key, ...provider } = draft;
     const body = api_key ? { ...provider, api_key } : provider;
-    void save(() => api.put<Settings>('/api/settings/providers', body), `Saved ${draft.label}.`);
+    void save(() => api.put<Settings>('/api/settings/providers', body), { key: 'Saved {name}.', values: { name: draft.label } });
   }
 
   function remove(provider: Provider) {
-    return save(() => api.delete<Settings>(`/api/settings/providers/${encodeURIComponent(provider.id)}`), `Removed ${provider.label}.`);
+    return save(() => api.delete<Settings>(`/api/settings/providers/${encodeURIComponent(provider.id)}`), { key: 'Removed {name}.', values: { name: provider.label } });
   }
 
   async function loadModels() {
     if (!draft) return;
-    modelMessage = 'Loading models…';
+    modelMessage = { key: 'Loading models…' };
     try {
       const { isNew, has_api_key, ...provider } = draft;
       const result = await api.post<{ models: string[] }>('/api/settings/models', provider.api_key ? provider : { ...provider, api_key: undefined });
       models = result.models;
-      modelMessage = models.length ? `${models.length} models available.` : 'The provider listed no models. Type the model name instead.';
+      modelMessage = models.length ? { key: '{count} models available.', values: { count: models.length } } : { key: 'The provider listed no models. Type the model name instead.' };
     } catch (e) {
       modelMessage = (e as Error).message;
     }
@@ -89,100 +90,100 @@
 
 <dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
-    <h2 id="settings-title">Model settings</h2>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>Close</button>
+    <h2 id="settings-title">{t("Model settings")}</h2>
+    <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>{t("Close")}</button>
   </header>
 
   {#if settings}
     {#if !draft}
-      <p class="intro">Choose who teaches. New lessons, answers and feedback use this model; text already written stays as it is.</p>
+      <p class="intro">{t("Choose who teaches. New lessons, answers and feedback use this model; text already written stays as it is.")}</p>
       <ul class="providers">
         {#each settings.providers as provider (provider.id)}
           {@const active = provider.id === settings.active}
           <li class:active>
             <div class="info">
-              <p class="name">{provider.label} {#if active}<span class="chip">In use</span>{/if}</p>
+              <p class="name">{provider.label} {#if active}<span class="chip">{t("In use")}</span>{/if}</p>
               <p class="detail">
-                {provider.kind === 'codex' ? 'Codex CLI on this computer' : provider.base_url}
-                · {(active ? settings.active_model : provider.model) || 'default model'}
+                {provider.kind === 'codex' ? t("Codex CLI on this computer") : provider.base_url}
+                · {(active ? settings.active_model : provider.model) || t("default model")}
               </p>
               {#if provider.kind === 'openai' && !provider.has_api_key}
-                <p class="detail warn">No API key set{provider.api_key_env ? ` (looked for ${provider.api_key_env})` : ''}.</p>
+                <p class="detail warn">{t("No API key set")}{provider.api_key_env ? t('(looked for {name})', { name: provider.api_key_env }) : ''}.</p>
               {/if}
             </div>
             <div class="row">
-              {#if !active}<button class="btn btn-small" disabled={busy} onclick={() => activate(provider)}>Use</button>{/if}
-              <button class="btn btn-quiet btn-small" onclick={() => edit(provider)}>Edit</button>
+              {#if !active}<button class="btn btn-small" disabled={busy} onclick={() => activate(provider)}>{t("Use")}</button>{/if}
+              <button class="btn btn-quiet btn-small" onclick={() => edit(provider)}>{t("Edit")}</button>
               {#if !active}
-                <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => remove(provider)}>Remove</button>
+                <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => remove(provider)}>{t("Remove")}</button>
               {/if}
             </div>
           </li>
         {/each}
       </ul>
 
-      <h3>Add an OpenAI-compatible provider</h3>
+      <h3>{t("Add an OpenAI-compatible provider")}</h3>
       <div class="presets">
         {#each presets as preset}
-          <button class="btn btn-small" onclick={() => add(preset.draft)}>{preset.name}</button>
+          <button class="btn btn-small" onclick={() => add(preset.draft)}>{preset.name === 'Other' ? t('Other') : preset.name}</button>
         {/each}
       </div>
 
       {#if settings.overridden}
-        <p class="note">This host was started with a provider or model on the command line. Choosing a provider here replaces it.</p>
+        <p class="note">{t("This host was started with a provider or model on the command line. Choosing a provider here replaces it.")}</p>
       {/if}
-      <p class="note">Saved for your user account in <code>{settings.path}</code>, never inside a course folder.</p>
+      <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
     {:else}
       <form class="edit" onsubmit={submit}>
-        <h3>{draft.isNew ? 'New provider' : `Edit ${draft.label}`}</h3>
-        <label class="field"><span>Name</span><input type="text" bind:value={draft.label} required /></label>
+        <h3>{draft.isNew ? t("New provider") : t('Edit {name}', { name: draft.label })}</h3>
+        <label class="field"><span>{t("Name")}</span><input type="text" bind:value={draft.label} required /></label>
         {#if draft.isNew}
-          <label class="field"><span>ID</span><input type="text" bind:value={draft.id} pattern="[a-z0-9][a-z0-9-]*" required /></label>
+          <label class="field"><span>{t("ID")}</span><input type="text" bind:value={draft.id} pattern="[a-z0-9][a-z0-9-]*" required /></label>
         {/if}
         {#if draft.kind === 'openai'}
           <label class="field">
-            <span>Base URL</span>
+            <span>{t("Base URL")}</span>
             <input type="url" bind:value={draft.base_url} required placeholder="https://api.example.com/v1" />
           </label>
         {/if}
         <label class="field">
-          <span>Model</span>
-          <input type="text" bind:value={draft.model} list="model-options" placeholder={draft.kind === 'codex' ? 'Leave empty for your Codex default' : 'For example: gpt-5.1'} required={draft.kind === 'openai'} />
+          <span>{t("Model")}</span>
+          <input type="text" bind:value={draft.model} list="model-options" placeholder={draft.kind === 'codex' ? t("Leave empty for your Codex default") : t("For example: gpt-5.1")} required={draft.kind === 'openai'} />
           <datalist id="model-options">
             {#each models as model}<option value={model}></option>{/each}
           </datalist>
         </label>
         {#if draft.kind === 'openai'}
           <div class="row">
-            <button type="button" class="btn btn-quiet btn-small" onclick={loadModels}>Load available models</button>
-            {#if modelMessage}<span class="detail">{modelMessage}</span>{/if}
+            <button type="button" class="btn btn-quiet btn-small" onclick={loadModels}>{t("Load available models")}</button>
+            {#if modelMessage}<span class="detail">{typeof modelMessage === 'string' ? diagnostic(modelMessage) : t(modelMessage.key, modelMessage.values)}</span>{/if}
           </div>
           <label class="field">
-            <span>API key</span>
-            <input type="password" bind:value={draft.api_key} autocomplete="off" placeholder={draft.has_api_key ? 'A key is saved. Leave empty to keep it.' : 'Optional for local servers'} />
+            <span>{t("API key")}</span>
+            <input type="password" bind:value={draft.api_key} autocomplete="off" placeholder={draft.has_api_key ? t("A key is saved. Leave empty to keep it.") : t("Optional for local servers")} />
           </label>
           <label class="field">
-            <span>Or read the key from an environment variable</span>
+            <span>{t("Or read the key from an environment variable")}</span>
             <input type="text" bind:value={draft.api_key_env} placeholder="OPENAI_API_KEY" />
           </label>
         {/if}
         <label class="field">
-          <span>Reasoning effort</span>
+          <span>{t("Reasoning effort")}</span>
           <select bind:value={draft.effort}>
-            <option value="">{draft.kind === 'codex' ? 'Medium' : 'Provider default'}</option>
-            <option value="minimal">Minimal</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
+            <option value="">{draft.kind === 'codex' ? 'Medium' : t("Provider default")}</option>
+            <option value="minimal">{t("Minimal")}</option>
+            <option value="low">{t("Low")}</option>
+            <option value="medium">{t("Medium")}</option>
+            <option value="high">{t("High")}</option>
           </select>
         </label>
         <div class="row">
-          <button class="btn btn-primary" type="submit" disabled={busy}>Save provider</button>
-          <button class="btn btn-quiet" type="button" onclick={() => (draft = null)}>Cancel</button>
+          <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save provider")}</button>
+          <button class="btn btn-quiet" type="button" onclick={() => (draft = null)}>{t("Cancel")}</button>
         </div>
       </form>
     {/if}
-    {#if message}<p class="message" role="status">{message}</p>{/if}
+    {#if message}<p class="message" role="status">{t(message.key, message.values)}</p>{/if}
   {/if}
 </dialog>
 

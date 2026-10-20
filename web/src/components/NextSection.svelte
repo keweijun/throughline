@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
 
@@ -22,21 +23,21 @@
 </script>
 
 {#if next}
-  <section class="next" aria-label="Next section">
+  <section class="next" aria-label={t("Next section")}>
     <div>
-      <p class="label">Up next</p>
+      <p class="label">{t("Up next")}</p>
       <p class="title">{next.title}</p>
       {#if activeSupplement}
-        <p class="note">Finish or close the foundation supplement in Questions before moving on.</p>
+        <p class="note">{t("Finish or close the foundation supplement in Questions before moving on.")}</p>
       {:else if pending}
-        <p class="note">{pending} {pending === 1 ? 'exercise stays' : 'exercises stay'} open and will be waiting for you.</p>
+        <p class="note">{t('{count} exercises stay open and will be waiting for you.', { count: pending })}</p>
       {/if}
     </div>
-    <button class="btn btn-primary" disabled={busy || activeSupplement} onclick={advance}>Enter next section</button>
+    <button class="btn btn-primary" disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
   </section>
 {:else if !next && app.hasLesson(conceptId)}
-  <section class="next done" aria-label="End of route">
-    <p class="title">This is the last section on the route.</p>
+  <section class="next done" aria-label={t("End of route")}>
+    <p class="title">{t("This is the last section on the route.")}</p>
   </section>
 {/if}
 

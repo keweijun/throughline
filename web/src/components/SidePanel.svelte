@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import Questions from './Questions.svelte';
   import SourceViewer from './SourceViewer.svelte';
@@ -14,13 +15,13 @@
   }
 </script>
 
-<aside id="auxiliary" class="panel" class:open={app.panelOpen} aria-label="Questions and sources" hidden={!app.panelOpen}>
+<aside id="auxiliary" class="panel" class:open={app.panelOpen} aria-label={t("Questions and sources")} hidden={!app.panelOpen}>
   <div class="bar">
     <div class="tabs" role="tablist">
-      <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>Questions</button>
-      <button role="tab" aria-selected={app.panelTab === 'source'} onclick={() => select('source')}>Source</button>
+      <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>{t("Questions")}</button>
+      <button role="tab" aria-selected={app.panelTab === 'source'} onclick={() => select('source')}>{t("Source")}</button>
     </div>
-    <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label="Close panel">Close</button>
+    <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label={t("Close panel")}>{t("Close")}</button>
   </div>
   <div class="body" bind:this={body}>
     <div hidden={app.panelTab !== 'questions'}><Questions /></div>

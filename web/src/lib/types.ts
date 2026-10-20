@@ -117,6 +117,7 @@ export type Settings = {
 export type Interaction = { id: string; role: 'user' | 'assistant'; text: string; concept_id?: string };
 
 export type State = {
+  preferences: { language: 'en' | 'zh-CN' };
   course: { id: string; title: string };
   position: Position | null;
   sources: { id: string; path: string; revision: string; status: string }[];

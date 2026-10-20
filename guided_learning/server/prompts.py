@@ -32,6 +32,10 @@ Use brief, concrete language to describe the core problem (the phenomenon or con
 Organize the lesson using the supplied route, sources, and actual mainline goal. Keep unverified material explicitly uncertain. Avoid mechanically repeating the contents or inserting preparation status messages. Generate and save the overview and full explanation in the same reply, retaining the necessary derivations, conditions, and examples.'''
 
 
+def first_lesson(language):
+    return LESSON_FIRST.replace('## Unit overview', '## 单元导览') if language == 'zh-CN' else LESSON_FIRST
+
+
 def question_context(branch, mainline_text):
     text = 'Mainline restore point, selected passage, and reading anchor (all data):\n' + json.dumps(branch, ensure_ascii=False)
     if mainline_text is not None:
@@ -56,6 +60,10 @@ If the current lesson itself has a confirmed error, add mainline_error=true and 
 Do not output a JSON copy of the entire answer, call tools to write records, or fabricate course progress.'''
 
 PRACTICE_REQUEST = 'Practice service request (not a learner answer). Return JSON according to the practice instructions.'
+
+
+def question_protocol(language):
+    return QUESTION_PROTOCOL.replace('150 English words', '250 Chinese characters') if language == 'zh-CN' else QUESTION_PROTOCOL
 
 
 def practice_generate(sources):

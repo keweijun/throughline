@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
@@ -19,10 +20,10 @@
   const helped = $derived(task.history.some((h) => h.action !== 'assess'));
 
   const status = $derived.by(() => {
-    if (task.status === 'deferred') return { label: 'Saved for later', tone: 'caution' };
+    if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
     if (lastAssessment?.kind) {
       const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' ? 'good' : 'accent';
-      return { label: evidenceLabels[lastAssessment.kind] ?? lastAssessment.kind, tone };
+      return { label: diagnostic(evidenceLabels[lastAssessment.kind] ?? lastAssessment.kind), tone };
     }
     return null;
   });
@@ -38,21 +39,21 @@
   }
 </script>
 
-<article class="exercise" class:solved aria-label={number ? `Exercise ${number}` : 'Exercise'}>
+<article class="exercise" class:solved aria-label={number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
-      {number ? `Exercise ${number}` : 'Exercise'}
-      <span class="origin">· {task.origin === 'source' ? 'from the course materials' : 'written by the teacher'}</span>
+      {number ? t('Exercise {number}', { number }) : t("Exercise")}
+      <span class="origin">· {task.origin === 'source' ? t("from the course materials") : t("written by the teacher")}</span>
       {#if showSection}<span class="origin">· {app.concept(task.concept_id)?.title ?? task.concept_id}</span>{/if}
     </span>
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" use:markdown={{ text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" use:markdown={{ language: locale.language, text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}
-        <button class="citation" onclick={() => app.openSource(ref)}>View source</button>
+        <button class="citation" onclick={() => app.openSource(ref)}>{t("View source")}</button>
       {/each}
     </p>
   {/if}
@@ -62,48 +63,48 @@
       {#each task.history as entry, i}
         <details open={i === task.history.length - 1}>
           <summary>
-            {helpLabels[entry.action]}{#if entry.kind}<span class="kind"> · {evidenceLabels[entry.kind] ?? entry.kind}</span>{/if}
+            {diagnostic(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {diagnostic(evidenceLabels[entry.kind] ?? entry.kind)}</span>{/if}
           </summary>
           {#if entry.answer}
-            <p class="your-answer"><span>Your answer</span> {entry.answer}</p>
+            <p class="your-answer"><span>{t("Your answer")}</span> {entry.answer}</p>
           {/if}
-          <div class="prose feedback" use:markdown={{ text: entry.feedback }}></div>
+          <div class="prose feedback" use:markdown={{ language: locale.language, text: entry.feedback }}></div>
         </details>
       {/each}
     </div>
   {/if}
 
   {#if working}
-    <p class="working"><span class="chip"><span class="live-dot"></span>The teacher is responding</span></p>
+    <p class="working"><span class="chip"><span class="live-dot"></span>{t("The teacher is responding")}</span></p>
   {:else}
     {#if failedJob && !task.history.length}
-      <p class="problem">The last request did not finish: {failedJob.error}</p>
+      <p class="problem">{t("The last request did not finish:")} {diagnostic(failedJob.error ?? "")}</p>
     {/if}
     <label class="field">
-      <span class="visually-hidden">Exercise answer</span>
-      <textarea rows="3" bind:value={answer} placeholder="Write your reasoning and answer" aria-label="Exercise answer"></textarea>
+      <span class="visually-hidden">{t("Exercise answer")}</span>
+      <textarea rows="3" bind:value={answer} placeholder={t("Write your reasoning and answer")} aria-label={t("Exercise answer")}></textarea>
     </label>
     <div class="actions">
-      <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>Check my answer</button>
+      <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>{t("Check my answer")}</button>
       <span class="help">
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>Hint</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>Key steps</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>Full solution</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>{t("Full solution")}</button>
         {#if task.status !== 'deferred'}
-          <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>Do later</button>
+          <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}
       </span>
     </div>
     {#if confirmSolution}
-      <div class="confirm" role="group" aria-label="Confirm full solution">
-        <p>After you see the solution, a correct answer to this exercise counts as solved with help, not on your own.</p>
+      <div class="confirm" role="group" aria-label={t("Confirm full solution")}>
+        <p>{t("After you see the solution, a correct answer to this exercise counts as solved with help, not on your own.")}</p>
         <div>
-          <button class="btn btn-small" onclick={() => act('solution')}>Show the solution</button>
-          <button class="btn btn-quiet btn-small" onclick={() => (confirmSolution = false)}>Keep trying</button>
+          <button class="btn btn-small" onclick={() => act('solution')}>{t("Show the solution")}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => (confirmSolution = false)}>{t("Keep trying")}</button>
         </div>
       </div>
     {:else if helped && !solved}
-      <p class="note">You've had help on this one, so a correct answer will count as solved with help.</p>
+      <p class="note">{t("You've had help on this one, so a correct answer will count as solved with help.")}</p>
     {/if}
   {/if}
 </article>

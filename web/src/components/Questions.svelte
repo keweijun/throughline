@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import QuestionThread from './QuestionThread.svelte';
@@ -37,35 +38,35 @@
 
 <section id="branch-panel">
   <form class="ask" onsubmit={ask}>
-    <h2>Ask a side question</h2>
-    <p class="intro">Select a sentence or formula in the lesson to ask about it. The lesson keeps going unless you pause it.</p>
+    <h2>{t("Ask a side question")}</h2>
+    <p class="intro">{t("Select a sentence or formula in the lesson to ask about it. The lesson keeps going unless you pause it.")}</p>
     {#if app.quote}
       <div class="quote">
         <blockquote id="branch-selection">{app.quote.text}</blockquote>
-        <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>Remove quote</button>
+        <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
       </div>
     {/if}
     <label class="field">
-      <span class="visually-hidden">Side question</span>
+      <span class="visually-hidden">{t("Side question")}</span>
       <textarea
         id="question-input"
         rows="3"
         bind:value={question}
-        aria-label="Side question"
-        placeholder={app.quote ? 'What would you like explained about this passage?' : 'What would you like explained?'}
+        aria-label={t("Side question")}
+        placeholder={app.quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
         onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
       ></textarea>
     </label>
     <div class="row">
       {#if app.runningLesson}
-        <label class="check"><input type="checkbox" bind:checked={pause} /> Pause the lesson while I ask</label>
+        <label class="check"><input type="checkbox" bind:checked={pause} /> {t("Pause the lesson while I ask")}</label>
       {/if}
-      <button class="btn btn-primary" type="submit" disabled={busy || !question.trim()}>Ask</button>
+      <button class="btn btn-primary" type="submit" disabled={busy || !question.trim()}>{t("Ask")}</button>
     </div>
   </form>
 
   {#if questions.length}
-    <h3 class="list-title">Your questions</h3>
+    <h3 class="list-title">{t("Your questions")}</h3>
     <div class="list">
       {#each questions as q (q.id)}
         <QuestionThread question={q} />

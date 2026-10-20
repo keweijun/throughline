@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
@@ -16,8 +17,8 @@
   const label = { current: 'Current section', visited: 'Visited', upcoming: 'Not started' };
 </script>
 
-<nav id="route" class="rail" class:open={app.routeOpen} aria-label="Course route">
-  <h2>Route</h2>
+<nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")}>
+  <h2>{t("Route")}</h2>
   <ol>
     {#each route as id, index (id)}
       {@const concept = app.concept(id)}
@@ -32,17 +33,17 @@
           <span class="text">
             <span class="name">{concept?.title ?? id}</span>
             {#if status === 'current'}
-              <span class="meta">You are here</span>
+              <span class="meta">{t("You are here")}</span>
             {:else if prepared.has(id)}
-              <span class="meta">Prepared</span>
+              <span class="meta">{t("Prepared")}</span>
             {/if}
-            <span class="visually-hidden">{label[status]}</span>
+            <span class="visually-hidden">{diagnostic(label[status])}</span>
           </span>
         </button>
       </li>
     {/each}
   </ol>
-  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>Model settings</button>
+  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>{t("Model settings")}</button>
 </nav>
 
 <style>

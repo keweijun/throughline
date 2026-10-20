@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { labelFor } from '../lib/markdown';
   import { verification } from '../lib/format';
@@ -20,22 +21,22 @@
       {/each}
     </ol>
     <dl>
-      <div><dt>Connections</dt><dd>{o.prior}; {o.next}</dd></div>
-      <div><dt>Afterwards you can</dt><dd>{o.target_ability}</dd></div>
+      <div><dt>{t("Connections")}</dt><dd>{o.prior}; {o.next}</dd></div>
+      <div><dt>{t("Afterwards you can")}</dt><dd>{o.target_ability}</dd></div>
     </dl>
   {:else}
-    <p class="note">The first lesson opens with a full unit overview written by the teacher.</p>
+    <p class="note">{t("The first lesson opens with a full unit overview written by the teacher.")}</p>
     <dl>
       <div>
-        <dt>Builds on</dt>
-        <dd>{preview.prerequisites.length ? preview.prerequisites.map((p) => p.title).join(', ') : 'No prerequisites listed'}</dd>
+        <dt>{t("Builds on")}</dt>
+        <dd>{preview.prerequisites.length ? preview.prerequisites.map((p) => p.title).join(', ') : t("No prerequisites listed")}</dd>
       </div>
-      <div><dt>Up next</dt><dd>{next?.title ?? 'This is the last section on the route'}</dd></div>
+      <div><dt>{t("Up next")}</dt><dd>{next?.title ?? t("This is the last section on the route")}</dd></div>
     </dl>
   {/if}
 
   <div class="sources">
-    <h3>Sources</h3>
+    <h3>{t("Sources")}</h3>
     {#if preview.sources.length}
       <ul>
         {#each preview.sources as ref}
@@ -44,12 +45,12 @@
             <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
               {sourceTitle(ref.source_id)}, {labelFor(ref)}
             </button>
-            <span class="chip chip-{v.tone}">{v.label}</span>
+            <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="note">No source location is linked to this section yet, so formulas and citations in its lessons still need checking.</p>
+      <p class="note">{t("No source location is linked to this section yet, so formulas and citations in its lessons still need checking.")}</p>
     {/if}
   </div>
 </div>

@@ -38,6 +38,8 @@ class Navigation(unittest.TestCase):
         self.assertEqual(source['text'],'The squared magnitude of the amplitude gives the probability.')
         self.assertEqual(source['locator'],{'line':2})
         self.assertEqual(source['verification'],'pending')
+        self.assertEqual([u['id'] for u in source['document']],['line-1','line-2'])
+        self.assertEqual(source['document'][0]['text'],'# Original material')
         for path in (source_path({**self.ref,'revision':'..%2Fnotes.md'}),source_path({**self.ref,'unit_id':'line-900'}),source_path(self.ref,'raw')):
             self.assertIn(self.client.get(path).status_code,(400,404,409),path)
         # A browser-supplied file path is never read; the registered revision is returned instead.

@@ -1,6 +1,6 @@
 # Guided Learning
 
-Personal cross-document guided learning. A local course workspace keeps your sources, learning route, teaching mainline and actual learning evidence. A local web app teaches from it: streaming lessons with unit overviews, side questions about any passage, original source pages, section practice and background preparation of the next section. The teacher can be any OpenAI-compatible model or your local Codex CLI.
+Personal cross-document guided learning. A local course workspace keeps your sources, learning route, teaching mainline and actual learning evidence. A local web app teaches from it: streaming lessons with unit overviews, side questions about any passage, original source pages, section practice and background preparation of the next section. The teacher is your local Codex CLI, the same tool that prepares and registers your course documents.
 
 The teacher makes instructional judgments from the materials. The program validates state and references; it never decides on its own that you have understood something.
 
@@ -29,17 +29,16 @@ Open http://127.0.0.1:8765. The host listens on loopback only and owns the cours
 Options:
 
 - `--port 8766` when 8765 is taken.
-- `--provider ID`, `--model NAME` and `--effort LEVEL` pick a provider, model and reasoning effort for this run only, without changing your saved choice.
-- `--config PATH` uses a different provider settings file.
+- `--model NAME` and `--effort LEVEL` pick the Codex model and reasoning effort for this run only, without changing your saved choice.
+- `--config PATH` uses a different teacher settings file.
 
 ## Choose the teacher model
 
-Open **Model settings** (the model name in the top bar). Two kinds of provider are supported:
+Lessons, answers and feedback are written by `codex app-server` on this computer, using your existing Codex sign-in and configuration. Open **Teacher settings** (the model name in the top bar) to set the model and reasoning effort; leave the model empty to use your Codex default. Settings live in your user config directory (`~/.config/guided-learning/settings.json`, or `%APPDATA%\guided-learning\settings.json` on Windows), never in a course folder, and apply to new requests only. See [ADR 0002](docs/adr/0002-codex-is-the-only-teacher.md).
 
-- **Local Codex CLI** (the default): runs `codex app-server` on this computer with your existing Codex configuration. Leave the model empty to use your Codex default.
-- **OpenAI-compatible**: any server that implements `/v1/chat/completions` with streaming, such as OpenAI, OpenRouter, Ollama, LM Studio or vLLM. Set a base URL and model name; **Load available models** reads the server's `/models` list.
+## Read sources
 
-API keys can be stored in the settings file or read from an environment variable you name (for example `OPENAI_API_KEY`). Settings live in your user config directory (`~/.config/guided-learning/providers.json`, or `%APPDATA%\guided-learning\providers.json` on Windows), saved with owner-only permissions. They are never written into a course folder and keys are never sent to the browser. Changing provider affects new requests only. The app never switches provider on its own. See [ADR 0002](docs/adr/0002-openai-compatible-teacher-providers.md).
+Citations in lessons and exercises show the cited text on hover. Clicking one opens the built-in reader beside the lesson: PDFs open at the cited page with selectable text, zoom and page controls; Markdown notes open at the cited line. Select text in either reader to ask a side question about it. Drag the panel edge to resize it.
 
 ## Use the Codex skill
 

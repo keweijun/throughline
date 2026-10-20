@@ -6,4 +6,4 @@ The host is now `guided_learning/server/`: a FastAPI app with typed request bodi
 
 Unchanged: the course workspace remains the only learning state (ADR 0001); domain operations and the JSON CLI used by the Codex skill keep their names and semantics; the loopback-only, same-origin, bounded-body rules stay; existing courses open without migration.
 
-The cost is three runtime dependencies (FastAPI, Uvicorn, httpx) and a developer-only frontend build step. Contributors changing the UI must run `npm run build` and commit the output.
+The cost is two runtime dependencies (FastAPI, Uvicorn) and a developer-only frontend build step. Contributors changing the UI must run `npm run build` and commit the output.

@@ -1,64 +1,69 @@
 <script lang="ts">
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
-
-  let imageState = $state<'loading' | 'ready' | 'failed'>('loading');
+  import PdfReader from './PdfReader.svelte';
+  import MarkdownReader from './MarkdownReader.svelte';
 
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
-  const where = $derived(s?.locator?.page ? `Page ${s.locator.page}` : s?.locator?.line ? `Line ${s.locator.line}` : 'Exact location missing');
-
-  $effect(() => {
-    void s?.image_url;
-    imageState = 'loading';
-  });
+  const page = $derived(s?.locator?.page);
+  const where = $derived(page ? `Page ${page}` : s?.locator?.line ? `Line ${s.locator.line}` : 'Exact location missing');
+  const label = $derived(s ? `${s.title}, ${page ? `p. ${page}` : `line ${s.locator?.line ?? '?'}`}` : '');
 </script>
 
 <section class="source-view">
-  {#if app.sourceLoading}
+  {#if app.sourceLoading && !s}
     <p class="muted">Opening the source…</p>
   {:else if s}
-    <h2>{s.title}</h2>
-    <p class="meta">
-      <span>{where}</span>
-      <span class="chip chip-{v.tone}">{v.label}</span>
-      {#if s.stale}<span class="chip chip-caution">Older revision of this file</span>{/if}
-    </p>
-    {#if s.verification !== 'verified'}
-      <p class="muted">Not yet checked against the original. Compare formulas and figures with the page itself.</p>
-    {/if}
-
-    {#if s.pdf_url}
-      {#if s.image_url}
-        {#if imageState === 'loading'}<p class="muted">Rendering the original page…</p>{/if}
-        <img
-          class="page"
-          class:loaded={imageState === 'ready'}
-          src={s.image_url}
-          alt="{s.title}, page {s.locator?.page}"
-          onload={() => (imageState = 'ready')}
-          onerror={() => (imageState = 'failed')}
-          hidden={imageState === 'failed'}
-        />
-        {#if imageState === 'failed'}
-          <p class="problem">The page image could not be rendered. Open the original PDF instead.</p>
+    <header>
+      <h2>{s.title}</h2>
+      <p class="meta">
+        <span>{where}</span>
+        <span class="chip chip-{v.tone}">{v.label}</span>
+        {#if s.stale}<span class="chip chip-caution">Older revision of this file</span>{/if}
+        {#if s.pdf_url}
+          <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">Open original ↗</a>
         {/if}
-      {:else}
-        <p class="problem">{s.render_message ?? 'The page image is unavailable because the source has no valid page number.'}</p>
+      </p>
+      {#if s.verification !== 'verified'}
+        <p class="muted">Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.</p>
       {/if}
-      <a class="btn btn-small" href={s.pdf_url} target="_blank" rel="noopener">Open the original PDF</a>
+    </header>
+
+    {#if s.pdf_url && page}
+      {#key s.pdf_url}
+        <PdfReader url={s.pdf_url.split('#')[0]} {page} {label} />
+      {/key}
+    {:else if s.document}
+      {#key `${s.source_id}/${s.revision}/${s.unit_id}`}
+        <MarkdownReader lines={s.document} target={s.unit_id} {label} />
+      {/key}
     {:else}
       <pre>{s.text || 'No text was extracted at this location.'}</pre>
     {/if}
+    {#if s.render_message && !s.pdf_url}
+      <p class="problem">{s.render_message}</p>
+    {/if}
   {:else}
-    <p class="muted">Choose a citation in a lesson, or a source in the unit overview, to see the original text here.</p>
+    <div class="empty">
+      <p>Choose a citation in a lesson, or a source in the unit overview, to read it here.</p>
+      <p class="muted">PDFs open at the cited page; Markdown notes open at the cited line.</p>
+    </div>
   {/if}
 </section>
 
 <style>
   .source-view {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  header {
+    display: grid;
+    gap: 0.35rem;
   }
 
   h2 {
@@ -76,6 +81,10 @@
     color: var(--ink-soft);
   }
 
+  .original {
+    margin-left: auto;
+  }
+
   .muted {
     font-size: var(--step--1);
     color: var(--pencil);
@@ -84,19 +93,6 @@
   .problem {
     font-size: var(--step--1);
     color: var(--danger);
-  }
-
-  .page {
-    display: block;
-    width: 100%;
-    height: auto;
-    border: 1px solid var(--rule);
-    background: white;
-    opacity: 0;
-  }
-
-  .page.loaded {
-    opacity: 1;
   }
 
   pre {
@@ -110,7 +106,12 @@
     white-space: pre-wrap;
   }
 
-  a.btn {
-    justify-self: start;
+  .empty {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 2rem;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: var(--step-0);
   }
 </style>

@@ -459,3 +459,37 @@ textarea:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/* Thin scrollbars that take the theme's colours instead of the platform default. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
+:root {
+  --scroll-thumb: color-mix(in srgb, var(--pencil) 38%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--pencil) 65%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scroll-thumb) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover) padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

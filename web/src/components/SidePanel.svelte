@@ -12,9 +12,40 @@
     app.panelTab = tab;
     requestAnimationFrame(() => body && (body.scrollTop = scroll[tab] ?? 0));
   }
+
+  function startResize(event: PointerEvent) {
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    const move = (e: PointerEvent) => app.resizePanel(window.innerWidth - e.clientX);
+    const stop = () => {
+      handle.removeEventListener('pointermove', move);
+      document.body.classList.remove('resizing');
+    };
+    document.body.classList.add('resizing');
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop, { once: true });
+  }
+
+  function resizeByKey(event: KeyboardEvent) {
+    if (event.key === 'ArrowLeft') app.resizePanel(app.panelWidth + 40);
+    if (event.key === 'ArrowRight') app.resizePanel(app.panelWidth - 40);
+  }
 </script>
 
-<aside id="auxiliary" class="panel" class:open={app.panelOpen} aria-label="Questions and sources" hidden={!app.panelOpen}>
+<aside id="auxiliary" class="panel" aria-label="Questions and sources" hidden={!app.panelOpen}>
+  <!-- A focusable window splitter is interactive per WAI-ARIA, which this lint rule does not model. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div
+    class="handle"
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Resize panel"
+    aria-valuenow={app.panelWidth}
+    aria-valuemin={320}
+    tabindex="0"
+    onpointerdown={startResize}
+    onkeydown={resizeByKey}
+  ></div>
   <div class="bar">
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>Questions</button>
@@ -22,9 +53,9 @@
     </div>
     <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label="Close panel">Close</button>
   </div>
-  <div class="body" bind:this={body}>
-    <div hidden={app.panelTab !== 'questions'}><Questions /></div>
-    <div hidden={app.panelTab !== 'source'}><SourceViewer /></div>
+  <div class="body" class:fill={app.panelTab === 'source'} bind:this={body}>
+    <div class="tab" hidden={app.panelTab !== 'questions'}><Questions /></div>
+    <div class="tab" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
   </div>
 </aside>
 
@@ -37,6 +68,27 @@
     height: calc(100vh - var(--topbar));
     border-left: 1px solid var(--rule);
     background: var(--sheet);
+  }
+
+  .handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -4px;
+    z-index: 2;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .handle:hover,
+  .handle:focus-visible {
+    background: linear-gradient(90deg, transparent 3px, var(--accent) 3px 5px, transparent 5px);
+  }
+
+  :global(body.resizing) {
+    cursor: col-resize;
+    user-select: none;
   }
 
   .bar {
@@ -71,8 +123,24 @@
 
   .body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 1.25rem 1.1rem 3rem;
+  }
+
+  /* The reader scrolls inside itself, so the source tab fills the panel instead. */
+  .body.fill {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 1rem;
+  }
+
+  .body.fill > .tab:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
   }
 
   @media (max-width: 79.99rem) {
@@ -92,6 +160,10 @@
     .panel {
       width: 100vw;
       border-left: 0;
+    }
+
+    .handle {
+      display: none;
     }
   }
 </style>

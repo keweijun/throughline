@@ -3,7 +3,6 @@
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
-  const provider = $derived(app.state?.settings.providers.find((p) => p.id === app.state?.settings.active));
   const openQuestions = $derived(
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
@@ -49,8 +48,8 @@
         {app.connection === 'connecting' ? 'Connecting…' : 'Reconnecting · your work is saved'}
       </span>
     {/if}
-    <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title="Model settings">
-      <span class="model-name">{provider ? provider.label : 'Model'}{app.state?.settings.active_model ? ` · ${app.state.settings.active_model}` : ''}</span>
+    <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title="Teacher settings">
+      <span class="model-name">Codex · {app.state?.settings.model || 'default model'}</span>
     </button>
     <button
       class="btn btn-quiet"
@@ -59,6 +58,7 @@
     >
       Questions{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
     </button>
+    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)">?</button>
     <button class="btn btn-quiet icon" onclick={toggleTheme} aria-label="Switch light or dark theme">
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14V3Z" fill="currentColor" /><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
     </button>
@@ -157,6 +157,16 @@
 
   .icon {
     padding-inline: 0.5rem;
+  }
+
+  .shortcuts {
+    font-weight: 600;
+  }
+
+  @media (hover: none) {
+    .shortcuts {
+      display: none;
+    }
   }
 
   @media (max-width: 68rem) {

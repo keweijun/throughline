@@ -59,20 +59,9 @@ class NextSectionRequest(Body):
     request_id: str
 
 
-class ProviderRequest(Body):
-    id: str
-    kind: Literal['codex', 'openai']
-    label: Optional[str] = None
-    model: Optional[str] = None
-    effort: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key_env: Optional[str] = None
-    api_key: Optional[str] = None
-
-
-class ActivateRequest(Body):
-    id: str
-    model: Optional[str] = None
+class SettingsRequest(Body):
+    model: str = ''
+    effort: str = 'medium'
 
 
 def _public_question(branch):
@@ -217,33 +206,11 @@ def create_app(workspace, port=8765, runner=None, settings=None):
     def settings_view():
         return host.settings.public()
 
-    @app.put('/api/settings/providers')
-    def save_provider(body: ProviderRequest):
-        result = host.settings.upsert(body.model_dump(exclude_none=True))
+    @app.put('/api/settings')
+    def save_settings(body: SettingsRequest):
+        result = host.settings.save(body.model, body.effort)
         host.changed('settings')
         return result
-
-    @app.delete('/api/settings/providers/{identifier}')
-    def delete_provider(identifier: str):
-        result = host.settings.remove(identifier)
-        host.changed('settings')
-        return result
-
-    @app.post('/api/settings/active')
-    def activate(body: ActivateRequest):
-        result = host.settings.activate(body.id, body.model)
-        host.changed('settings')
-        return result
-
-    @app.post('/api/settings/models')
-    def models(body: ProviderRequest):
-        runner = host.settings.draft_runner(body.model_dump(exclude_none=True))
-        if not hasattr(runner, 'list_models'):
-            return {'models': [], 'listable': False}
-        try:
-            return {'models': runner.list_models(), 'listable': True}
-        except Exception as exc:
-            raise OperationError('provider_unreachable', str(exc)) from exc
 
     if (DIST / 'assets').is_dir():
         app.mount('/assets', StaticFiles(directory=DIST / 'assets'), name='assets')

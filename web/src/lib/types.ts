@@ -95,21 +95,9 @@ export type PreparationJob = {
   reason?: string;
 };
 
-export type Provider = {
-  id: string;
-  kind: 'codex' | 'openai';
-  label: string;
-  model: string;
-  effort: string;
-  base_url?: string;
-  api_key_env?: string;
-  has_api_key?: boolean;
-};
-
 export type Settings = {
-  active: string;
-  active_model: string;
-  providers: Provider[];
+  model: string;
+  effort: 'minimal' | 'low' | 'medium' | 'high';
   overridden: boolean;
   path: string;
 };
@@ -160,6 +148,7 @@ export type SourceView = Ref & {
   image_url: string | null;
   pdf_url: string | null;
   render_message: string | null;
+  document: { id: string; text: string }[] | null;
 };
 
 export type HostEvent =

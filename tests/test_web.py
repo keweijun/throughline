@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from pathlib import Path
 
 from guided_learning.api import execute
 from guided_learning.server import Host
@@ -129,23 +130,30 @@ class WebLearning(unittest.TestCase):
             self.assertEqual(seen[0]['type'], 'turn')
             self.assertEqual(seen[0]['turn']['status'], 'running')
 
-    def test_provider_settings_routes_never_return_keys(self):
+    def test_teacher_settings_apply_to_the_next_codex_request(self):
+        from guided_learning.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)
             client, host = host_client(tmp, runner=BlockingRunner())
             with client:
-                saved = client.put('/api/settings/providers', json={'id': 'openrouter', 'kind': 'openai', 'label': 'OpenRouter',
-                                                                     'base_url': 'https://openrouter.ai/api/v1', 'model': 'some/model', 'api_key': 'sk-or-secret'})
-                self.assertEqual(saved.status_code, 200, saved.text)
-                active = client.post('/api/settings/active', json={'id': 'openrouter', 'model': 'other/model'}).json()
-                self.assertEqual((active['active'], active['active_model']), ('openrouter', 'other/model'))
-                state = client.get('/api/state').text
-                self.assertNotIn('sk-or-secret', state)
-                self.assertEqual(host.settings.runner().api_key, 'sk-or-secret')
-                self.assertEqual(client.delete('/api/settings/providers/openrouter').json()['code'], 'provider_in_use')
-                client.post('/api/settings/active', json={'id': 'codex'})
-                self.assertEqual(client.delete('/api/settings/providers/openrouter').json()['active'], 'codex')
-                self.assertEqual(client.post('/api/settings/active', json={'id': 'missing'}).status_code, 409)
+                self.assertEqual(client.get('/api/state').json()['settings']['effort'], 'medium')
+                saved = client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'effort': 'high'})
+                self.assertEqual((saved.json()['model'], saved.json()['effort']), ('gpt-6.1-sol', 'high'))
+                runner = host.settings.runner()
+                self.assertIsInstance(runner, CodexRunner)
+                self.assertEqual((runner.model, runner.effort), ('gpt-6.1-sol', 'high'))
+                self.assertEqual(client.put('/api/settings', json={'effort': 'extreme'}).status_code, 409)
+                self.assertEqual(client.put('/api/settings', json={'base_url': 'https://x'}).status_code, 400)
+
+    def test_command_line_choice_is_not_saved(self):
+        from guided_learning.server.settings import TeacherSettings
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'settings.json'
+            TeacherSettings(path).save('saved-model', 'low')
+            once = TeacherSettings(path, override={'model': 'trial', 'effort': None})
+            self.assertEqual(once.current(), {'model': 'trial', 'effort': 'low'})
+            self.assertEqual(TeacherSettings(path).current()['model'], 'saved-model')
+            self.assertEqual(TeacherSettings(Path(tmp) / 'missing.json').current(), {'model': '', 'effort': 'medium'})
 
 
 if __name__ == '__main__':

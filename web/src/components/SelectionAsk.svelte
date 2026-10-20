@@ -4,22 +4,27 @@
   let visible = $state(false);
   let left = $state(0);
   let top = $state(0);
-  let pending: { text: string; turnId: string } | null = null;
+  let pending: { text: string; turnId: string | null; source?: string } | null = null;
+
+  // Lessons and the source readers are the places a passage can be quoted from.
+  const scope = (node: Node | null | undefined) =>
+    node?.parentElement?.closest<HTMLElement>('.lesson-body, [data-source-label]') ?? null;
 
   function capture() {
     const selection = window.getSelection();
     if (!selection?.rangeCount || !selection.toString().trim()) return;
+    const area = scope(selection.anchorNode);
+    if (!area || area !== scope(selection.focusNode)) return;
     const start = selection.anchorNode?.parentElement;
-    const end = selection.focusNode?.parentElement;
-    const lesson = start?.closest<HTMLElement>('.lesson-body')?.closest<HTMLElement>('[data-turn-id]');
-    if (!lesson || lesson !== end?.closest('.lesson-body')?.closest('[data-turn-id]')) return;
     const formula = start?.closest('.katex');
     // KaTeX holds both MathML and glyphs; a formula-only selection keeps its original TeX.
     const text =
-      formula && formula === end?.closest('.katex')
+      formula && formula === selection.focusNode?.parentElement?.closest('.katex')
         ? (formula.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? selection.toString())
         : selection.toString();
-    pending = { text: text.trim(), turnId: lesson.dataset.turnId! };
+    pending = area.dataset.sourceLabel
+      ? { text: text.replace(/\s+/g, ' ').trim(), turnId: null, source: area.dataset.sourceLabel }
+      : { text: text.trim(), turnId: area.closest<HTMLElement>('[data-turn-id]')!.dataset.turnId! };
     const rect = selection.getRangeAt(0).getBoundingClientRect();
     left = Math.max(8, Math.min(rect.left + rect.width / 2 - 95, window.innerWidth - 198));
     top = Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - 52));
@@ -45,7 +50,7 @@
   onkeyup={(e) => (e.key === 'Shift' || e.key.startsWith('Arrow')) && capture()}
   onselectionchange={onSelectionChange}
 />
-<svelte:window onscroll={() => (visible = false)} />
+<svelte:window onscrollcapture={() => (visible = false)} />
 
 {#if visible}
   <button

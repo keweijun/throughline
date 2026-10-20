@@ -13,17 +13,38 @@
   const lessons = $derived(app.lessons(turn.concept_id));
   const number = $derived(lessons.findIndex((t) => t.id === turn.id) + 1);
   const asked = $derived(
-    (app.state?.questions ?? [])
-      .filter((q) => q.selection && (q.selected_turn_id ?? q.main_turn_id) === turn.id)
-      .map((q) => q.selection),
+    (app.state?.questions ?? []).filter((q) => q.selection && (q.selected_turn_id ?? q.main_turn_id) === turn.id),
   );
+
+  // Margin notes sit level with the passage each question was asked about.
+  let notes = $state<{ top: number; ids: string[] }[]>([]);
+  let width = $state(0);
+  let fonts = $state(false);
+  document.fonts?.ready.then(() => (fonts = true));
 
   $effect(() => {
     if (!body) return;
     void turn.text;
-    markAsked(turn.id, body, asked);
+    void width;
+    void fonts;
+    const found = markAsked(turn.id, body, asked.map((q) => q.selection));
+    const origin = body.getBoundingClientRect().top;
+    const rows: { top: number; ids: string[] }[] = [];
+    found.forEach((range, i) => {
+      if (!range) return;
+      const top = Math.round(range.getClientRects()[0]?.top - origin);
+      const row = rows.find((r) => Math.abs(r.top - top) < 24);
+      if (row) row.ids.push(asked[i].id);
+      else rows.push({ top, ids: [asked[i].id] });
+    });
+    notes = rows;
     return () => clearAsked(turn.id);
   });
+
+  function openThread(id: string) {
+    app.focusThread = id;
+    app.openPanel('questions');
+  }
 </script>
 
 <section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? `Lesson ${number}` : 'Lesson'}>
@@ -42,8 +63,22 @@
   {/if}
 
   {#if turn.text}
+    <div class="notes" aria-label="Questions asked about this lesson">
+      {#each notes as note}
+        <button
+          class="note"
+          style:top="{note.top}px"
+          onclick={() => openThread(note.ids[0])}
+          aria-label="Open your question about this passage"
+          title={note.ids.length > 1 ? `${note.ids.length} questions about this passage` : 'Your question about this passage'}
+        >
+          <span aria-hidden="true">?</span>{#if note.ids.length > 1}<sup>{note.ids.length}</sup>{/if}
+        </button>
+      {/each}
+    </div>
     <div
       class="prose lesson-body"
+      bind:clientWidth={width}
       bind:this={body}
       use:markdown={{ text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref) }}
     ></div>
@@ -63,7 +98,60 @@
 
 <style>
   .lesson {
+    position: relative;
     scroll-margin-top: calc(var(--topbar) + 1rem);
+  }
+
+  .notes {
+    position: relative;
+    height: 0;
+  }
+
+  .note {
+    position: absolute;
+    left: -2.6rem;
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-top: 0.15rem;
+    padding: 0;
+    border: 1px solid #c9a82b;
+    border-radius: 50% 50% 50% 4px;
+    background: var(--marker);
+    color: #2a2208;
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  .note:hover,
+  .note:focus-visible {
+    transform: scale(1.12) rotate(-6deg);
+  }
+
+  .note sup {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    min-width: 1rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 0.62rem;
+    line-height: 1rem;
+  }
+
+  @media (max-width: 56rem) {
+    .note {
+      left: auto;
+      right: -0.6rem;
+      width: 1.3rem;
+      height: 1.3rem;
+      font-size: 0.7rem;
+    }
   }
 
   .meta {

@@ -27,7 +27,7 @@ test('lesson streams, renders math safely, survives reload and opens sources', a
   await expect(page.getByText('Ask for another pass')).toBeVisible();
 
   await page.getByRole('button', { name: 'View source line 2' }).first().click();
-  await expect(page.locator('.source-view pre')).toHaveText('Normalization condition');
+  await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);
   await expect(page.locator('.source-view')).toContainText('Pending verification');
 
   await page.locator('#close-aux').click();
@@ -62,5 +62,5 @@ test('both current and older citation formats open the cited source', async ({ p
   await expect(citations).toHaveCount(2);
   await expect(page.locator('.lesson-body')).not.toContainText('来源');
   await citations.nth(1).click();
-  await expect(page.locator('.source-view pre')).toHaveText('Normalization condition');
+  await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);
 });

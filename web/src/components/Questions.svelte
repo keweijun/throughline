@@ -19,7 +19,7 @@
       api.post('/api/questions', {
         id: newId(),
         question,
-        selection: quote?.text ?? '',
+        selection: quote ? (quote.source ? `${quote.text}\n(${quote.source})` : quote.text) : '',
         selected_turn_id: quote?.turnId ?? null,
         main_turn_id: currentLesson?.id ?? null,
         anchor: { scroll_y: quote?.scrollY ?? window.scrollY },
@@ -38,10 +38,11 @@
 <section id="branch-panel">
   <form class="ask" onsubmit={ask}>
     <h2>Ask a side question</h2>
-    <p class="intro">Select a sentence or formula in the lesson to ask about it. The lesson keeps going unless you pause it.</p>
+    <p class="intro">Select a sentence or formula in a lesson or the source reader to ask about it. The lesson keeps going unless you pause it.</p>
     {#if app.quote}
       <div class="quote">
         <blockquote id="branch-selection">{app.quote.text}</blockquote>
+        {#if app.quote.source}<p class="from">From {app.quote.source}</p>{/if}
         <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>Remove quote</button>
       </div>
     {/if}
@@ -105,6 +106,11 @@
     max-height: 8rem;
     overflow: auto;
     white-space: pre-wrap;
+  }
+
+  .from {
+    font-size: var(--step--1);
+    color: var(--pencil);
   }
 
   .quote .btn {

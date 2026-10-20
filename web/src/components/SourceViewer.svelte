@@ -7,7 +7,7 @@
 
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
-  const where = $derived(s?.locator?.page ? t('Page {page}', { page: s.locator.page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : 'Exact location missing');
+  const where = $derived(s?.locator?.page ? t('Page {page}', { page: s.locator.page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : t('Exact location missing'));
 
   $effect(() => {
     void s?.image_url;

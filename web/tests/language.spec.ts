@@ -44,6 +44,7 @@ test('switching during generation preserves the turn and drafts but applies to t
   await expect(page.getByRole('heading', { name: '模型设置' })).toBeVisible();
   await page.getByRole('button', { name: '编辑', exact: true }).first().click();
   await expect(page.getByText('推理强度', { exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '推理强度' }).locator('option[value=""]')).toHaveText('中');
   await expect(page.getByRole('button', { name: '保存服务' })).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -61,4 +62,18 @@ test('practice controls and evidence labels translate while the answer draft sta
   await first.getByRole('button', { name: '继续尝试' }).click();
   await first.getByRole('button', { name: '稍后做' }).click();
   await expect(first).toContainText('已留待稍后');
+});
+
+
+test('source without a locator shows the Chinese fallback', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.route('**/api/sources/*/*/*', async route => {
+    const response = await route.fetch();
+    const source = await response.json();
+    await route.fulfill({ response, json: { ...source, locator: {} } });
+  });
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('zh-CN');
+  await page.getByRole('button', { name: 'source.md, 第 2 行', exact: true }).click();
+  await expect(page.locator('.source-view')).toContainText('缺少精确定位');
+  await expect(page.locator('.source-view pre')).toHaveText('Normalization condition');
 });

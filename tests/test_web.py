@@ -142,6 +142,8 @@ class WebLearning(unittest.TestCase):
                 state = client.get('/api/state').text
                 self.assertNotIn('sk-or-secret', state)
                 self.assertEqual(host.settings.runner().api_key, 'sk-or-secret')
+                self.assertEqual(client.delete('/api/settings/providers/openrouter').json()['code'], 'provider_in_use')
+                client.post('/api/settings/active', json={'id': 'codex'})
                 self.assertEqual(client.delete('/api/settings/providers/openrouter').json()['active'], 'codex')
                 self.assertEqual(client.post('/api/settings/active', json={'id': 'missing'}).status_code, 409)
 

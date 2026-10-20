@@ -4,8 +4,10 @@ test('questions about an older lesson name both the selected and the current les
   await course('branch_recovery_browser_fixture');
   await expect(page.locator('.lesson-body')).toContainText('Current lecture explains measurement.');
   await page.getByRole('button', { name: /Older lesson/ }).click();
+  // The overview loads after the page opens and shifts the lesson down; select only once it is in place.
+  await expect(page.locator('details.overview')).toBeVisible();
   const older = page.locator('.lesson-body p').filter({ hasText: 'Older selectable lecture' });
-  await dragSelect(page, older, 150);
+  expect((await dragSelect(page, older, 150)).trim().length).toBeGreaterThan(5);
   await page.getByRole('button', { name: 'Ask about this passage' }).click();
   await page.getByRole('textbox', { name: 'Side question' }).fill('Explain this older passage');
   const request = page.waitForRequest((r) => r.url().endsWith('/api/questions') && r.method() === 'POST');

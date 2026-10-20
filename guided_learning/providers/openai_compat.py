@@ -21,16 +21,13 @@ def _error_message(response):
 
 
 class OpenAICompatibleRunner:
-    def __init__(self, base_url, model, api_key=None, effort=None, timeout=600, headers=None, transport=None):
-        if not base_url:
-            raise ProviderError('Set a base URL for this provider')
+    def __init__(self, base_url, model, api_key=None, effort=None, timeout=600, transport=None):
         self.base_url = base_url.rstrip('/')
         self.model, self.api_key, self.effort, self.timeout = model, api_key, effort, timeout
-        self.headers = dict(headers or {})
         self.transport = transport
 
     def _client(self, timeout):
-        headers = {'Accept': 'application/json', **self.headers}
+        headers = {'Accept': 'application/json'}
         if self.api_key:
             headers['Authorization'] = f'Bearer {self.api_key}'
         return httpx.Client(base_url=self.base_url, headers=headers, timeout=timeout, transport=self.transport)

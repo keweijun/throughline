@@ -29,7 +29,7 @@ Open http://127.0.0.1:8765. The host listens on loopback only and owns the cours
 Options:
 
 - `--port 8766` when 8765 is taken.
-- `--provider ID` and `--model NAME` pick a provider and model for this run only, without changing your saved choice.
+- `--provider ID`, `--model NAME` and `--effort LEVEL` pick a provider, model and reasoning effort for this run only, without changing your saved choice.
 - `--config PATH` uses a different provider settings file.
 
 ## Choose the teacher model

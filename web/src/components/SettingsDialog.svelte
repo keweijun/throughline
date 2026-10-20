@@ -113,7 +113,7 @@
             <div class="row">
               {#if !active}<button class="btn btn-small" disabled={busy} onclick={() => activate(provider)}>Use</button>{/if}
               <button class="btn btn-quiet btn-small" onclick={() => edit(provider)}>Edit</button>
-              {#if settings.providers.length > 1}
+              {#if !active}
                 <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => remove(provider)}>Remove</button>
               {/if}
             </div>

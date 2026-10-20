@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
 
@@ -9,11 +10,11 @@
 
 {#if items.length}
   <details class="history">
-    <summary>Earlier conversation from chat sessions</summary>
+    <summary>{t("Earlier conversation from chat sessions")}</summary>
     {#each items as item (item.id)}
       <div class="item">
-        <p class="who">{item.role === 'assistant' ? 'Teacher' : 'You'}</p>
-        <div class="prose" use:markdown={{ text: item.text }}></div>
+        <p class="who">{item.role === 'assistant' ? t("Teacher") : t("You")}</p>
+        <div class="prose" use:markdown={{ language: locale.language, text: item.text }}></div>
       </div>
     {/each}
   </details>

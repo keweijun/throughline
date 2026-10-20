@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   let { conceptId, hasLesson }: { conceptId: string; hasLesson: boolean } = $props();
@@ -20,31 +21,31 @@
   <form class="composer" class:first={!hasLesson} onsubmit={start}>
     {#if hasLesson}
       <label class="field">
-        <span>Ask for another pass</span>
+        <span>{t("Ask for another pass")}</span>
         <textarea
           id="lesson-prompt"
           rows="2"
           bind:value={prompt}
-          placeholder="For example: go deeper on the derivation, or explain it with a different example"
+          placeholder={t("For example: go deeper on the derivation, or explain it with a different example")}
         ></textarea>
       </label>
       <div class="row">
-        <button class="btn" type="submit" disabled={busy || !!running}>Teach again</button>
-        {#if running}<span class="hint">Another lesson is being written. Pause it first.</span>{/if}
+        <button class="btn" type="submit" disabled={busy || !!running}>{t("Teach again")}</button>
+        {#if running}<span class="hint">{t("Another lesson is being written. Pause it first.")}</span>{/if}
       </div>
     {:else}
-      <h2>Start this section</h2>
-      <p>The teacher opens with a unit overview, then teaches the section in one pass. You can pause at any time.</p>
+      <h2>{t("Start this section")}</h2>
+      <p>{t("The teacher opens with a unit overview, then teaches the section in one pass. You can pause at any time.")}</p>
       <details>
-        <summary>Change what the lesson focuses on</summary>
+        <summary>{t("Change what the lesson focuses on")}</summary>
         <label class="field">
-          <span class="visually-hidden">Lesson request</span>
-          <textarea id="lesson-prompt" rows="3" bind:value={prompt} placeholder="Leave empty for a full lesson: intuition, formulas and derivations, then an example."></textarea>
+          <span class="visually-hidden">{t("Lesson request")}</span>
+          <textarea id="lesson-prompt" rows="3" bind:value={prompt} placeholder={t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}></textarea>
         </label>
       </details>
       <div class="row">
-        <button class="btn btn-primary" id="start" type="submit" disabled={busy || !!running}>Start lesson</button>
-        {#if running}<span class="hint">Another lesson is being written. Pause it first.</span>{/if}
+        <button class="btn btn-primary" id="start" type="submit" disabled={busy || !!running}>{t("Start lesson")}</button>
+        {#if running}<span class="hint">{t("Another lesson is being written. Pause it first.")}</span>{/if}
       </div>
     {/if}
   </form>

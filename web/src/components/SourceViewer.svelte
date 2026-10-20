@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
 
@@ -6,7 +7,7 @@
 
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
-  const where = $derived(s?.locator?.page ? `Page ${s.locator.page}` : s?.locator?.line ? `Line ${s.locator.line}` : 'Exact location missing');
+  const where = $derived(s?.locator?.page ? t('Page {page}', { page: s.locator.page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : 'Exact location missing');
 
   $effect(() => {
     void s?.image_url;
@@ -16,42 +17,42 @@
 
 <section class="source-view">
   {#if app.sourceLoading}
-    <p class="muted">Opening the source…</p>
+    <p class="muted">{t("Opening the source…")}</p>
   {:else if s}
     <h2>{s.title}</h2>
     <p class="meta">
       <span>{where}</span>
-      <span class="chip chip-{v.tone}">{v.label}</span>
-      {#if s.stale}<span class="chip chip-caution">Older revision of this file</span>{/if}
+      <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
+      {#if s.stale}<span class="chip chip-caution">{t("Older revision of this file")}</span>{/if}
     </p>
     {#if s.verification !== 'verified'}
-      <p class="muted">Not yet checked against the original. Compare formulas and figures with the page itself.</p>
+      <p class="muted">{t("Not yet checked against the original. Compare formulas and figures with the page itself.")}</p>
     {/if}
 
     {#if s.pdf_url}
       {#if s.image_url}
-        {#if imageState === 'loading'}<p class="muted">Rendering the original page…</p>{/if}
+        {#if imageState === 'loading'}<p class="muted">{t("Rendering the original page…")}</p>{/if}
         <img
           class="page"
           class:loaded={imageState === 'ready'}
           src={s.image_url}
-          alt="{s.title}, page {s.locator?.page}"
+          alt={t('{title}, page {page}', { title: s.title, page: s.locator?.page ?? '' })}
           onload={() => (imageState = 'ready')}
           onerror={() => (imageState = 'failed')}
           hidden={imageState === 'failed'}
         />
         {#if imageState === 'failed'}
-          <p class="problem">The page image could not be rendered. Open the original PDF instead.</p>
+          <p class="problem">{t("The page image could not be rendered. Open the original PDF instead.")}</p>
         {/if}
       {:else}
-        <p class="problem">{s.render_message ?? 'The page image is unavailable because the source has no valid page number.'}</p>
+        <p class="problem">{s.render_message ? diagnostic(s.render_message) : t("The page image is unavailable because the source has no valid page number.")}</p>
       {/if}
-      <a class="btn btn-small" href={s.pdf_url} target="_blank" rel="noopener">Open the original PDF</a>
+      <a class="btn btn-small" href={s.pdf_url} target="_blank" rel="noopener">{t("Open the original PDF")}</a>
     {:else}
-      <pre>{s.text || 'No text was extracted at this location.'}</pre>
+      <pre>{s.text || t("No text was extracted at this location.")}</pre>
     {/if}
   {:else}
-    <p class="muted">Choose a citation in a lesson, or a source in the unit overview, to see the original text here.</p>
+    <p class="muted">{t("Choose a citation in a lesson, or a source in the unit overview, to see the original text here.")}</p>
   {/if}
 </section>
 

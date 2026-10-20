@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, locale, diagnostic } from './lib/i18n.svelte';
   import { onMount } from 'svelte';
   import { app } from './lib/store.svelte';
   import TopBar from './components/TopBar.svelte';
@@ -14,7 +15,8 @@
   });
 
   $effect(() => {
-    document.title = app.state ? `${app.state.course.title} · Guided Learning` : 'Guided Learning';
+    document.documentElement.lang = locale.language;
+    document.title = app.state ? `${app.state.course.title} · ${t('Guided Learning')}` : t('Guided Learning');
   });
 
   function onKey(event: KeyboardEvent) {
@@ -30,8 +32,8 @@
 
 {#if app.error}
   <div class="banner" role="alert">
-    <p>{app.error}</p>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.error = null)}>Dismiss</button>
+    <p>{diagnostic(app.error)}</p>
+    <button class="btn btn-quiet btn-small" onclick={() => (app.error = null)}>{t("Dismiss")}</button>
   </div>
 {/if}
 
@@ -47,7 +49,7 @@
     <SidePanel />
   {:else if !app.error}
     <main id="main" class="loading" aria-busy="true">
-      <p>Opening your course…</p>
+      <p>{t("Opening your course…")}</p>
     </main>
   {/if}
 </div>

@@ -151,10 +151,7 @@ class Navigation(Feature):
             return ''
         earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
-        first = prompts.LESSON_FIRST
-        if turn.get('language', 'en') == 'zh-CN':
-            first = first.replace('## Unit overview', '## 单元导览')
-        return prompts.LESSON_CONTINUES if earlier else first
+        return prompts.LESSON_CONTINUES if earlier else prompts.first_lesson(turn.get('language', 'en'))
 
 
 class Questions(Feature):
@@ -212,10 +209,7 @@ class Questions(Feature):
         common = prompts.question_context(branch, main_text)
         if turn['id'] == branch.get('supplement_turn_id'):
             return common + prompts.SUPPLEMENT
-        protocol = prompts.QUESTION_PROTOCOL
-        if turn.get('language', 'en') == 'zh-CN':
-            protocol = protocol.replace('150 English words', '250 Chinese characters')
-        return common + protocol
+        return common + prompts.question_protocol(turn.get('language', 'en'))
 
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):

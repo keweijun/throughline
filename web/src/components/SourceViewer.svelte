@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
   import PdfReader from './PdfReader.svelte';
@@ -7,26 +8,26 @@
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
   const page = $derived(s?.locator?.page);
-  const where = $derived(page ? `Page ${page}` : s?.locator?.line ? `Line ${s.locator.line}` : 'Exact location missing');
+  const where = $derived(page ? t('Page {page}', { page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : t('Exact location missing'));
   const label = $derived(s ? `${s.title}, ${page ? `p. ${page}` : `line ${s.locator?.line ?? '?'}`}` : '');
 </script>
 
 <section class="source-view">
   {#if app.sourceLoading && !s}
-    <p class="muted">Opening the source…</p>
+    <p class="muted">{t("Opening the source…")}</p>
   {:else if s}
     <header>
       <h2>{s.title}</h2>
       <p class="meta">
         <span>{where}</span>
-        <span class="chip chip-{v.tone}">{v.label}</span>
-        {#if s.stale}<span class="chip chip-caution">Older revision of this file</span>{/if}
+        <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
+        {#if s.stale}<span class="chip chip-caution">{t("Older revision of this file")}</span>{/if}
         {#if s.pdf_url}
-          <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">Open original ↗</a>
+          <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">{t("Open original ↗")}</a>
         {/if}
       </p>
       {#if s.verification !== 'verified'}
-        <p class="muted">Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.</p>
+        <p class="muted">{t("Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.")}</p>
       {/if}
     </header>
 
@@ -39,15 +40,15 @@
         <MarkdownReader lines={s.document} target={s.unit_id} {label} />
       {/key}
     {:else}
-      <pre>{s.text || 'No text was extracted at this location.'}</pre>
+      <pre>{s.text || t("No text was extracted at this location.")}</pre>
     {/if}
     {#if s.render_message && !s.pdf_url}
-      <p class="problem">{s.render_message}</p>
+      <p class="problem">{diagnostic(s.render_message)}</p>
     {/if}
   {:else}
     <div class="empty">
-      <p>Choose a citation in a lesson, or a source in the unit overview, to read it here.</p>
-      <p class="muted">PDFs open at the cited page; Markdown notes open at the cited line.</p>
+      <p>{t("Choose a citation in a lesson, or a source in the unit overview, to read it here.")}</p>
+      <p class="muted">{t("PDFs open at the cited page; Markdown notes open at the cited line.")}</p>
     </div>
   {/if}
 </section>

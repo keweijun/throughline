@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   let visible = $state(false);
@@ -60,7 +61,7 @@
     onpointerdown={(e) => e.preventDefault()}
     onclick={ask}
   >
-    Ask about this passage
+    {t("Ask about this passage")}
   </button>
 {/if}
 

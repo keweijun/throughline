@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import Exercise from './Exercise.svelte';
@@ -36,19 +37,19 @@
 {#if tasks.length || earlier.length || generating || (isCurrent && hasLesson)}
   <section class="practice" id="practice" aria-labelledby="practice-title">
     <header>
-      <h2 id="practice-title">Practice</h2>
-      <p>Answers you give on your own, with hints, or after seeing a solution are recorded separately. Practice is optional before moving on.</p>
+      <h2 id="practice-title">{t("Practice")}</h2>
+      <p>{t("Answers you give on your own, with hints, or after seeing a solution are recorded separately. Practice is optional before moving on.")}</p>
     </header>
 
     {#if generating}
-      <p class="status"><span class="chip"><span class="live-dot"></span>Preparing exercises</span></p>
+      <p class="status"><span class="chip"><span class="live-dot"></span>{t("Preparing exercises")}</span></p>
     {:else if !tasks.length && isCurrent}
       {#if failed}
-        <p class="problem">The exercises could not be prepared: {failed.error}</p>
+        <p class="problem">{t("The exercises could not be prepared:")} {diagnostic(failed.error ?? "")}</p>
       {:else if interrupted}
-        <p class="problem">Preparing exercises stopped before it finished.</p>
+        <p class="problem">{t("Preparing exercises stopped before it finished.")}</p>
       {/if}
-      <button class="btn" disabled={busy} onclick={generate}>{failed || interrupted ? 'Try again' : 'Prepare exercises'}</button>
+      <button class="btn" disabled={busy} onclick={generate}>{failed || interrupted ? t("Try again") : t("Prepare exercises")}</button>
     {/if}
 
     {#each tasks as task, i (task.id)}
@@ -56,7 +57,7 @@
     {/each}
 
     {#if earlier.length}
-      <h3>Still open from earlier sections</h3>
+      <h3>{t("Still open from earlier sections")}</h3>
       {#each earlier as task (task.id)}
         <Exercise {task} showSection />
       {/each}

@@ -1,3 +1,4 @@
+import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import type { HostEvent, Preview, Ref, SourceView, State, Turn } from './types';
 
@@ -79,6 +80,7 @@ class AppStore {
   async load() {
     try {
       this.state = await api.get<State>('/api/state');
+      locale.language = this.state.preferences.language;
       this.error = null;
     } catch (e) {
       this.error = (e as Error).message;
@@ -210,6 +212,14 @@ class AppStore {
 
   startLesson(prompt: string) {
     return this.act(() => api.post('/api/lessons', { id: newId(), prompt }));
+  }
+
+  async setLanguage(language: Language) {
+    const result = await this.act(() => api.put<{ preferences: { language: Language } }>('/api/preferences', { language }));
+    if (result) {
+      locale.language = result.preferences.language;
+      if (this.state) this.state.preferences = result.preferences;
+    }
   }
 
   pause(turnId: string) {

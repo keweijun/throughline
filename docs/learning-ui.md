@@ -6,7 +6,9 @@ Start the host from the project root and open http://127.0.0.1:8765:
 .venv/bin/python -m guided_learning.web --workspace work/courses/quantum-v1
 ```
 
-Keep the terminal open; Ctrl+C stops the host. The interface and teaching default to English; ask for another language in a lesson request or question. Sources and saved records keep their original language.
+Keep the terminal open; Ctrl+C stops the host. Choose English (default) or Simplified Chinese with the language selector in the top bar. The selection is course-owned and survives browser reloads and host restarts. It updates interface text without discarding input drafts, while sources and saved records keep their original language.
+
+New lessons, side answers, supplements, exercises, feedback and preparation use the selected teaching language. Running requests finish in their original language; regenerating an incomplete reply uses the current selection and retains the earlier attempt. Changing language invalidates previous-language preparation without changing the teaching position or mastery evidence.
 
 ## Learning
 

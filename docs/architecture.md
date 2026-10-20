@@ -38,6 +38,7 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/state` | Course, position, curriculum, session, turns, questions, practice, preparation, settings |
+| PUT | `/api/preferences` | Save the course interface/teaching language and invalidate stale preparation |
 | GET | `/api/events` | SSE: `delta`, `turn`, `changed` |
 | POST | `/api/lessons` | Start a mainline lesson (enters the first concept if there is no position) |
 | POST | `/api/turns/{id}/pause`, `/resume` | Pause, or regenerate as a new attempt |
@@ -59,3 +60,5 @@ The browser cannot call domain operations directly; there is no generic operatio
 
 - A new kind of model work: add a feature class (or extend one) in `features.py`, its text in `prompts.py`, a route in `app.py`, and any durable records as domain operations.
 - Tests: `tests/test_web*.py` drive `Host` directly or through `support.host_client`; `web/tests/*.spec.ts` drive the built UI against fixture courses in `tests/*_fixture.py`.
+
+Language preferences are domain operations (`preferences.view` / `preferences.save`) in the course workspace. Each stream attempt freezes its language alongside its source snapshot. The host emits a preference change notice so connected interfaces refresh their labels without rewriting saved teaching content. Preparation fingerprints include language.

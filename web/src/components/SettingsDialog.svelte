@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import type { Settings } from '../lib/types';
@@ -6,7 +7,7 @@
   let dialog: HTMLDialogElement | undefined = $state();
   let model = $state('');
   let effort = $state<Settings['effort']>('medium');
-  let message = $state('');
+  let message = $state<MessageKey | null>(null);
   let busy = $state(false);
 
   const settings = $derived(app.state?.settings);
@@ -16,7 +17,7 @@
     if (app.settingsOpen && !dialog.open) {
       model = settings?.model ?? '';
       effort = settings?.effort ?? 'medium';
-      message = '';
+      message = null;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
@@ -32,33 +33,33 @@
 
 <dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
-    <h2 id="settings-title">Teacher settings</h2>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>Close</button>
+    <h2 id="settings-title">{t("Teacher settings")}</h2>
+    <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>{t("Close")}</button>
   </header>
   {#if settings}
     <form onsubmit={save}>
-      <p class="intro">Lessons are taught by the Codex CLI on this computer, using your existing Codex sign-in. Text already written stays as it is.</p>
+      <p class="intro">{t("Lessons are taught by the Codex CLI on this computer, using your existing Codex sign-in. Text already written stays as it is.")}</p>
       <label class="field">
-        <span>Model</span>
-        <input type="text" bind:value={model} placeholder="Leave empty for your Codex default" autocomplete="off" />
+        <span>{t("Model")}</span>
+        <input type="text" bind:value={model} placeholder={t("Leave empty for your Codex default")} autocomplete="off" />
       </label>
       <label class="field">
-        <span>Reasoning effort</span>
+        <span>{t("Reasoning effort")}</span>
         <select bind:value={effort}>
-          <option value="minimal">Minimal</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
+          <option value="minimal">{t("Minimal")}</option>
+          <option value="low">{t("Low")}</option>
+          <option value="medium">{t("Medium")}</option>
+          <option value="high">{t("High")}</option>
         </select>
       </label>
       <div class="row">
-        <button class="btn btn-primary" type="submit" disabled={busy}>Save</button>
-        {#if message}<span class="message" role="status">{message}</span>{/if}
+        <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save")}</button>
+        {#if message}<span class="message" role="status">{t(message)}</span>{/if}
       </div>
       {#if settings.overridden}
-        <p class="note">This host was started with --model or --effort. Saving here replaces them.</p>
+        <p class="note">{t("This host was started with --model or --effort. Saving here replaces them.")}</p>
       {/if}
-      <p class="note">Saved for your user account in <code>{settings.path}</code>, never inside a course folder.</p>
+      <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
     </form>
   {/if}
 </dialog>

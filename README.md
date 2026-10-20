@@ -2,7 +2,7 @@
 
 Personal cross-document guided learning: a Codex skill guides teacher behavior while a local course workspace preserves sources, routes, the teaching mainline, and actual learning evidence. A local learning interface provides streaming lessons, unit overviews, original source pages, side questions, practice, and next-section preparation. The teacher makes instructional judgments from the materials; the program validates state and references without automatically deciding whether a learner understands.
 
-Project documentation and the UI are in English. Teaching defaults to English; learners can explicitly request another language. Imported materials and existing course records retain their original language.
+Project documentation is in English. The UI supports English and Simplified Chinese, with English as the default. The header's language selector controls the interface and new teaching content, including side answers, exercises, hints, and feedback. The choice is saved in the course workspace. Imported materials and existing course records retain their original language.
 
 ## Install and invoke
 

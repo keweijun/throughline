@@ -100,7 +100,8 @@ def register(app):
         prior=[t for t in app.operation({'op':'stream.list'})['turns'] if t['id']!=turn['id'] and t['channel']=='mainline' and t['concept_id']==turn['concept_id'] and t['status']=='completed']
         if prior:
             return 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full unit overview.'
-        return '''This is the first formal lesson for this section in the learning interface. Begin the reply with a substantive "## Unit overview", then teach the section directly without asking the learner to confirm.
+        heading='Unit overview' if turn.get('language','en')=='en' else '\u5355\u5143\u5bfc\u89c8'
+        return f'''This is the first formal lesson for this section in the learning interface. Begin the reply with a substantive "## {heading}", then teach the section directly without asking the learner to confirm.
 Use brief, concrete language to describe the core problem (the phenomenon or contradiction this unit explains), main steps (about three, each naming specific concepts rather than just intuition, formulas, and practice), connections to learned prerequisites and later topics, and target ability (what the learner can explain or calculate afterward).
 Organize the lesson using the supplied route, sources, and actual mainline goal. Keep unverified material explicitly uncertain. Avoid mechanically repeating the contents or inserting preparation status messages. Generate and save the overview and full explanation in the same reply, retaining the necessary derivations, conditions, and examples.'''
     app.prompt_hooks.append(overview_prompt)

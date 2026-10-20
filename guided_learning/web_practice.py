@@ -83,7 +83,9 @@ def register(app):
             for turn in app.operation({'op':'stream.list'})['turns']:
                 if turn['concept_id']==cid and turn['status']=='running':app.pause_turn(turn['id'])
             concept=app.operation({'op':'curriculum.context','concept_id':target})['concept']
-            return app.operation({'op':'mainline.enter','request_id':body['request_id'],'concept_id':target,'goal':concept['title'],'next_step':'Begin teaching this section','progress':''})
+            language=app.operation({'op':'preferences.view'})['preferences']['language']
+            next_step='Begin teaching this section' if language=='en' else '\u5f00\u59cb\u672c\u5c0f\u8282\u8bb2\u89e3'
+            return app.operation({'op':'mainline.enter','request_id':body['request_id'],'concept_id':target,'goal':concept['title'],'next_step':next_step,'progress':''})
     app.routes.update({('GET','/api/practice'):state,('POST','/api/practice/generate'):generate,('POST','/api/practice/action'):action,('POST','/api/practice/next'):next_section})
     app.prompt_hooks.append(prompt)
     app.completion_hooks.append(complete)

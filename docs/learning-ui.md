@@ -8,7 +8,9 @@ From the project root, install `python -m pip install -e ".[pdf]"` using the pro
 
 The host listens only on loopback; open [the interface](http://127.0.0.1:8765). Keep the terminal open; Ctrl+C stops it. No Node build or CDN is needed: Markdown, KaTeX, DOMPurify, and WOFF2 fonts are bundled. Codex CLI must be on PATH with a configured provider supporting the requested model. PDF rendering uses pypdfium2/Pillow from the `pdf` extra.
 
-The UI and teaching default to English. Explicitly request another language in your lesson or question prompt when needed. Sources and saved learning records keep their original language.
+Use the header's **Language / 语言** selector to choose **English** or **简体中文**. English is the default for a new course. The selection updates interface labels and controls the language of new lessons, side answers, supplements, exercises, hints, solutions, feedback, and background preparation. It is saved per course and restored when you reopen the host or use another browser.
+
+Switching language preserves typed drafts, source text, saved lessons, and learning evidence. A running reply keeps the language selected when it started. Regenerating an unfinished reply uses the current selection while retaining the earlier attempt and its original language. New practice help uses the current language even for an earlier exercise. Existing exercises and saved explanations are not automatically translated. Preparation in a previous language becomes stale and can be prepared again when idle.
 
 ## Learning
 

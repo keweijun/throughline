@@ -53,7 +53,7 @@ class StreamingCourse(unittest.TestCase):
 
     def test_source_snapshot_stays_bound_to_prompt_and_record_after_revision_change(self):
         from pathlib import Path
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         path=Path(self.workspace)/'lesson.md'
         path.write_text('OLD_SOURCE_FACT',encoding='utf-8')
         old=self.call('source.register',path=str(path))['source']
@@ -64,7 +64,7 @@ class StreamingCourse(unittest.TestCase):
         new=self.call('source.register',path=str(path))['source']
         newref={**ref,'revision':new['revision']}
         self.call('curriculum.save',concepts=[{'id':'state','title':'States','links':[newref]}],route=['state'],coverage=[])
-        app=LearningApp(self.workspace)
+        app=Host(self.workspace)
         try:
             prompt=app.build_prompt(turn)
             self.assertIn('OLD_SOURCE_FACT',prompt)

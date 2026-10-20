@@ -1,36 +1,39 @@
-# Learning interface usage and recovery
+# Using the learning interface
 
-From the project root, install `python -m pip install -e ".[pdf]"` using the project virtual environment, then run:
+Start the host from the project root and open http://127.0.0.1:8765:
 
-```powershell
-.\.venv\Scripts\python.exe -m guided_learning.web --workspace work/courses/quantum-v1 --port 8765 --model gpt-6.1-sol --effort medium
+```sh
+.venv/bin/python -m guided_learning.web --workspace work/courses/quantum-v1
 ```
 
-The host listens only on loopback; open [the interface](http://127.0.0.1:8765). Keep the terminal open; Ctrl+C stops it. No Node build or CDN is needed: Markdown, KaTeX, DOMPurify, and WOFF2 fonts are bundled. Codex CLI must be on PATH with a configured provider supporting the requested model. PDF rendering uses pypdfium2/Pillow from the `pdf` extra.
-
-The UI and teaching default to English. Explicitly request another language in your lesson or question prompt when needed. Sources and saved learning records keep their original language.
+Keep the terminal open; Ctrl+C stops the host. The interface and teaching default to English; ask for another language in a lesson request or question. Sources and saved records keep their original language.
 
 ## Learning
 
-- Left-side concepts preview without moving the mainline; the central goal and section state show your position. The first lesson begins with a concrete unit overview and then teaches directly.
-- Text streams and saves automatically. Taught content and mastery remain separate; the teacher does not need to write a second script.
-- Select a sentence/formula and click "Ask about this passage," or open "Side questions." Ordinary questions preserve the mainline. Choose whether to accept foundation supplements and return to the original goal afterward.
-- Source buttons open the exact registered PDF revision. Pending verification stays pending even when a model cites it.
-- Exercises are prepared at section completion. Freely request hints, steps, or full solutions. "Do later" retains pending work; you choose "Enter next section." Correct answers after viewing a solution or receiving help are not independent mastery.
-- Next-section preparation runs when idle. Teaching, questions, and practice take priority; failed preparation does not block the teacher from preparing independently. Ready means internal material is available.
+- **Route** (left): your current section is marked "You are here". Selecting another section previews it without moving your learning position; "Back to current section" returns.
+- **Start lesson**: the first lesson of a section opens with a unit overview and then teaches directly. Text streams in and is saved automatically when complete. "Ask for another pass" requests a new lesson in the same section.
+- **Side questions**: select a sentence or formula in a lesson and choose "Ask about this passage", or open Questions in the top bar. The lesson keeps going unless you tick "Pause the lesson while I ask". Passages you asked about stay highlighted. If the teacher suggests studying a foundation first, you decide; "Return to the lesson" scrolls back to where you asked.
+- **Sources**: citation buttons in lessons open the exact registered revision in the Source tab: the extracted line for Markdown, a rendered page image plus the original PDF for PDFs. "Pending verification" stays visible even when the model cites the source.
+- **Practice**: exercises are prepared after a lesson completes. "Check my answer" asks the teacher to assess; Hint, Key steps and Full solution are always available, but after any help a correct answer is recorded as solved with help, not on your own. "Do later" keeps an exercise open; open exercises from earlier sections follow you.
+- **Enter next section** moves your position; practice is optional.
+- **Preparation**: while nothing else runs, the next section is prepared in the background. Prepared material is teacher-only and never counts as learning. Your own requests always take priority.
 
-## Pause, close, and reopen
+## Model settings
 
-"Pause" stops the current generation request, retaining partial text as unfinished. "Regenerate section" retains the old attempt and starts a complete new lesson rather than continuing from a character offset. Wait for model cancellation to finish before retrying.
+Choose the teacher in Model settings: Local Codex CLI (default) or any OpenAI-compatible provider (OpenAI, OpenRouter, Ollama, LM Studio, vLLM and others). Keys can be stored or read from an environment variable; they stay in your user config directory and are never shown in the browser. `--provider` and `--model` override the saved choice for one run.
 
-Closing the browser does not stop the host; generation/preparation can continue while the terminal runs. Closing the host stops background work. Reopening the same workspace restores official records and marks unexpectedly interrupted requests without completing partial lessons. Only one host may own a course.
+## Pause, close and reopen
 
-To change machines, copy the full course directory, including `course.sqlite3` and revision snapshots under `sources`, after stopping the host. Materials, state, and model logs are outside Git.
+"Pause" stops generation and keeps the partial text as unfinished. "Regenerate" keeps the earlier attempt (under "Earlier unfinished attempts") and writes a complete new reply rather than continuing mid-sentence. If the model is still stopping, wait a moment and try again.
+
+Closing the browser does not stop the host; work in progress continues. Stopping the host stops all model work. On reopen, the saved records return and any request cut off by the stop is shown as interrupted. Only one host can own a course at a time.
+
+To move a course to another machine, stop the host and copy the whole course directory, including `course.sqlite3` and `sources/`.
 
 ## Troubleshooting
 
-- Port occupied: change `--port` and use its URL. If the course already has a host, return to that window rather than starting a second host.
-- Model failure: check the terminal's Codex configuration. Failed state and partial text are retained; inspect before repeated retries. The app does not change authentication.
-- Page image unavailable: reinstall `.[pdf]` in the same environment or use the original PDF link.
-- Preparation failure: retry explicitly in the UI; learning can continue without it.
-- Report problems with the action, visible state, and error text. Keep configuration secrets out of reports.
+- **Port in use**: pass `--port`. If the course already has a host, use that window instead of starting a second one.
+- **Model errors**: the lesson shows the provider's message. For Codex, check the CLI's configuration in a terminal. For OpenAI-compatible providers, check the base URL, model name and key in Model settings ("Load available models" tests the connection). Partial text is kept.
+- **Page image unavailable**: install the `pdf` extra in the same environment, or use the original PDF link.
+- **Preparation failed**: choose "Retry preparation"; learning continues without it.
+- **"Reconnecting"** in the top bar: the browser lost the live connection. Your work is saved; it reconnects automatically once the host is reachable.

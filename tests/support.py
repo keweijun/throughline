@@ -21,3 +21,13 @@ def call_cli(case, workspace, op, error=None, **fields):
     case.assertEqual(process.returncode, 0, process.stdout + process.stderr)
     case.assertTrue(response['ok'], response)
     return response['result']
+
+
+def host_client(workspace, runner=None, settings=None, port=8765):
+    """A loopback-addressed client for the HTTP host; close it to release the course lease."""
+    from fastapi.testclient import TestClient
+    from guided_learning.providers import ProviderSettings
+    from guided_learning.server import create_app
+    settings = settings or ProviderSettings(Path(workspace) / 'test-providers.json')
+    app = create_app(workspace, port=port, runner=runner, settings=settings)
+    return TestClient(app, base_url=f'http://127.0.0.1:{port}'), app.state.host

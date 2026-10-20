@@ -7,7 +7,7 @@ from pathlib import Path
 
 class ModelStream(unittest.TestCase):
     def test_streams_final_phase_and_requires_successful_turn(self):
-        from guided_learning.model_stream import CodexRunner
+        from guided_learning.providers import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             script=Path(tmp)/'server.py'
             script.write_text('''import sys,json
@@ -31,7 +31,7 @@ for line in sys.stdin:
             self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},{'kind':'complete'}])
 
     def test_commentary_only_and_connection_loss_never_complete_a_lesson(self):
-        from guided_learning.model_stream import CodexRunner
+        from guided_learning.providers import CodexRunner
         for terminal in ('completed','disconnect'):
             with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as tmp:
                 script=Path(tmp)/'server.py'
@@ -53,7 +53,7 @@ for line in sys.stdin:
         import time
         from unittest.mock import patch
         import subprocess
-        from guided_learning.model_stream import CodexRunner
+        from guided_learning.providers import CodexRunner
         for stalled in ('initialize','thread/start','turn/start'):
             with self.subTest(stalled=stalled), tempfile.TemporaryDirectory() as tmp:
                 script=Path(tmp)/'server.py'
@@ -64,7 +64,7 @@ for line in sys.stdin:
                     process=real_popen(*args,**kwargs);owned.append(process);return process
                 started=time.monotonic()
                 try:
-                    with patch('guided_learning.model_stream.subprocess.Popen',side_effect=launch):
+                    with patch('guided_learning.providers.codex.subprocess.Popen',side_effect=launch):
                         CodexRunner(command=[sys.executable,str(script)],timeout=2).run('teach',tmp,lambda e:None,cancel)
                     self.assertLess(time.monotonic()-started,1.5)
                     self.assertIsNotNone(owned[0].poll())

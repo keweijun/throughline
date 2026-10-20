@@ -5,6 +5,7 @@ test('ask about a selected passage, then return to the same reading position', a
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(30);
   await expect(paragraph).toBeVisible();
+  await expect(page.locator('details.overview')).toBeVisible();
   const excerpt = await dragSelect(page, paragraph);
   expect(excerpt.trim().length).toBeGreaterThan(5);
   const anchor = await page.evaluate(() => window.scrollY);

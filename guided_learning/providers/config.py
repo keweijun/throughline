@@ -65,13 +65,18 @@ class ProviderSettings:
         except (OSError, ValueError) as exc:
             raise OperationError('invalid_settings', f'Could not read provider settings at {self.path}') from exc
         providers = [_clean(p) for p in data.get('providers', [])] or DEFAULT['providers']
-        return {'active': data.get('active') or providers[0]['id'], 'providers': providers}
+        active = data.get('active')
+        if not any(p['id'] == active for p in providers):
+            active = providers[0]['id']
+        return {'active': active, 'providers': providers}
 
     def _save(self, data):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary = self.path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
-        os.chmod(temporary, 0o600)
+        # Created owner-only, so an API key is never readable by others, even briefly.
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as file:
+            file.write(json.dumps(data, indent=2, ensure_ascii=False))
         os.replace(temporary, self.path)
 
     def _find(self, data, identifier):
@@ -84,8 +89,9 @@ class ProviderSettings:
         with self.lock:
             data = self._load()
         provider = dict(self._find(data, self.override.get('provider') or data['active']))
-        if self.override.get('model'):
-            provider['model'] = self.override['model']
+        for key in ('model', 'effort'):
+            if self.override.get(key):
+                provider[key] = self.override[key]
         return provider
 
     def public(self):
@@ -118,9 +124,9 @@ class ProviderSettings:
             self._find(data, identifier)
             if len(data['providers']) == 1:
                 raise OperationError('invalid_provider', 'Keep at least one provider')
-            data['providers'] = [p for p in data['providers'] if p['id'] != identifier]
             if data['active'] == identifier:
-                data['active'] = data['providers'][0]['id']
+                raise OperationError('provider_in_use', 'Choose another provider before removing the one in use')
+            data['providers'] = [p for p in data['providers'] if p['id'] != identifier]
             self._save(data)
         return self.public()
 
@@ -136,16 +142,16 @@ class ProviderSettings:
         return self.public()
 
     def draft_runner(self, provider):
-        """A runner for unsaved settings; a missing key falls back to the saved provider's key."""
+        """A runner for unsaved settings; a saved key is reused only for the same server."""
         with self.lock:
             existing = next((p for p in self._load()['providers'] if p['id'] == provider.get('id')), {})
-        if not provider.get('api_key') and existing.get('api_key'):
+        same_server = existing.get('base_url') == str(provider.get('base_url') or '').strip().rstrip('/')
+        if not provider.get('api_key') and existing.get('api_key') and same_server:
             provider = {**provider, 'api_key': existing['api_key']}
         return self._build(_clean(provider))
 
-    def runner(self, identifier=None):
-        provider = self.active() if identifier is None else self._find(self._load(), identifier)
-        return self._build(provider)
+    def runner(self):
+        return self._build(self.active())
 
     def _build(self, provider):
         if provider['kind'] == 'codex':

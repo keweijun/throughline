@@ -123,7 +123,8 @@ class Settings(unittest.TestCase):
         settings.upsert({'id': 'hosted', 'kind': 'openai', 'base_url': 'https://api.example.com/v1', 'model': 'm', 'api_key_env': 'GL_TEST_KEY'})
         os.environ['GL_TEST_KEY'] = 'from-env'
         try:
-            self.assertEqual(settings.runner('hosted').api_key, 'from-env')
+            settings.activate('hosted')
+            self.assertEqual(settings.runner().api_key, 'from-env')
         finally:
             del os.environ['GL_TEST_KEY']
         for bad in ({'id': 'Bad Id', 'kind': 'openai', 'base_url': 'https://x'}, {'id': 'x', 'kind': 'other'},
@@ -133,11 +134,21 @@ class Settings(unittest.TestCase):
 
     def test_command_line_override_is_not_saved(self):
         ProviderSettings(self.path).upsert({'id': 'hosted', 'kind': 'openai', 'base_url': 'https://api.example.com/v1', 'model': 'saved'})
-        settings = ProviderSettings(self.path, override={'provider': 'hosted', 'model': 'trial'})
-        self.assertEqual(settings.active()['model'], 'trial')
+        settings = ProviderSettings(self.path, override={'provider': 'hosted', 'model': 'trial', 'effort': 'high'})
+        self.assertEqual((settings.active()['model'], settings.active()['effort']), ('trial', 'high'))
         self.assertEqual(ProviderSettings(self.path).active()['id'], 'codex')
         with self.assertRaises(OperationError):
             ProviderSettings(self.path, override={'provider': 'missing'}).active()
+
+    def test_saved_key_is_only_sent_to_its_own_server(self):
+        settings = ProviderSettings(self.path)
+        settings.upsert({'id': 'hosted', 'kind': 'openai', 'base_url': 'https://api.example.com/v1', 'model': 'm', 'api_key': 'sk-secret'})
+        self.assertEqual(settings.draft_runner({'id': 'hosted', 'kind': 'openai', 'base_url': 'https://api.example.com/v1/'}).api_key, 'sk-secret')
+        self.assertIsNone(settings.draft_runner({'id': 'hosted', 'kind': 'openai', 'base_url': 'https://attacker.example/v1'}).api_key)
+
+    def test_unknown_active_provider_falls_back(self):
+        self.path.write_text(json.dumps({'active': 'gone', 'providers': [{'id': 'codex', 'kind': 'codex'}]}), encoding='utf-8')
+        self.assertEqual(ProviderSettings(self.path).public()['active'], 'codex')
 
     def test_last_provider_cannot_be_removed(self):
         settings = ProviderSettings(self.path)

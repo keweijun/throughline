@@ -54,3 +54,13 @@ test('narrow screens use drawers without horizontal overflow', async ({ page, co
   await expect(page.locator('.lesson-body .katex').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
+
+test('both current and older citation formats open the cited source', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const citations = page.locator('.lesson-body .citation');
+  await expect(citations).toHaveCount(2);
+  await expect(page.locator('.lesson-body')).not.toContainText('来源');
+  await citations.nth(1).click();
+  await expect(page.locator('.source-view pre')).toHaveText('Normalization condition');
+});

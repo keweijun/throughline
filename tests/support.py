@@ -1,6 +1,7 @@
 """Public CLI seam shared by behavioral scenarios; every call is a fresh process."""
 import json
 import subprocess
+import tempfile
 import sys
 import uuid
 from pathlib import Path
@@ -28,6 +29,6 @@ def host_client(workspace, runner=None, settings=None, port=8765):
     from fastapi.testclient import TestClient
     from guided_learning.providers import ProviderSettings
     from guided_learning.server import create_app
-    settings = settings or ProviderSettings(Path(workspace) / 'test-providers.json')
+    settings = settings or ProviderSettings(Path(tempfile.mkdtemp()) / 'providers.json')
     app = create_app(workspace, port=port, runner=runner, settings=settings)
     return TestClient(app, base_url=f'http://127.0.0.1:{port}'), app.state.host

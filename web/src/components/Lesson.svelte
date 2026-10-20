@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
   import { markAsked, clearAsked } from '../lib/highlight';
@@ -26,36 +27,36 @@
   });
 </script>
 
-<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? `Lesson ${number}` : 'Lesson'}>
+<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? t('Lesson {number}', { number }) : 'Lesson'}>
   <div class="meta">
-    {#if lessons.length > 1}<span class="number">Lesson {number}</span>{/if}
+    {#if lessons.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}
     {#if turn.status === 'running'}
-      <span class="chip"><span class="live-dot"></span>{status.label}</span>
+      <span class="chip"><span class="live-dot"></span>{diagnostic(status.label)}</span>
     {:else if turn.status !== 'completed'}
-      <span class="chip chip-{status.tone}">{status.label}</span>
+      <span class="chip chip-{status.tone}">{diagnostic(status.label)}</span>
     {/if}
-    <TurnControls {turn} pauseLabel="Pause" regenerateLabel="Regenerate lesson" />
+    <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Regenerate lesson")} />
   </div>
 
   {#if turn.error && turn.status !== 'completed'}
-    <p class="error">{turn.error}</p>
+    <p class="error">{diagnostic(turn.error)}</p>
   {/if}
 
   {#if turn.text}
     <div
       class="prose lesson-body"
       bind:this={body}
-      use:markdown={{ text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref) }}
+      use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref) }}
     ></div>
   {:else if turn.status === 'running'}
-    <p class="waiting">The teacher is reading the goal and sources. Text appears here as it is written.</p>
+    <p class="waiting">{t("The teacher is reading the goal and sources. Text appears here as it is written.")}</p>
   {/if}
 
   {#if turn.attempts.length}
     <details class="attempts">
-      <summary>Earlier unfinished {turn.attempts.length === 1 ? 'attempt' : 'attempts'}</summary>
+      <summary>{t('Earlier unfinished attempts')}</summary>
       {#each turn.attempts as attempt}
-        <div class="prose attempt" use:markdown={{ text: attempt.text || '(No text was received.)' }}></div>
+        <div class="prose attempt" use:markdown={{ language: locale.language, text: attempt.text || t("(No text was received.)") }}></div>
       {/each}
     </details>
   {/if}

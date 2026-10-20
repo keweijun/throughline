@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '../lib/i18n.svelte';
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
@@ -54,38 +55,38 @@
 
 {#if !conceptId || !concept}
   <section class="empty">
-    <h2>No learning route yet</h2>
-    <p>Plan a course route with the guided-learning skill, then reopen this page to start the first section.</p>
+    <h2>{t("No learning route yet")}</h2>
+    <p>{t("Plan a course route with the guided-learning skill, then reopen this page to start the first section.")}</p>
   </section>
 {:else}
   <article class="page" aria-labelledby="concept-title">
     {#if !isCurrent}
       <div class="previewing" role="note">
         <p>
-          You're previewing this section. Your learning position stays at
+          {t("You're previewing this section. Your learning position stays at")}
           <strong>{app.concept(app.currentId)?.title}</strong>.
         </p>
-        <button class="btn btn-small" onclick={() => app.view(app.currentId!)}>Back to current section</button>
+        <button class="btn btn-small" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
       </div>
     {/if}
 
     <header class="head">
-      <p class="eyebrow">Section {index + 1} of {total}</p>
+      <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
       <h1 id="concept-title">{concept.title}</h1>
       {#if isCurrent && position}
         <dl class="position">
           <div>
-            <dt>Goal</dt>
-            <dd>{position.goal || preview?.overview.target_ability || 'Read the lesson, then try the exercises'}</dd>
+            <dt>{t("Goal")}</dt>
+            <dd>{position.goal || preview?.overview.target_ability || t("Read the lesson, then try the exercises")}</dd>
           </div>
           <div>
-            <dt>Next step</dt>
-            <dd>{position.next_step || 'Read the lesson, then try the exercises'}</dd>
+            <dt>{t("Next step")}</dt>
+            <dd>{position.next_step || t("Read the lesson, then try the exercises")}</dd>
           </div>
         </dl>
         {#if position.progress}
           <details class="left-off">
-            <summary>Where you left off</summary>
+            <summary>{t("Where you left off")}</summary>
             <p>{position.progress}</p>
           </details>
         {/if}
@@ -95,7 +96,7 @@
     {#if preview}
       <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
         <summary>
-          {preview.overview.origin === 'teacher' ? 'Unit overview' : 'Route and sources'}
+          {preview.overview.origin === 'teacher' ? t("Unit overview") : t("Route and sources")}
         </summary>
         <UnitOverview {preview} />
       </details>
@@ -108,7 +109,7 @@
         {/each}
       </div>
     {:else if !isCurrent}
-      <p class="quiet">No lesson yet. This section starts when you reach it on the route.</p>
+      <p class="quiet">{t("No lesson yet. This section starts when you reach it on the route.")}</p>
     {/if}
 
     {#if isCurrent}

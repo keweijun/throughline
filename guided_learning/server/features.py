@@ -151,7 +151,10 @@ class Navigation(Feature):
             return ''
         earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
-        return prompts.LESSON_CONTINUES if earlier else prompts.LESSON_FIRST
+        first = prompts.LESSON_FIRST
+        if turn.get('language', 'en') == 'zh-CN':
+            first = first.replace('## Unit overview', '## 单元导览')
+        return prompts.LESSON_CONTINUES if earlier else first
 
 
 class Questions(Feature):
@@ -209,7 +212,10 @@ class Questions(Feature):
         common = prompts.question_context(branch, main_text)
         if turn['id'] == branch.get('supplement_turn_id'):
             return common + prompts.SUPPLEMENT
-        return common + prompts.QUESTION_PROTOCOL
+        protocol = prompts.QUESTION_PROTOCOL
+        if turn.get('language', 'en') == 'zh-CN':
+            protocol = protocol.replace('150 English words', '250 Chinese characters')
+        return common + protocol
 
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):
@@ -306,8 +312,9 @@ class Practice(Feature):
                 if turn['concept_id'] == concept_id and turn['status'] == 'running':
                     self.host.pause_turn(turn['id'])
             concept = self.operation({'op': 'curriculum.context', 'concept_id': target})['concept']
+            language = self.operation({'op': 'preferences.view'})['preferences']['language']
             result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': target,
-                                     'goal': concept['title'], 'next_step': 'Begin teaching this section', 'progress': ''})
+                                     'goal': concept['title'], 'next_step': '开始本小节讲解' if language == 'zh-CN' else 'Begin teaching this section', 'progress': ''})
             self.host.changed()
             return result
 
@@ -374,6 +381,8 @@ class Preparation(Feature):
             job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
             return prompts.preparation_task(job['snapshot']['context'])
         material = self.state(turn['concept_id'])['ready']
+        if material and material['snapshot'].get('language', 'en') != turn.get('language', 'en'):
+            material = None
         return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING
 
     def schedule(self, retry=False):
@@ -392,7 +401,8 @@ class Preparation(Feature):
             concept_id = values['next_concept_id']
             if not concept_id:
                 return {'scheduled': False, 'reason': 'no_next_section'}
-            relevant = [j for j in values['jobs'] if j['concept_id'] == concept_id]
+            language = self.operation({'op': 'preferences.view'})['preferences']['language']
+            relevant = [j for j in values['jobs'] if j['concept_id'] == concept_id and j['snapshot'].get('language', 'en') == language]
             if any(j['status'] == 'ready' for j in relevant):
                 return {'scheduled': False, 'reason': 'ready'}
             # Failed attempts need an explicit retry rather than an unbounded model loop.
@@ -403,7 +413,7 @@ class Preparation(Feature):
                 return {'scheduled': False, 'reason': 'existing'}
             try:
                 return self.host.start_turn({'id': result['job']['id'], 'concept_id': concept_id, 'channel': 'preparation',
-                                             'record_user': False, 'prompt': prompts.PREPARATION_REQUEST})
+                                             'language': result['job']['snapshot']['language'], 'record_user': False, 'prompt': prompts.PREPARATION_REQUEST})
             except Exception:
                 self.operation({'op': 'preparation.recover'})
                 raise

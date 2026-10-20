@@ -110,9 +110,20 @@ class Host:
 
     def snapshot(self):
         return {**self.operation({'op': 'course.status'}),
+                **self.operation({'op': 'preferences.view'}),
                 'curriculum': self.operation({'op': 'curriculum.view'}),
                 'session': self.operation({'op': 'session.resume', 'recent_limit': 20}),
                 'turns': self.turns()}
+
+    def set_language(self, language):
+        with self.lock:
+            result = self.operation({'op': 'preferences.save', 'language': language})
+            stale = {job['id'] for job in self.preparation.state()['jobs'] if job['status'] == 'stale'}
+            for turn in self.turns():
+                if turn['id'] in stale and turn['status'] == 'running':
+                    self.pause_turn(turn['id'])
+            self.changed('preferences')
+            return result
 
     def build_prompt(self, turn):
         if turn.get('prompt_snapshot') is None:
@@ -153,9 +164,10 @@ class Host:
                 if not curriculum['route']:
                     raise OperationError('no_route', 'Plan a course route first')
                 first = next(c for c in curriculum['concepts'] if c['id'] == curriculum['route'][0])
+                chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
                 self.operation({'op': 'mainline.enter', 'request_id': str(uuid.uuid4()), 'concept_id': first['id'],
-                                'goal': first.get('objective') or first.get('goal') or 'Understand ' + first['title'],
-                                'next_step': 'Read the lesson, then try the exercises'})
+                                'goal': first.get('objective') or first.get('goal') or ('理解' if chinese else 'Understand ') + first['title'],
+                                'next_step': '阅读讲解，然后尝试练习' if chinese else 'Read the lesson, then try the exercises'})
                 position = self.operation({'op': 'course.status'})['position']
             prompt = (body.get('prompt') or '').strip() or prompts.DEFAULT_LESSON_REQUEST
             return self.start_turn({'id': body.get('id'), 'concept_id': position['concept_id'], 'prompt': prompt, 'channel': 'mainline'})

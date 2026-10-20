@@ -5,14 +5,16 @@ import time
 from . import curriculum
 from .teaching import require_text
 from .store import OperationError
+from .preferences import view as preferences
 
 
 def capture(store, cid):
     context = curriculum.context(store, {'concept_id': cid})
     context.pop('position', None)
-    data = {'context': context, 'curriculum': curriculum.view(store, {}),
+    language = preferences(store,{})['preferences']['language']
+    data = {'context': context, 'curriculum': curriculum.view(store, {}), 'language': language,
             'sources': store.list('sources')}
-    return {'fingerprint': hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest(), 'context':context}
+    return {'fingerprint': hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest(), 'context':context, 'language':language}
 
 
 def target(store):
@@ -27,7 +29,7 @@ def reconcile(store, request):
     for job in store.list('preparation_jobs'):
         if job['status'] not in ('running','ready'): continue
         if job['concept_id'] not in (current,upcoming) or capture(store,job['concept_id'])['fingerprint'] != job['snapshot']['fingerprint']:
-            job.update(status='stale',reason='Route or sources changed; the main teacher will prepare independently')
+            job.update(status='stale',reason='Route, sources, or teaching language changed; the main teacher will prepare independently')
             job.pop('content',None)
         elif job['status']=='running':
             turn=store.get('streams',job['id'])

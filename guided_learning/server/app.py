@@ -28,6 +28,10 @@ class LessonRequest(Body):
     prompt: Optional[str] = None
 
 
+class PreferencesRequest(Body):
+    language: Literal['en', 'zh-CN']
+
+
 class ResumeRequest(Body):
     request_id: str
 
@@ -159,6 +163,10 @@ def create_app(workspace, port=8765, runner=None, settings=None):
     @app.post('/api/lessons')
     def start_lesson(body: LessonRequest):
         return host.start_lesson(body.model_dump())
+
+    @app.put('/api/preferences')
+    def preferences(body: PreferencesRequest):
+        return host.set_language(body.language)
 
     @app.post('/api/turns/{identifier}/pause')
     def pause(identifier: str):

@@ -1,78 +1,87 @@
-# Codex Guided Learning
+# Guided Learning
 
-Personal cross-document guided learning: a Codex skill guides teacher behavior while a local course workspace preserves sources, routes, the teaching mainline, and actual learning evidence. A local learning interface provides streaming lessons, unit overviews, original source pages, side questions, practice, and next-section preparation. The teacher makes instructional judgments from the materials; the program validates state and references without automatically deciding whether a learner understands.
+Personal cross-document guided learning. A local course workspace keeps your sources, learning route, teaching mainline and actual learning evidence. A local web app teaches from it: streaming lessons with unit overviews, side questions about any passage, original source pages, section practice and background preparation of the next section. The teacher can be any OpenAI-compatible model or your local Codex CLI.
 
-Project documentation and the UI are in English. Teaching defaults to English; learners can explicitly request another language. Imported materials and existing course records retain their original language.
+The teacher makes instructional judgments from the materials. The program validates state and references; it never decides on its own that you have understood something.
 
-## Install and invoke
+Documentation and the interface are in English. Teaching defaults to English; ask for another language in a lesson request or question when you want one. Imported materials and existing course records keep their original language.
 
-Requires Python 3.10+. From the repository root in PowerShell:
+## Install
 
-```powershell
+Requires Python 3.10+. From the repository root:
+
+```sh
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e '.[pdf]'
-.\.venv\Scripts\python.exe -m unittest discover -s tests
+.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
+.venv/bin/python -m unittest discover -s tests
 ```
 
-Open this project in Codex and invoke `$guided-learning`. The repository skill is at [.agents/skills/guided-learning/SKILL.md](.agents/skills/guided-learning/SKILL.md). If the current chat has not discovered it, start a new project chat or explicitly ask Codex to read that file. The skill is separate from individual course state and need not be copied into the global skills directory.
+The built interface ships inside the package (`guided_learning/web_dist`), so learners need neither Node.js nor internet access for the interface itself. Markdown, math and fonts are bundled.
 
-For example:
+## Open a course
 
-> Use guided-learning to open work/courses/quantum-v1 in this project. Briefly explain the candidate route and material still awaiting verification, then begin guided learning from wavefunctions. Do not count demonstrations or self-reported understanding as independent completion.
-
-The operation entrypoint accepts JSON from a UTF-8 request file or standard input:
-
-```powershell
-'{"op":"course.init","title":"My course"}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
-'{"op":"position.save","request_id":"demo-checkpoint-1","position":{"goal":"Prepare course","next_step":"Register materials"}}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
-'{"op":"session.resume"}' | .\.venv\Scripts\python.exe -m guided_learning --workspace work/courses/demo
+```sh
+.venv/bin/python -m guided_learning.web --workspace work/courses/quantum-v1
 ```
 
-Position-changing operations `position.save` and `mainline.enter` require a unique `request_id`. Reuse the same ID for retries; an old request cannot overwrite newer progress. Use `interaction.read {id}` to inspect original exchanges beyond the recent-history window.
+Open http://127.0.0.1:8765. The host listens on loopback only and owns the course while it runs; press Ctrl+C to stop it. The course must already exist; see [course import](docs/course-import.md) to create one.
 
-Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` and a nonzero exit code. `--request` takes a JSON **file path**. Use `--request work/request.json` to avoid shell escaping for complex formulas or long text.
+Options:
 
-## Open the V2 learning interface
+- `--port 8766` when 8765 is taken.
+- `--provider ID` and `--model NAME` pick a provider and model for this run only, without changing your saved choice.
+- `--config PATH` uses a different provider settings file.
 
-Complete the installation above and make sure the current terminal can run `codex` with a configured model provider. The host reuses local Codex configuration; it does not store another API key or automatically choose a new paid provider. From the project root:
+## Choose the teacher model
 
-```powershell
-.\.venv\Scripts\python.exe -m guided_learning.web --workspace work/courses/quantum-v1 --port 8765 --model gpt-6.1-sol --effort medium
+Open **Model settings** (the model name in the top bar). Two kinds of provider are supported:
+
+- **Local Codex CLI** (the default): runs `codex app-server` on this computer with your existing Codex configuration. Leave the model empty to use your Codex default.
+- **OpenAI-compatible**: any server that implements `/v1/chat/completions` with streaming, such as OpenAI, OpenRouter, Ollama, LM Studio or vLLM. Set a base URL and model name; **Load available models** reads the server's `/models` list.
+
+API keys can be stored in the settings file or read from an environment variable you name (for example `OPENAI_API_KEY`). Settings live in your user config directory (`~/.config/guided-learning/providers.json`, or `%APPDATA%\guided-learning\providers.json` on Windows), saved with owner-only permissions. They are never written into a course folder and keys are never sent to the browser. Changing provider affects new requests only. The app never switches provider on its own. See [ADR 0002](docs/adr/0002-openai-compatible-teacher-providers.md).
+
+## Use the Codex skill
+
+Open this project in Codex and invoke `$guided-learning`. The skill is at [.agents/skills/guided-learning/SKILL.md](.agents/skills/guided-learning/SKILL.md). It reads and updates the same course workspace through the operation entry point, which accepts JSON from a request file or standard input:
+
+```sh
+echo '{"op":"course.init","title":"My course"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
+echo '{"op":"session.resume"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
 ```
 
-Open [the local learning interface](http://127.0.0.1:8765). The course must already exist. On another machine, first follow [course import](docs/course-import.md) to create a course and replace `--workspace`. The model must be supported by your configured provider; omit `--model` to use its default. The course path is distinct from the original PDF directory.
+Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` with a nonzero exit code. Use `--request work/request.json` for long text or formulas. Position-changing operations `position.save` and `mainline.enter` need a unique `request_id`; reuse it only for retries.
 
-Keep the terminal running; press Ctrl+C to stop. Repeat the command to resume the same course. UI actions save to that course. To try a copy, stop the host, copy the entire course directory, and use the copy's path. [Usage and recovery](docs/learning-ui.md) covers pause, branches, practice, and troubleshooting; [V2 acceptance](docs/acceptance-v2.md) separates automated tests, real-model checks, and teaching checks.
+## What the course workspace keeps
 
-Markdown, math rendering, and fonts are bundled without runtime CDN access. Model generation still needs a network connection and valid local Codex configuration. Original PDF page rendering requires `.[pdf]`.
+- PDF and Markdown sources with revision snapshots, reading issues and exact locations.
+- Cross-document concepts, prerequisite routes, notation and exercise mappings, with validated references, cycles and coverage dispositions.
+- The teaching mainline and side questions, with route-aware answer depth, foundation supplements and pending explanations.
+- Section practice with taught, self-reported, hinted, independent and retest evidence kept separate.
+- Deferred items, revisited when due without a mandatory quiz.
 
-## Current capabilities
+Background preparation runs only while the host is running. Course materials and databases stay in local `work/` and are not tracked by Git. To move a course, stop the host and copy its whole directory.
 
-- Register PDF/Markdown sources, retain revision snapshots and reading issues, and check source locations.
-- Save cross-document concepts, prerequisite routes, notation, and exercise mappings; validate references, cycles, and coverage dispositions.
-- Choose side-question depth using the current goal; resume after brief answers and wait after long answers. Follow-up questions within long branches can also link pending explanations.
-- Group practice at section ends and keep taught, self-reported, hinted, independent, and retest evidence separate.
-- Revisit deferred items when due; resume a new chat after a brief recap without a mandatory quiz.
-- Keep the main teacher responsive. When the host provides Luna, it can consolidate candidate notes; otherwise tasks remain pending without automatic paid API calls.
+### Prepared local quantum course
 
-Background preparation runs only while the local learning host is running. It does not persist as a service after shutdown. Public plugin distribution is outside the current scope.
+`work/courses/quantum-v1` registers six lecture documents and two exercise documents (231 pages) with 45 candidate concepts, 23 exercise subrequirements and eight source-linked notation entries. **It is a candidate coverage map awaiting review**: 41 pages have candidate mappings, 190 explicitly need review, and verification for all pages remains pending.
 
-### V2 original-page dependencies
+## Development
 
-The interface uses pypdfium2 and Pillow from the `pdf` extra to render the exact registered PDF revision as an image, independently of browser PDF plugins. Update with `.\.venv\Scripts\python.exe -m pip install -e ".[pdf]"`. Without the renderer, the UI explicitly reports that the image is unavailable and still links to the original PDF.
+- [Architecture](docs/architecture.md): modules, HTTP API, live events and how to extend them.
+- [Using the interface](docs/learning-ui.md): pause, regenerate, side questions, practice, recovery and troubleshooting.
+- [Domain glossary](GLOSSARY.md) and [decisions](docs/adr/).
+- Earlier specifications, reviews and experiments are kept in [docs/archive](docs/archive/).
 
-## Prepared local quantum course
+Frontend work happens in `web/` (Svelte 5, Vite, TypeScript):
 
-`work/courses/quantum-v1` registers six actual lecture documents and two exercise documents, totaling 231 pages, with 45 candidate concepts, 23 exercise subrequirements, and eight source-linked notation entries. Input copies are in `work/course-inputs/quantum`; runtime access does not depend on the original note application's directory.
+```sh
+cd web
+npm install
+GL_HOST=http://127.0.0.1:8765 npm run dev   # hot-reloading UI against a running host
+npm run check                               # type check
+npm run build                               # writes guided_learning/web_dist (commit the result)
+npx playwright test                         # browser tests against disposable fixture courses
+```
 
-**This is a candidate coverage map awaiting review.** Candidate mappings exist for 41 pages; 190 pages explicitly need review. Verification for all 231 pages remains pending. Only seven original PDF pages were spot-checked, which does not establish that all formulas, images, or concepts are verified. No personal old chats were imported and no artificial learning progress was created.
-
-Course materials and the database stay in local `work/` and are not distributed with Git. Other machines must supply materials and create their own courses. [Course import and review](docs/course-import.md) explains local import replay and new-course creation. [V1 acceptance](docs/acceptance-v1.md) distinguishes program tests, real materials, teaching replay, and Luna checks.
-
-## Design and development
-
-- [V1 proposal](docs/v1-spec.md), [implementation specification](docs/implementation-spec.md), [task breakdown](docs/implementation-plan.md)
-- [Design interview](docs/design-interview.md), [domain glossary](GLOSSARY.md), [state ownership ADR](docs/adr/0001-course-workspace-owns-learning-state.md)
-- [Earlier research](docs/research/) retains historical comparisons; the V1 proposal defines the final V1 scope.
-
-The project uses GitHub Issues; engineering instructions start at [AGENTS.md](AGENTS.md). It is independent of Obsidian, with no compatibility, export, or synchronization integration.
+The project uses GitHub Issues; engineering instructions start at [AGENTS.md](AGENTS.md).

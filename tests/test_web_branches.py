@@ -15,7 +15,7 @@ class Branches(unittest.TestCase):
 
     def test_teacher_suggestion_waits_for_consent_and_return_keeps_anchor(self):
         import threading
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 if 'Branch decision protocol' not in prompt:
@@ -27,17 +27,17 @@ class Branches(unittest.TestCase):
             execute(tmp, {'op':'course.init','title':'Quantum'})
             execute(tmp, {'op':'curriculum.save','concepts':[{'id':'state','title':'State'}],'route':['state'],'coverage':[]})
             execute(tmp, {'op':'mainline.enter','concept_id':'state','goal':'probability','next_step':'projection','request_id':'p'})
-            app=LearningApp(tmp,runner=Runner())
+            app=Host(tmp,runner=Runner())
             try:
                 app.start_turn({'id':'main','concept_id':'state','prompt':'Lecture'})
-                app.routes[('POST','/api/branches/ask')]({'id':'q','question':'Why?','selection':'|a|²','main_turn_id':'main','anchor':{'scroll_y':320}})
+                app.questions.ask({'id':'q','question':'Why?','selection':'|a|²','main_turn_id':'main','anchor':{'scroll_y':320}})
                 app.wait('branch:q',3)
                 branch=app.operation({'op':'branch.read','id':'q'})['branch']
                 self.assertEqual(branch['status'],'suggested')
                 self.assertEqual(app.operation({'op':'stream.read','id':'main'})['turn']['status'],'running')
-                app.routes[('POST','/api/branches/choose')]({'id':'q','choice':'accept'})
+                app.questions.choose('q','accept')
                 self.assertEqual(app.operation({'op':'stream.read','id':'main'})['turn']['status'],'paused')
-                returned=app.routes[('POST','/api/branches/return')]({'id':'q'})
+                returned=app.questions.return_to_mainline('q')
                 self.assertEqual(returned['branch']['anchor']['scroll_y'],320)
                 self.assertEqual(app.snapshot()['position']['next_step'],'projection')
             finally: app.close()
@@ -56,7 +56,7 @@ class Branches(unittest.TestCase):
             self.assertEqual(execute(tmp, {'op':'branch.read','id':'q'})['branch']['status'],'unanswered')
 
     def test_declining_supplement_is_idempotent_and_does_not_pause_main(self):
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 if 'Branch decision protocol' not in prompt:cancel.wait(3);return
@@ -66,12 +66,12 @@ class Branches(unittest.TestCase):
             execute(tmp, {'op':'course.init','title':'Quantum'})
             execute(tmp, {'op':'curriculum.save','concepts':[{'id':'state','title':'State'}],'route':['state'],'coverage':[]})
             execute(tmp, {'op':'mainline.enter','concept_id':'state','goal':'probability','next_step':'projection','request_id':'p'})
-            app=LearningApp(tmp,runner=Runner())
+            app=Host(tmp,runner=Runner())
             try:
                 app.start_turn({'id':'main','concept_id':'state','prompt':'Lecture'})
-                app.routes[('POST','/api/branches/ask')]({'id':'q','question':'Why?','main_turn_id':'main'})
+                app.questions.ask({'id':'q','question':'Why?','main_turn_id':'main'})
                 app.wait('branch:q',3)
-                for _ in range(2):app.routes[('POST','/api/branches/choose')]({'id':'q','choice':'decline'})
+                for _ in range(2):app.questions.choose('q','decline')
                 self.assertEqual(app.operation({'op':'stream.read','id':'main'})['turn']['status'],'running')
                 self.assertEqual(app.operation({'op':'branch.read','id':'q'})['branch']['choice'],'decline')
             finally:app.close()
@@ -110,7 +110,7 @@ class Branches(unittest.TestCase):
 
     def test_older_selected_lecture_freezes_context_and_attribution_separate_from_recovery(self):
         from pathlib import Path
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 emit({'kind':'final','text':'A saved explanation'});emit({'kind':'complete'})
@@ -122,12 +122,12 @@ class Branches(unittest.TestCase):
                 source=execute(tmp,{'op':'source.register','path':str(p)})['source']
                 refs.append({'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'})
             execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'Old','links':[refs[0]]},{'id':'b','title':'New','links':[refs[1]]}],'route':['a','b'],'coverage':[]})
-            app=LearningApp(tmp,runner=Runner())
+            app=Host(tmp,runner=Runner())
             try:
                 for concept in ('a','b'):
                     execute(tmp,{'op':'mainline.enter','concept_id':concept,'goal':concept,'next_step':'practice','request_id':concept})
                     app.start_turn({'id':concept,'concept_id':concept,'prompt':'Explain '+concept});app.wait(concept,3)
-                ask=app.routes[('POST','/api/branches/ask')]
+                ask=app.questions.ask
                 branch=ask({'id':'q','question':'Old passage?','selection':'saved','selected_turn_id':'a','main_turn_id':'b'})['branch']
                 app.wait('branch:q',3)
                 self.assertEqual(branch['selected_turn_id'],'a')
@@ -142,13 +142,13 @@ class Branches(unittest.TestCase):
                 with self.assertRaises(ValueError):ask({'id':'stale','question':'?','main_turn_id':'a'})
                 with self.assertRaises(ValueError):ask({'id':'q','question':'Old passage?','selection':'saved','selected_turn_id':'b','main_turn_id':'b'})
                 execute(tmp,{'op':'mainline.enter','concept_id':'a','goal':'later','next_step':'practice','request_id':'later'})
-                app.routes[('POST','/api/branches/return')]({'id':'q'})
+                app.questions.return_to_mainline('q')
                 self.assertEqual(app.snapshot()['position']['goal'],'later')
                 self.assertEqual(app.operation({'op':'branch.read','id':'q'})['branch']['selected_lecture'],branch['selected_lecture'])
             finally:app.close()
 
     def test_interrupted_supplement_reopens_and_completes_once(self):
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 emit({'kind':'final','text':'Recovered complete supplement'});emit({'kind':'complete'})
@@ -164,7 +164,7 @@ class Branches(unittest.TestCase):
             execute(tmp,{'op':'branch.choose','id':'q','choice':'accept'})
             execute(tmp,{'op':'stream.start','id':'supplement:q','concept_id':'a','prompt':'Explain foundation','channel':'sidequestion','record_user':False})
             execute(tmp,{'op':'stream.event','id':'supplement:q','attempt':1,'sequence':1,'kind':'delta','text':'Partial explanation'})
-            app=LearningApp(tmp,runner=Runner())
+            app=Host(tmp,runner=Runner())
             try:
                 self.assertEqual(app.operation({'op':'stream.read','id':'supplement:q'})['turn']['status'],'interrupted')
                 app.resume_turn('supplement:q','retry');app.wait('supplement:q',3)

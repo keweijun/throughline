@@ -2,7 +2,8 @@
 import json,tempfile
 from pathlib import Path
 from guided_learning.api import execute
-from guided_learning.web import create_server
+from guided_learning.providers import ProviderSettings
+from guided_learning.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Practice continuity'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Original section'},{'id':'b','title':'Next section'}],'route':['a','b'],'coverage':[]})
@@ -19,6 +20,5 @@ for index,outcome in ((2,'needs_work'),(3,'passed')):
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
   emit({'kind':'final','text':'New section explanation'});emit({'kind':'complete'})
-server=create_server(root,port=0,runner=Runner());print(server.server_port,flush=True)
-try:server.serve_forever()
-finally:server.server_close();scratch.cleanup()
+try:serve(root,port=0,runner=Runner(),settings=ProviderSettings(Path(root)/'providers.json'),on_ready=lambda port:print(port,flush=True))
+finally:scratch.cleanup()

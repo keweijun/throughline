@@ -1,6 +1,6 @@
 import { test, expect, dragSelect } from './fixture';
 
-test('ask about a selected passage, then return to the same reading position', async ({ page, course }) => {
+test('ask about a selected passage, then return to that passage', async ({ page, course }) => {
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(30);
@@ -8,7 +8,6 @@ test('ask about a selected passage, then return to the same reading position', a
   await expect(page.locator('details.overview')).toBeVisible();
   const excerpt = await dragSelect(page, paragraph);
   expect(excerpt.trim().length).toBeGreaterThan(5);
-  const anchor = await page.evaluate(() => window.scrollY);
 
   await page.getByRole('button', { name: 'Ask about this passage' }).click();
   await expect(page.locator('#branch-selection')).toHaveText(excerpt.trim());
@@ -19,10 +18,11 @@ test('ask about a selected passage, then return to the same reading position', a
   await expect(thread).toContainText('What does this sentence mean?');
   await expect(thread.locator('.answer')).toContainText('complete lesson paragraph');
 
-  await page.mouse.wheel(0, -2000);
-  await thread.getByRole('button', { name: 'Return to the lesson' }).click();
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(anchor - 3);
-  expect(Math.abs((await page.evaluate(() => window.scrollY)) - anchor)).toBeLessThan(3);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect(paragraph).not.toBeInViewport();
+  // The passage repeats in many paragraphs; returning picks the one the learner was reading.
+  await thread.getByRole('button', { name: 'Back to the passage' }).click();
+  await expect(paragraph).toBeInViewport();
 });
 
 test('a formula selection keeps its original TeX and the quote can be removed', async ({ page, course }) => {

@@ -49,7 +49,7 @@ export type Question = {
   id: string;
   question: string;
   selection: string;
-  anchor: { scroll_y?: number };
+  anchor: { scroll_y?: number; concept_id?: string | null };
   restore_point: Position;
   main_turn_id: string | null;
   selected_turn_id: string | null;
@@ -102,6 +102,15 @@ export type Settings = {
   path: string;
 };
 
+export type DeferredExplanation = {
+  id: string;
+  target_concept_id: string;
+  status: 'pending' | 'resolved';
+  question: string;
+  provisional_answer: string;
+  answer_interaction_id?: string;
+};
+
 export type Interaction = { id: string; role: 'user' | 'assistant'; text: string; concept_id?: string };
 
 export type State = {
@@ -115,6 +124,7 @@ export type State = {
     unanswered_questions: unknown[];
     due_explanations: unknown[];
   };
+  deferred_explanations: DeferredExplanation[];
   turns: Turn[];
   questions: Question[];
   practice: { tasks: Task[]; jobs: PracticeJob[] };
@@ -137,6 +147,7 @@ export type Preview = {
   next_concept_id: string | null;
   overview: Overview;
   sources: (Ref & { verification: string; stale?: boolean; locator?: { page?: number; line?: number } })[];
+  set_aside: (Ref & { disposition: 'deferred' | 'needs_review'; reason: string })[];
 };
 
 export type SourceView = Ref & {

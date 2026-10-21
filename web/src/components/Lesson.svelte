@@ -48,7 +48,7 @@
   }
 </script>
 
-<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? t('Lesson {number}', { number }) : 'Lesson'}>
+<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? t('Lesson {number}', { number }) : t('Lesson')}>
   <div class="meta">
     {#if lessons.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}
     {#if turn.status === 'running'}

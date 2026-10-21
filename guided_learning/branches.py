@@ -53,8 +53,13 @@ def decide(store,request):
     if decision['suggest_supplement'] and not str(decision.get('supplement_goal','')).strip():
         raise OperationError('invalid_decision','Supplement goal required')
     if decision['category']=='future' and decision['depth']=='short':
-        create_deferred(store,{'id':'web:'+branch['id'],'interaction_id':'stream-user:'+branch['turn_id'],
-            'provisional_answer_interaction_id':'stream:'+branch['turn_id'],'target_concept_id':decision.get('target_concept_id')})
+        try:
+            create_deferred(store,{'id':'web:'+branch['id'],'interaction_id':'stream-user:'+branch['turn_id'],
+                'provisional_answer_interaction_id':'stream:'+branch['turn_id'],'target_concept_id':decision.get('target_concept_id')})
+        except OperationError as exc:
+            # An unknown target section loses only the schedule, never the answer's route note.
+            if exc.code not in ('invalid_request','unknown_concept'): raise
+            decision={**decision,'target_concept_id':None}
     branch.update(decision=decision,status='suggested' if decision['suggest_supplement'] else 'answered')
     store.put('web_branches',branch['id'],branch)
     return {'branch':branch}

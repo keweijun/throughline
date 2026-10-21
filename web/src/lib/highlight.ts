@@ -8,7 +8,11 @@ function publish() {
   else CSS.highlights.delete('asked');
 }
 
-function find(root: HTMLElement, needle: string): Range | null {
+/**
+ * Finds a passage in rendered text, ignoring whitespace differences, formulas and citation chips.
+ * When the passage occurs more than once, `nearY` (a page offset) picks the occurrence closest to it.
+ */
+export function locate(root: HTMLElement, needle: string, nearY?: number): Range | null {
   const target = needle.replace(/\s+/g, ' ').trim();
   if (target.length < 3) return null;
   const nodes: Text[] = [];
@@ -28,19 +32,30 @@ function find(root: HTMLElement, needle: string): Range | null {
       map.push([node, i]);
     }
   }
-  const start = flat.indexOf(target);
+  const toRange = (start: number) => {
+    const [startNode, startOffset] = map[start];
+    const [endNode, endOffset] = map[start + target.length - 1];
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset + 1);
+    return range;
+  };
+  let start = flat.indexOf(target);
   if (start < 0) return null;
-  const [startNode, startOffset] = map[start];
-  const [endNode, endOffset] = map[start + target.length - 1];
-  const range = document.createRange();
-  range.setStart(startNode, startOffset);
-  range.setEnd(endNode, endOffset + 1);
-  return range;
+  if (nearY === undefined) return toRange(start);
+  let best: Range | null = null;
+  let distance = Infinity;
+  for (; start >= 0; start = flat.indexOf(target, start + 1)) {
+    const range = toRange(start);
+    const gap = Math.abs(range.getBoundingClientRect().top + window.scrollY - nearY);
+    if (gap < distance) [best, distance] = [range, gap];
+  }
+  return best;
 }
 
 /** Highlights each passage and returns its range (null when the passage is no longer in the text). */
 export function markAsked(key: string, root: HTMLElement, passages: string[]): (Range | null)[] {
-  const found = passages.map((p) => find(root, p));
+  const found = passages.map((p) => locate(root, p));
   ranges.set(key, found.filter((r): r is Range => r !== null));
   publish();
   return found;

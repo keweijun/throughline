@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { solved } from '../lib/format';
   import type { Preview } from '../lib/types';
   import UnitOverview from './UnitOverview.svelte';
   import Lesson from './Lesson.svelte';
@@ -15,6 +16,7 @@
   let { conceptId }: { conceptId: string | null } = $props();
 
   let preview = $state<Preview | null>(null);
+  let previewFailed = $state(false);
   let overviewOpen = $state(false);
 
   const concept = $derived(app.concept(conceptId));
@@ -24,6 +26,40 @@
   const lessons = $derived(app.lessons(conceptId));
   const position = $derived(app.state?.position);
   const seenKey = $derived(`overview-seen:${app.state?.course.id}:${conceptId}`);
+  const explanations = $derived(app.explanationsFor(conceptId));
+  const goal = $derived(
+    position?.goal ||
+      concept?.objective ||
+      concept?.goal ||
+      (preview?.overview.origin === 'teacher' ? preview.overview.target_ability : t("Read the lesson, then try the exercises")),
+  );
+
+  // The host records where a section starts; what to do next follows from the lessons and practice so far.
+  const nextStep = $derived.by(() => {
+    if (lessons.some((l) => l.status === 'running')) return t("Follow the lesson as it is written. Select any passage to ask about it.");
+    if (!lessons.some((l) => l.status === 'completed'))
+      return lessons.length ? t("Regenerate the unfinished lesson, or start a new one.") : t("Start the lesson for this section.");
+    const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.processed);
+    if (generating) return t("Exercises are being prepared from this lesson.");
+    const open = app.tasks(conceptId).filter((task) => !solved(task)).length;
+    const last = index === total - 1;
+    if (open === 1) return last ? t("Try the open exercise below.") : t("Try the open exercise below, or enter the next section.");
+    if (open) return last ? t("Try the {count} open exercises below.", { count: open }) : t("Try the {count} open exercises below, or enter the next section.", { count: open });
+    return last ? t("Review this section. It is the last one on the route.") : t("Enter the next section when you are ready.");
+  });
+
+  function openQuestion(id: string) {
+    app.focusThread = id.replace(/^web:/, '');
+    app.openPanel('questions');
+  }
+
+  // The first lesson opens with its own unit overview, so the route summary steps aside once teaching starts.
+  let hadLesson: boolean | null = null;
+  $effect(() => {
+    const has = app.hasLesson(conceptId);
+    if (has && hadLesson === false) overviewOpen = false;
+    hadLesson = has;
+  });
 
   onMount(async () => {
     if (!conceptId) return;
@@ -37,6 +73,7 @@
     try {
       preview = await api.get<Preview>(`/api/concepts/${encodeURIComponent(conceptId)}/preview`);
     } catch (e) {
+      previewFailed = true;
       app.error = (e as Error).message;
     }
   });
@@ -73,18 +110,18 @@
     <header class="head">
       <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
       <h1 id="concept-title">{concept.title}</h1>
-      {#if isCurrent && position}
+      {#if isCurrent}
         <dl class="position">
           <div>
             <dt>{t("Goal")}</dt>
-            <dd>{position.goal || preview?.overview.target_ability || t("Read the lesson, then try the exercises")}</dd>
+            <dd>{goal}</dd>
           </div>
           <div>
             <dt>{t("Next step")}</dt>
-            <dd>{position.next_step || t("Read the lesson, then try the exercises")}</dd>
+            <dd id="next-step">{nextStep}</dd>
           </div>
         </dl>
-        {#if position.progress}
+        {#if position?.progress}
           <details class="left-off">
             <summary>{t("Where you left off")}</summary>
             <p>{position.progress}</p>
@@ -93,6 +130,32 @@
       {/if}
     </header>
 
+    {#if explanations.length}
+      <section class="saved" aria-labelledby="saved-title">
+        <h2 id="saved-title">{t("Saved for this section")}</h2>
+        <p class="note">
+          {#if explanations.some((e) => e.status === 'pending')}
+            {t("You asked these earlier and got a short answer. The full explanation is part of this section's lesson.")}
+          {:else}
+            {t("Questions from earlier sections that this section's lesson explained in full.")}
+          {/if}
+        </p>
+        <ul>
+          {#each explanations as item (item.id)}
+            <li>
+              <span class="chip chip-{item.status === 'pending' ? 'accent' : 'good'}">
+                {item.status === 'pending' ? t("Explanation pending") : t("Explained")}
+              </span>
+              <span class="question">{item.question}</span>
+              {#if item.id.startsWith('web:')}
+                <button class="btn btn-quiet btn-small" onclick={() => openQuestion(item.id)}>{t("Open question")}</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if preview}
       <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
         <summary>
@@ -100,6 +163,8 @@
         </summary>
         <UnitOverview {preview} />
       </details>
+    {:else if !previewFailed}
+      <p class="overview loading" aria-busy="true">{t("Loading the section overview…")}</p>
     {/if}
 
     {#if lessons.length}
@@ -229,6 +294,50 @@
 
   .overview[open] summary {
     margin-bottom: 0.9rem;
+  }
+
+  .overview.loading {
+    color: var(--pencil);
+    font-size: var(--step-0);
+  }
+
+  .saved {
+    margin-bottom: 2rem;
+    padding: 0.85rem 1.1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+  }
+
+  .saved h2 {
+    font-size: var(--step-0);
+    font-weight: 600;
+  }
+
+  .saved .note {
+    margin-top: 0.2rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .saved ul {
+    margin: 0.6rem 0 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .saved li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: var(--step-0);
+  }
+
+  .saved .question {
+    flex: 1 1 14rem;
   }
 
   .lessons {

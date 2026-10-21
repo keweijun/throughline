@@ -41,13 +41,24 @@
     requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
+  let settle: ReturnType<typeof setTimeout> | undefined;
+
   function onSelectionChange() {
-    if (!window.getSelection()?.toString().trim()) visible = false;
+    if (!window.getSelection()?.toString().trim()) {
+      visible = false;
+      return;
+    }
+    // Touch selections arrive through handle drags rather than mouseup, so offer the button once the selection settles.
+    if (matchMedia('(pointer: coarse)').matches) {
+      clearTimeout(settle);
+      settle = setTimeout(capture, 450);
+    }
   }
 </script>
 
 <svelte:document
   onmouseup={() => setTimeout(capture)}
+  ontouchend={() => setTimeout(capture, 50)}
   onkeyup={(e) => (e.key === 'Shift' || e.key.startsWith('Arrow')) && capture()}
   onselectionchange={onSelectionChange}
 />

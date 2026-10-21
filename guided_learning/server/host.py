@@ -113,6 +113,7 @@ class Host:
                 **self.operation({'op': 'preferences.view'}),
                 'curriculum': self.operation({'op': 'curriculum.view'}),
                 'session': self.operation({'op': 'session.resume', 'recent_limit': 20}),
+                'deferred_explanations': self.operation({'op': 'deferred.list'})['deferred_explanations'],
                 'turns': self.turns()}
 
     def set_language(self, language):
@@ -166,7 +167,7 @@ class Host:
                 first = next(c for c in curriculum['concepts'] if c['id'] == curriculum['route'][0])
                 chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
                 self.operation({'op': 'mainline.enter', 'request_id': str(uuid.uuid4()), 'concept_id': first['id'],
-                                'goal': first.get('objective') or first.get('goal') or ('理解' if chinese else 'Understand ') + first['title'],
+                                'goal': prompts.section_goal(first, chinese),
                                 'next_step': '阅读讲解，然后尝试练习' if chinese else 'Read the lesson, then try the exercises'})
                 position = self.operation({'op': 'course.status'})['position']
             prompt = (body.get('prompt') or '').strip() or prompts.DEFAULT_LESSON_REQUEST

@@ -2,7 +2,8 @@
 from pathlib import Path
 import tempfile
 from guided_learning.api import execute
-from guided_learning.web import create_server
+from guided_learning.server.settings import TeacherSettings
+from guided_learning.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Recovery regression'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Older lesson'},{'id':'b','title':'Current lesson'}],'route':['a','b'],'coverage':[]})
@@ -24,6 +25,5 @@ class Runner:
   if 'The learner accepted the supplement' in prompt:
    emit({'kind':'delta','text':'Regenerated supplement is still running.'});cancel.wait(20);return
   emit({'kind':'final','text':'Answer about the selected passage.'});emit({'kind':'complete'})
-server=create_server(root,port=0,runner=Runner());print(server.server_port,flush=True)
-try:server.serve_forever()
-finally:server.server_close();scratch.cleanup()
+try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
+finally:scratch.cleanup()

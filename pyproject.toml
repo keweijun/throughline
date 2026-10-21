@@ -4,19 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-guided-learning"
-version = "0.1.0"
+version = "0.3.0"
 description = "Local, transactional course workspace for cross-document guided learning"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
 
 [project.optional-dependencies]
 pdf = ["pypdf>=6,<7", "pypdfium2>=5,<6", "Pillow>=11,<13"]
 
 [project.scripts]
 guided-learning = "guided_learning.__main__:main"
+guided-learning-web = "guided_learning.web:main"
 
 [tool.setuptools.packages.find]
 include = ["guided_learning*"]
 
 [tool.setuptools.package-data]
-guided_learning = ["web_static/*", "web_static/vendor/*", "web_static/vendor/*/*", "web_static/vendor/katex/fonts/*"]
+guided_learning = ["web_dist/*", "web_dist/assets/*"]

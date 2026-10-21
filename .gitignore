@@ -8,3 +8,10 @@ __pycache__/
 node_modules/
 .DS_Store
 Thumbs.db
+
+*.egg-info/
+build/
+dist/
+*.sqlite3
+*.sqlite3-journal
+.playwright-mcp/

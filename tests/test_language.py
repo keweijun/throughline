@@ -3,7 +3,8 @@ import time
 import unittest
 from guided_learning.api import execute
 from guided_learning.store import OperationError
-from guided_learning.web import LearningApp
+from guided_learning.server import Host
+from tests.support import host_client
 
 
 class LanguagePreferences(unittest.TestCase):
@@ -61,29 +62,36 @@ class LanguagePreferences(unittest.TestCase):
         self.assertIsNone(changed['ready']);self.assertEqual(changed['jobs'][0]['status'],'stale')
         self.assertEqual(self.op(op='preparation.enqueue',id='prep-zh')['job']['snapshot']['language'],'zh-CN')
 
-    def test_model_prompts_use_selected_language_across_channels_and_reopen(self):
+    def test_http_language_selection_reaches_teacher_and_survives_reopen(self):
+        import threading
         class Runner:
-            def run(self,prompt,cwd,emit,cancel):cancel.wait(1)
-        app=LearningApp(self.path,runner=Runner())
-        try:
-            self.assertEqual(app.snapshot()['preferences']['language'],'en')
-            self.op(op='preferences.save',language='zh-CN')
-            for channel in ('mainline','sidequestion','practice','preparation'):
-                turn=self.op(op='stream.start',id=channel,concept_id='a',prompt='Explain',channel=channel)['turn']
-                # Prompt generation is read-only and all channels share the language boundary.
-                if channel in ('practice','preparation'):
-                    hooks=app.prompt_hooks;app.prompt_hooks=[]
-                    try:prompt=app.build_prompt(turn)
-                    finally:app.prompt_hooks=hooks
-                else:prompt=app.build_prompt(turn)
-                self.assertIn('selected teaching language: Simplified Chinese',prompt)
-                self.assertIn('JSON field names/enumerated values unchanged',prompt)
-                self.assertIn('[Source source_id / unit_id]',prompt)
-            self.assertIn('## \u5355\u5143\u5bfc\u89c8',app.build_prompt(self.op(op='stream.read',id='mainline')['turn']))
-        finally:app.close()
-        reopened=LearningApp(self.path,runner=Runner())
-        try:self.assertEqual(reopened.snapshot()['preferences']['language'],'zh-CN')
-        finally:reopened.close()
+            def __init__(self):
+                self.prompts=[]
+                self.received=threading.Event()
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt)
+                self.received.set()
+                cancel.wait(3)
+        runner=Runner()
+        client,host=host_client(self.path,runner=runner)
+        with client:
+            self.assertEqual(client.get('/api/state').json()['preferences']['language'],'en')
+            self.assertEqual(client.put('/api/preferences',json={'language':'zh-CN'}).status_code,200)
+            self.assertEqual(client.put('/api/preferences',json={'language':'xx'}).status_code,400)
+            turn=client.post('/api/lessons',json={'id':'lesson'}).json()['turn']
+            self.assertTrue(runner.received.wait(2))
+            self.assertEqual(turn['language'],'zh-CN')
+            self.assertIn('selected teaching language: Simplified Chinese',runner.prompts[0])
+            self.assertIn('## 单元导览',runner.prompts[0])
+            self.assertIn('JSON field names/enumerated values unchanged',runner.prompts[0])
+            client.put('/api/preferences',json={'language':'en'})
+            self.assertEqual(self.op(op='stream.read',id='lesson')['turn']['language'],'zh-CN')
+            client.put('/api/preferences',json={'language':'zh-CN'})
+        reopened,host=host_client(self.path,runner=Runner())
+        with reopened:
+            self.assertEqual(reopened.get('/api/state').json()['preferences']['language'],'zh-CN')
+            self.assertFalse(self.op(op='evidence.view',concept_id='a')['independently_verified'])
+
 
     def test_failure_in_previous_language_does_not_block_new_preparation(self):
         class Runner:
@@ -91,7 +99,7 @@ class LanguagePreferences(unittest.TestCase):
                 if 'selected teaching language: English' in prompt:raise RuntimeError('Synthetic English failure')
                 emit({'kind':'final','text':'Chinese preparation'});emit({'kind':'complete'})
         self.op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
-        app=LearningApp(self.path,runner=Runner())
+        app=Host(self.path,runner=Runner())
         try:
             def wait_for(status):
                 deadline=time.monotonic()+4

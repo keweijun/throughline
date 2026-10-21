@@ -45,7 +45,7 @@ class PreparationState(unittest.TestCase):
     def test_idle_pipeline_preempted_by_foreground_and_ready_is_injected(self):
         import threading
         import time
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             entered=threading.Event();release=threading.Event();cancelled=threading.Event()
             prompts=[]
@@ -62,7 +62,7 @@ class PreparationState(unittest.TestCase):
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
-            runner=Runner();app=LearningApp(path,runner=runner)
+            runner=Runner();app=Host(path,runner=runner)
             try:
                 self.assertTrue(runner.entered.wait(3),'automatic next-section preparation must start')
                 foreground=app.start_turn({'concept_id':'a','channel':'sidequestion','prompt':'Small question'})['turn']
@@ -71,7 +71,7 @@ class PreparationState(unittest.TestCase):
                 runner.release.set()
                 deadline=time.time()+4
                 while time.time()<deadline:
-                    state=app.routes[('GET','/api/preparation')]('')
+                    state=app.preparation.state()
                     if any(j['status']=='ready' for j in state['jobs']):break
                     time.sleep(.05)
                 self.assertTrue(any(j['status']=='ready' for j in state['jobs']))
@@ -83,7 +83,7 @@ class PreparationState(unittest.TestCase):
 
     def test_failed_preparation_falls_back_and_shutdown_does_not_schedule(self):
         import time
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         class Runner:
             prompts=[]
             def run(self,prompt,cwd,emit,cancel):
@@ -94,29 +94,29 @@ class PreparationState(unittest.TestCase):
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
-            runner=Runner();app=LearningApp(path,runner=runner)
+            runner=Runner();app=Host(path,runner=runner)
             deadline=time.time()+3
             while time.time()<deadline:
-                jobs=app.routes[('GET','/api/preparation')]('')['jobs']
+                jobs=app.preparation.state()['jobs']
                 if jobs and jobs[-1]['status']=='failed':break
                 time.sleep(.03)
             self.assertEqual(jobs[-1]['status'],'failed')
             time.sleep(.5)
-            self.assertEqual(len(app.routes[('GET','/api/preparation')]('')['jobs']),1)
+            self.assertEqual(len(app.preparation.state()['jobs']),1)
             op(op='mainline.enter',request_id='next',concept_id='b',goal='B',next_step='explain')
             turn=app.start_turn({'concept_id':'b','channel':'sidequestion','prompt':'Explain'})['turn'];self.assertEqual(app.wait(turn['id'],3)['final_text'],'Teacher fallback')
             self.assertIn('Complete the necessary source checks',runner.prompts[-1]);app.close()
             count=len(runner.prompts);time.sleep(.5)
             self.assertEqual(len(runner.prompts),count)
-            self.assertFalse(app.routes[('POST','/api/preparation/schedule')]({})['scheduled'])
+            self.assertFalse(app.preparation.schedule()['scheduled'])
 
     def test_orphaned_preparation_recovers_as_failed(self):
-        from guided_learning.web import LearningApp
+        from guided_learning.server import Host
         with tempfile.TemporaryDirectory() as path:
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
             op(op='preparation.enqueue',id='crashed-before-launch')
-            app=LearningApp(path)
-            try:self.assertEqual(app.routes[('GET','/api/preparation')]('')['jobs'][0]['status'],'failed')
+            app=Host(path)
+            try:self.assertEqual(app.preparation.state()['jobs'][0]['status'],'failed')
             finally:app.close()

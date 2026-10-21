@@ -30,3 +30,15 @@ _Avoid_: Single reply, fixed page count, slide subheading.
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
+
+**Unit overview**: An introduction to related learning content explaining its core problem, main steps, connections, and target ability.
+_Avoid_: Contents alone, a list of concepts alone.
+
+**Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.
+_Avoid_: A second course with separate progress, a complete chat mirror.
+
+**Preparation material**: Goals, source checks, teaching points, examples, exercises, and uncertainty notes prepared for a learning section and used by the teacher during instruction.
+_Avoid_: A final script that must be read verbatim, evidence of learner mastery.
+
+**Preparation readiness**: The preparation material for a section is sufficient to begin teaching it.
+_Avoid_: Learning completed, mastered, all sources permanently valid.

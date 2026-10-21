@@ -1,6 +1,6 @@
 # Personal cross-document guided learning: V1 proposal
 
-Status: interview decisions confirmed; overall proposal awaiting final confirmation. This describes intended behavior rather than implemented functionality.
+Status: implemented with layered acceptance; see acceptance-v1.md. This preserves the confirmed design scope. See implementation-spec.md and implementation-plan.md for the specification and tasks.
 
 ## Goal and deliverables
 

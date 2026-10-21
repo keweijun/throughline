@@ -1,18 +1,86 @@
-# Codex Guided Learning
+# Guided Learning
 
-Personal cross-document guided learning using a Codex skill, an independent course workspace, and helper scripts. V1 prioritizes teaching continuity, material coverage, and route-aware question answering.
+Personal cross-document guided learning. A local course workspace keeps your sources, learning route, teaching mainline and actual learning evidence. A local web app teaches from it: streaming lessons with unit overviews, side questions about any passage, original source pages, section practice and background preparation of the next section. The teacher is your local Codex CLI, the same tool that prepares and registers your course documents.
 
-This branch is at the design and engineering-configuration stage; teaching functionality is not implemented here.
+The teacher makes instructional judgments from the materials. The program validates state and references; it never decides on its own that you have understood something.
 
-## Documents
+Documentation is in English. The language selector chooses English (default) or Simplified Chinese for the interface and new teaching requests. This preference is saved with the course. Imported materials and existing course records keep their original language; explicit language requests in a question are still honored.
 
-- [V1 proposal](docs/v1-spec.md): teaching behavior, state boundaries, and acceptance scenarios.
-- [Design interview](docs/design-interview.md): confirmed requirements and choices.
-- [Domain glossary](GLOSSARY.md): shared project terminology.
-- [Architecture decision](docs/adr/0001-course-workspace-owns-learning-state.md): the course workspace owns official learning state.
-- [Earlier research](docs/research/): framework comparisons and workflow analysis; the V1 proposal supersedes historical suggestions.
-- [Initial design archive](docs/archive/initial-design/): preserved early records.
+## Install
 
-The project lives at `F:\Projects\codex-guided-learning`. V1 is independent of Obsidian, with no compatibility, export, or synchronization integration.
+Requires Python 3.10+. From the repository root:
 
-Tasks use GitHub Issues. Start with [AGENTS.md](AGENTS.md) for engineering instructions and [docs/agents/](docs/agents/) for their rules; these configuration files can be edited directly.
+```sh
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
+.venv/bin/python -m unittest discover -s tests
+```
+
+The built interface ships inside the package (`guided_learning/web_dist`), so learners need neither Node.js nor internet access for the interface itself. Markdown, math and fonts are bundled.
+
+## Open a course
+
+```sh
+.venv/bin/python -m guided_learning.web --workspace work/courses/quantum-v1
+```
+
+Open http://127.0.0.1:8765. The host listens on loopback only and owns the course while it runs; press Ctrl+C to stop it. The course must already exist; see [course import](docs/course-import.md) to create one.
+
+Options:
+
+- `--port 8766` when 8765 is taken.
+- `--model NAME` and `--effort LEVEL` pick the Codex model and reasoning effort for this run only, without changing your saved choice.
+- `--config PATH` uses a different teacher settings file.
+
+## Choose the teacher model
+
+Lessons, answers and feedback are written by `codex app-server` on this computer, using your existing Codex sign-in and configuration. Open **Teacher settings** (the model name in the top bar) to set the model and reasoning effort; leave the model empty to use your Codex default. Settings live in your user config directory (`~/.config/guided-learning/settings.json`, or `%APPDATA%\guided-learning\settings.json` on Windows), never in a course folder, and apply to new requests only. See [ADR 0002](docs/adr/0002-codex-is-the-only-teacher.md).
+
+## Read sources
+
+Citations in lessons and exercises show the cited text on hover. Clicking one opens the built-in reader beside the lesson: PDFs open at the cited page with selectable text, zoom and page controls; Markdown notes open at the cited line. Select text in either reader to ask a side question about it. Drag the panel edge to resize it.
+
+## Use the Codex skill
+
+Open this project in Codex and invoke `$guided-learning`. The skill is at [.agents/skills/guided-learning/SKILL.md](.agents/skills/guided-learning/SKILL.md). It reads and updates the same course workspace through the operation entry point, which accepts JSON from a request file or standard input:
+
+```sh
+echo '{"op":"course.init","title":"My course"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
+echo '{"op":"session.resume"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
+```
+
+Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` with a nonzero exit code. Use `--request work/request.json` for long text or formulas. Position-changing operations `position.save` and `mainline.enter` need a unique `request_id`; reuse it only for retries.
+
+## What the course workspace keeps
+
+- PDF and Markdown sources with revision snapshots, reading issues and exact locations.
+- Cross-document concepts, prerequisite routes, notation and exercise mappings, with validated references, cycles and coverage dispositions.
+- The teaching mainline and side questions, with route-aware answer depth, foundation supplements and pending explanations.
+- Section practice with taught, self-reported, hinted, independent and retest evidence kept separate.
+- Deferred items, revisited when due without a mandatory quiz.
+
+Background preparation runs only while the host is running. Course materials and databases stay in local `work/` and are not tracked by Git. To move a course, stop the host and copy its whole directory.
+
+### Prepared local quantum course
+
+`work/courses/quantum-v1` registers six lecture documents and two exercise documents (231 pages) with 45 candidate concepts, 23 exercise subrequirements and eight source-linked notation entries. **It is a candidate coverage map awaiting review**: 41 pages have candidate mappings, 190 explicitly need review, and verification for all pages remains pending.
+
+## Development
+
+- [Architecture](docs/architecture.md): modules, HTTP API, live events and how to extend them.
+- [Using the interface](docs/learning-ui.md): pause, regenerate, side questions, practice, recovery and troubleshooting.
+- [Domain glossary](GLOSSARY.md) and [decisions](docs/adr/).
+- Earlier specifications, reviews and experiments are kept in [docs/archive](docs/archive/).
+
+Frontend work happens in `web/` (Svelte 5, Vite, TypeScript):
+
+```sh
+cd web
+npm install
+GL_HOST=http://127.0.0.1:8765 npm run dev   # hot-reloading UI against a running host
+npm run check                               # type check
+npm run build                               # writes guided_learning/web_dist (commit the result)
+npx playwright test                         # browser tests against disposable fixture courses
+```
+
+The project uses GitHub Issues; engineering instructions start at [AGENTS.md](AGENTS.md).

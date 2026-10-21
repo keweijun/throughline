@@ -1,6 +1,6 @@
 # Personal guided-learning workflow: design interview
 
-Status: design choices confirmed; awaiting confirmation of the overall proposal. Implementation has not begun.
+Status: design choices confirmed; V1 implementation and layered acceptance are complete, as recorded in acceptance-v1.md. This document preserves the interview decisions.
 
 This continues the earlier interview, archived under docs/archive/initial-design/. The project is now at F:\Projects\codex-guided-learning; the former directory retains only a historical copy.
 
@@ -54,6 +54,6 @@ Separate taught, self-reported understanding, answered, and independently passed
 
 ## Interview convergence
 
-No decision frontier remains. V1 boundaries are in v1-spec.md. Begin implementation after the user confirms shared understanding of the overall proposal.
+No decision frontier remained. V1 scope is in v1-spec.md. The user requested implementation preparation through ask-matt, followed by to-spec and to-tickets.
 
 After confirming these boundaries, summarize the proposal for shared understanding; proceed to implementation if no new branches arise. Choose the simplest reversible technical approach that satisfies the agreed rules rather than turning every internal detail into another interview question.

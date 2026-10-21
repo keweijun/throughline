@@ -12,9 +12,12 @@ New lessons, side answers, supplements, exercises, feedback and preparation use 
 
 ## Learning
 
-- **Route** (left): your current section is marked "You are here". Selecting another section previews it without moving your learning position; "Back to current section" returns.
+- **Route** (left): your current section is marked "You are here". Selecting another section previews it without moving your learning position; "Back to current section" returns. A section shows "saved questions" when earlier questions are waiting for their full explanation there.
+- **Goal and next step**: the top of the current section shows its goal and what to do next, following what has actually happened: start the lesson, follow it while it is written, try the open exercises, or move on. "Where you left off" appears when the course has a progress note.
 - **Start lesson**: the first lesson of a section opens with a unit overview and then teaches directly. Text streams in and is saved automatically when complete. "Ask for another pass" requests a new lesson in the same section.
-- **Side questions**: select a sentence or formula in a lesson and choose "Ask about this passage", or open Questions in the top bar. The lesson keeps going unless you tick "Pause the lesson while I ask". Passages you asked about stay highlighted, with a marker in the margin that opens the question. If the teacher suggests studying a foundation first, you decide; "Return to the lesson" scrolls back to where you asked.
+- **Side questions**: select a sentence or formula in a lesson and choose "Ask about this passage", or open Questions in the top bar. The lesson keeps going unless you tick "Pause the lesson while I ask". Passages you asked about stay highlighted, with a marker in the margin that opens the question. If the teacher suggests studying a foundation first, you decide. "Back to the passage" (or "Return to the lesson" for a question without a quoted passage) scrolls to what you asked about, even if the page has reflowed; it appears only while you are still in the section you asked from.
+- **Pending explanations**: when a question is answered briefly because a later section covers it properly, the thread says which section and links to it. That section lists the question under "Saved for this section", its lesson gives the full explanation, and the question is then marked "Explained".
+- **Set aside for now**: the section overview lists source material the course plan deferred or flagged for review, with the reason, so nothing silently disappears from the route.
 - **Sources**: hover over a citation to see the cited text. Click it to open the exact registered revision in the built-in reader: PDFs open at the cited page (outlined, with "Back to cited page" if you scroll away), with selectable text, zoom and fit-to-width; Markdown notes open at the highlighted line. Select text in the reader to ask about it. "Pending verification" stays visible even when the model cites the source. Drag the panel's left edge (or focus it and use the arrow keys) to resize it.
 - **Practice**: exercises are prepared after a lesson completes. "Check my answer" asks the teacher to assess; Hint, Key steps and Full solution are always available, but after any help a correct answer is recorded as solved with help, not on your own. "Do later" keeps an exercise open; open exercises from earlier sections follow you.
 - **Enter next section** moves your position; practice is optional.
@@ -26,7 +29,7 @@ The teacher is the Codex CLI on this computer. In Teacher settings choose the mo
 
 ## Keyboard shortcuts
 
-`/` ask a side question · `[` and `]` previous and next section · `s` show or hide the source reader · `?` list the shortcuts · `Esc` close a drawer or popup.
+`/` ask a side question · `[` and `]` previous and next section · `s` show or hide the source reader · `?` list the shortcuts · `Esc` close the route drawer, or the side panel when it covers the lesson.
 
 ## Pause, close and reopen
 

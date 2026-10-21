@@ -23,6 +23,10 @@ def base(turn):
     return prompt
 
 
+def section_goal(concept, chinese):
+    return concept.get('objective') or concept.get('goal') or ('理解' if chinese else 'Understand ') + concept['title']
+
+
 DEFAULT_LESSON_REQUEST = 'Teach this section fully around the current goal: start with physical intuition, then explain the formulas and necessary derivations, and include an example.'
 
 LESSON_CONTINUES = 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full unit overview.'
@@ -34,6 +38,13 @@ Organize the lesson using the supplied route, sources, and actual mainline goal.
 
 def first_lesson(language):
     return LESSON_FIRST.replace('## Unit overview', '## 单元导览') if language == 'zh-CN' else LESSON_FIRST
+
+
+def due_explanations(items):
+    questions = [{'question': i['question'], 'short_answer_already_given': i['provisional_answer']} for i in items]
+    return ('Pending explanations: earlier the learner asked these questions and received only a short answer, with the full explanation promised for this section. '
+            'Within this lesson, at the point where the material makes it natural, give each one its full explanation and say briefly that it answers the earlier question. '
+            'Do not repeat the short answer as if it were new (data): ' + json.dumps(questions, ensure_ascii=False))
 
 
 def question_context(branch, mainline_text):

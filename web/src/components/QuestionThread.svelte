@@ -12,6 +12,10 @@
   const answer = $derived(app.turn(question.turn_id));
   const supplement = $derived(app.turn(question.supplement_turn_id));
   const decision = $derived(question.decision);
+  const later = $derived(decision?.category === 'future' && decision.target_concept_id ? app.concept(decision.target_concept_id) : undefined);
+  const scheduled = $derived(app.state?.deferred_explanations.find((e) => e.id === `web:${question.id}`));
+  // Returning restores reading inside the section the question was asked from; once the route moves on there is nothing to return to.
+  const canReturn = $derived(question.restore_point?.concept_id === app.currentId);
   const categories: Record<string, string> = {
     local: 'about this passage',
     prerequisite: 'a missing foundation',
@@ -40,8 +44,12 @@
     const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/return`));
     if (!result) return;
     if (matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
-    app.view(app.currentId!);
-    requestAnimationFrame(() => window.scrollTo({ top: question.anchor?.scroll_y ?? 0, behavior: 'instant' }));
+    await app.returnTo(question);
+  }
+
+  function previewLater() {
+    if (matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+    app.view(later!.id);
   }
 </script>
 
@@ -66,8 +74,20 @@
       {decision.depth === 'short' ? t("Short answer") : t("Detailed answer")}, {diagnostic(categories[decision.category] ?? decision.category)}.
       <span>{decision.rationale}</span>
     </p>
+    {#if later}
+      <p class="later">
+        {#if scheduled?.status === 'resolved'}
+          {t("Explained in full in {section}.", { section: later.title })}
+        {:else}
+          {t("The full explanation is saved for {section}.", { section: later.title })}
+        {/if}
+        {#if later.id !== app.viewingId}
+          <button class="btn btn-quiet btn-small" onclick={previewLater}>{t("Look at that section")}</button>
+        {/if}
+      </p>
+    {/if}
   {:else if answer?.status === 'completed'}
-    <p class="decision">{t("Answer saved, but the teacher's route note is missing, so this question stays open.")}</p>
+    <p class="decision">{t("Answered. The teacher did not say how this question fits the route, so it is not scheduled for a later section.")}</p>
   {/if}
 
   {#if question.status === 'suggested' && decision}
@@ -95,9 +115,13 @@
     </section>
   {/if}
 
-  <div class="row end">
-    <button class="btn btn-quiet btn-small" onclick={backToLesson}>{t("Return to the lesson")}</button>
-  </div>
+  {#if canReturn}
+    <div class="row end">
+      <button class="btn btn-quiet btn-small" onclick={backToLesson}>
+        {question.selection && question.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
+      </button>
+    </div>
+  {/if}
 </article>
 
 <style>
@@ -159,6 +183,19 @@
   .decision {
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .later {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.5rem;
+    font-size: var(--step--1);
+    color: var(--accent);
+  }
+
+  .later .btn {
+    padding-left: 0;
   }
 
   .suggest {

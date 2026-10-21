@@ -1,9 +1,17 @@
 <script lang="ts">
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { solved } from '../lib/format';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const currentIndex = $derived(app.routeIndex(app.currentId));
+  const saved = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const item of app.state?.deferred_explanations ?? []) {
+      if (item.status === 'pending') counts.set(item.target_concept_id, (counts.get(item.target_concept_id) ?? 0) + 1);
+    }
+    return counts;
+  });
   const prepared = $derived(
     new Set((app.state?.preparation.jobs ?? []).filter((j) => j.status === 'ready').map((j) => j.concept_id)),
   );
@@ -12,7 +20,7 @@
     for (const task of app.state?.practice.tasks ?? []) {
       const entry = counts.get(task.concept_id) ?? { solved: 0, total: 0 };
       entry.total += 1;
-      if (task.history.filter((h) => h.action === 'assess').at(-1)?.outcome === 'passed') entry.solved += 1;
+      if (solved(task)) entry.solved += 1;
       counts.set(task.concept_id, entry);
     }
     return counts;
@@ -46,6 +54,7 @@
       {@const concept = app.concept(id)}
       {@const status = stateOf(id, index)}
       {@const count = exercises.get(id)}
+      {@const waiting = saved.get(id)}
       <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
         <span class="node" aria-hidden="true"></span>
         <button
@@ -54,10 +63,11 @@
           onclick={() => app.view(id)}
         >
           <span class="name">{concept?.title ?? id}</span>
-          {#if status === 'current' || count || prepared.has(id)}
+          {#if status === 'current' || count || waiting || prepared.has(id)}
             <span class="meta">
               {#if status === 'current'}<span>{t("You are here")}</span>{/if}
               {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
+              {#if waiting}<span class="saved">{waiting === 1 ? t("1 saved question") : t("{count} saved questions", { count: waiting })}</span>{/if}
               {#if prepared.has(id) && status !== 'current'}<span>{t("Prepared")}</span>{/if}
             </span>
           {/if}
@@ -190,6 +200,10 @@
     gap: 0 0.6rem;
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .meta .saved {
+    color: var(--accent);
   }
 
   .settings {

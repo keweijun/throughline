@@ -103,6 +103,8 @@ class Navigation(Feature):
             'target_ability': overview.get('target_ability') or concept.get('objective') or concept.get('goal') or f'Explain {title} and apply it to related problems',
             'origin': 'teacher' if overview else 'route_summary',
         }
+        context['set_aside'] = [{**{k: m[k] for k in ('source_id', 'revision', 'unit_id')}, 'disposition': m['disposition'], 'reason': m.get('reason', '')}
+                                for m in model['coverage'] if m.get('disposition') in ('deferred', 'needs_review') and concept['id'] in m.get('concept_ids', [])]
         for source in context['sources']:
             mapping = next((m for m in model['coverage'] if matching_ref(m, source)), {})
             source['verification'] = mapping.get('verification', 'pending')
@@ -147,12 +149,30 @@ class Navigation(Feature):
                 'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
                 'document': None if kind == '.pdf' else [{'id': u['id'], 'text': u.get('text', '')} for u in snapshot['units']]}
 
+    def _due(self, turn):
+        # The explanations frozen into this turn's snapshot are the ones this lesson was asked to give.
+        due = {i['id'] for i in (turn.get('prompt_snapshot') or {}).get('session', {}).get('due_explanations', [])}
+        return [i for i in self.operation({'op': 'deferred.list'})['deferred_explanations'] if i['id'] in due]
+
     def prompt(self, turn, context):
         if turn['channel'] != 'mainline':
             return ''
         earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
-        return prompts.LESSON_CONTINUES if earlier else prompts.first_lesson(turn.get('language', 'en'))
+        text = prompts.LESSON_CONTINUES if earlier else prompts.first_lesson(turn.get('language', 'en'))
+        due = [i for i in self._due(turn) if i['status'] == 'pending']
+        return text + '\n' + prompts.due_explanations(due) if due else text
+
+    def on_complete(self, turn):
+        if turn['channel'] != 'mainline':
+            return
+        for item in self._due(turn):
+            if item['status'] != 'pending':
+                continue
+            try:
+                self.operation({'op': 'deferred.resolve', 'id': item['id'], 'answer_interaction_id': 'stream:' + turn['id']})
+            except OperationError:
+                continue
 
 
 class Questions(Feature):
@@ -307,9 +327,9 @@ class Practice(Feature):
                 if turn['concept_id'] == concept_id and turn['status'] == 'running':
                     self.host.pause_turn(turn['id'])
             concept = self.operation({'op': 'curriculum.context', 'concept_id': target})['concept']
-            language = self.operation({'op': 'preferences.view'})['preferences']['language']
+            chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
             result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': target,
-                                     'goal': concept['title'], 'next_step': '开始本小节讲解' if language == 'zh-CN' else 'Begin teaching this section', 'progress': ''})
+                                     'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''})
             self.host.changed()
             return result
 

@@ -190,6 +190,18 @@ def create_deferred(store, request):
 
 OPERATIONS['deferred.create'] = create_deferred
 
+
+def list_deferred(store, request):
+    """Pending explanations with the question and the provisional answer the learner already saw."""
+    items = []
+    for item in store.list('deferred_explanations'):
+        question = store.get('interactions', item['interaction_id']) or {}
+        provisional = store.get('interactions', item['provisional_answer_interaction_id']) or {}
+        items.append({**item, 'question': question.get('text', ''), 'provisional_answer': provisional.get('text', '')})
+    return {'deferred_explanations': items}
+
+OPERATIONS['deferred.list'] = list_deferred
+
 def read_interaction(store, request):
     value = store.get('interactions', require_text(request, 'id'))
     if value is None:

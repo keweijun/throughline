@@ -23,7 +23,7 @@
         selection: quote ? (quote.source ? `${quote.text}\n(${quote.source})` : quote.text) : '',
         selected_turn_id: quote?.turnId ?? null,
         main_turn_id: currentLesson?.id ?? null,
-        anchor: { scroll_y: quote?.scrollY ?? window.scrollY },
+        anchor: { scroll_y: quote?.scrollY ?? window.scrollY, concept_id: app.viewingId },
         pause,
       }),
     );

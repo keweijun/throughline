@@ -1,6 +1,8 @@
+import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
-import type { HostEvent, Preview, Ref, SourceView, State, Turn } from './types';
+import { locate } from './highlight';
+import type { HostEvent, Question, Ref, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -24,7 +26,6 @@ class AppStore {
 
   /** Concept shown in the reading column; null follows the formal position. */
   viewing = $state<string | null>(null);
-  preview = $state<Preview | null>(null);
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -158,13 +159,30 @@ class AppStore {
     window.scrollTo({ top: 0 });
   }
 
-  async loadPreview(conceptId: string) {
-    this.preview = null;
-    try {
-      this.preview = await api.get<Preview>(`/api/concepts/${encodeURIComponent(conceptId)}/preview`);
-    } catch (e) {
-      this.error = (e as Error).message;
-    }
+  /** Brings the reading column back to the passage a question was about, falling back to where the learner was reading. */
+  async returnTo(question: Question) {
+    if (this.currentId) this.view(this.currentId);
+    await tick();
+    requestAnimationFrame(() => {
+      const lesson = document.getElementById(`turn-${question.selected_turn_id ?? question.main_turn_id}`);
+      const body = lesson?.querySelector<HTMLElement>('.lesson-body');
+      const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
+      const near = sameSection ? question.anchor.scroll_y! + window.innerHeight / 2 : undefined;
+      const range = body && question.selection ? locate(body, question.selection, near) : null;
+      let top: number | null = null;
+      if (range) top = range.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
+      else if (sameSection) top = question.anchor.scroll_y!;
+      else if (lesson) top = lesson.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top: Math.max(0, top ?? 0), behavior: 'instant' });
+    });
+  }
+
+  explanationsFor(conceptId: string | null) {
+    return (this.state?.deferred_explanations ?? []).filter((e) => e.target_concept_id === conceptId);
+  }
+
+  tasks(conceptId: string | null): Task[] {
+    return (this.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId);
   }
 
   openPanel(tab: PanelTab) {

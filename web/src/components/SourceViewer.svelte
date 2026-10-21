@@ -9,13 +9,14 @@
   const v = $derived(verification(s?.verification));
   const page = $derived(s?.locator?.page);
   const where = $derived(page ? t('Page {page}', { page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : t('Exact location missing'));
-  const label = $derived(s ? `${s.title}, ${page ? `p. ${page}` : `line ${s.locator?.line ?? '?'}`}` : '');
+  const label = $derived(s ? `${s.title}, ${page ? t('p. {page}', { page }) : t('line {line}', { line: s.locator?.line ?? '?' })}` : '');
 </script>
 
-<section class="source-view">
+<section class="source-view" aria-busy={app.sourceLoading}>
   {#if app.sourceLoading && !s}
     <p class="muted">{t("Opening the source…")}</p>
   {:else if s}
+    {#if app.sourceLoading}<p class="switching" role="status">{t("Opening the source…")}</p>{/if}
     <header>
       <h2>{s.title}</h2>
       <p class="meta">
@@ -65,6 +66,15 @@
   header {
     display: grid;
     gap: 0.35rem;
+  }
+
+  .switching {
+    align-self: flex-start;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-size: var(--step--1);
   }
 
   h2 {

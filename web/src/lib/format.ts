@@ -1,4 +1,4 @@
-import type { TurnStatus } from './types';
+import type { Task, TurnStatus } from './types';
 
 type Tone = 'good' | 'caution' | 'danger' | 'accent' | 'plain';
 
@@ -26,9 +26,4 @@ export const evidenceLabels: Record<string, string> = {
   needs_work: 'Needs another try',
 };
 
-export const sectionNumber = (index: number) => String(index + 1);
-
-export function minutes(seconds: number | undefined) {
-  if (!seconds) return '';
-  return seconds < 60 ? `${Math.round(seconds)} s` : `${Math.round(seconds / 60)} min`;
-}
+export const solved = (task: Task) => task.history.filter((h) => h.action === 'assess').at(-1)?.outcome === 'passed';

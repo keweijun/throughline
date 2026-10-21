@@ -20,7 +20,7 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
 
 - `host.py` — `Host` owns one workspace: takes the single-host lease, marks turns left `running` by a crash as `interrupted`, and runs every model turn through `start_turn` / `pause_turn` / `resume_turn`. Each turn attempt runs in its own thread; runner events become `stream.event` operations, and the `EventBus` publishes `delta`, `turn` and `changed` events.
 - `features.py` — the four features, each a class with optional `prompt(turn, context)`, `before_start(request)` and `on_complete(turn)`:
-  - `Navigation`: concept previews and exact-revision source views (Markdown text, PDF page PNG, original PDF).
+  - `Navigation`: concept previews (including source material the course plan set aside for the section) and exact-revision source views (Markdown text, PDF page PNG, original PDF). It also delivers pending explanations: a mainline lesson in a section with due explanations is asked to give them in full, and they are resolved when that lesson completes.
   - `Questions`: side questions, the `<teaching-decision>` protocol, foundation supplements, return to the mainline.
   - `Practice`: exercise generation, hints/steps/solutions/assessment, deferral, entering the next section.
   - `Preparation`: idle-only preparation of the next section; foreground requests pause it.
@@ -37,12 +37,12 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/state` | Course, position, curriculum, session, turns, questions, practice, preparation, settings |
+| GET | `/api/state` | Course, position, curriculum, session, pending explanations, turns, questions, practice, preparation, settings |
 | PUT | `/api/preferences` | Save the course interface/teaching language and invalidate stale preparation |
 | GET | `/api/events` | SSE: `delta`, `turn`, `changed` |
 | POST | `/api/lessons` | Start a mainline lesson (enters the first concept if there is no position) |
 | POST | `/api/turns/{id}/pause`, `/resume` | Pause, or regenerate as a new attempt |
-| GET | `/api/concepts/{id}/preview` | Overview, prerequisites and sources, without moving the position |
+| GET | `/api/concepts/{id}/preview` | Overview, prerequisites, sources and set-aside material, without moving the position |
 | GET | `/api/sources/{source}/{revision}/{unit}?format=image\|pdf` | Exact source revision; Markdown responses include the whole document for the reader |
 | POST | `/api/questions`, `/api/questions/{id}/choice`, `/return` | Side questions and supplements |
 | POST | `/api/practice/generate`, `/api/practice/tasks/{id}/{action}` | Exercises and help |
@@ -54,7 +54,7 @@ The browser cannot call domain operations directly; there is no generic operatio
 
 ## Interface (`web/`)
 
-`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Components map to the page: `RouteRail`, `ConceptPage` (goal, overview, lessons, composer, practice, next section), `SidePanel` (questions, and `SourceViewer` with `PdfReader` and `MarkdownReader`), `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
+`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Components map to the page: `TopBar`; `RouteRail`; `ConceptPage` (goal, next step derived from the section's lessons and practice, questions saved for the section, `UnitOverview`, `Lesson` with `TurnControls`, `Composer`, `Practice` with `Exercise`, `NextSection`, `Preparation`, `EarlierHistory`); `SidePanel` (`Questions` with `QuestionThread`, and `SourceViewer` with `PdfReader` and `MarkdownReader`); `SelectionAsk`, `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
 
 ## Adding behavior
 

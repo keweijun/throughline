@@ -25,7 +25,11 @@
       <div><dt>{t("Afterwards you can")}</dt><dd>{o.target_ability}</dd></div>
     </dl>
   {:else}
-    <p class="note">{t("The first lesson opens with a full unit overview written by the teacher.")}</p>
+    <p class="note">
+      {app.hasLesson(preview.concept.id)
+        ? t("The teacher's unit overview is at the start of the first lesson below.")
+        : t("The first lesson opens with a full unit overview written by the teacher.")}
+    </p>
     <dl>
       <div>
         <dt>{t("Builds on")}</dt>
@@ -53,6 +57,24 @@
       <p class="note">{t("No source location is linked to this section yet, so formulas and citations in its lessons still need checking.")}</p>
     {/if}
   </div>
+
+  {#if preview.set_aside?.length}
+    <div class="sources">
+      <h3>{t("Set aside for now")}</h3>
+      <p class="note">{t("Material for this section that the course plan left out of the lessons for now. It stays on the route for later review.")}</p>
+      <ul>
+        {#each preview.set_aside as ref}
+          <li>
+            <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
+              {sourceTitle(ref.source_id)}, {labelFor(ref)}
+            </button>
+            <span class="chip chip-caution">{ref.disposition === 'deferred' ? t("Deferred") : t("Needs review")}</span>
+            {#if ref.reason}<span class="reason">{ref.reason}</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -128,5 +150,11 @@
     padding-left: 0;
     white-space: normal;
     text-align: left;
+  }
+
+  .reason {
+    flex-basis: 100%;
+    color: var(--pencil);
+    font-size: var(--step--1);
   }
 </style>

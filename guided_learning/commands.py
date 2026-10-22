@@ -37,7 +37,7 @@ def setup(args):
     target = skills_dir() / 'guided-learning'
     marker = target / 'SKILL.md'
     if target.exists() and not (marker.is_file() and 'name: guided-learning' in marker.read_text(encoding='utf-8')):
-        print(f'Refusing to replace {target}: it is not a Guided Learning skill.', file=sys.stderr)
+        print(f'Refusing to replace {target}: it is not the Throughline (guided-learning) skill.', file=sys.stderr)
         return 1
     staging = target.with_name('.guided-learning.tmp')
     shutil.rmtree(staging, ignore_errors=True)
@@ -46,7 +46,7 @@ def setup(args):
     staging.rename(target)
     root = library.default_root()
     root.mkdir(parents=True, exist_ok=True)
-    print(f'Guided Learning {version()} is ready.')
+    print(f'Throughline {version()} is ready.')
     print(f'Codex skill: {target}')
     print(f'Course library: {root}')
     if not shutil.which('codex'):
@@ -111,7 +111,7 @@ def open_course(args):
             print(json.loads(exc.read() or b'{}').get('error', str(exc)), file=sys.stderr)
             return 1
     url = f"http://127.0.0.1:{record['port']}/"
-    print(f'Guided Learning is open at {url}')
+    print(f'Throughline is open at {url}')
     if not args.no_browser:
         try:
             webbrowser.open(url)

@@ -3,11 +3,11 @@ name: guided-learning
 description: Build or resume a course from multiple PDFs and notes, then open its local learning UI. Use when a learner asks to plan a cross-document route, study from their materials, continue a course, or launch the guided-learning app.
 ---
 
-# Guided learning
+# Throughline: guided learning
 
 Teach in English by default. Follow explicit learner requests for another language, and preserve original source text and existing learning records in their original language.
 
-The `guided-learning` command is the app; the browser interface it opens is the teaching surface. The learner should not need to type commands: run them yourself. If `guided-learning` is not found, ask the learner to install Guided Learning first (the project README has a prompt to paste) and stop.
+The `guided-learning` command is the app; the browser interface it opens is the teaching surface. The learner should not need to type commands: run them yourself. If `guided-learning` is not found, ask the learner to install Throughline first (the project README has a prompt to paste) and stop.
 
 Use the course workspace as the only official state. Courses live in the learner's course library; `guided-learning courses` lists them by name. On entering an existing course, read its status before teaching; recover its saved goal and next step rather than infer them from the latest message.
 

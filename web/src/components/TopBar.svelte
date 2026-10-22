@@ -43,8 +43,8 @@
   {/if}
 
   <div class="title">
-    <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)" /><path d="M9 22.5V9.5h5.2c3.3 0 5.3 1.7 5.3 4.4 0 2.8-2 4.5-5.3 4.5H12.2" fill="none" stroke="var(--sheet)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /><path d="M17.5 22.5h5.5" stroke="var(--marker)" stroke-width="2.6" stroke-linecap="round" /></svg>
-    <span class="course">{app.libraryOpen || !app.state ? t("Guided Learning") : app.state.course.title}</span>
+    <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
+    <span class="course">{app.libraryOpen || !app.state ? t("Throughline") : app.state.course.title}</span>
   </div>
 
   {#if route.length && index >= 0 && !app.libraryOpen}
@@ -57,7 +57,7 @@
   <div class="actions">
     <label class="language" title={t('Language applies to the interface and new teaching content.')}>
       <span class="visually-hidden">{t('Language')}</span>
-      <select aria-label={t('Language')} value={locale.language} onchange={changeLanguage} disabled={savingLanguage || !app.state}>
+      <select aria-label={t('Language')} value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
         <option value="en">English</option>
         <option value="zh-CN">简体中文</option>
       </select>

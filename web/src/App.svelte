@@ -19,7 +19,7 @@
 
   $effect(() => {
     document.documentElement.lang = locale.language;
-    document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Guided Learning')}` : t('Guided Learning');
+    document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Throughline')}` : t('Throughline');
   });
 
   function step(offset: number) {

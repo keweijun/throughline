@@ -155,7 +155,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         finally:
             await asyncio.to_thread(courses.close)
 
-    app = FastAPI(title='Guided Learning', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title='Throughline', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.courses = courses
     app.state.host = courses.host
     app.state.stop = None

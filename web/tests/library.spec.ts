@@ -30,3 +30,12 @@ test('the library fits a phone screen', async ({ page, course }) => {
   await expect(page.locator('.courses > li')).toHaveCount(3);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
+
+test('the library remembers the last language before a course is open', async ({ page, course }) => {
+  await course('library_browser_fixture');
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('zh-CN');
+  await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();
+  await expect(page.locator('.topbar .course')).toHaveText('贯学');
+});

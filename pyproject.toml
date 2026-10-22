@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "codex-guided-learning"
 version = "0.4.0"
-description = "Cross-document guided learning with Codex: a local course library, a Codex skill and a reading interface"
+description = "Throughline: guided learning across your documents, taught by Codex"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]

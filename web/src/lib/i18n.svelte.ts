@@ -137,7 +137,7 @@ const messages = {
   "Course contents": "课程目录",
   "Where you left off": "上次学到哪里",
   "View source": "查看来源",
-  "Guided Learning": "导学空间",
+  "Throughline": "贯学",
   "Teach this section fully around the current goal: start with physical intuition, then explain the formulas and necessary derivations, and include an example.": "请围绕当前目标完整讲解这一小节，先讲物理图像，再讲公式和必要推导，结合一个例子。",
   "Language": "语言",
   "Language applies to the interface and new teaching content.": "语言设置用于界面和新生成的教学内容。",

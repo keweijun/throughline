@@ -10,6 +10,17 @@ export type Quote = { text: string; turnId: string | null; scrollY: number; sour
 
 const DEFAULT_PANEL = 400;
 
+/** Each course owns its language; the last one used also labels the library before a course opens. */
+function rememberLanguage(language?: Language): Language | null {
+  try {
+    if (language) localStorage.setItem('language', language);
+    const stored = localStorage.getItem('language');
+    return stored === 'en' || stored === 'zh-CN' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
 function storedWidth() {
   try {
     return Number(localStorage.getItem('panel-width')) || DEFAULT_PANEL;
@@ -87,11 +98,13 @@ class AppStore {
       this.state = await api.get<State>('/api/state');
       this.settings = this.state.settings;
       locale.language = this.state.preferences.language;
+      rememberLanguage(locale.language);
       this.error = null;
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_course') {
         this.state = null;
         this.libraryOpen = true;
+        locale.language = rememberLanguage() ?? locale.language;
         [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
       } else this.error = (e as Error).message;
     }
@@ -268,9 +281,14 @@ class AppStore {
   }
 
   async setLanguage(language: Language) {
+    if (!this.state) {
+      locale.language = rememberLanguage(language) ?? language;
+      return;
+    }
     const result = await this.act(() => api.put<{ preferences: { language: Language } }>('/api/preferences', { language }));
     if (result) {
       locale.language = result.preferences.language;
+      rememberLanguage(locale.language);
       if (this.state) this.state.preferences = result.preferences;
     }
   }

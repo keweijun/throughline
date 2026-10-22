@@ -1,12 +1,12 @@
-# Optional Luna note jobs
+# Optional background note jobs
 
 Use this after a natural section boundary when note consolidation is useful. Continue teaching from current raw interactions and evidence; the learner's next answer never waits for a note job. These operations persist a queue, not a model client or daemon.
 
 ## Queue and host handoff
 
 1. `background.enqueue {id, interaction_ids, concept_id?}` snapshots actual recorded interactions and optional focused concept context. Use a small relevant batch. Identical enqueue IDs preserve the existing job; use a new ID for a new batch.
-2. When the host has a free subagent slot and `gpt-6-luna` is available, call `background.claim {id, request_id, attempt_id}`. It returns `handoff` with model, raw messages, optional context and fingerprint. `model_call_performed:false` means no model has run yet.
-3. Use the host's actual `collaboration.spawn_agent` with `model:"gpt-6-luna"`, `fork_turns:"none"`, and a task containing only the handoff payload and note instructions below. The skill authorizes this optional delegation for note consolidation. Use the host's matching wait/message tools to receive its result; do not invent model output. If unavailable, interrupted, rate-limited or failed, call `background.pause {id, request_id, reason}` and keep teaching. No automatic paid API fallback.
+2. When the host has a free subagent slot and a small auxiliary model is available (the handoff names `gpt-6-luna` by default), call `background.claim {id, request_id, attempt_id}`. It returns `handoff` with model, raw messages, optional context and fingerprint. `model_call_performed:false` means no model has run yet.
+3. Use the host's actual `collaboration.spawn_agent` with the handoff's `model`, `fork_turns:"none"`, and a task containing only the handoff payload and note instructions below. The skill authorizes this optional delegation for note consolidation. Use the host's matching wait/message tools to receive its result; do not invent model output. If unavailable, interrupted, rate-limited or failed, call `background.pause {id, request_id, reason}` and keep teaching. No automatic paid API fallback.
 4. Submit actual returned notes with `background.submit {id, request_id, attempt_id, notes}`. A candidate does not update teaching state. The main teacher checks each statement against its cited raw sources, then calls `background.review {id, request_id, decision:"accept"|"reject", reason}`. Only accepted, current candidates enter derived notes.
 
 Instruction for the auxiliary model:

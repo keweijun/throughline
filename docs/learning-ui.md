@@ -1,12 +1,6 @@
 # Using the learning interface
 
-After preparing a course, start the host from the project root with its actual workspace path and open the printed URL (normally http://127.0.0.1:8765):
-
-```sh
-.venv/bin/python -m guided_learning.web --workspace 'work/courses/<course-name>'
-```
-
-Replace `<course-name>` with the path returned by Codex. The maintainer's ignored quantum course is not included in a clone. On Windows, use `.\.venv\Scripts\python.exe` in place of `.venv/bin/python`. Keep the terminal open; Ctrl+C stops the host. Choose English (default) or Simplified Chinese with the language selector in the top bar. The selection is course-owned and survives browser reloads and host restarts. It updates interface text without discarding input drafts, while sources and saved records keep their original language.
+Ask Codex `$guided-learning open <course>` (or run `guided-learning open <course>`); the interface runs in the background until `guided-learning stop`. It opens on **Your courses**, the course library; **Courses** in the top bar returns to it. For a course outside the library, run `guided-learning-web --workspace path/to/course` and keep the terminal open; Ctrl+C stops it. Choose English (default) or Simplified Chinese with the language selector in the top bar. The selection is course-owned and survives browser reloads and host restarts. It updates interface text without discarding input drafts, while sources and saved records keep their original language.
 
 New lessons, side answers, supplements, exercises, feedback and preparation use the selected teaching language. Running requests finish in their original language; regenerating an incomplete reply uses the current selection and retains the earlier attempt. Changing language invalidates previous-language preparation without changing the teaching position or mastery evidence.
 

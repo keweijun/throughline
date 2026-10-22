@@ -1,6 +1,13 @@
 # Course operations
 
-From the repository root run `python -m guided_learning --workspace <course-directory> --request <request.json>`. Install `python -m pip install -e ".[pdf]"` for PDF extraction. The request file is UTF-8 JSON; omit `--request` to read JSON from stdin. An installed package can run outside the repository. Exit 0 returns `{ "ok": true, "result": ... }`; exit 1 returns `{ "ok": false, "error": { "code": ..., "message": ... } }`.
+Run `guided-learning --course <course-name> --request <request.json>`. Course names use lowercase letters, digits and hyphens (`quantum-v1`) and resolve inside the course library; `guided-learning courses` prints the library `root` and each course's `name`, `title`, source count and review backlog. `--workspace <directory>` addresses a course outside the library instead. The request file is UTF-8 JSON; omit `--request` to read JSON from stdin. Exit 0 returns `{ "ok": true, "result": ... }`; exit 1 returns `{ "ok": false, "error": { "code": ..., "message": ... } }`.
+
+## Creating a course
+
+1. Choose a short course name with the learner and check it is not already listed by `guided-learning courses`.
+2. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
+3. Run `course.init`, then `source.register` for each copy, then build the route (see curriculum operations).
+4. Offer to open the course in the interface with `guided-learning open <course-name>`.
 
 ## Requests
 

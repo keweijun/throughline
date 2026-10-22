@@ -2,7 +2,7 @@
 
 At session start call `session.resume`. Briefly recover the saved goal and next step, any active sidequestion, and due explanations. A waiting branch means the learner is still considering a long answer; resuming the chat does not advance it. Recent messages are bounded (default 8, maximum 20), while raw records stay durable.
 
-For each actual learner message, call `interaction.record` before teaching. Use the current curriculum context to choose response depth yourself. Persist the actual assistant response and the checkpoint before returning it to the learner. Record original wording, not a summary or an imagined learner answer. IDs are unique per message; retries reuse the same ID and payload. Background note generation may follow a small section; the foreground response does not wait on Luna.
+For each actual learner message, call `interaction.record` before teaching. Use the current curriculum context to choose response depth yourself. Persist the actual assistant response and the checkpoint before returning it to the learner. Record original wording, not a summary or an imagined learner answer. IDs are unique per message; retries reuse the same ID and payload. Background note generation may follow a small section; the foreground response does not wait on it.
 
 ## Decide depth from the route
 

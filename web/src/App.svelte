@@ -10,6 +10,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
+  import Library from './components/Library.svelte';
 
   onMount(() => {
     void app.load();
@@ -18,7 +19,7 @@
 
   $effect(() => {
     document.documentElement.lang = locale.language;
-    document.title = app.state ? `${app.state.course.title} · ${t('Guided Learning')}` : t('Guided Learning');
+    document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Guided Learning')}` : t('Guided Learning');
   });
 
   function step(offset: number) {
@@ -34,7 +35,7 @@
       return;
     }
     const target = event.target as HTMLElement;
-    if (event.metaKey || event.ctrlKey || event.altKey || target.closest('input, textarea, select, [contenteditable], dialog')) return;
+    if (app.libraryOpen || event.metaKey || event.ctrlKey || event.altKey || target.closest('input, textarea, select, [contenteditable], dialog')) return;
     if (event.key === '/') {
       event.preventDefault();
       app.openPanel('questions');
@@ -58,7 +59,9 @@
 {/if}
 
 <div class="layout" class:with-panel={app.panelOpen} style:--panel="{app.panelWidth}px">
-  {#if app.state}
+  {#if app.libraryOpen}
+    <Library />
+  {:else if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
     <RouteRail />
     <main id="main">

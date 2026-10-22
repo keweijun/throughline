@@ -1,53 +1,44 @@
 # Guided Learning
 
-Guided Learning is a local study app for learning from several PDFs and Markdown documents as one course. Codex helps organize the materials into a source-linked route. The browser app then teaches with unit overviews, streaming lessons, questions about selected passages, original-page reading, practice, and a saved place to resume.
+Guided Learning is a local study app for learning from several PDFs and Markdown documents as one course. Codex organizes the materials into a source-linked route. The browser app then teaches with unit overviews, streaming lessons, questions about selected passages, original-page reading, practice, and a saved place to resume.
 
 The teacher makes instructional judgments from the materials. The program validates state and references; it never decides on its own that you have understood something.
 
-Your course workspace owns the route, source snapshots, position, and learning evidence. The app runs on your computer and uses your configured Codex CLI as its teacher. The [Codex skill](.agents/skills/guided-learning/SKILL.md) is an optional guide for preparing a course and opening the app. Installing the skill alone does not install the app or include a course.
+Each course workspace owns its route, source snapshots, position and learning evidence. Everything runs on your computer and uses your configured Codex CLI as the teacher. The interface and new teaching default to English; Simplified Chinese is available from the language selector, and imported materials keep their original language.
 
-## First-time setup
+## Install
 
-Install [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) and Python 3.10+, then clone this repository:
+You need the [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), signed in, and Python 3.10 or newer. Paste this into Codex:
 
-```sh
-git clone https://github.com/keweijun/codex-guided-learning.git
-cd codex-guided-learning
+```text
+Install Guided Learning for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/codex-guided-learning"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` and show me its output.
 ```
 
-From the repository root, install the app:
+Codex installs the package (no Node.js needed), copies the `guided-learning` skill into `~/.agents/skills/`, and creates your course library. Paste the same prompt again to update.
+
+## Use it from Codex
+
+You never need to type a command; ask Codex:
+
+- `$guided-learning create a course called quantum from these files: …` copies the files into the course library, registers them and builds the route.
+- `$guided-learning open quantum` starts the learning interface in the background and opens it in your browser. Codex asks for permission because the interface keeps running after the command and runs Codex for lessons.
+- `$guided-learning add these files to quantum: …`, `review the pages that still need review in quantum`, `stop the learning interface`.
+
+The interface opens on **Your courses**, the course library: every course with its sources, sections, review backlog and current section. Open one to study; **Courses** in the top bar switches between them. Creating and changing courses stays in Codex, which does the reading and judging; the library shows the prompts to paste.
+
+Courses live in `~/.local/share/guided-learning/courses` (`%LOCALAPPDATA%\guided-learning\courses` on Windows; set `GUIDED_LEARNING_HOME` to move everything). Each course is one folder; to move a course, stop the interface and copy its folder. Extraction alone does not verify formulas, images or teaching coverage, so the library shows what still needs review.
+
+## Commands behind the prompts
 
 ```sh
-python -m venv .venv
-.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
-.venv/bin/python -m unittest discover -s tests
+guided-learning setup                 # install or update the Codex skill
+guided-learning open [course] [--no-browser] [--port 8765]
+guided-learning stop
+guided-learning courses               # JSON list of the library
+echo '{"op":"course.status"}' | guided-learning --course quantum
 ```
 
-On Windows PowerShell, use `py -3 -m venv .venv` and `.\.venv\Scripts\python.exe -m pip install -e '.[pdf]'`. The built interface ships in the Python package; Node.js is needed only for frontend development.
-
-## Prepare a course with Codex
-
-Open this clone in Codex and ask:
-
-> Use `$guided-learning` to build a course from my PDFs and exercises. Show the proposed route and what still needs source review, then open the learning interface when the course is ready.
-
-Provide the paths to stable local copies of your materials and your learning goal. The skill registers sources, saves a course under `work/courses/<course-name>/` by default, and reports the actual course path. You can ask Codex to resume and reopen it later.
-
-**A clone contains no course materials or learning history.** The maintainer's quantum course described in historical documents lives under the ignored local `work/` folder. It is not included in Git or the Python package. Extraction alone does not verify formulas, images, or teaching coverage.
-
-## Open a prepared course yourself
-
-```sh
-.venv/bin/python -m guided_learning.web --workspace 'work/courses/<course-name>'
-```
-
-Replace `<course-name>` with the name returned by Codex. On Windows, use `.\.venv\Scripts\python.exe` instead. Open the URL printed by the host (normally http://127.0.0.1:8765). The host listens on loopback only and owns the course while it runs; press Ctrl+C to stop it. See [course import](docs/course-import.md) for the underlying operations.
-
-Options:
-
-- `--port 8766` when 8765 is taken.
-- `--model NAME` and `--effort LEVEL` pick the Codex model and reasoning effort for this run only, without changing your saved choice.
-- `--config PATH` uses a different teacher settings file.
+`guided-learning-web --workspace <folder>` still serves a course outside the library in the foreground; `--port`, `--model` and `--effort` work as before.
 
 ## Choose the teacher model
 
@@ -57,16 +48,16 @@ Lessons, answers and feedback are written by `codex app-server` on this computer
 
 Citations in lessons and exercises show the cited text on hover. Clicking one opens the built-in reader beside the lesson: PDFs open at the cited page with selectable text, zoom and page controls; Markdown notes open at the cited line. Select text in either reader to ask a side question about it. Drag the panel edge to resize it.
 
-## Use the Codex skill
+## Course operations
 
-Open this project in Codex and invoke `$guided-learning`. The skill is at [.agents/skills/guided-learning/SKILL.md](.agents/skills/guided-learning/SKILL.md). It reads and updates the same course workspace through the operation entry point, which accepts JSON from a request file or standard input:
+The skill is bundled in the package at [guided_learning/skill/](guided_learning/skill/SKILL.md). It reads and updates course workspaces through the operation entry point, which accepts JSON from a request file or standard input:
 
 ```sh
-echo '{"op":"course.init","title":"My course"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
-echo '{"op":"session.resume"}' | .venv/bin/python -m guided_learning --workspace work/courses/demo
+echo '{"op":"course.init","title":"My course"}' | guided-learning --course demo
+echo '{"op":"session.resume"}' | guided-learning --workspace work/courses/demo
 ```
 
-Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` with a nonzero exit code. Use `--request work/request.json` for long text or formulas. Position-changing operations `position.save` and `mainline.enter` need a unique `request_id`; reuse it only for retries.
+Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` with a nonzero exit code. Use `--request request.json` for long text or formulas. Position-changing operations `position.save` and `mainline.enter` need a unique `request_id`; reuse it only for retries.
 
 ## What the course workspace keeps
 
@@ -76,22 +67,23 @@ Success returns `{ok:true,result:...}`; failure returns `{ok:false,error:...}` w
 - Section practice with taught, self-reported, hinted, independent and retest evidence kept separate.
 - Deferred items, revisited when due without a mandatory quiz.
 
-Background preparation runs only while the host is running. Course materials and databases stay in local `work/` and are not tracked by Git. To move a course, stop the host and copy its whole directory.
-
-### Maintainer's private local quantum course
-
-The maintainer's ignored `work/courses/quantum-v1` registers six lecture documents and two exercise documents (231 pages) with 45 candidate concepts. It is an example of a candidate coverage map awaiting review, not a bundled demo course: 41 pages have candidate mappings, 190 explicitly need review, and verification remains pending.
-
-## Install the skill outside this repository
-
-Codex discovers the repository skill when you open this clone. For use from other folders, install the entire [skill directory](.agents/skills/guided-learning/) in `~/.agents/skills/guided-learning/`, or ask `$skill-installer` to install that directory from this repository. Install the app separately. The skill's [app setup and launch reference](.agents/skills/guided-learning/references/learning-app.md) tells Codex how to find the runtime and open a prepared course.
+Background preparation runs only while the host is running. Course materials and databases stay in the course library (or local `work/` for development) and are never tracked by Git.
 
 ## Development
 
 - [Architecture](docs/architecture.md): modules, HTTP API, live events and how to extend them.
 - [Using the interface](docs/learning-ui.md): pause, regenerate, side questions, practice, recovery and troubleshooting.
+- [Creating and reviewing a course](docs/course-import.md): what the skill does when it builds a course, and how to check or replay it.
 - [Domain glossary](GLOSSARY.md) and [decisions](docs/adr/).
-- Earlier specifications, reviews and experiments are kept in [docs/archive](docs/archive/).
+
+From a checkout, install in development mode and run the tests:
+
+```sh
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
+.venv/bin/python -m unittest discover -s tests
+.venv/bin/guided-learning setup                     # copy this checkout's skill to Codex; rerun after editing it
+```
 
 Frontend work happens in `web/` (Svelte 5, Vite, TypeScript):
 

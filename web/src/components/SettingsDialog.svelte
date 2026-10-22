@@ -10,7 +10,7 @@
   let message = $state<MessageKey | null>(null);
   let busy = $state(false);
 
-  const settings = $derived(app.state?.settings);
+  const settings = $derived(app.settings);
 
   $effect(() => {
     if (!dialog) return;

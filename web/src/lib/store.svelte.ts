@@ -2,7 +2,7 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
-import type { HostEvent, Question, Ref, SourceView, State, Task, Turn } from './types';
+import type { HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -23,6 +23,10 @@ class AppStore {
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
   notice = $state<string | null>(null);
+  library = $state<Library | null>(null);
+  libraryOpen = $state(false);
+  /** Teacher settings belong to the learner, so they are available before a course is open. */
+  settings = $state<Settings | null>(null);
 
   /** Concept shown in the reading column; null follows the formal position. */
   viewing = $state<string | null>(null);
@@ -81,11 +85,35 @@ class AppStore {
   async load() {
     try {
       this.state = await api.get<State>('/api/state');
+      this.settings = this.state.settings;
       locale.language = this.state.preferences.language;
       this.error = null;
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'no_course') {
+        this.state = null;
+        this.libraryOpen = true;
+        [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+      } else this.error = (e as Error).message;
+    }
+  }
+
+  async loadLibrary() {
+    try {
+      this.library = await api.get<Library>('/api/library');
+    } catch (e) {
       this.error = (e as Error).message;
     }
+  }
+
+  showLibrary() {
+    this.libraryOpen = true;
+    void this.loadLibrary();
+  }
+
+  async openCourse(name: string) {
+    const opened = await this.act(() => api.post<Library>('/api/library/open', { name }));
+    // Everything in the store belongs to one course, so start clean.
+    if (opened) location.reload();
   }
 
   refresh() {
@@ -124,8 +152,15 @@ class AppStore {
   }
 
   #apply(event: HostEvent) {
+    if (event.type === 'changed' && event.scope === 'course') {
+      location.reload();
+      return;
+    }
     const turns = this.state?.turns;
-    if (!turns) return;
+    if (!turns) {
+      if (event.type === 'changed') this.refresh();
+      return;
+    }
     if (event.type === 'delta') {
       const turn = turns.find((t) => t.id === event.id);
       if (turn && turn.attempt === event.attempt && turn.status === 'running') turn.text += event.text;

@@ -167,3 +167,17 @@ export type HostEvent =
   | { type: 'delta'; id: string; attempt: number; text: string }
   | { type: 'turn'; turn: Turn }
   | { type: 'changed'; scope: string };
+
+export type LibraryCourse = {
+  name: string;
+  path: string;
+  title?: string;
+  sources?: number;
+  concepts?: number;
+  needs_review?: number;
+  current?: string | null;
+  updated?: number;
+  error?: string;
+};
+
+export type Library = { root: string | null; active: string | null; courses: LibraryCourse[] };

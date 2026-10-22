@@ -2,6 +2,7 @@
 import asyncio
 import json
 import socket
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal, Optional
@@ -12,8 +13,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
+from .. import library
 from ..store import OperationError
-from .host import Host, turn_summary
+from .host import EventBus, Host, turn_summary
+from .settings import TeacherSettings
 
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
 MAX_BODY = 1024 * 1024
@@ -68,13 +71,80 @@ class SettingsRequest(Body):
     effort: str = 'medium'
 
 
+class OpenCourseRequest(Body):
+    name: str
+
+
+class Courses:
+    """The course library this host serves and the one course it owns at a time."""
+
+    def __init__(self, root, runner, settings):
+        self.root = Path(root).resolve() if root else None
+        self.runner = runner
+        self.settings = settings
+        self.events = EventBus()
+        self.lock = threading.Lock()
+        self.host = None
+
+    def open(self, path):
+        path = Path(path).resolve()
+        with self.lock:
+            if self.host and self.host.workspace == path:
+                return self.host
+            if self.host:
+                self.host.close()
+                self.host = None
+            self.host = Host(path, runner=self.runner, settings=self.settings, events=self.events)
+        self.events.publish({'type': 'changed', 'scope': 'course'})
+        return self.host
+
+    def open_named(self, name):
+        if self.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        path = library.course_path(self.root, name)
+        if not library.is_course(path):
+            raise OperationError('unknown_course', f'No course named {name} in {self.root}')
+        return self.open(path)
+
+    def require(self):
+        host = self.host
+        if host is None:
+            raise OperationError('no_course', 'Choose a course from the library')
+        return host
+
+    def view(self):
+        courses = library.list_courses(self.root) if self.root else []
+        active = str(self.host.workspace) if self.host else None
+        if active and not any(c['path'] == active for c in courses):
+            courses.insert(0, library.summary(active))
+        return {'root': str(self.root) if self.root else None, 'active': active, 'courses': courses}
+
+    def close(self):
+        with self.lock:
+            if self.host:
+                self.host.close()
+
+
+class ActiveHost:
+    """Forwards to whichever course is open, so routes need not track course switches."""
+
+    def __init__(self, courses):
+        self._courses = courses
+
+    def __getattr__(self, name):
+        return getattr(self._courses.require(), name)
+
+
 def _public_question(branch):
     selected = branch.get('selected_lecture')
     return {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
 
 
-def create_app(workspace, port=8765, runner=None, settings=None):
-    host = Host(workspace, runner=runner, settings=settings)
+def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None):
+    courses = Courses(library_root, runner, settings or TeacherSettings())
+    if workspace:
+        courses.open(workspace)
+    host = ActiveHost(courses)
     allowed = {f'127.0.0.1:{port}', f'localhost:{port}'}
     origins = {'http://' + h for h in allowed}
 
@@ -83,10 +153,12 @@ def create_app(workspace, port=8765, runner=None, settings=None):
         try:
             yield
         finally:
-            await asyncio.to_thread(host.close)
+            await asyncio.to_thread(courses.close)
 
     app = FastAPI(title='Guided Learning', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.state.host = host
+    app.state.courses = courses
+    app.state.host = courses.host
+    app.state.stop = None
 
     @app.middleware('http')
     async def guard(request: Request, call_next):
@@ -123,17 +195,18 @@ def create_app(workspace, port=8765, runner=None, settings=None):
 
     @app.get('/api/state')
     def state():
-        snapshot = host.snapshot()
+        current = courses.require()
+        snapshot = current.snapshot()
         return {**snapshot,
                 'turns': [turn_summary(t) for t in snapshot['turns']],
-                'questions': [_public_question(b) for b in host.questions.list()],
-                'practice': host.practice.state(),
-                'preparation': host.preparation.state(),
-                'settings': host.settings.public()}
+                'questions': [_public_question(b) for b in current.questions.list()],
+                'practice': current.practice.state(),
+                'preparation': current.preparation.state(),
+                'settings': current.settings.public()}
 
     @app.get('/api/events')
     async def events(request: Request):
-        subscriber = host.events.subscribe()
+        subscriber = courses.events.subscribe()
 
         async def stream():
             try:
@@ -146,7 +219,7 @@ def create_app(workspace, port=8765, runner=None, settings=None):
                         continue
                     yield 'data: ' + json.dumps(event, ensure_ascii=False) + '\n\n'
             finally:
-                host.events.unsubscribe(subscriber)
+                courses.events.unsubscribe(subscriber)
         return StreamingResponse(stream(), media_type='text/event-stream')
 
     @app.post('/api/lessons')
@@ -212,13 +285,29 @@ def create_app(workspace, port=8765, runner=None, settings=None):
 
     @app.get('/api/settings')
     def settings_view():
-        return host.settings.public()
+        return courses.settings.public()
 
     @app.put('/api/settings')
     def save_settings(body: SettingsRequest):
-        result = host.settings.save(body.model, body.effort)
-        host.changed('settings')
+        result = courses.settings.save(body.model, body.effort)
+        courses.events.publish({'type': 'changed', 'scope': 'settings'})
         return result
+
+    @app.get('/api/library')
+    def library_view():
+        return courses.view()
+
+    @app.post('/api/library/open')
+    def open_course(body: OpenCourseRequest):
+        courses.open_named(body.name)
+        return courses.view()
+
+    @app.post('/api/shutdown')
+    def shutdown():
+        if app.state.stop is None:
+            return JSONResponse({'error': 'This host cannot be stopped from the interface'}, 409)
+        app.state.stop()
+        return {'stopping': True}
 
     if (DIST / 'assets').is_dir():
         app.mount('/assets', StaticFiles(directory=DIST / 'assets'), name='assets')
@@ -236,7 +325,7 @@ def create_app(workspace, port=8765, runner=None, settings=None):
     return app
 
 
-def serve(workspace, port=8765, runner=None, settings=None, on_ready=None):
+def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -244,8 +333,9 @@ def serve(workspace, port=8765, runner=None, settings=None, on_ready=None):
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
-    app = create_app(workspace, port=actual, runner=runner, settings=settings)
+    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
+    app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:
         on_ready(actual)
     server.run(sockets=[sock])

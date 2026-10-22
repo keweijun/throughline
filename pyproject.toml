@@ -4,10 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "codex-guided-learning"
-version = "0.3.0"
-description = "Local, transactional course workspace for cross-document guided learning"
+version = "0.4.0"
+description = "Cross-document guided learning with Codex: a local course library, a Codex skill and a reading interface"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
+
+[project.urls]
+Homepage = "https://github.com/keweijun/codex-guided-learning"
 
 [project.optional-dependencies]
 pdf = ["pypdf>=6,<7", "pypdfium2>=5,<6", "Pillow>=11,<13"]
@@ -20,4 +24,4 @@ guided-learning-web = "guided_learning.web:main"
 include = ["guided_learning*"]
 
 [tool.setuptools.package-data]
-guided_learning = ["web_dist/*", "web_dist/assets/*"]
+guided_learning = ["web_dist/*", "web_dist/assets/*", "skill/*.md", "skill/references/*.md", "skill/agents/*.yaml"]

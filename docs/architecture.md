@@ -14,7 +14,7 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
 
 ## Domain operations
 
-`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice` and `preparation`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through `python -m guided_learning`; their names and semantics are a stable contract documented in `.agents/skills/guided-learning/references/`. The host calls the same operations and keeps no state of its own besides worker threads.
+`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice` and `preparation`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through the `guided-learning` command (`--course <name>` resolves inside the course library, `--workspace` takes any folder); their names and semantics are a stable contract documented in `guided_learning/skill/references/`, which `guided-learning setup` copies to `~/.agents/skills/guided-learning`. The host calls the same operations and keeps no state of its own besides worker threads.
 
 ## Host (`guided_learning/server/`)
 
@@ -25,7 +25,8 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
   - `Practice`: exercise generation, hints/steps/solutions/assessment, deferral, entering the next section.
   - `Preparation`: idle-only preparation of the next section; foreground requests pause it.
 - `prompts.py` — every instruction sent to a model. Changing wording here changes teaching behavior.
-- `app.py` — the FastAPI routes, the loopback Host/Origin guard, the 1 MiB body limit, and static files.
+- `app.py` — the FastAPI routes, the loopback Host/Origin guard, the 1 MiB body limit, and static files. `Courses` holds the course library root and the one `Host` currently open; switching courses closes the old host (pausing its turns and releasing its lease) before opening the next. Routes reach the open course through `ActiveHost`, so they do not track switches, and the SSE `EventBus` is shared across switches.
+- `guided_learning/library.py` lists library courses read-only through operations; `guided_learning/commands.py` implements `setup`, `open`, `stop` and `courses`. `open` starts `guided_learning.web --record` detached and reuses it while `host.json` in the data directory points at a live host.
 
 Rules the host enforces: one running mainline lesson at a time; side questions run alongside it unless the learner pauses it; preparation starts only when nothing else runs; partial text never becomes an interaction or evidence.
 
@@ -37,7 +38,10 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/state` | Course, position, curriculum, session, pending explanations, turns, questions, practice, preparation, settings |
+| GET | `/api/state` | Course, position, curriculum, session, pending explanations, turns, questions, practice, preparation, settings; 409 `no_course` before a course is open |
+| GET | `/api/library` | Library root, open course and a summary of each course |
+| POST | `/api/library/open` | Open a library course by name (publishes `changed` with scope `course`) |
+| POST | `/api/shutdown` | Stop a host started by `guided-learning open` |
 | PUT | `/api/preferences` | Save the course interface/teaching language and invalidate stale preparation |
 | GET | `/api/events` | SSE: `delta`, `turn`, `changed` |
 | POST | `/api/lessons` | Start a mainline lesson (enters the first concept if there is no position) |
@@ -54,7 +58,7 @@ The browser cannot call domain operations directly; there is no generic operatio
 
 ## Interface (`web/`)
 
-`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Components map to the page: `TopBar`; `RouteRail`; `ConceptPage` (goal, next step derived from the section's lessons and practice, questions saved for the section, `UnitOverview`, `Lesson` with `TurnControls`, `Composer`, `Practice` with `Exercise`, `NextSection`, `Preparation`, `EarlierHistory`); `SidePanel` (`Questions` with `QuestionThread`, and `SourceViewer` with `PdfReader` and `MarkdownReader`); `SelectionAsk`, `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
+`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Before a course is open, and from **Courses** in the top bar, `Library` lists the courses; opening one reloads the page so the store starts clean. Components map to the page: `TopBar`; `Library`; `RouteRail`; `ConceptPage` (goal, next step derived from the section's lessons and practice, questions saved for the section, `UnitOverview`, `Lesson` with `TurnControls`, `Composer`, `Practice` with `Exercise`, `NextSection`, `Preparation`, `EarlierHistory`); `SidePanel` (`Questions` with `QuestionThread`, and `SourceViewer` with `PdfReader` and `MarkdownReader`); `SelectionAsk`, `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
 
 ## Adding behavior
 

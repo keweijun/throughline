@@ -30,6 +30,7 @@
 </script>
 
 <header class="topbar">
+  {#if app.state && !app.libraryOpen}
   <button
     class="btn btn-quiet menu"
     aria-label={t("Course contents")}
@@ -39,13 +40,14 @@
   >
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
   </button>
+  {/if}
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="var(--accent)" /><path d="M9 22.5V9.5h5.2c3.3 0 5.3 1.7 5.3 4.4 0 2.8-2 4.5-5.3 4.5H12.2" fill="none" stroke="var(--sheet)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /><path d="M17.5 22.5h5.5" stroke="var(--marker)" stroke-width="2.6" stroke-linecap="round" /></svg>
-    <span class="course">{app.state?.course.title ?? t("Guided Learning")}</span>
+    <span class="course">{app.libraryOpen || !app.state ? t("Guided Learning") : app.state.course.title}</span>
   </div>
 
-  {#if route.length && index >= 0}
+  {#if route.length && index >= 0 && !app.libraryOpen}
     <div class="progress" title={t("Your position on the course route")}>
       <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
       <span class="track" aria-hidden="true"><span style:width="{((index + 1) / route.length) * 100}%"></span></span>
@@ -65,11 +67,16 @@
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
     {/if}
+    <button class="btn btn-quiet" aria-pressed={app.libraryOpen} disabled={app.libraryOpen && !app.state} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? (app.libraryOpen = false) : app.showLibrary())}>
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Courses")}</span>
+    </button>
     <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title={t("Teacher settings")}>
-      <span class="visually-hidden">{t("Teacher settings")}: </span><span class="model-name">Codex · {app.state?.settings.model || t("default model")}</span>
+      <span class="visually-hidden">{t("Teacher settings")}: </span><span class="model-name">Codex · {app.settings?.model || t("default model")}</span>
     </button>
     <button
       class="btn btn-quiet"
+      disabled={!app.state || app.libraryOpen}
       aria-pressed={app.panelOpen && app.panelTab === 'questions'}
       onclick={() => (app.panelOpen && app.panelTab === 'questions' ? (app.panelOpen = false) : app.openPanel('questions'))}
     >
@@ -194,9 +201,18 @@
     }
   }
 
+  .narrow-only {
+    display: none;
+  }
+
   @media (max-width: 56rem) {
-    .menu {
+    .menu,
+    .narrow-only {
       display: inline-flex;
+    }
+
+    .wide-only {
+      display: none;
     }
 
     .progress,

@@ -259,7 +259,31 @@ const messages = {
   "The first lesson opens with a full unit overview written by the teacher.": "首次讲解会以老师准备的完整单元导览开场。",
   "Builds on": "先修知识",
   "Sources": "来源",
-  "No source location is linked to this section yet, so formulas and citations in its lessons still need checking.": "本节尚未关联来源位置，讲解中的公式和引用仍需核验。"
+  "No source location is linked to this section yet, so formulas and citations in its lessons still need checking.": "本节尚未关联来源位置，讲解中的公式和引用仍需核验。",
+  "Courses": "课程",
+  "Your courses": "我的课程",
+  "Library folder": "课程库目录",
+  "Refresh": "刷新",
+  "Back to {course}": "返回{course}",
+  "Loading your courses…": "正在加载课程…",
+  "No courses yet. Ask Codex to create one from your documents; it appears here when Codex is done.": "还没有课程。请让 Codex 用你的文档创建一门课程，完成后会显示在这里。",
+  "This course could not be read: {error}": "无法读取此课程：{error}",
+  "Sources: {count}": "资料：{count}",
+  "Sections: {count}": "小节：{count}",
+  "Updated {date}": "更新于 {date}",
+  "Now studying: {section}": "正在学习：{section}",
+  "{count} locations need review": "{count} 处待核对",
+  "Continue": "继续学习",
+  "Opening…": "正在打开…",
+  "Open": "打开",
+  "Route not built yet": "尚未生成路线",
+  "Add or change courses in Codex": "在 Codex 中添加或修改课程",
+  "Codex reads your documents and builds the route. Paste one of these into Codex, then press Refresh.": "Codex 会阅读你的文档并生成学习路线。将下列任一指令粘贴到 Codex，完成后点击刷新。",
+  "$guided-learning create a course called my-course from these files: …": "$guided-learning 用这些文件创建名为 my-course 的课程：…",
+  "$guided-learning add these files to my-course: …": "$guided-learning 把这些文件加入 my-course：…",
+  "$guided-learning review the pages that still need review in my-course": "$guided-learning 核对 my-course 中仍待核对的页面",
+  "Copy": "复制",
+  "Copied": "已复制"
 } as const;
 export type MessageKey = keyof typeof messages;
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {

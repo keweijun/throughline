@@ -4,8 +4,13 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   const { errors } = await course('demo_course_fixture');
   const citation = page.getByRole('button', { name: 'View source p. 2' }).first();
 
-  await citation.hover();
   const peek = page.getByRole('tooltip');
+  // Background preparation can re-render the lesson under a still mouse; hover again until the peek opens.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await citation.hover();
+    await expect(peek).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(peek).toContainText('lecture-2.pdf');
   await expect(peek).toContainText('The last term is the interference term.');
   await expect(peek).toContainText('Pending verification');

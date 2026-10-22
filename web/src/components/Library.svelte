@@ -1,0 +1,249 @@
+<script lang="ts">
+  import { t, locale, type MessageKey } from '../lib/i18n.svelte';
+  import { app } from '../lib/store.svelte';
+  import type { LibraryCourse } from '../lib/types';
+
+  const prompts: MessageKey[] = [
+    '$guided-learning create a course called my-course from these files: …',
+    '$guided-learning add these files to my-course: …',
+    '$guided-learning review the pages that still need review in my-course',
+  ];
+
+  let copied = $state<string | null>(null);
+  let opening = $state<string | null>(null);
+
+  const library = $derived(app.library);
+
+  function updated(course: LibraryCourse) {
+    if (!course.updated) return '';
+    return new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(course.updated * 1000));
+  }
+
+  async function copy(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = text;
+      setTimeout(() => copied === text && (copied = null), 1800);
+    } catch {
+      copied = null;
+    }
+  }
+
+  async function open(course: LibraryCourse) {
+    opening = course.name;
+    await app.openCourse(course.name);
+    opening = null;
+  }
+</script>
+
+<section class="library" aria-labelledby="library-title">
+  <header>
+    <div>
+      <h1 id="library-title">{t('Your courses')}</h1>
+      {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-quiet btn-small" onclick={() => app.loadLibrary()}>{t('Refresh')}</button>
+      {#if app.state}
+        <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
+      {/if}
+    </div>
+  </header>
+
+  {#if !library}
+    <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
+  {:else if !library.courses.length}
+    <p class="empty">{t('No courses yet. Ask Codex to create one from your documents; it appears here when Codex is done.')}</p>
+  {:else}
+    <ul class="courses">
+      {#each library.courses as course (course.path)}
+        {@const active = course.path === library.active}
+        <li class:active>
+          <div class="summary">
+            <h2>{course.title ?? course.name}</h2>
+            {#if course.error}
+              <p class="problem">{t('This course could not be read: {error}', { error: course.error })}</p>
+            {:else}
+              <p class="facts">
+                <span>{course.name}</span>
+                <span>{t('Sources: {count}', { count: course.sources ?? 0 })}</span>
+                <span>{t('Sections: {count}', { count: course.concepts ?? 0 })}</span>
+                {#if updated(course)}<span>{t('Updated {date}', { date: updated(course) })}</span>{/if}
+              </p>
+              {#if course.current}<p class="current">{t('Now studying: {section}', { section: course.current })}</p>{/if}
+            {/if}
+          </div>
+          <div class="state">
+            {#if course.needs_review}
+              <span class="chip chip-caution">{t('{count} locations need review', { count: course.needs_review })}</span>
+            {/if}
+            {#if active}
+              <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Continue')}</button>
+            {:else if !course.error && course.concepts}
+              <button class="btn btn-primary btn-small" disabled={opening !== null} onclick={() => open(course)}>
+                {opening === course.name ? t('Opening…') : t('Open')}
+              </button>
+            {:else if !course.error}
+              <span class="chip chip-plain">{t('Route not built yet')}</span>
+            {/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  <aside class="codex" aria-labelledby="codex-title">
+    <h2 id="codex-title">{t('Add or change courses in Codex')}</h2>
+    <p class="muted">{t('Codex reads your documents and builds the route. Paste one of these into Codex, then press Refresh.')}</p>
+    <ul class="prompts">
+      {#each prompts as prompt (prompt)}
+        <li>
+          <code>{t(prompt)}</code>
+          <button class="btn btn-quiet btn-small" onclick={() => copy(t(prompt))}>{copied === t(prompt) ? t('Copied') : t('Copy')}</button>
+        </li>
+      {/each}
+    </ul>
+  </aside>
+</section>
+
+<style>
+  .library {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 52rem;
+    margin-inline: auto;
+    padding: 2.5rem clamp(1rem, 4vw, 3rem) 6rem;
+  }
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: var(--step-3);
+    font-weight: 600;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .root,
+  .muted,
+  .facts {
+    color: var(--pencil);
+    font-size: var(--step--1);
+    overflow-wrap: anywhere;
+  }
+
+  .courses {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .courses > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--sheet);
+  }
+
+  .courses > li.active {
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .summary {
+    min-width: 0;
+    flex: 1 1 18rem;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: var(--step-1);
+    font-weight: 600;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.9rem;
+    margin-top: 0.2rem;
+  }
+
+  .current {
+    margin-top: 0.35rem;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+
+  .problem {
+    color: var(--danger);
+    font-size: var(--step--1);
+  }
+
+  .state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .empty {
+    padding: 2rem 1.25rem;
+    border: 1px dashed var(--rule-strong);
+    border-radius: 10px;
+    color: var(--pencil);
+    text-align: center;
+  }
+
+  .codex {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .codex h2 {
+    font-size: var(--step-0);
+    font-family: var(--sans);
+  }
+
+  .prompts {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .prompts li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.85rem;
+    border-radius: var(--radius);
+    background: var(--raised);
+    border: 1px solid var(--rule);
+  }
+
+  .prompts code {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    overflow-wrap: anywhere;
+  }
+</style>

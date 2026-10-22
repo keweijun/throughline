@@ -74,12 +74,12 @@ def turn_summary(turn):
 
 
 class Host:
-    def __init__(self, workspace, runner=None, settings=None):
+    def __init__(self, workspace, runner=None, settings=None, events=None):
         from .features import Navigation, Practice, Preparation, Questions
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
-        self.events = EventBus()
+        self.events = events or EventBus()
         self.lock = threading.RLock()
         self.closing = False
         self.workers = {}

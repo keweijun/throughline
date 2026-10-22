@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = ["fastapi>=0.115", "uvicorn>=0.30"]
 
 [project.urls]
-Homepage = "https://github.com/keweijun/codex-guided-learning"
+Homepage = "https://github.com/keweijun/throughline"
 
 [project.optional-dependencies]
 pdf = ["pypdf>=6,<7", "pypdfium2>=5,<6", "Pillow>=11,<13"]

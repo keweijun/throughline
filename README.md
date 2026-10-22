@@ -1,8 +1,6 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/wordmark-dark.svg">
-    <img src="docs/images/wordmark-light.svg" alt="Throughline" width="340">
-  </picture>
+  <img src="docs/images/wordmark-light.svg#gh-light-mode-only" alt="Throughline" width="356">
+  <img src="docs/images/wordmark-dark.svg#gh-dark-mode-only" alt="Throughline" width="356">
 </p>
 
 <p align="center"><b>One line of teaching through all your documents.</b><br>A local study app that turns your PDFs and notes into a guided course, taught by Codex.</p>
@@ -20,7 +18,7 @@ The teacher makes instructional judgments from your materials. The program valid
 You need the [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), signed in, and Python 3.10 or newer. Paste this into Codex:
 
 ```text
-Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/codex-guided-learning"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` and show me its output.
+Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` and show me its output.
 ```
 
 Codex installs the app (no Node.js needed), adds the `$guided-learning` skill to `~/.agents/skills/`, and creates your course library. Paste the same prompt again to update.

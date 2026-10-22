@@ -68,4 +68,4 @@ Three single-output pairs reduced aggregate full-reply time by about 37%, with a
 
 The user accepted the interaction direction; no per-scenario user logs establish completion of every walkthrough. Prototype preservation and issue links belong to publication. This extends V1's UI scope without changing state ownership.
 
-Prototype reference: https://github.com/keweijun/codex-guided-learning/blob/5189312/docs/prototypes/learning-flow.prototype.html. At specification time, real-model/browser integration acceptance was still pending.
+Prototype reference: learning-flow.prototype.html. At specification time, real-model/browser integration acceptance was still pending.

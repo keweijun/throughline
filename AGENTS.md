@@ -17,3 +17,7 @@ Use the five default role labels when triaging tasks; see `docs/agents/triage-la
 ### Domain docs
 
 This project uses a single-domain layout. Before exploring or changing it, follow `docs/agents/domain.md` to read the glossary and relevant ADRs.
+
+### Learner workflow
+
+For requests to build a course from documents, resume guided study, or open the learning interface, read `.agents/skills/guided-learning/SKILL.md`. The skill links course operations and app startup; it does not replace the installed Python app or the learner's course workspace.

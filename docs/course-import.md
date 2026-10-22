@@ -1,5 +1,7 @@
 # Course import, reproduction, and review
 
+The paths and replay commands in the next section describe the maintainer's ignored local quantum course. Those materials are not included in a clone. For your own course, use `$guided-learning` to prepare it from stable copies of your documents, or follow [Create another course](#create-another-course) below. The [app setup reference](../.agents/skills/guided-learning/references/learning-app.md) explains how Codex opens the resulting workspace.
+
 ## Local course and audit materials
 
 Paths relative to the project root:

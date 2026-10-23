@@ -64,9 +64,11 @@
       <span class="wide-only">{t("Notes")}</span>
     </button>
     <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: language, appearance and teacher")}>
-      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.02 8.14L18.08 8.61L18.08 11.39L16.02 11.86L15.57 12.94L16.70 14.73L14.73 16.70L12.94 15.57L11.86 16.02L11.39 18.08L8.61 18.08L8.14 16.02L7.06 15.57L5.27 16.70L3.30 14.73L4.43 12.94L3.98 11.86L1.92 11.39L1.92 8.61L3.98 8.14L4.43 7.06L3.30 5.27L5.27 3.30L7.06 4.43L8.14 3.98L8.61 1.92L11.39 1.92L11.86 3.98L12.94 4.43L14.73 3.30L16.70 5.27L15.57 7.06Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
     </button>
-    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>?</button>
+    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="1.75" y="4.5" width="16.5" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M5 8h.01M8 8h.01M11 8h.01M14.5 8h.5M6.5 10.5h.01M9.5 10.5h.01M12.5 10.5h.01M6.5 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    </button>
   </div>
 </header>
 
@@ -154,10 +156,6 @@
 
   .icon {
     padding-inline: 0.5rem;
-  }
-
-  .shortcuts {
-    font-weight: 600;
   }
 
   @media (hover: none), (max-width: 30rem) {

@@ -1,5 +1,23 @@
 import { test, expect, dragSelect } from './fixture';
 
+test('a question box grows with its text instead of offering a resize handle', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  const box = page.locator('#question-input');
+  await box.click();
+  const before = (await box.boundingBox())!.height;
+  for (const line of ['First line', 'Second line', 'Third line', 'Fourth line']) {
+    await page.keyboard.type(line);
+    await page.keyboard.press('Shift+Enter');
+  }
+  await page.keyboard.type('Fifth line');
+  await expect.poll(async () => (await box.boundingBox())!.height).toBeGreaterThan(before + 20);
+  expect(await box.evaluate((node) => getComputedStyle(node).resize)).toBe('none');
+  await page.keyboard.press('Enter');
+  await expect(box).toHaveValue('');
+  await expect.poll(async () => (await box.boundingBox())!.height).toBeLessThan(before + 2);
+});
+
 test('ask about a selected passage, then return to that passage', async ({ page, course }) => {
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();

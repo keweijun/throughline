@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
@@ -101,7 +102,7 @@
         bind:value={question} use:autogrow={question}
         aria-label={t("Side question")}
         placeholder={app.quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
-        onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
+        use:enterToSend
       ></textarea>
     </label>
     <div class="row">

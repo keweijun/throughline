@@ -8,6 +8,10 @@ test('a long question list stays scannable: collapsed threads and search', async
     const question = i === 2 ? 'Why does interference vanish?' : `Ordinary question ${i}`;
     await page.request.post(base + '/api/questions', { data: { id: `q${i}`, question } });
   }
+  // A question still being answered opens by itself, so wait for every answer before checking the collapsed list.
+  await expect
+    .poll(async () => (await (await page.request.get(base + '/api/state')).json()).turns.filter((turn: { status: string }) => turn.status === 'running').length)
+    .toBe(0);
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
   const threads = page.locator('#branch-panel .thread');

@@ -65,6 +65,7 @@
 
 <style>
   .panel {
+    animation: enter-slide var(--settle) var(--ease-out);
     position: sticky;
     top: var(--topbar);
     display: flex;

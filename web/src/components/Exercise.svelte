@@ -141,6 +141,7 @@
 <style>
   .your-notes { margin-left: auto; color: var(--mine); font-weight: 600; }
   .exercise {
+    animation: enter-rise var(--settle) var(--ease-out) backwards;
     display: grid;
     gap: 0.85rem;
     padding: 1.25rem 1.35rem;

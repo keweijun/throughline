@@ -106,7 +106,7 @@
       aria-controls="thread-body-{question.id}"
       aria-label={open ? t("Collapse question") : t("Expand question")}
       onclick={() => (open = !open)}
-    ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
+    ><span aria-hidden="true" class="chevron" class:open></span></button>
     <!-- The whole summary opens the thread; the toggle button is the keyboard-accessible control. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="summary" onclick={() => (open = true)}>
@@ -267,6 +267,7 @@
   }
 
   .body {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.6rem;
     padding-left: 1.7rem;

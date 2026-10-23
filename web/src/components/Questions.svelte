@@ -114,9 +114,9 @@
   {#if questions.length}
     <div class="list-head">
       <h3 class="list-title">{t("Your questions")}</h3>
-      <div class="scope" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
-        <label><input type="radio" bind:group={scope} value="section" /> {t("This section ({count})", { count: inSection.length })}</label>
-        <label><input type="radio" bind:group={scope} value="all" /> {t("All ({count})", { count: questions.length })}</label>
+      <div class="scope segmented" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
+        <label><input type="radio" bind:group={scope} value="section" />{t("This section ({count})", { count: inSection.length })}</label>
+        <label><input type="radio" bind:group={scope} value="all" />{t("All ({count})", { count: questions.length })}</label>
       </div>
       {#if questions.length > 4}
         <input class="search" type="search" bind:value={search} aria-label={t("Search questions")} placeholder={t("Search questions and answers…")} />
@@ -209,17 +209,7 @@
   }
 
   .scope {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-  }
-
-  .scope label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    align-self: flex-start;
   }
 
   .search {

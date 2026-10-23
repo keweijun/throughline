@@ -141,6 +141,7 @@
 
 <style>
   .pop {
+    animation: enter-pop var(--quick) var(--ease-out);
     position: fixed;
     z-index: 50;
     display: flex;

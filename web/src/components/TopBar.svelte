@@ -130,6 +130,7 @@
   }
 
   .track span {
+    transition: width 0.4s var(--ease-out);
     display: block;
     height: 100%;
     background: var(--accent);

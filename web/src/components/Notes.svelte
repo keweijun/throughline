@@ -79,9 +79,9 @@
     </form>
   {/if}
 
-  <div class="scope" role="radiogroup" aria-label={t("Show notes from")}>
-    <label><input type="radio" bind:group={scope} value="section" /> {t("This section")}</label>
-    <label><input type="radio" bind:group={scope} value="all" /> {t("All sections ({count})", { count: total })}</label>
+  <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
+    <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
+    <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
   </div>
 
   {#each groups as group (group.concept!.id)}
@@ -159,18 +159,7 @@
   }
 
   .scope {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
     margin-top: 0.5rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-  }
-
-  .scope label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
   }
 
   h3 {

@@ -18,7 +18,7 @@
 你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可；桌面应用自带贯学所需的命令）以及 Python 3.10 或更高版本。把下面这段粘贴到 Codex：
 
 ```text
-帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup`，把输出给我看，并打开它输出的欢迎对话链接；如果没有，就打开项目链接（如果你是 Codex CLI，就告诉我在它输出的文件夹里启动 codex）。
+帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup --language zh-CN`，把输出给我看，并打开它输出的欢迎对话链接；如果没有，就打开项目链接（如果你是 Codex CLI，就告诉我在它输出的文件夹里启动 codex）。
 ```
 
 Codex 会安装应用（不需要 Node.js），把 `$guided-learning` 技能放进 `~/.agents/skills/`，创建贯学文件夹并将其作为 Codex 项目打开，还会在应用菜单中添加 Throughline 启动器。以后再粘贴一次同样的内容即可更新。

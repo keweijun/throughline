@@ -18,7 +18,7 @@ The teacher makes instructional judgments from your materials. The program valid
 You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli); the app includes the command Throughline uses), and Python 3.10 or newer. Paste this into Codex:
 
 ```text
-Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup`, show me its output, and open the welcome chat link it prints, or the project link if there is none (if you are the Codex CLI, tell me to start codex in the folder it prints instead).
+Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` (add `--language zh-CN` if I write to you in Chinese), show me its output, and open the welcome chat link it prints, or the project link if there is none (if you are the Codex CLI, tell me to start codex in the folder it prints instead).
 ```
 
 Codex installs the app (no Node.js needed), adds the `$guided-learning` skill to `~/.agents/skills/`, creates your Throughline folder and opens it as a Codex project, and adds a Throughline launcher to your app menu. Paste the same prompt again to update.

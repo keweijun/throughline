@@ -25,12 +25,60 @@ def find_codex():
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
+def ensure_project(root, name, timeout=60):
+    """The Codex app project whose root is `root`, created if missing; returns its id."""
+    process = subprocess.Popen([find_codex() or 'codex', 'app-server', '--stdio'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                               stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace',
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    def call(method, params):
+        identifier = call.next
+        call.next += 1
+        process.stdin.write(json.dumps({'id': identifier, 'method': method, 'params': params}) + '\n')
+        process.stdin.flush()
+        deadline = time.monotonic() + timeout
+        for line in process.stdout:
+            try:
+                message = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if message.get('id') == identifier and 'method' not in message:
+                if 'error' in message:
+                    raise RuntimeError(message['error'].get('message', 'Codex rejected ' + method))
+                return message['result']
+            if time.monotonic() > deadline:
+                break
+        raise RuntimeError('Codex closed the connection during ' + method)
+    call.next = 1
+    wanted = os.path.normcase(os.path.abspath(root))
+    try:
+        call('initialize', {'clientInfo': {'name': 'guided_learning', 'version': '0.4.0'}, 'capabilities': {'experimentalApi': True}})
+        process.stdin.write(json.dumps({'method': 'initialized', 'params': {}}) + '\n')
+        cursor = None
+        while True:
+            page = call('project/list', {'cursor': cursor, 'limit': 100})
+            for project in page['data']:
+                if any(os.path.normcase(os.path.abspath(r['path'])) == wanted for r in project['roots']):
+                    return project['id']
+            cursor = page.get('nextCursor')
+            if not cursor:
+                break
+        return call('project/create', {'idempotencyKey': 'throughline:' + wanted, 'name': name, 'roots': [{'path': str(root)}]})['project']['id']
+    finally:
+        process.stdin.close()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+
 class CodexRunner:
-    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True):
+    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True, project_id=None, name=None):
         self.model, self.effort, self.timeout = model, effort, timeout
         self.command = command
         # A kept thread is saved like any Codex chat, so the Codex app can open it.
         self.ephemeral = ephemeral
+        self.project_id = project_id
+        self.name = name
 
     def run(self, prompt, cwd, emit, cancel):
         command = self.command or [find_codex() or 'codex','app-server','--stdio']
@@ -71,10 +119,12 @@ class CodexRunner:
                     params = {'cwd':str(cwd),'ephemeral':self.ephemeral,'approvalPolicy':'never','sandbox':'read-only',
                               'config':{'model_reasoning_effort':self.effort}}
                     if self.model: params['model'] = self.model
+                    if self.project_id: params['projectId'] = self.project_id
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
                     if not self.ephemeral: emit({'kind':'thread','id':thread_id})
+                    if self.name: send({'id':5,'method':'thread/name/set','params':{'threadId':thread_id,'name':self.name}})
                     params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]}
                     if self.model: params['model'] = self.model
                     if cancel.is_set(): return

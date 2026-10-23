@@ -2,6 +2,7 @@
   import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import type { AnnotationSource } from '../lib/types';
 
   type Pending = { text: string; turnId: string | null; source?: string; questionId?: string; unit?: string; taskId?: string };
@@ -121,7 +122,7 @@
   <form class="pop writing" style:left="{left}px" style:top="{top}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
     <label for="quick-note">{t("Note on this passage")}</label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea id="quick-note" rows="3" bind:value={note} onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
+    <textarea id="quick-note" rows="3" bind:value={note} use:autogrow={note} onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
     <div class="actions">
       <button type="button" class="btn btn-quiet btn-small" onclick={close}>{t("Cancel")}</button>
       <button type="submit" class="btn btn-small" disabled={!note.trim()}>{t("Save note")}</button>

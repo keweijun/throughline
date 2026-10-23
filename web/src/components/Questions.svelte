@@ -3,6 +3,7 @@
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import QuestionThread from './QuestionThread.svelte';
   import type { Question } from '../lib/types';
 
@@ -97,7 +98,7 @@
       <textarea
         id="question-input"
         rows="3"
-        bind:value={question}
+        bind:value={question} use:autogrow={question}
         aria-label={t("Side question")}
         placeholder={app.quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
         onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}

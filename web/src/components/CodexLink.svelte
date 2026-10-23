@@ -20,4 +20,4 @@
   }
 </script>
 
-{#if root}<a class={className} {href} onclick={copy}>{@render children()}</a>{/if}
+{#if root}<a class="codex-link {className}" {href} onclick={copy}>{@render children()}</a>{/if}

@@ -72,7 +72,7 @@
     gap: 1.25rem;
     margin-top: 3.5rem;
     padding-top: 2rem;
-    border-top: 2px solid var(--ink);
+    border-top: 1px solid var(--rule-strong);
   }
 
   h2 {

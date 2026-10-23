@@ -3,6 +3,7 @@
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
   import { lessonStatus } from '../lib/format';
   import type { Question, QuestionReply } from '../lib/types';
@@ -210,7 +211,7 @@
     {/if}
     <label class="field">
       <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:autogrow={replyText} aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
     </label>
     <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
   </form>

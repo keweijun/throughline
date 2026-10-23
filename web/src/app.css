@@ -197,7 +197,7 @@ a {
 
 .btn:disabled {
   opacity: 0.55;
-  cursor: progress;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -211,6 +211,33 @@ a {
   border-color: var(--accent-hover);
 }
 
+/* A primary action that is not ready yet (nothing typed) goes neutral rather than a faded accent. */
+.btn-primary:disabled,
+.btn-primary:disabled:hover {
+  opacity: 1;
+  background: var(--rule);
+  border-color: var(--rule);
+  color: var(--pencil);
+}
+
+/* Links that leave the app for Codex say so with an arrow. */
+.codex-link:not(.btn) {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.codex-link:not(.btn):hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.codex-link::after {
+  content: '↗';
+  margin-left: 0.25em;
+  font-size: 0.9em;
+}
+
 .btn-quiet {
   border-color: transparent;
   background: transparent;
@@ -221,6 +248,12 @@ a {
 .btn-quiet:hover {
   background: var(--accent-wash);
   border-color: transparent;
+}
+
+/* A toggle that is on (an open panel, the page you are on) stays marked, not just while hovered. */
+.btn-quiet[aria-pressed='true'] {
+  background: var(--accent-wash);
+  font-weight: 600;
 }
 
 .btn-small {
@@ -244,27 +277,43 @@ a {
 input[type='text'],
 input[type='password'],
 input[type='url'],
+input[type='search'],
 select,
 textarea {
   width: 100%;
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem 0.75rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--raised);
   font-size: var(--step-0);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--pencil);
+}
+
+::placeholder {
+  color: var(--pencil);
+  opacity: 0.75;
+}
+
+/* Text areas grow with what is typed (lib/autogrow.ts) instead of offering a drag handle, then scroll. */
 textarea {
-  resize: vertical;
+  display: block;
+  resize: none;
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-  border-color: transparent;
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 /* Selects draw the same chevron as disclosures instead of each browser's arrow. */

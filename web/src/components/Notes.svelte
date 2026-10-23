@@ -2,6 +2,7 @@
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import type { Annotation } from '../lib/types';
 
   let scope = $state<'section' | 'all'>('section');
@@ -71,7 +72,7 @@
       <textarea
         id="section-note"
         rows="2"
-        bind:value={draft}
+        bind:value={draft} use:autogrow={draft}
         placeholder={t("Add a note to this section…")}
         onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
       ></textarea>
@@ -102,7 +103,7 @@
             {#if editing === item.id}
               <textarea
                 rows="3"
-                bind:value={edit}
+                bind:value={edit} use:autogrow={edit}
                 aria-label={t("Note")}
                 onkeydown={(e) => {
                   if (e.key === 'Escape') editing = null;

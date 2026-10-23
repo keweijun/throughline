@@ -2,7 +2,7 @@
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
-  import { markAsked, clearAsked } from '../lib/highlight';
+  import { mark, clear } from '../lib/highlight';
   import { lessonStatus } from '../lib/format';
   import type { Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
@@ -16,9 +16,11 @@
   const asked = $derived(
     (app.state?.questions ?? []).filter((q) => q.selection && (q.selected_turn_id ?? q.main_turn_id) === turn.id),
   );
+  const mine = $derived((app.state?.annotations ?? []).filter((a) => a.turn_id === turn.id && a.passage));
 
-  // Margin notes sit level with the passage each question was asked about.
-  let notes = $state<{ top: number; ids: string[] }[]>([]);
+  // Margin markers sit level with the passage: one for questions asked about it, one for the learner's notes on it.
+  type Row = { top: number; questions: string[]; notes: string[] };
+  let rows = $state<Row[]>([]);
   let width = $state(0);
   let fonts = $state(false);
   document.fonts?.ready.then(() => (fonts = true));
@@ -28,18 +30,24 @@
     void turn.text;
     void width;
     void fonts;
-    const found = markAsked(turn.id, body, asked.map((q) => q.selection));
     const origin = body.getBoundingClientRect().top;
-    const rows: { top: number; ids: string[] }[] = [];
-    found.forEach((range, i) => {
+    const found: Row[] = [];
+    const place = (range: Range | null, add: (row: Row) => void) => {
       if (!range) return;
       const top = Math.round(range.getClientRects()[0]?.top - origin);
-      const row = rows.find((r) => Math.abs(r.top - top) < 24);
-      if (row) row.ids.push(asked[i].id);
-      else rows.push({ top, ids: [asked[i].id] });
+      let row = found.find((r) => Math.abs(r.top - top) < 24);
+      if (!row) found.push((row = { top, questions: [], notes: [] }));
+      add(row);
+    };
+    mark('asked', turn.id, body, asked.map((q) => q.selection)).forEach((range, i) => place(range, (row) => row.questions.push(asked[i].id)));
+    mark('mine', turn.id, body, mine.map((a) => a.passage)).forEach((range, i) => {
+      if (mine[i].note) place(range, (row) => row.notes.push(mine[i].id));
     });
-    notes = rows;
-    return () => clearAsked(turn.id);
+    rows = found;
+    return () => {
+      clear('asked', turn.id);
+      clear('mine', turn.id);
+    };
   });
 
   function openThread(id: string) {
@@ -64,17 +72,30 @@
   {/if}
 
   {#if turn.text}
-    <div class="notes" aria-label={t("Questions asked about this lesson")}>
-      {#each notes as note}
-        <button
-          class="note"
-          style:top="{note.top}px"
-          onclick={() => openThread(note.ids[0])}
-          aria-label={t("Open your question about this passage")}
-          title={note.ids.length > 1 ? t('{count} questions about this passage', { count: note.ids.length }) : t('Your question about this passage')}
-        >
-          <span aria-hidden="true">?</span>{#if note.ids.length > 1}<sup>{note.ids.length}</sup>{/if}
-        </button>
+    <div class="notes" aria-label={t("Questions and notes on this lesson")}>
+      {#each rows as row}
+        <div class="markers" style:top="{row.top}px">
+          {#if row.notes.length}
+            <button
+              class="note mine"
+              onclick={() => app.showAnnotation(row.notes[0])}
+              aria-label={t("Open your note on this passage")}
+              title={t("Your note on this passage")}
+            >
+              <span aria-hidden="true">✎</span>{#if row.notes.length > 1}<sup>{row.notes.length}</sup>{/if}
+            </button>
+          {/if}
+          {#if row.questions.length}
+            <button
+              class="note"
+              onclick={() => openThread(row.questions[0])}
+              aria-label={t("Open your question about this passage")}
+              title={row.questions.length > 1 ? t('{count} questions about this passage', { count: row.questions.length }) : t('Your question about this passage')}
+            >
+              <span aria-hidden="true">?</span>{#if row.questions.length > 1}<sup>{row.questions.length}</sup>{/if}
+            </button>
+          {/if}
+        </div>
       {/each}
     </div>
     <div
@@ -108,14 +129,20 @@
     height: 0;
   }
 
-  .note {
+  .markers {
     position: absolute;
-    left: -2.6rem;
+    right: calc(100% + 1rem);
+    display: flex;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+  }
+
+  .note {
+    position: relative;
     display: grid;
     place-items: center;
     width: 1.6rem;
     height: 1.6rem;
-    margin-top: 0.15rem;
     padding: 0;
     border: 1px solid #c9a82b;
     border-radius: 50% 50% 50% 4px;
@@ -126,6 +153,12 @@
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.15s;
+  }
+
+  .note.mine {
+    border-color: var(--mine);
+    background: var(--mine-wash);
+    color: var(--ink);
   }
 
   .note:hover,
@@ -146,9 +179,12 @@
   }
 
   @media (max-width: 56rem) {
-    .note {
-      left: auto;
+    .markers {
       right: -0.6rem;
+      flex-direction: column;
+    }
+
+    .note {
       width: 1.3rem;
       height: 1.3rem;
       font-size: 0.7rem;

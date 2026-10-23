@@ -2,7 +2,7 @@ from importlib import import_module
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
-MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences')
+MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations')
 
 def execute(workspace, request):
     if not isinstance(request, dict) or not isinstance(request.get('op'), str):

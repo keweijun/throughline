@@ -10,6 +10,8 @@ export type Concept = {
   goal?: string;
 };
 
+export type Coverage = Ref & { concept_ids?: string[]; disposition: 'mapped' | 'deferred' | 'needs_review'; reason?: string };
+
 export type Position = {
   concept_id?: string;
   goal?: string;
@@ -123,7 +125,7 @@ export type State = {
   course: { id: string; title: string };
   position: Position | null;
   sources: { id: string; path: string; revision: string; status: string }[];
-  curriculum: { concepts: Concept[]; route: string[] };
+  curriculum: { concepts: Concept[]; route: string[]; coverage?: Coverage[] };
   session: {
     recent_interactions: Interaction[];
     unanswered_questions: unknown[];
@@ -135,6 +137,23 @@ export type State = {
   practice: { tasks: Task[]; jobs: PracticeJob[] };
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };
   settings: Settings;
+  annotations: Annotation[];
+};
+
+export type AnnotationSource = Ref & { label?: string; page?: number };
+
+/** The learner's own highlight, note or bookmark. Never sent to the teacher. */
+export type Annotation = {
+  id: string;
+  kind: 'highlight' | 'note' | 'bookmark';
+  concept_id: string;
+  turn_id: string | null;
+  task_id?: string | null;
+  source: AnnotationSource | null;
+  passage: string;
+  note: string;
+  created_at: number;
+  updated_at: number;
 };
 
 export type Overview = {

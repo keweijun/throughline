@@ -3,8 +3,15 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import type { PDFDocumentProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
   import { openPdf, pdfjs } from '../lib/pdf';
+  import { mark, clear } from '../lib/highlight';
 
-  let { url, page: target, label }: { url: string; page: number; label: string } = $props();
+  let {
+    url,
+    page: target,
+    label,
+    highlights = [],
+    current = $bindable(target),
+  }: { url: string; page: number; label: string; highlights?: { page: number; passage: string }[]; current?: number } = $props();
 
   let scroller: HTMLDivElement | undefined = $state();
   let doc = $state<PDFDocumentProxy | null>(null);
@@ -12,7 +19,6 @@
   let fit = $state(true);
   let zoom = $state(1);
   let base = $state({ width: 612, height: 792 });
-  let current = $state(1);
   let pageInput = $state('1');
   let width = $state(0);
 
@@ -48,7 +54,20 @@
     go(target, 'instant');
   });
 
+  function markPage(number: number) {
+    const text = elements.get(number)?.querySelector<HTMLElement>('.textLayer');
+    if (!text) return;
+    const passages = highlights.filter((h) => h.page === number).map((h) => h.passage);
+    mark('mine', `pdf-${number}`, text, passages, { loose: true });
+  }
+
+  $effect(() => {
+    void highlights;
+    for (const number of rendered.keys()) markPage(number);
+  });
+
   onDestroy(() => {
+    for (const number of elements.keys()) clear('mine', `pdf-${number}`);
     observer?.disconnect();
     resize?.disconnect();
     for (const r of rendered.values()) r.task?.cancel();
@@ -111,6 +130,7 @@
     element.style.setProperty('--total-scale-factor', String(s));
     element.querySelector('.layers')!.replaceChildren(canvas, text);
     await new pdf.TextLayer({ textContentSource: page.streamTextContent(), container: text, viewport }).render();
+    markPage(number);
   }
 
   function onScroll() {
@@ -180,6 +200,7 @@
         class="pdf-page"
         class:cited={number === target}
         data-page={number}
+        data-unit="page-{number}"
         aria-label={t("Page {page}", { page: number })}
         style:width="{base.width * scale}px"
         style:height="{base.height * scale}px"

@@ -1,23 +1,31 @@
-/** Marks passages the learner asked about, using the CSS Custom Highlight API (no DOM changes). */
-const ranges = new Map<string, Range[]>();
+/** Marks passages using the CSS Custom Highlight API (no DOM changes): ones the learner asked about, and their own highlights. */
+const layers = { asked: new Map<string, Range[]>(), mine: new Map<string, Range[]>() };
+type Layer = keyof typeof layers;
 
-function publish() {
+function publish(layer: Layer) {
   if (!('highlights' in CSS)) return;
-  const all = [...ranges.values()].flat();
-  if (all.length) CSS.highlights.set('asked', new Highlight(...all));
-  else CSS.highlights.delete('asked');
+  const all = [...layers[layer].values()].flat();
+  if (all.length) CSS.highlights.set(layer, new Highlight(...all));
+  else CSS.highlights.delete(layer);
 }
+
+export type LocateOptions = {
+  /** Ignore whitespace entirely, for text split into lines or PDF spans whose breaks are not in the text. */
+  loose?: boolean;
+  skip?: string;
+};
 
 /**
  * Finds a passage in rendered text, ignoring whitespace differences, formulas and citation chips.
  * When the passage occurs more than once, `nearY` (a page offset) picks the occurrence closest to it.
  */
-export function locate(root: HTMLElement, needle: string, nearY?: number): Range | null {
-  const target = needle.replace(/\s+/g, ' ').trim();
+export function locate(root: HTMLElement, needle: string, nearY?: number, options: LocateOptions = {}): Range | null {
+  const target = options.loose ? needle.replace(/\s+/g, '') : needle.replace(/\s+/g, ' ').trim();
   if (target.length < 3) return null;
+  const skip = options.skip ?? '.katex, .citation';
   const nodes: Text[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => (node.parentElement?.closest('.katex, .citation') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    acceptNode: (node) => (node.parentElement?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
   });
   while (walker.nextNode()) nodes.push(walker.currentNode as Text);
   // Build a whitespace-collapsed copy of the text with a map back to node offsets.
@@ -27,7 +35,7 @@ export function locate(root: HTMLElement, needle: string, nearY?: number): Range
     const value = node.data;
     for (let i = 0; i < value.length; i++) {
       const space = /\s/.test(value[i]);
-      if (space && flat.endsWith(' ')) continue;
+      if (space && (options.loose || flat.endsWith(' '))) continue;
       flat += space ? ' ' : value[i];
       map.push([node, i]);
     }
@@ -54,14 +62,35 @@ export function locate(root: HTMLElement, needle: string, nearY?: number): Range
 }
 
 /** Highlights each passage and returns its range (null when the passage is no longer in the text). */
-export function markAsked(key: string, root: HTMLElement, passages: string[]): (Range | null)[] {
-  const found = passages.map((p) => locate(root, p));
-  ranges.set(key, found.filter((r): r is Range => r !== null));
-  publish();
+export function mark(layer: Layer, key: string, root: HTMLElement, passages: string[], options?: LocateOptions): (Range | null)[] {
+  const found = passages.map((p) => locate(root, p, undefined, options));
+  layers[layer].set(key, found.filter((r): r is Range => r !== null));
+  publish(layer);
   return found;
 }
 
-export function clearAsked(key: string) {
-  ranges.delete(key);
-  publish();
+export function clear(layer: Layer, key: string) {
+  layers[layer].delete(key);
+  publish(layer);
+}
+
+let nextKey = 0;
+
+/** Svelte action: keeps the learner's highlights painted in a rendered block as its text changes. */
+export function highlights(node: HTMLElement, params: { passages: string[]; text?: string }) {
+  const key = `block-${nextKey++}`;
+  let frame = 0;
+  const paint = (p: { passages: string[] }) => {
+    cancelAnimationFrame(frame);
+    // Wait for the Markdown action to finish patching this block.
+    frame = requestAnimationFrame(() => mark('mine', key, node, p.passages));
+  };
+  paint(params);
+  return {
+    update: paint,
+    destroy() {
+      cancelAnimationFrame(frame);
+      clear('mine', key);
+    },
+  };
 }

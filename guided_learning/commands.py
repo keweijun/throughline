@@ -13,6 +13,7 @@ from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
 from . import library
+from .codex import find_codex
 
 SKILL = Path(__file__).resolve().parent / 'skill'
 COMMANDS = ('setup', 'open', 'stop', 'courses')
@@ -49,8 +50,8 @@ def setup(args):
     print(f'Throughline {version()} is ready.')
     print(f'Codex skill: {target}')
     print(f'Course library: {root}')
-    if not shutil.which('codex'):
-        print('Warning: the codex command is not on PATH; lessons in the interface need it.')
+    if not find_codex():
+        print('Warning: Codex was not found (neither the codex command nor the Codex app); lessons in the interface need it. Set CODEX_CLI_PATH if it is installed somewhere else.')
     try:
         import pypdf  # noqa: F401
     except ImportError:

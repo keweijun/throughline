@@ -11,11 +11,11 @@
 
 贯学（Throughline）把多份 PDF 和 Markdown 资料组织成一条与原文出处相连的学习路线，然后在浏览器里带你学：单元导览、流式讲解、针对任意段落提问、原文页面与讲解并排、练习，以及随时可以接着学的进度。
 
-教学判断由老师依据你的资料做出；程序只负责校验状态和引用，从不自行认定你已经掌握。所有内容都在你自己的电脑上运行，由你自己的 Codex CLI 担任老师。
+教学判断由老师依据你的资料做出；程序只负责校验状态和引用，从不自行认定你已经掌握。所有内容都在你自己的电脑上运行，由你自己的 Codex 担任老师。
 
 ## 安装
 
-你需要已登录的 [Codex CLI](https://learn.chatgpt.com/docs/codex/cli) 和 Python 3.10 或更高版本。把下面这段粘贴到 Codex：
+你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可；桌面应用自带贯学所需的命令）以及 Python 3.10 或更高版本。把下面这段粘贴到 Codex：
 
 ```text
 帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup`，把输出给我看。

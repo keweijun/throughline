@@ -1,10 +1,24 @@
 """Owned Codex App Server transport. Never writes teacher-generated lecture files."""
 import json
+import os
 import queue
 import shutil
 import subprocess
 import threading
 import time
+
+
+def find_codex():
+    """The codex binary: CODEX_CLI_PATH, then PATH, then the copy bundled with the Codex desktop app."""
+    if os.environ.get('CODEX_CLI_PATH'):
+        return os.environ['CODEX_CLI_PATH']
+    found = shutil.which('codex')
+    if found:
+        return found
+    bundled = ['/Applications/Codex.app/Contents/Resources/codex', os.path.expanduser('~/Applications/Codex.app/Contents/Resources/codex')]
+    if os.environ.get('LOCALAPPDATA'):
+        bundled.append(os.path.join(os.environ['LOCALAPPDATA'], 'OpenAI', 'Codex', 'bin', 'codex.exe'))
+    return next((path for path in bundled if os.path.isfile(path)), None)
 
 
 class CodexRunner:
@@ -13,7 +27,7 @@ class CodexRunner:
         self.command = command
 
     def run(self, prompt, cwd, emit, cancel):
-        command = self.command or [shutil.which('codex') or 'codex','app-server','--stdio']
+        command = self.command or [find_codex() or 'codex','app-server','--stdio']
         process = subprocess.Popen(command,cwd=cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
                                    text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         incoming = queue.Queue()

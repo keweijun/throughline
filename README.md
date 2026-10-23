@@ -11,11 +11,11 @@
 
 Throughline organizes several PDFs and Markdown documents into one source-linked route, then teaches it in your browser: unit overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
 
-The teacher makes instructional judgments from your materials. The program validates state and references; it never decides on its own that you have understood something. Everything runs on your computer, with your own Codex CLI as the teacher.
+The teacher makes instructional judgments from your materials. The program validates state and references; it never decides on its own that you have understood something. Everything runs on your computer, with your own Codex as the teacher.
 
 ## Install
 
-You need the [Codex CLI](https://learn.chatgpt.com/docs/codex/cli), signed in, and Python 3.10 or newer. Paste this into Codex:
+You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli); the app includes the command Throughline uses), and Python 3.10 or newer. Paste this into Codex:
 
 ```text
 Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` and show me its output.

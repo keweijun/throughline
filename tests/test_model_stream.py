@@ -69,3 +69,21 @@ for line in sys.stdin:
                     self.assertLess(time.monotonic()-started,1.5)
                     self.assertIsNotNone(owned[0].poll())
                 finally:timer.cancel()
+
+
+class FindCodex(unittest.TestCase):
+    def test_explicit_path_then_path_then_desktop_app(self):
+        from unittest import mock
+        from guided_learning import codex
+        with tempfile.TemporaryDirectory() as tmp:
+            bundled = Path(tmp) / 'OpenAI' / 'Codex' / 'bin' / 'codex.exe'
+            bundled.parent.mkdir(parents=True)
+            bundled.write_text('')
+            with mock.patch.dict(codex.os.environ, {'CODEX_CLI_PATH': '/opt/codex'}):
+                self.assertEqual(codex.find_codex(), '/opt/codex')
+            with mock.patch.dict(codex.os.environ, {'LOCALAPPDATA': tmp}), mock.patch.object(codex.shutil, 'which', return_value='/usr/bin/codex'):
+                codex.os.environ.pop('CODEX_CLI_PATH', None)
+                self.assertEqual(codex.find_codex(), '/usr/bin/codex')
+            with mock.patch.dict(codex.os.environ, {'LOCALAPPDATA': tmp}), mock.patch.object(codex.shutil, 'which', return_value=None):
+                codex.os.environ.pop('CODEX_CLI_PATH', None)
+                self.assertEqual(codex.find_codex(), str(bundled))

@@ -1,6 +1,6 @@
 # Creating and reviewing a course
 
-Ask Codex `$guided-learning create a course called <name> from these files: …`. The skill follows the steps below; they are written out here so the result can be checked or reproduced by hand with the `guided-learning` command.
+Ask Codex `$throughline create a course called <name> from these files: …`. The skill follows the steps below; they are written out here so the result can be checked or reproduced by hand with the `guided-learning` command.
 
 1. **Collect sources.** Copy the originals into `<library>/<name>/inputs/`, keeping the originals elsewhere. Source identity follows the absolute path, so register stable copies, not files in Downloads or a temporary folder. `guided-learning courses` prints the library root.
 2. **Register.** Run `course.init`, then `source.register {path}` for each copy, and inspect each with `source.read {source_id}`. Reading success only establishes text extraction: PDFs are split by physical page (`page-1` onward), Markdown by line, and the two locators are never mixed.

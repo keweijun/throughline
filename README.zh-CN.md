@@ -21,25 +21,25 @@
 帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup --language zh-CN`，然后把它输出的欢迎指南原样展示给我。
 ```
 
-Codex 会安装应用（不需要 Node.js），把 `$guided-learning` 技能放进 `~/.agents/skills/`，创建贯学文件夹并将其作为 Codex 项目打开，还会在应用菜单中添加 Throughline 启动器。以后再粘贴一次同样的内容即可更新。
+Codex 会安装应用（不需要 Node.js），把 `$throughline` 技能放进 `~/.agents/skills/`，创建贯学文件夹，并在应用菜单中添加 Throughline 启动器。以后再粘贴一次同样的内容即可更新。
 
 ## 创建第一门课程
 
-安装完成后，你用来安装的这段对话会被移入 Codex 中新建的 **Throughline** 项目，并显示一份简短的欢迎指南。
+安装完成后，Codex 会显示一份简短的欢迎指南。之后在任意 Codex 对话中以 **`$throughline`** 开头，就能处理你的课程。
 
-1. 附上你的 PDF 或笔记（也可以写出它们所在的文件夹），再用一句话说明想学什么，例如"量子力学，学到微扰理论，为了期末考试"。
+1. 输入 `$throughline 用这些文件建一门课`，附上你的 PDF 或笔记（也可以写出它们所在的文件夹），再用一句话说明想学什么，例如“量子力学，学到微扰理论，为了期末考试”。
 2. Codex 会先问几个简单的问题：你的目标和截止时间、对资料所需的各项先修知识掌握得如何、希望讲到多细。然后它会建议课程名，把文件复制进贯学文件夹，生成跨资料的学习路线，并告诉你哪些内容仍需核对。
 3. 完成后，课程会在浏览器的贯学中打开。之后可以从应用菜单里的 **Throughline** 启动器直接打开。
 
-以后创建课程也是一样：在贯学课程库中点击 **在 Codex 中新建课程**，或在 Throughline 项目中新建对话。
+以后创建课程也是一样：在任意 Codex 对话中输入 `$throughline`，或在贯学课程库中点击 **在 Codex 中新建课程**。
 
 ## 工作方式
 
 在贯学里学习，在 Codex 里创建课程，两者之间一键切换。
 
 - **在贯学里学习**：从应用菜单中的 **Throughline** 启动器打开（安装时会自动添加）。讲解、提问和练习都在后台调用 Codex，学习时不需要打开 Codex。
-- **在 Codex 里创建课程**：安装时会把你的贯学文件夹设为 Codex 项目。在课程库中点击 **在 Codex 中新建课程**、**在 Codex 中添加文件** 或 **在 Codex 中核对**，会在该项目中新建对话并填好请求：附上文件后发送即可。Codex 读完资料、生成路线后会在贯学中打开这门课程；已打开的贯学页面会自动更新。
-- **也可以从 Codex 开始**：在贯学项目里直接说"用这些课件做一门课"、"把这份习题加入 quantum"、"打开 quantum"。Codex 第一次启动贯学时会请求权限，因为应用会在后台持续运行。
+- **在 Codex 里创建课程**：在任意 Codex 对话中以 `$throughline` 开头。在课程库中点击 **在 Codex 中新建课程**、**在 Codex 中添加文件** 或 **在 Codex 中核对**，会新建一段已填好 `$throughline` 请求的 Codex 对话：附上文件后发送即可。Codex 读完资料、生成路线后会在贯学中打开这门课程；已打开的贯学页面会自动更新。
+- **想做什么直接说**：`$throughline 把这份习题加入 quantum`、`$throughline 把量子课讲得更严谨些`、`$throughline 打开 quantum`。Codex 第一次启动贯学时会请求权限，因为应用会在后台持续运行。
 
 ![课程库：列出三门课程及其资料、小节、待核对数量和当前学习位置](docs/images/library-zh-CN.png)
 
@@ -66,7 +66,7 @@ Codex 会安装应用（不需要 Node.js），把 `$guided-learning` 技能放�
 
 ## 文件在哪里
 
-- **课程**：你的贯学文件夹 `~/Throughline`（Windows 上是 `Documents\Throughline`；设置 `GUIDED_LEARNING_HOME` 可改用其他文件夹）。它同时也是你的 Codex 项目，其中的 `AGENTS.md` 告诉 Codex 如何在这里工作。每门课程是一个子文件夹，包含源文件（`inputs/`）、资料快照、路线、进度和学习记录；要迁移课程，先关闭应用，再复制整个文件夹。
+- **课程**：你的贯学文件夹 `~/Throughline`（Windows 上是 `C:\Users\<你>\Throughline`）。它特意放在“文档”之外，因为“文档”常被 OneDrive 或 iCloud 同步，而同步可能损坏课程数据库。设置 `GUIDED_LEARNING_HOME` 可改用其他文件夹；如果指向同步文件夹，请每门课程同一时间只在一台电脑上打开。其中的 `AGENTS.md` 告诉 Codex 如何在这里工作。每门课程是一个子文件夹，包含源文件（`inputs/`）、资料快照、路线、进度和学习记录；要迁移课程，先关闭应用，再复制整个文件夹。
 - **教师设置**：点击顶栏中的齿轮打开 **设置**，在教师一项中选择 Codex 模型和推理强度。设置按用户保存在 `~/.config/guided-learning/settings.json`（Windows 上是 `%APPDATA%\guided-learning\settings.json`），不会写进任何课程。
 
 文字提取并不能保证公式、图片或覆盖范围正确，所以课程库和阅读器会标出仍需核对的内容。参见[创建与核对课程](docs/course-import.md)（英文）。

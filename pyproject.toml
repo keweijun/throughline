@@ -24,4 +24,4 @@ guided-learning-web = "guided_learning.web:main"
 include = ["guided_learning*"]
 
 [tool.setuptools.package-data]
-guided_learning = ["web_dist/*", "web_dist/assets/*", "skill/*.md", "skill/references/*.md", "skill/agents/*.yaml"]
+guided_learning = ["web_dist/*", "web_dist/assets/*", "skill/*.md", "skill/references/*.md", "skill/agents/*.yaml", "icons/*"]

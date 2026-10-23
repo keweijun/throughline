@@ -1,4 +1,4 @@
 interface:
   display_name: "Throughline"
   short_description: "Build a course from documents and open the learning UI"
-  default_prompt: "Use $guided-learning to organize my documents into a course and open its learning interface."
+  default_prompt: "Use $throughline to organize my documents into a course and open its learning interface."

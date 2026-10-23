@@ -25,53 +25,6 @@ def find_codex():
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
-def ensure_project(root, name, thread_id=None, timeout=60):
-    """The Codex app project whose root is `root`, created if missing; moves `thread_id` into it. Returns the project id."""
-    process = subprocess.Popen([find_codex() or 'codex', 'app-server', '--stdio'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace',
-                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-    def call(method, params):
-        identifier = call.next
-        call.next += 1
-        process.stdin.write(json.dumps({'id': identifier, 'method': method, 'params': params}) + '\n')
-        process.stdin.flush()
-        deadline = time.monotonic() + timeout
-        for line in process.stdout:
-            try:
-                message = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if message.get('id') == identifier and 'method' not in message:
-                if 'error' in message:
-                    raise RuntimeError(message['error'].get('message', 'Codex rejected ' + method))
-                return message['result']
-            if time.monotonic() > deadline:
-                break
-        raise RuntimeError('Codex closed the connection during ' + method)
-    call.next = 1
-    wanted = os.path.normcase(os.path.abspath(root))
-    try:
-        call('initialize', {'clientInfo': {'name': 'guided_learning', 'version': '0.4.0'}, 'capabilities': {'experimentalApi': True}})
-        process.stdin.write(json.dumps({'method': 'initialized', 'params': {}}) + '\n')
-        cursor, found = None, None
-        while not found:
-            page = call('project/list', {'cursor': cursor, 'limit': 100})
-            found = next((p['id'] for p in page['data'] if any(os.path.normcase(os.path.abspath(r['path'])) == wanted for r in p['roots'])), None)
-            cursor = page.get('nextCursor')
-            if not cursor:
-                break
-        found = found or call('project/create', {'idempotencyKey': 'throughline:' + wanted, 'name': name, 'roots': [{'path': str(root)}]})['project']['id']
-        if thread_id:
-            call('thread/metadata/update', {'threadId': thread_id, 'projectId': found})
-        return found
-    finally:
-        process.stdin.close()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-
-
 class CodexRunner:
     def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True, project_id=None, name=None):
         self.model, self.effort, self.timeout = model, effort, timeout

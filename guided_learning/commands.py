@@ -18,63 +18,68 @@ from . import library
 from .codex import find_codex
 
 SKILL = Path(__file__).resolve().parent / 'skill'
-ICON = Path(__file__).resolve().parent / 'web_dist' / 'favicon.svg'
-PROJECT_MARKER = '<!-- Written by guided-learning setup; rerunning setup replaces this file. -->'
-FIRST_PROMPT = '$guided-learning Help me create my first Throughline course.'
+ICONS = Path(__file__).resolve().parent / 'icons'
+LIBRARY_MARKER = '<!-- Written by guided-learning setup; rerunning setup replaces this file. -->'
 LANGUAGES = ('en', 'zh-CN')
 LAUNCHER_HINTS = {
     'nt': {'en': 'search for "Throughline" in the Start menu', 'zh-CN': '在开始菜单中搜索“Throughline”'},
     'darwin': {'en': 'open Throughline from Launchpad, Spotlight, or Applications in your home folder', 'zh-CN': '从启动台、聚焦搜索或个人文件夹中的“应用程序”打开 Throughline'},
     'linux': {'en': 'open Throughline from your app menu', 'zh-CN': '从应用菜单中打开 Throughline'},
-    None: {'en': 'ask Codex in the Throughline project to "open Throughline"', 'zh-CN': '在 Throughline 项目中让 Codex“打开贯学”'},
+    None: {'en': 'ask Codex "$throughline open"', 'zh-CN': '在 Codex 中输入“$throughline 打开”'},
 }
 
 
-def welcome(root, launcher, moved, language):
+def welcome(root, launcher, language):
     """The guide setup prints for Codex to show the learner in the install chat."""
     platform = None if not launcher else 'nt' if os.name == 'nt' else 'darwin' if sys.platform == 'darwin' else 'linux'
     hint = LAUNCHER_HINTS[platform][language]
     if language == 'zh-CN':
-        here = '这段对话已移入 Codex 的“Throughline”项目，以后创建和修改课程都在这个项目里进行。' if moved else f'在 Codex 中把 {root} 作为项目打开（项目名 Throughline），以后创建和修改课程都在那里进行。'
         return f"""## 欢迎使用贯学（Throughline）
 
 贯学把你自己的 PDF、Markdown 笔记和习题集变成有引导的课程：分节讲解、针对任意段落提问、讲解旁边就是原文页面，还有练习。讲课由 Codex 在后台完成，学习时不需要打开 Codex。
 
-**文件在哪里**
-- 贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
-- {here}
+**在 Codex 里用 `$throughline`**
+在任意 Codex 对话中以 `$throughline` 开头，就能创建或修改课程，例如：
+- `$throughline 用这些文件建一门课`（再附上文件，或写出它们所在的文件夹）
+- `$throughline 把这份习题加入 quantum`
+- `$throughline 打开 quantum`
 
-**创建第一门课程**
-在 Throughline 项目的对话里附上你的文件（或写出它们所在的文件夹），再用一句话说明想学什么、为什么学，例如准备考试。Codex 会给出课程名和学习路线，说明哪些内容还需核对，然后在贯学中打开课程。
+建课时，Codex 会先问几个问题（目标和截止时间、先修知识掌握情况、希望讲多细），再给出学习路线，说明哪些内容还需核对，然后在贯学中打开课程。
+
+**文件在哪里**
+贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
 
 **之后怎么学习**
-{hint}。课程库会列出所有课程；需要添加资料或核对页面时，点“在 Codex 中添加文件”或“在 Codex 中核对”回到这个项目。界面顶部可以在 English 和简体中文之间切换。
+{hint}。课程库会列出所有课程，“在 Codex 中…”按钮会打开一段已经写好请求的 Codex 对话。界面顶部可以在 English 和简体中文之间切换。
 
-你想先用哪些文件建课？"""
-    here = 'This chat has been moved into the "Throughline" project in Codex; course work happens in that project from now on.' if moved else f'Open {root} as a project in Codex (name it Throughline); course work happens there.'
+想现在就建第一门课吗？在这里输入 `$throughline`，附上你的文件即可。"""
     return f"""## Welcome to Throughline
 
 Throughline turns your own PDFs, Markdown notes and problem sets into a guided course: lessons section by section, questions about any passage, the original page beside each explanation, and practice. Codex teaches in the background, so you don't need Codex open to study.
 
-**Where things are**
-- Your Throughline folder: `{root}`. Each course is a folder inside it.
-- {here}
+**Use `$throughline` in Codex**
+Start any Codex chat with `$throughline` to create or change a course, for example:
+- `$throughline make a course from these files` (then attach them, or name the folder they're in)
+- `$throughline add this problem set to quantum`
+- `$throughline open quantum`
 
-**Create your first course**
-In a chat in the Throughline project, attach your files (or name the folder they're in) and say in a sentence what you want to learn and why, for example an exam. Codex proposes a course name and route, says what still needs checking, and opens the course in Throughline.
+When building a course, Codex first asks a few questions (your goal and deadline, how well you know the prerequisites, how much detail you want), then proposes a route, says what still needs checking, and opens the course in Throughline.
+
+**Where things are**
+Your Throughline folder: `{root}`. Each course is a folder inside it.
 
 **Study afterwards**
-To open Throughline, {hint}. The library lists every course; "Add files in Codex" and "Review in Codex" bring you back to the project. Switch between English and Simplified Chinese at the top.
+To open Throughline, {hint}. The library lists every course; its "in Codex" buttons open a Codex chat with the request already written. Switch between English and Simplified Chinese at the top.
 
-Which files would you like to start with?"""
+Want to build your first course now? Type `$throughline` here and attach your files."""
 
 
-PROJECT_AGENTS = PROJECT_MARKER + '''
+LIBRARY_AGENTS = LIBRARY_MARKER + '''
 # Throughline course library
 
 This folder is the learner's Throughline course library. Each subfolder containing `course.sqlite3` is one course.
 
-- Use the `$guided-learning` skill for all course work: creating a course, adding files, rebuilding a route, reviewing pages.
+- Use the `$throughline` skill for all course work: creating a course, adding files, rebuilding a route, reviewing pages.
 - Copy a course's source files into `<course>/inputs/` before registering them. Never edit `course.sqlite3`, `sources/` or `.throughline/` by hand.
 - When course work is done, run `guided-learning open <course>` so the learner can study it in the Throughline app.
 - Studying happens in the app. Teach in this chat only when the learner asks for it.
@@ -116,15 +121,11 @@ def windowless_python():
     return sys.executable
 
 
-def project_link(root):
-    return 'codex://new?' + urllib.parse.urlencode({'prompt': FIRST_PROMPT, 'path': str(root)}, quote_via=urllib.parse.quote)
-
-
-def write_project_agents(root):
+def write_library_agents(root):
     target = root / 'AGENTS.md'
-    if target.exists() and not target.read_text(encoding='utf-8').startswith(PROJECT_MARKER):
+    if target.exists() and not target.read_text(encoding='utf-8').startswith(LIBRARY_MARKER):
         return False
-    target.write_text(PROJECT_AGENTS, encoding='utf-8')
+    target.write_text(LIBRARY_AGENTS, encoding='utf-8')
     return True
 
 
@@ -136,9 +137,10 @@ def install_launcher():
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / 'Throughline.lnk'
         script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:GL_LNK);"
-                  "$s.TargetPath=$env:GL_EXE;$s.Arguments='-m guided_learning open';$s.Description='Throughline';$s.Save()")
+                  "$s.TargetPath=$env:GL_EXE;$s.Arguments='-m guided_learning open';$s.Description='Throughline';"
+                  "$s.IconLocation=$env:GL_ICON+',0';$s.Save()")
         result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True,
-                                env={**os.environ, 'GL_LNK': str(target), 'GL_EXE': executable},
+                                env={**os.environ, 'GL_LNK': str(target), 'GL_EXE': executable, 'GL_ICON': str(ICONS / 'throughline.ico')},
                                 creationflags=subprocess.CREATE_NO_WINDOW)
         return target if result.returncode == 0 else None
     command = f'"{sys.executable}" -m guided_learning open'
@@ -152,8 +154,11 @@ def install_launcher():
 <key>CFBundleIdentifier</key><string>io.github.keweijun.throughline</string>
 <key>CFBundleExecutable</key><string>Throughline</string>
 <key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleIconFile</key><string>throughline</string>
 </dict></plist>
 ''', encoding='utf-8')
+        (app / 'Resources').mkdir(exist_ok=True)
+        shutil.copyfile(ICONS / 'throughline.icns', app / 'Resources' / 'throughline.icns')
         launcher = app / 'MacOS' / 'Throughline'
         launcher.write_text(f'#!/bin/sh\nexec {command}\n', encoding='utf-8')
         launcher.chmod(0o755)
@@ -161,46 +166,80 @@ def install_launcher():
     folder = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'applications'
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / 'throughline.desktop'
+    icon = ICONS / 'throughline.png'
     target.write_text(f'[Desktop Entry]\nType=Application\nName=Throughline\nComment=Study your courses\n'
-                      f'Exec={command}\nIcon={ICON}\nTerminal=false\nCategories=Education;\n', encoding='utf-8')
+                      f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Education;\n', encoding='utf-8')
     return target
 
 
+def migrate(root):
+    """Move courses from earlier default locations into `root`; returns (moved, skipped) course names."""
+    moved, skipped = [], []
+    for old in library.legacy_roots():
+        if not old.is_dir() or old.resolve() == root.resolve():
+            continue
+        try:  # a host started from the old location still holds its courses
+            record = json.loads((old / '.throughline' / 'host.json').read_text(encoding='utf-8'))
+            _call(record['port'], 'POST', '/api/shutdown', {})
+            time.sleep(3)
+        except (OSError, ValueError, KeyError, urllib.error.URLError):
+            pass
+        for course in sorted(p for p in old.iterdir() if p.is_dir() and library.is_course(p)):
+            if (root / course.name).exists():
+                skipped.append(str(course))
+                continue
+            try:
+                shutil.move(str(course), str(root / course.name))
+                moved.append(course.name)
+            except OSError:
+                skipped.append(str(course))
+        agents = old / 'AGENTS.md'
+        if agents.is_file() and agents.read_text(encoding='utf-8').startswith(LIBRARY_MARKER):
+            agents.unlink()
+        shutil.rmtree(old / '.throughline', ignore_errors=True)
+        try:
+            old.rmdir()
+        except OSError:
+            pass
+    return moved, skipped
+
+
+def ours(folder, name):
+    marker = folder / 'SKILL.md'
+    return marker.is_file() and f'name: {name}' in marker.read_text(encoding='utf-8')
+
+
 def setup(args):
-    target = skills_dir() / 'guided-learning'
-    marker = target / 'SKILL.md'
-    if target.exists() and not (marker.is_file() and 'name: guided-learning' in marker.read_text(encoding='utf-8')):
-        print(f'Refusing to replace {target}: it is not the Throughline (guided-learning) skill.', file=sys.stderr)
+    target = skills_dir() / 'throughline'
+    if target.exists() and not ours(target, 'throughline'):
+        print(f'Refusing to replace {target}: it is not the Throughline skill.', file=sys.stderr)
         return 1
-    staging = target.with_name('.guided-learning.tmp')
+    previous = skills_dir() / 'guided-learning'  # the skill's name before 0.5
+    if previous.exists() and ours(previous, 'guided-learning'):
+        shutil.rmtree(previous, ignore_errors=True)
+    staging = target.with_name('.throughline.tmp')
     shutil.rmtree(staging, ignore_errors=True)
     shutil.copytree(SKILL, staging, ignore=shutil.ignore_patterns('__pycache__'))
     shutil.rmtree(target, ignore_errors=True)
     staging.rename(target)
     root = library.default_root()
     root.mkdir(parents=True, exist_ok=True)
-    wrote_agents = write_project_agents(root)
+    wrote_agents = write_library_agents(root)
+    migrated, kept = migrate(root)
     launcher = None if args.no_launcher else install_launcher()
     print(f'Throughline {version()} is ready.')
     print(f'Codex skill: {target}')
-    print(f'Course library and Codex project: {root}')
+    print(f'Course library: {root}')
+    if migrated:
+        print(f'Moved {len(migrated)} course(s) into {root}: {", ".join(migrated)}')
+    for path in kept:
+        print(f'Left {path} where it is: a course with that name exists in {root}, or it is in use.')
     if not wrote_agents:
-        print(f'Kept your own {root / "AGENTS.md"}; add a note that course work uses the $guided-learning skill.')
+        print(f'Kept your own {root / "AGENTS.md"}; add a note that course work uses the $throughline skill.')
     if launcher:
         print(f'Launcher: {launcher}')
     elif not args.no_launcher:
         print('Warning: the launcher could not be created; open Throughline with "guided-learning open".')
-    moved = False
-    if os.environ.get('CODEX_THREAD_ID') and find_codex():
-        try:
-            from .codex import ensure_project
-            ensure_project(root, 'Throughline', os.environ['CODEX_THREAD_ID'])
-            moved = True
-        except Exception as exc:
-            print(f'Warning: could not create the Throughline project in Codex ({exc}).')
-    if not moved:
-        print(f'Open the project in the Codex app: {project_link(root)}')
-        print(f'With the Codex CLI, start codex in {root}.')
     if not find_codex():
         print('Warning: Codex was not found (neither the codex command nor the Codex app); lessons in the interface need it. Set CODEX_CLI_PATH if it is installed somewhere else.')
     try:
@@ -210,7 +249,7 @@ def setup(args):
     print()
     print('Show the learner this welcome guide as written:')
     print()
-    print(welcome(root, launcher, moved, args.language))
+    print(welcome(root, launcher, args.language))
     return 0
 
 

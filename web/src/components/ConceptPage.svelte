@@ -10,7 +10,6 @@
   import Composer from './Composer.svelte';
   import Practice from './Practice.svelte';
   import NextSection from './NextSection.svelte';
-  import Preparation from './Preparation.svelte';
   import EarlierHistory from './EarlierHistory.svelte';
   import CodexLink from './CodexLink.svelte';
 
@@ -165,7 +164,7 @@
     {#if preview}
       <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
         <summary>
-          {preview.overview.origin === 'teacher' ? t("Unit overview") : t("Route and sources")}
+          {t("About this section")}
         </summary>
         <UnitOverview {preview} />
       </details>
@@ -191,7 +190,6 @@
 
     {#if isCurrent}
       <NextSection conceptId={conceptId} />
-      <Preparation />
       <EarlierHistory />
     {/if}
   </article>

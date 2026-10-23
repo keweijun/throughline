@@ -1,14 +1,18 @@
 <script lang="ts">
-  import { t, type MessageKey } from '../lib/i18n.svelte';
+  import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import type { Settings } from '../lib/types';
+
+  type Theme = 'system' | 'light' | 'dark';
 
   let dialog: HTMLDialogElement | undefined = $state();
   let model = $state('');
   let effort = $state<Settings['effort']>('medium');
   let message = $state<MessageKey | null>(null);
   let busy = $state(false);
+  let savingLanguage = $state(false);
+  let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
 
@@ -22,46 +26,101 @@
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
 
+  async function changeLanguage(event: Event) {
+    const select = event.currentTarget as HTMLSelectElement;
+    savingLanguage = true;
+    await app.setLanguage(select.value as Language);
+    select.value = locale.language;
+    savingLanguage = false;
+  }
+
+  function changeTheme() {
+    const root = document.documentElement;
+    if (theme === 'system') delete root.dataset.theme;
+    else root.dataset.theme = theme;
+    try {
+      if (theme === 'system') localStorage.removeItem('theme');
+      else localStorage.setItem('theme', theme);
+    } catch {
+      // The choice still applies for this visit.
+    }
+  }
+
   async function save(event: SubmitEvent) {
     event.preventDefault();
     busy = true;
     const result = await app.act(() => api.put<Settings>('/api/settings', { model, effort }));
     busy = false;
-    if (result) message = 'Saved. New lessons, answers and feedback use these settings.';
+    if (result) {
+      app.settings = result;
+      message = 'Saved. New lessons, answers and feedback use these settings.';
+    }
   }
 </script>
 
 <dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
-    <h2 id="settings-title">{t("Teacher settings")}</h2>
+    <h2 id="settings-title">{t("Settings")}</h2>
     <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>{t("Close")}</button>
   </header>
-  {#if settings}
-    <form onsubmit={save}>
-      <p class="intro">{t("Lessons are taught by the Codex CLI on this computer, using your existing Codex sign-in. Text already written stays as it is.")}</p>
-      <label class="field">
-        <span>{t("Model")}</span>
-        <input type="text" bind:value={model} placeholder={t("Leave empty for your Codex default")} autocomplete="off" />
-      </label>
-      <label class="field">
-        <span>{t("Reasoning effort")}</span>
-        <select bind:value={effort}>
-          <option value="minimal">{t("Minimal")}</option>
-          <option value="low">{t("Low")}</option>
-          <option value="medium">{t("Medium")}</option>
-          <option value="high">{t("High")}</option>
-        </select>
-      </label>
-      <div class="row">
-        <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save")}</button>
-        {#if message}<span class="message" role="status">{t(message)}</span>{/if}
-      </div>
-      {#if settings.overridden}
-        <p class="note">{t("This host was started with --model or --effort. Saving here replaces them.")}</p>
-      {/if}
-      <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
-    </form>
-  {/if}
+
+  <section aria-labelledby="language-title">
+    <h3 id="language-title">{t("Language")}</h3>
+    <label class="field">
+      <span class="visually-hidden">{t("Language")}</span>
+      <select aria-label={t("Language")} value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
+        <option value="en">English</option>
+        <option value="zh-CN">简体中文</option>
+      </select>
+    </label>
+    <p class="note">
+      {app.state
+        ? t("For this course: the interface and new teaching content. Sources and saved lessons keep their language.")
+        : t("For this page. Each course keeps its own language once it is open.")}
+    </p>
+  </section>
+
+  <section aria-labelledby="theme-title">
+    <h3 id="theme-title">{t("Appearance")}</h3>
+    <label class="field">
+      <span class="visually-hidden">{t("Appearance")}</span>
+      <select aria-label={t("Appearance")} bind:value={theme} onchange={changeTheme}>
+        <option value="system">{t("Match the system")}</option>
+        <option value="light">{t("Light")}</option>
+        <option value="dark">{t("Dark")}</option>
+      </select>
+    </label>
+  </section>
+
+  <section aria-labelledby="teacher-title">
+    <h3 id="teacher-title">{t("Teacher")}</h3>
+    {#if settings}
+      <form onsubmit={save}>
+        <p class="note">{t("Lessons are taught by the Codex CLI on this computer, using your existing Codex sign-in. Text already written stays as it is.")}</p>
+        <label class="field">
+          <span>{t("Model")}</span>
+          <input type="text" bind:value={model} placeholder={t("Leave empty for your Codex default")} autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>{t("Reasoning effort")}</span>
+          <select bind:value={effort}>
+            <option value="minimal">{t("Minimal")}</option>
+            <option value="low">{t("Low")}</option>
+            <option value="medium">{t("Medium")}</option>
+            <option value="high">{t("High")}</option>
+          </select>
+        </label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save")}</button>
+          {#if message}<span class="message" role="status">{t(message)}</span>{/if}
+        </div>
+        {#if settings.overridden}
+          <p class="note">{t("This host was started with --model or --effort. Saving here replaces them.")}</p>
+        {/if}
+        <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
+      </form>
+    {/if}
+  </section>
 </dialog>
 
 <style>
@@ -97,7 +156,21 @@
     gap: 0.9rem;
   }
 
-  .intro,
+  section {
+    display: grid;
+    gap: 0.5rem;
+    padding-block: 1rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--pencil);
+  }
+
   .note {
     font-size: var(--step--1);
     color: var(--pencil);

@@ -12,7 +12,7 @@
       case 'running':
         return t("Preparing in the background while you read.");
       case 'ready':
-        return t("Prepared. This is teacher material only; it does not count as learning.");
+        return t("Prepared by the teacher in the background.");
       case 'deferred':
         return t("Preparation paused so your own requests go first.");
       case 'failed':
@@ -27,7 +27,7 @@
 
 {#if next}
   <p class="prep" role="status" id="preparation-status">
-    <span><strong>{next.title}:</strong> {text}</span>
+    <span>{text}</span>
     {#if job?.status === 'failed'}
       <button class="btn btn-quiet btn-small" onclick={() => app.act(() => api.post('/api/preparation/retry'))}>{t("Retry preparation")}</button>
     {/if}
@@ -40,13 +40,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.25rem 0.75rem;
-    margin-top: 0.75rem;
+    margin-top: 0.35rem;
     font-size: var(--step--1);
     color: var(--pencil);
-  }
-
-  strong {
-    font-weight: 600;
-    color: var(--ink-soft);
   }
 </style>

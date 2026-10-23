@@ -46,7 +46,7 @@ Write a short, friendly welcome in {LANGUAGES[language]}, using headings or a li
 - Where things are: their Throughline folder is {root}. This chat lives in the Codex project "Throughline", which points at that folder; course work happens in this project.
 - To create the first course: in this chat, attach their files (or name the folder they are in) and say in a sentence what they want to learn and why, for example an exam or a project. Codex proposes a course name and route, says what still needs checking, and opens the course in Throughline.
 - To study afterwards: {how_to_open}. The library there lists every course, and its Codex buttons come back to this project to add files or review pages.
-- The app can switch between English and Simplified Chinese from the language selector at the top.
+- The app can switch between English and Simplified Chinese in Settings, the gear at the top.
 
 End by asking which files they want to start with. Do not run any commands or read any files.'''
 PROJECT_AGENTS = PROJECT_MARKER + '''

@@ -62,12 +62,12 @@ Codex 会安装应用（不需要 Node.js），把 `$guided-learning` 技能放�
   </tr>
 </table>
 
-界面和新的讲解默认使用英文，可以在语言选择器中切换为简体中文。导入的资料和已有记录保留原来的语言，所以上图中的英文课程内容不会被翻译。更多说明见[界面使用说明](docs/learning-ui.md)（英文）。
+界面和新的讲解默认使用英文，可以在 **设置**（顶栏中的齿轮）的语言一项中切换为简体中文。导入的资料和已有记录保留原来的语言，所以上图中的英文课程内容不会被翻译。更多说明见[界面使用说明](docs/learning-ui.md)（英文）。
 
 ## 文件在哪里
 
 - **课程**：你的贯学文件夹 `~/Throughline`（Windows 上是 `Documents\Throughline`；设置 `GUIDED_LEARNING_HOME` 可改用其他文件夹）。它同时也是你的 Codex 项目，其中的 `AGENTS.md` 告诉 Codex 如何在这里工作。每门课程是一个子文件夹，包含源文件（`inputs/`）、资料快照、路线、进度和学习记录；要迁移课程，先关闭应用，再复制整个文件夹。
-- **教师设置**：点击顶栏中的模型名称打开 **教师设置**，选择 Codex 模型和推理强度。设置按用户保存在 `~/.config/guided-learning/settings.json`（Windows 上是 `%APPDATA%\guided-learning\settings.json`），不会写进任何课程。
+- **教师设置**：点击顶栏中的齿轮打开 **设置**，在教师一项中选择 Codex 模型和推理强度。设置按用户保存在 `~/.config/guided-learning/settings.json`（Windows 上是 `%APPDATA%\guided-learning\settings.json`），不会写进任何课程。
 
 文字提取并不能保证公式、图片或覆盖范围正确，所以课程库和阅读器会标出仍需核对的内容。参见[创建与核对课程](docs/course-import.md)（英文）。
 

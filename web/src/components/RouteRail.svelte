@@ -90,7 +90,6 @@
       {/if}
     </section>
   {/if}
-  <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>{t("Teacher settings")}</button>
 </nav>
 
 <style>
@@ -235,11 +234,6 @@
     color: var(--pencil);
   }
 
-  .settings {
-    display: none;
-    margin: 1.5rem 0 0 var(--gutter);
-  }
-
   @media (max-width: 56rem) {
     .rail {
       position: fixed;
@@ -261,10 +255,6 @@
     .rail.open {
       transform: none;
       visibility: visible;
-    }
-
-    .settings {
-      display: inline-flex;
     }
   }
 </style>

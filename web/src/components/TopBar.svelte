@@ -1,36 +1,24 @@
 <script lang="ts">
-  import { t, locale, type Language } from '../lib/i18n.svelte';
-  import { app } from '../lib/store.svelte';
-
-  let savingLanguage = $state(false);
-  async function changeLanguage(event: Event) {
-    const select = event.currentTarget as HTMLSelectElement;
-    savingLanguage = true;
-    await app.setLanguage(select.value as Language);
-    select.value = locale.language;
-    savingLanguage = false;
-  }
+  import { t } from '../lib/i18n.svelte';
+  import { app, type PanelTab } from '../lib/store.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
+  const studying = $derived(!!app.state && !app.libraryOpen);
   const openQuestions = $derived(
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
 
-  function toggleTheme() {
-    const root = document.documentElement;
-    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    root.dataset.theme = dark ? 'light' : 'dark';
-    try {
-      localStorage.setItem('theme', root.dataset.theme);
-    } catch {
-      // The choice still applies for this visit.
-    }
+  // Each side-panel tab has its own toggle, mirroring the tabs inside the panel.
+  const showing = (tab: PanelTab) => studying && app.panelOpen && app.panelTab === tab;
+  function toggle(tab: PanelTab) {
+    if (showing(tab)) app.panelOpen = false;
+    else app.openPanel(tab);
   }
 </script>
 
 <header class="topbar">
-  {#if app.state && !app.libraryOpen}
+  {#if studying}
   <button
     class="btn btn-quiet menu"
     aria-label={t("Course contents")}
@@ -44,10 +32,10 @@
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
-    <span class="course">{app.libraryOpen || !app.state ? t("Throughline") : app.state.course.title}</span>
+    <span class="course">{studying ? app.state!.course.title : t("Throughline")}</span>
   </div>
 
-  {#if route.length && index >= 0 && !app.libraryOpen}
+  {#if route.length && index >= 0 && studying}
     <div class="progress" title={t("Your position on the course route")}>
       <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
       <span class="track" aria-hidden="true"><span style:width="{((index + 1) / route.length) * 100}%"></span></span>
@@ -55,13 +43,6 @@
   {/if}
 
   <div class="actions">
-    <label class="language" title={t('Language applies to the interface and new teaching content.')}>
-      <span class="visually-hidden">{t('Language')}</span>
-      <select aria-label={t('Language')} value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
-        <option value="en">English</option>
-        <option value="zh-CN">简体中文</option>
-      </select>
-    </label>
     {#if app.connection !== 'live'}
       <span class="chip chip-caution" role="status">
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
@@ -71,27 +52,20 @@
       <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
       <span class="wide-only">{t("Courses")}</span>
     </button>
-    <button class="btn btn-quiet model" onclick={() => (app.settingsOpen = true)} title={t("Teacher settings")}>
-      <span class="visually-hidden">{t("Teacher settings")}: </span><span class="model-name">Codex · {app.settings?.model || t("default model")}</span>
-    </button>
-    <button
-      class="btn btn-quiet"
-      disabled={!app.state || app.libraryOpen}
-      aria-pressed={app.panelOpen && app.panelTab === 'questions'}
-      onclick={() => (app.panelOpen && app.panelTab === 'questions' ? (app.panelOpen = false) : app.openPanel('questions'))}
-    >
+    <button class="btn btn-quiet" disabled={!studying} aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
       {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
     </button>
-    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>?</button>
-    <button class="btn btn-quiet icon" onclick={toggleTheme} aria-label={t("Switch light or dark theme")}>
-      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14V3Z" fill="currentColor" /><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+    <button class="btn btn-quiet" disabled={!studying} aria-pressed={showing('source')} title={t("Source reader (s)")} onclick={() => toggle('source')}>
+      {t("Source")}
     </button>
+    <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: language, appearance and teacher")}>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5" /><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    </button>
+    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>?</button>
   </div>
 </header>
 
 <style>
-  .language { flex: none; }
-  .language select { width: auto; max-width: 7rem; font-size: var(--step--1); padding: 0.35rem; }
   .topbar {
     position: sticky;
     top: 0;
@@ -112,6 +86,7 @@
 
   .title {
     display: flex;
+    flex: 0 1 auto;
     align-items: center;
     gap: 0.65rem;
     min-width: 0;
@@ -155,19 +130,10 @@
 
   .actions {
     display: flex;
+    flex: none;
     align-items: center;
     gap: 0.25rem;
     margin-left: auto;
-  }
-
-  .model {
-    color: var(--ink-soft);
-    max-width: 18rem;
-  }
-
-  .model-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .count {
@@ -216,12 +182,19 @@
     }
 
     .progress,
-    .model {
+    .shortcuts {
       display: none;
     }
 
     .topbar {
       gap: 0.5rem;
+    }
+  }
+
+  /* A title cut to a letter or two says nothing; the section heading below names where you are. */
+  @media (max-width: 30rem) {
+    .course {
+      display: none;
     }
   }
 </style>

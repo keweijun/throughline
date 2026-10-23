@@ -73,12 +73,14 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
 
 test('teacher settings save the Codex model and effort', async ({ page, course }) => {
   const { base } = await course('demo_course_fixture');
-  await page.getByRole('button', { name: /^Teacher settings: Codex · default model/ }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('textbox', { name: 'Model' }).fill('gpt-6.1-sol');
   await page.getByRole('combobox', { name: 'Reasoning effort' }).selectOption('high');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Codex · gpt-6.1-sol/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Model' })).toHaveValue('gpt-6.1-sol');
   const settings = await (await page.request.get(base + '/api/settings')).json();
   expect([settings.model, settings.effort]).toEqual(['gpt-6.1-sol', 'high']);
 });

@@ -1,4 +1,4 @@
-import { test, expect } from './fixture';
+import { test, expect, chooseLanguage } from './fixture';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +61,7 @@ test('the library fits a phone screen', async ({ page, course }) => {
 
 test('the library remembers the last language before a course is open', async ({ page, course }) => {
   await course('library_browser_fixture');
-  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('zh-CN');
+  await chooseLanguage(page, 'zh-CN');
   await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();

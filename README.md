@@ -62,12 +62,12 @@ Throughline is where you study; Codex is where courses are built. You move betwe
   </tr>
 </table>
 
-The interface and new teaching default to English; switch to Simplified Chinese from the language selector. Imported materials and earlier records keep their original language. More in [using the interface](docs/learning-ui.md).
+The interface and new teaching default to English; switch to Simplified Chinese under Language in Settings (the gear in the top bar). Imported materials and earlier records keep their original language. More in [using the interface](docs/learning-ui.md).
 
 ## Where things live
 
 - **Courses:** your Throughline folder, `~/Throughline` (`Documents\Throughline` on Windows; set `GUIDED_LEARNING_HOME` to use another folder). It is also your Codex project, with an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
-- **Teacher settings:** open **Teacher settings** (the model name in the top bar) to pick the Codex model and reasoning effort. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
+- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the Codex model and reasoning effort. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).
 

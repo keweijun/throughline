@@ -3,6 +3,7 @@
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
+  import Preparation from './Preparation.svelte';
 
   let { conceptId }: { conceptId: string } = $props();
 
@@ -33,6 +34,7 @@
       {:else if pending}
         <p class="note">{t('{count} exercises stay open and will be waiting for you.', { count: pending })}</p>
       {/if}
+      <Preparation />
     </div>
     <button class="btn btn-primary" disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
   </section>

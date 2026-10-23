@@ -38,3 +38,10 @@ export async function dragSelect(page: Page, locator: ReturnType<Page['locator']
   await page.mouse.up();
   return page.evaluate(() => window.getSelection()!.toString());
 }
+
+/** Language lives in the Settings dialog; choose it there and close the dialog again. */
+export async function chooseLanguage(page: Page, language: 'en' | 'zh-CN') {
+  await page.getByRole('button', { name: /^(Settings|设置)$/ }).click();
+  await page.getByRole('combobox', { name: /^(Language|语言)$/ }).selectOption(language);
+  await page.getByRole('button', { name: /^(Close|关闭)$/ }).click();
+}

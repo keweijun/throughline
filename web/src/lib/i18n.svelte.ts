@@ -263,10 +263,8 @@ const messages = {
   "Courses": "课程",
   "Your courses": "我的课程",
   "Library folder": "课程库目录",
-  "Refresh": "刷新",
   "Back to {course}": "返回{course}",
   "Loading your courses…": "正在加载课程…",
-  "No courses yet. Ask Codex to create one from your documents; it appears here when Codex is done.": "还没有课程。请让 Codex 用你的文档创建一门课程，完成后会显示在这里。",
   "This course could not be read: {error}": "无法读取此课程：{error}",
   "Sources: {count}": "资料：{count}",
   "Sections: {count}": "小节：{count}",
@@ -277,13 +275,20 @@ const messages = {
   "Opening…": "正在打开…",
   "Open": "打开",
   "Route not built yet": "尚未生成路线",
-  "Add or change courses in Codex": "在 Codex 中添加或修改课程",
-  "Codex reads your documents and builds the route. Paste one of these into Codex, then press Refresh.": "Codex 会阅读你的文档并生成学习路线。将下列任一指令粘贴到 Codex，完成后点击刷新。",
-  "$guided-learning create a course called my-course from these files: …": "$guided-learning 用这些文件创建名为 my-course 的课程：…",
-  "$guided-learning add these files to my-course: …": "$guided-learning 把这些文件加入 my-course：…",
-  "$guided-learning review the pages that still need review in my-course": "$guided-learning 核对 my-course 中仍待核对的页面",
   "Copy": "复制",
-  "Copied": "已复制"
+  "Copied": "已复制",
+  "New course in Codex": "在 Codex 中新建课程",
+  "Build the route in Codex": "在 Codex 中生成路线",
+  "Add files in Codex": "在 Codex 中添加文件",
+  "Review in Codex": "在 Codex 中核对",
+  "Courses are built in Codex": "课程在 Codex 中创建",
+  "The Codex buttons open a new chat in your Throughline project with the request typed in. Attach your files, send, and this page updates when Codex is done.": "点击 Codex 按钮会在你的贯学项目中新建对话并填好请求。附上文件后发送，Codex 完成后此页面会自动更新。",
+  "Using the Codex CLI, or nothing opened? Copy a request into Codex in your Throughline folder instead:": "使用 Codex CLI，或者点击后没有反应？可以复制请求，在贯学文件夹中粘贴到 Codex：",
+  "$guided-learning create a new course from these files: ": "$guided-learning 用这些文件创建一门新课程：",
+  "$guided-learning add these files to the course {course}: ": "$guided-learning 把这些文件加入课程 {course}：",
+  "$guided-learning review the pages that still need review in the course {course}": "$guided-learning 核对课程 {course} 中仍待核对的页面",
+  "$guided-learning build the route for the course {course}": "$guided-learning 为课程 {course} 生成学习路线",
+  "No courses yet. Use New course in Codex above; your course appears here when Codex is done.": "还没有课程。点击上方的“在 Codex 中新建课程”，Codex 完成后课程会显示在这里。"
 } as const;
 export type MessageKey = keyof typeof messages;
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {

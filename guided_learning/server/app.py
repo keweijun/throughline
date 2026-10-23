@@ -78,13 +78,34 @@ class OpenCourseRequest(Body):
 class Courses:
     """The course library this host serves and the one course it owns at a time."""
 
-    def __init__(self, root, runner, settings):
+    def __init__(self, root, runner, settings, watch_interval=1.5):
         self.root = Path(root).resolve() if root else None
         self.runner = runner
         self.settings = settings
         self.events = EventBus()
         self.lock = threading.Lock()
         self.host = None
+        self.watch_interval = watch_interval
+        self.stopping = threading.Event()
+
+    def _fingerprints(self):
+        paths = [p for p in self.root.iterdir() if p.is_dir() and library.is_course(p)] if self.root and self.root.is_dir() else []
+        host = self.host
+        if host and host.workspace not in paths:
+            paths.append(host.workspace)
+        return {path: library.fingerprint(path) for path in paths}
+
+    def watch(self):
+        """Tell open tabs when Codex changes a course or the library from outside the app."""
+        seen = self._fingerprints()
+        while not self.stopping.wait(self.watch_interval):
+            current = self._fingerprints()
+            if current != seen:
+                self.events.publish({'type': 'changed', 'scope': 'library'})
+                host = self.host
+                if host and current.get(host.workspace) != seen.get(host.workspace):
+                    self.events.publish({'type': 'changed', 'scope': 'state'})
+            seen = current
 
     def open(self, path):
         path = Path(path).resolve()
@@ -120,6 +141,7 @@ class Courses:
         return {'root': str(self.root) if self.root else None, 'active': active, 'courses': courses}
 
     def close(self):
+        self.stopping.set()
         with self.lock:
             if self.host:
                 self.host.close()
@@ -140,8 +162,8 @@ def _public_question(branch):
     return {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
 
 
-def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None):
-    courses = Courses(library_root, runner, settings or TeacherSettings())
+def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5):
+    courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval)
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -150,6 +172,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @asynccontextmanager
     async def lifespan(app):
+        threading.Thread(target=courses.watch, name='library-watch', daemon=True).start()
         try:
             yield
         finally:

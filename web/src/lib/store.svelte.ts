@@ -169,6 +169,10 @@ class AppStore {
       location.reload();
       return;
     }
+    if (event.type === 'changed' && event.scope === 'library') {
+      if (this.libraryOpen) void this.loadLibrary();
+      return;
+    }
     const turns = this.state?.turns;
     if (!turns) {
       if (event.type === 'changed') this.refresh();

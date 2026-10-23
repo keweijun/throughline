@@ -3,16 +3,22 @@
   import { app } from '../lib/store.svelte';
   import type { LibraryCourse } from '../lib/types';
 
-  const prompts: MessageKey[] = [
-    '$guided-learning create a course called my-course from these files: …',
-    '$guided-learning add these files to my-course: …',
-    '$guided-learning review the pages that still need review in my-course',
+  const templates: MessageKey[] = [
+    '$guided-learning create a new course from these files: ',
+    '$guided-learning add these files to the course {course}: ',
+    '$guided-learning review the pages that still need review in the course {course}',
   ];
 
   let copied = $state<string | null>(null);
   let opening = $state<string | null>(null);
 
   const library = $derived(app.library);
+
+  /** A new Codex chat in the Throughline project with the request typed in but not sent, so files can be attached. */
+  function codexLink(key: MessageKey, course = '') {
+    const prompt = t(key, { course });
+    return `codex://new?prompt=${encodeURIComponent(prompt)}&path=${encodeURIComponent(library?.root ?? '')}`;
+  }
 
   function updated(course: LibraryCourse) {
     if (!course.updated) return '';
@@ -43,7 +49,7 @@
       {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
     </div>
     <div class="header-actions">
-      <button class="btn btn-quiet btn-small" onclick={() => app.loadLibrary()}>{t('Refresh')}</button>
+      {#if library?.root}<a class="btn btn-primary btn-small" href={codexLink('$guided-learning create a new course from these files: ')}>{t('New course in Codex')}</a>{/if}
       {#if app.state}
         <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
       {/if}
@@ -53,7 +59,7 @@
   {#if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
   {:else if !library.courses.length}
-    <p class="empty">{t('No courses yet. Ask Codex to create one from your documents; it appears here when Codex is done.')}</p>
+    <p class="empty">{t('No courses yet. Use New course in Codex above; your course appears here when Codex is done.')}</p>
   {:else}
     <ul class="courses">
       {#each library.courses as course (course.path)}
@@ -87,19 +93,32 @@
               <span class="chip chip-plain">{t('Route not built yet')}</span>
             {/if}
           </div>
+          {#if !course.error && library.root}
+            <div class="codex-actions">
+              {#if !course.concepts}
+                <a href={codexLink('$guided-learning build the route for the course {course}', course.name)}>{t('Build the route in Codex')}</a>
+              {/if}
+              <a href={codexLink('$guided-learning add these files to the course {course}: ', course.name)}>{t('Add files in Codex')}</a>
+              {#if course.needs_review}
+                <a href={codexLink('$guided-learning review the pages that still need review in the course {course}', course.name)}>{t('Review in Codex')}</a>
+              {/if}
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
   {/if}
 
   <aside class="codex" aria-labelledby="codex-title">
-    <h2 id="codex-title">{t('Add or change courses in Codex')}</h2>
-    <p class="muted">{t('Codex reads your documents and builds the route. Paste one of these into Codex, then press Refresh.')}</p>
+    <h2 id="codex-title">{t('Courses are built in Codex')}</h2>
+    <p class="muted">{t('The Codex buttons open a new chat in your Throughline project with the request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
+    <p class="muted">{t('Using the Codex CLI, or nothing opened? Copy a request into Codex in your Throughline folder instead:')}</p>
     <ul class="prompts">
-      {#each prompts as prompt (prompt)}
+      {#each templates as key (key)}
+        {@const prompt = t(key, { course: 'my-course' }).trim()}
         <li>
-          <code>{t(prompt)}</code>
-          <button class="btn btn-quiet btn-small" onclick={() => copy(t(prompt))}>{copied === t(prompt) ? t('Copied') : t('Copy')}</button>
+          <code>{prompt}</code>
+          <button class="btn btn-quiet btn-small" onclick={() => copy(prompt)}>{copied === prompt ? t('Copied') : t('Copy')}</button>
         </li>
       {/each}
     </ul>
@@ -193,6 +212,16 @@
 
   .problem {
     color: var(--danger);
+    font-size: var(--step--1);
+  }
+
+  .codex-actions {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.1rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--rule);
     font-size: var(--step--1);
   }
 

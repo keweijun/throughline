@@ -1,6 +1,8 @@
-"""The course library: one per-user directory holding every course workspace."""
+"""The course library: the learner's Throughline folder, holding every course workspace and doubling as a Codex project."""
+import hashlib
 import os
 import re
+import sqlite3
 from pathlib import Path
 
 from .api import execute
@@ -9,16 +11,15 @@ from .store import OperationError
 NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,63}$')
 
 
-def data_dir():
+def default_root():
     if os.environ.get('GUIDED_LEARNING_HOME'):
         return Path(os.environ['GUIDED_LEARNING_HOME'])
-    if os.name == 'nt' and os.environ.get('LOCALAPPDATA'):
-        return Path(os.environ['LOCALAPPDATA']) / 'guided-learning'
-    return Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'guided-learning'
+    return Path.home() / ('Documents' if os.name == 'nt' else '') / 'Throughline'
 
 
-def default_root():
-    return data_dir() / 'courses'
+def state_dir():
+    """Host bookkeeping, kept out of sight inside the library."""
+    return default_root() / '.throughline'
 
 
 def course_path(root, name):
@@ -29,6 +30,19 @@ def course_path(root, name):
 
 def is_course(path):
     return (Path(path) / 'course.sqlite3').is_file()
+
+
+def fingerprint(path):
+    """Changes when course building touches the course: title, position, sources or route. Reads without locking."""
+    try:
+        db = sqlite3.connect(f'file:{Path(path) / "course.sqlite3"}?mode=ro', uri=True, timeout=1)
+        try:
+            rows = db.execute("SELECT namespace, key, value FROM documents WHERE namespace IN ('course', 'sources', 'curriculum') ORDER BY namespace, key").fetchall()
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return None
+    return hashlib.sha256(repr(rows).encode()).hexdigest()
 
 
 def summary(path):

@@ -18,20 +18,18 @@ The teacher makes instructional judgments from your materials. The program valid
 You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli); the app includes the command Throughline uses), and Python 3.10 or newer. Paste this into Codex:
 
 ```text
-Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` and show me its output.
+Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup`, show me its output, and open the Codex project link it prints (if you are the Codex CLI, tell me to start codex in the folder it prints instead).
 ```
 
-Codex installs the app (no Node.js needed), adds the `$guided-learning` skill to `~/.agents/skills/`, and creates your course library. Paste the same prompt again to update.
+Codex installs the app (no Node.js needed), adds the `$guided-learning` skill to `~/.agents/skills/`, creates your Throughline folder and opens it as a Codex project, and adds a Throughline launcher to your app menu. Paste the same prompt again to update.
 
-## Use it from Codex
+## How it works
 
-You never need to type a command. Ask Codex:
+Throughline is where you study; Codex is where courses are built. You move between them in one click.
 
-- `$guided-learning create a course called quantum from these files: …` copies the files into your course library, registers them and builds the route.
-- `$guided-learning open quantum` starts the app in the background and opens it in your browser. Codex asks for permission, because the app keeps running and calls Codex for lessons.
-- `$guided-learning add these files to quantum: …`, `review the pages that still need review in quantum`, or `stop the learning interface`.
-
-The app opens on **Your courses**: every course with its sources, sections, review backlog and where you left off. Creating and changing courses stays in Codex, which does the reading and judging; the library shows prompts to paste.
+- **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it). Lessons, questions and practice run Codex in the background, so you never need Codex open to study.
+- **Build courses in Codex.** Setup makes your Throughline folder a Codex project. In the library, **New course in Codex**, **Add files in Codex** and **Review in Codex** open a new chat in that project with the request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself.
+- **Or start in Codex.** In the Throughline project, just ask: "make a course from these slides", "add this problem set to quantum", "open quantum". Codex asks for permission the first time it starts Throughline, because the app keeps running in the background.
 
 ![The course library listing three courses with their sources, sections, review backlog and current section](docs/images/library-en.png)
 
@@ -58,7 +56,7 @@ The interface and new teaching default to English; switch to Simplified Chinese 
 
 ## Where things live
 
-- **Courses:** `~/.local/share/guided-learning/courses` (`%LOCALAPPDATA%\guided-learning\courses` on Windows; set `GUIDED_LEARNING_HOME` to move it). Each course is one folder holding its source snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
+- **Courses:** your Throughline folder, `~/Throughline` (`Documents\Throughline` on Windows; set `GUIDED_LEARNING_HOME` to use another folder). It is also your Codex project, with an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
 - **Teacher settings:** open **Teacher settings** (the model name in the top bar) to pick the Codex model and reasoning effort. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).

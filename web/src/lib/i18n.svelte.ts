@@ -353,7 +353,10 @@ const messages = {
   "$guided-learning add these files to the course {course}: ": "$guided-learning 把这些文件加入课程 {course}：",
   "$guided-learning review the pages that still need review in the course {course}": "$guided-learning 核对课程 {course} 中仍待核对的页面",
   "$guided-learning build the route for the course {course}": "$guided-learning 为课程 {course} 生成学习路线",
-  "No courses yet. Use New course in Codex above; your course appears here when Codex is done.": "还没有课程。点击上方的“在 Codex 中新建课程”，Codex 完成后课程会显示在这里。"
+  "Create your first course": "创建你的第一门课程",
+  "Choose New course in Codex. A Codex chat opens in your Throughline project with the request typed in.": "点击“在 Codex 中新建课程”。Codex 会在你的贯学项目中新建对话，并填好请求。",
+  "Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.": "附上你的 PDF 或笔记（也可以写出它们所在的文件夹），并用一句话说明你想学什么。",
+  "Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.": "发送。Codex 会给出学习路线、说明仍需核对的内容，完成后在这里打开课程。"
 } as const;
 export type MessageKey = keyof typeof messages;
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {

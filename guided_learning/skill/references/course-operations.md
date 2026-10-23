@@ -4,10 +4,11 @@ Run `guided-learning --course <course-name> --request <request.json>`. Course na
 
 ## Creating a course
 
-1. Choose a short course name with the learner (suggest one from the files) and check it is not already listed by `guided-learning courses`.
-2. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
-3. Run `course.init`, then `source.register` for each copy, then build the route (see curriculum operations).
-4. Open the course in the app with `guided-learning open <course-name>`.
+1. Get the learner's files and goal. If either is missing, explain in a few lines: attach the files or name their folder, and say what they want to learn. Attachments may arrive as local paths; if a file's content is visible but not its path, ask where it is saved, or ask the learner to put it in `<root>/<course-name>/inputs/`.
+2. Propose a short course name from the files and goal, and check it is not already listed by `guided-learning courses`.
+3. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
+4. Run `course.init`, then `source.register` for each copy, then build the route (see curriculum operations).
+5. Open the course in the app with `guided-learning open <course-name>`.
 
 ## Requests
 

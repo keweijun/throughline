@@ -110,9 +110,8 @@ class Courses:
             paths.append(host.workspace)
         return {path: library.fingerprint(path) for path in paths}
 
-    def watch(self):
+    def watch(self, seen):
         """Tell open tabs when Codex changes a course or the library from outside the app."""
-        seen = self._fingerprints()
         while not self.stopping.wait(self.watch_interval):
             current = self._fingerprints()
             if current != seen:
@@ -187,7 +186,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @asynccontextmanager
     async def lifespan(app):
-        threading.Thread(target=courses.watch, name='library-watch', daemon=True).start()
+        threading.Thread(target=courses.watch, args=(courses._fingerprints(),), name='library-watch', daemon=True).start()
         try:
             yield
         finally:

@@ -18,10 +18,20 @@
 你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可；桌面应用自带贯学所需的命令）以及 Python 3.10 或更高版本。把下面这段粘贴到 Codex：
 
 ```text
-帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup`，把输出给我看，并打开它输出的 Codex 项目链接（如果你是 Codex CLI，就告诉我在它输出的文件夹里启动 codex）。
+帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup --language zh-CN`，把输出给我看，并打开它输出的欢迎对话链接；如果没有，就打开项目链接（如果你是 Codex CLI，就告诉我在它输出的文件夹里启动 codex）。
 ```
 
 Codex 会安装应用（不需要 Node.js），把 `$guided-learning` 技能放进 `~/.agents/skills/`，创建贯学文件夹并将其作为 Codex 项目打开，还会在应用菜单中添加 Throughline 启动器。以后再粘贴一次同样的内容即可更新。
+
+## 创建第一门课程
+
+安装完成后，Codex 会在你的 **Throughline** 项目中打开一段欢迎对话，告诉你接下来怎么做。
+
+1. 附上你的 PDF 或笔记（也可以写出它们所在的文件夹），再用一句话说明想学什么，例如"量子力学，学到微扰理论，为了期末考试"。
+2. Codex 会建议课程名，把文件复制进贯学文件夹，生成跨资料的学习路线，并告诉你哪些内容仍需核对。
+3. 完成后，课程会在浏览器的贯学中打开。之后可以从应用菜单里的 **Throughline** 启动器直接打开。
+
+以后创建课程也是一样：在贯学课程库中点击 **在 Codex 中新建课程**，或在 Throughline 项目中新建对话。
 
 ## 工作方式
 

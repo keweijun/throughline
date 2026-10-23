@@ -83,6 +83,9 @@ class NextSectionRequest(Body):
 
 class SettingsRequest(Body):
     model: str = ''
+    small_model: str = ''
+    service_tier: str = ''
+    small_effort: str = ''
     effort: str = 'medium'
 
 
@@ -350,9 +353,16 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.put('/api/settings')
     def save_settings(body: SettingsRequest):
-        result = courses.settings.save(body.model, body.effort)
+        result = courses.settings.save(body.model, body.effort, body.small_model, body.service_tier, body.small_effort)
         courses.events.publish({'type': 'changed', 'scope': 'settings'})
         return result
+
+    @app.get('/api/models')
+    def models_view():
+        try:
+            return courses.settings.models()
+        except (OSError, RuntimeError) as exc:
+            return JSONResponse({'error': str(exc)}, 502)
 
     @app.get('/api/library')
     def library_view():

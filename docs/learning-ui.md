@@ -22,7 +22,7 @@ New lessons, side answers, supplements, exercises, feedback and preparation use 
 
 ## Teacher settings
 
-The teacher is the Codex CLI on this computer. In **Settings**, under Teacher, choose the model (empty means your Codex default) and reasoning effort. `--model` and `--effort` override the saved choice for one run.
+The teacher is the Codex CLI on this computer. In **Settings**, under Teacher, choose from the models your Codex sign-in offers: the teacher model (Codex default unless you pick one), the small model for preparing upcoming sections and consolidating notes (the teacher model unless you pick one), and a reasoning effort for each (the small model uses the teacher's unless you pick one). **Fast mode** appears when the teacher model offers a Fast tier; it speeds up lessons, answers and feedback at higher Codex usage, while background preparation keeps the standard speed. If Codex cannot list models, type a model name instead. `--model`, `--small-model`, `--effort` and `--small-effort` override the saved choice for one run.
 
 ## Keyboard shortcuts
 

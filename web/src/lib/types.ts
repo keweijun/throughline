@@ -104,9 +104,23 @@ export type PreparationJob = {
 
 export type Settings = {
   model: string;
+  small_model: string;
   effort: 'minimal' | 'low' | 'medium' | 'high';
+  small_effort: '' | 'minimal' | 'low' | 'medium' | 'high';
+  service_tier: string;
   overridden: boolean;
   path: string;
+};
+
+export type ServiceTier = { id: string; name: string; description: string };
+
+export type CodexModel = {
+  id: string;
+  name: string;
+  description: string;
+  default: boolean;
+  efforts: string[];
+  tiers: ServiceTier[];
 };
 
 export type DeferredExplanation = {

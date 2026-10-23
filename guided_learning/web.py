@@ -30,11 +30,13 @@ def main():
     parser.add_argument('--library', help=f'Course library directory (default: {library.default_root()})')
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--model', help='Codex model for this run (default: your saved choice, else the Codex default)')
+    parser.add_argument('--small-model', help='Codex model for section preparation and note consolidation in this run (default: your saved choice, else the teacher model)')
     parser.add_argument('--effort', choices=('minimal', 'low', 'medium', 'high'), help='Reasoning effort for this run')
+    parser.add_argument('--small-effort', choices=('minimal', 'low', 'medium', 'high'), help='Reasoning effort for the small model in this run (default: the teacher effort)')
     parser.add_argument('--config', help='Teacher settings file (default: per-user config directory)')
     parser.add_argument('--record', action='store_true', help='Record this host for `guided-learning open` and `stop`')
     args = parser.parse_args()
-    settings = TeacherSettings(args.config, override={'model': args.model, 'effort': args.effort})
+    settings = TeacherSettings(args.config, override={'model': args.model, 'small_model': args.small_model, 'effort': args.effort, 'small_effort': args.small_effort})
 
     def ready(port):
         if args.record:

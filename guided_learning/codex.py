@@ -25,9 +25,64 @@ def find_codex():
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
+def list_models(command=None, timeout=20):
+    """The models the signed-in Codex account can use, from the App Server's paginated model/list."""
+    command = command or [find_codex() or 'codex','app-server','--stdio']
+    try:
+        process = subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                                   text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    except OSError as exc:
+        raise RuntimeError('Codex CLI not found; install Codex or set CODEX_CLI_PATH') from exc
+    incoming = queue.Queue()
+    def reader():
+        for line in process.stdout:
+            try: incoming.put(json.loads(line))
+            except json.JSONDecodeError: continue
+        incoming.put(None)
+    threading.Thread(target=reader,daemon=True).start()
+    def send(value):
+        process.stdin.write(json.dumps(value)+'\n')
+        process.stdin.flush()
+    models, request = [], 1
+    deadline = time.monotonic()+timeout
+    try:
+        send({'id':request,'method':'initialize','params':{'clientInfo':{'name':'guided_learning','version':'0.2.0'},'capabilities':{'experimentalApi':True}}})
+        while time.monotonic() < deadline:
+            try: event = incoming.get(timeout=.1)
+            except queue.Empty: continue
+            if event is None:
+                raise RuntimeError('Codex closed before listing models')
+            if event.get('id') != request or 'method' in event: continue
+            if 'error' in event:
+                raise RuntimeError('Codex could not list models; check CLI authentication')
+            result = event.get('result') or {}
+            if request == 1:
+                send({'method':'initialized','params':{}})
+            else:
+                models += [{'id':m['id'],'name':m.get('displayName') or m['id'],'description':m.get('description') or '',
+                            'default':bool(m.get('isDefault')),
+                            'tiers':[{'id':t['id'],'name':t.get('name') or t['id'],'description':t.get('description') or ''}
+                                     for t in m.get('serviceTiers') or []],
+                            'efforts':[e['reasoningEffort'] for e in m.get('supportedReasoningEfforts') or []]}
+                           for m in result.get('data',[]) if not m.get('hidden')]
+                if not result.get('nextCursor'):
+                    return models
+            request += 1
+            send({'id':request,'method':'model/list','params':{'cursor':result['nextCursor']} if result.get('nextCursor') else {}})
+        raise TimeoutError('Codex took too long to list models')
+    finally:
+        try:
+            process.stdin.close()
+            process.wait(timeout=2)
+        except (OSError,subprocess.TimeoutExpired):
+            process.kill(); process.wait()
+        process.stdout.close()
+
+
 class CodexRunner:
-    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True, project_id=None, name=None):
+    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True, project_id=None, name=None, service_tier=None):
         self.model, self.effort, self.timeout = model, effort, timeout
+        self.service_tier = service_tier
         self.command = command
         # A kept thread is saved like any Codex chat, so the Codex app can open it.
         self.ephemeral = ephemeral
@@ -73,6 +128,7 @@ class CodexRunner:
                     params = {'cwd':str(cwd),'ephemeral':self.ephemeral,'approvalPolicy':'never','sandbox':'read-only',
                               'config':{'model_reasoning_effort':self.effort}}
                     if self.model: params['model'] = self.model
+                    if self.service_tier: params['serviceTier'] = self.service_tier
                     if self.project_id: params['projectId'] = self.project_id
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:

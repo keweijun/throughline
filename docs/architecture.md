@@ -32,7 +32,7 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 
 ## Teacher (`guided_learning/codex.py`, `server/settings.py`)
 
-`CodexRunner` drives `codex app-server`. `TeacherSettings` keeps the Codex model and reasoning effort per user and builds a runner for each turn, so a change in Teacher settings applies to the next request. See ADR 0002.
+`CodexRunner` drives `codex app-server`. `TeacherSettings` keeps the teacher model and effort, small model and effort, and service tier (fast mode) per user and builds a runner for each turn, so a change in Teacher settings applies to the next request. Preparation turns use the small model and effort (each falling back to the teacher's) at the default speed; `background.claim` names the small model in its handoff. `list_models` asks `codex app-server` for `model/list`, following `nextCursor`, and drops hidden models. See ADR 0002.
 
 ## HTTP API
 
@@ -53,7 +53,8 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | POST | `/api/practice/generate`, `/api/practice/tasks/{id}/{action}` | Exercises and help |
 | POST | `/api/sections/next` | Enter the next route section |
 | POST | `/api/preparation/retry` | Retry failed preparation |
-| GET/PUT | `/api/settings` | Codex model and reasoning effort |
+| GET/PUT | `/api/settings` | Teacher model and effort, small model and effort, and service tier |
+| GET | `/api/models` | Models the Codex sign-in can use, with their reasoning efforts and service tiers; 502 when Codex cannot list them |
 | POST | `/api/annotations` | Save a learner annotation (highlight, note or bookmark); `/api/state` lists them |
 | PUT/DELETE | `/api/annotations/{id}` | Edit an annotation's note, or delete it |
 

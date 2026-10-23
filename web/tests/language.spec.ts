@@ -45,7 +45,7 @@ test('switching during generation preserves the turn and drafts but applies to t
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
   await expect(page.getByText('推理强度', { exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '推理强度' }).locator('option[value="medium"]')).toHaveText('中');
+  await expect(page.getByRole('combobox', { name: '推理强度', exact: true }).locator('option[value="medium"]')).toHaveText('中');
   await expect(page.getByRole('button', { name: '保存', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

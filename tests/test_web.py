@@ -142,8 +142,32 @@ class WebLearning(unittest.TestCase):
                 runner = host.settings.runner()
                 self.assertIsInstance(runner, CodexRunner)
                 self.assertEqual((runner.model, runner.effort), ('gpt-6.1-sol', 'high'))
+                client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'small_model': 'gpt-6-luna', 'effort': 'high',
+                                                  'small_effort': 'low', 'service_tier': 'priority'})
+                host._runner = None
+                teacher, small = host.runner_for({'channel': 'mainline'}), host.runner_for({'channel': 'preparation'})
+                self.assertEqual((teacher.model, teacher.effort, teacher.service_tier), ('gpt-6.1-sol', 'high', 'priority'))
+                # Background preparation uses the small model and effort at the standard speed.
+                self.assertEqual((small.model, small.effort, small.service_tier), ('gpt-6-luna', 'low', None))
+                client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'effort': 'high'})
+                small = host.settings.runner(small=True)
+                self.assertEqual((small.model, small.effort), ('gpt-6.1-sol', 'high'))
                 self.assertEqual(client.put('/api/settings', json={'effort': 'extreme'}).status_code, 409)
+                self.assertEqual(client.put('/api/settings', json={'small_effort': 'extreme'}).status_code, 409)
                 self.assertEqual(client.put('/api/settings', json={'base_url': 'https://x'}).status_code, 400)
+
+    def test_model_list_comes_from_codex(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            course(tmp)
+            client, host = host_client(tmp, runner=BlockingRunner())
+            with client:
+                listed = [{'id': 'gpt-6-luna', 'name': 'GPT-6-Luna', 'description': '', 'default': False, 'efforts': ['low'], 'tiers': []}]
+                with patch('guided_learning.server.settings.list_models', return_value=listed):
+                    self.assertEqual(client.get('/api/models').json(), {'models': listed})
+                with patch('guided_learning.server.settings.list_models', side_effect=RuntimeError('Codex CLI not found')):
+                    failed = client.get('/api/models')
+                self.assertEqual((failed.status_code, failed.json()['error']), (502, 'Codex CLI not found'))
 
     def test_command_line_choice_is_not_saved(self):
         from guided_learning.server.settings import TeacherSettings
@@ -151,9 +175,10 @@ class WebLearning(unittest.TestCase):
             path = Path(tmp) / 'settings.json'
             TeacherSettings(path).save('saved-model', 'low')
             once = TeacherSettings(path, override={'model': 'trial', 'effort': None})
-            self.assertEqual(once.current(), {'model': 'trial', 'effort': 'low'})
+            self.assertEqual(once.current(), {'model': 'trial', 'small_model': '', 'effort': 'low', 'small_effort': '', 'service_tier': ''})
             self.assertEqual(TeacherSettings(path).current()['model'], 'saved-model')
-            self.assertEqual(TeacherSettings(Path(tmp) / 'missing.json').current(), {'model': '', 'effort': 'medium'})
+            self.assertEqual(TeacherSettings(Path(tmp) / 'missing.json').current(),
+                             {'model': '', 'small_model': '', 'effort': 'medium', 'small_effort': '', 'service_tier': ''})
 
 
 if __name__ == '__main__':

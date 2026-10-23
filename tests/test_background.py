@@ -1,7 +1,10 @@
 from support import call_cli
+import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 class BackgroundCLI(unittest.TestCase):
@@ -9,6 +12,10 @@ class BackgroundCLI(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.workspace = Path(self.temp.name) / 'course'
+        self.settings = Path(self.temp.name) / 'settings.json'
+        environment = patch.dict(os.environ, {'GUIDED_LEARNING_CONFIG': str(self.settings)})
+        environment.start()
+        self.addCleanup(environment.stop)
         self.call('course.init', title='Quantum')
         self.call('curriculum.save', concepts=[{'id':'state','title':'State'}], route=['state'], coverage=[])
         self.call('mainline.enter', concept_id='state', goal='States', next_step='Normalize')
@@ -16,6 +23,12 @@ class BackgroundCLI(unittest.TestCase):
 
     def call(self, op, error=None, workspace=None, **fields):
         return call_cli(self, workspace or self.workspace, op, error=error, **fields)
+
+    def test_handoff_names_the_learners_small_model(self):
+        self.settings.write_text(json.dumps({'model': 'gpt-6.1-sol', 'small_model': 'gpt-5.6-luna'}), encoding='utf-8')
+        self.call('background.enqueue', id='job', interaction_ids=['u1'], concept_id='state')
+        claim = self.call('background.claim', id='job', request_id='claim', attempt_id='attempt-1')
+        self.assertEqual(claim['handoff']['model'], 'gpt-5.6-luna')
 
     def test_queue_survives_unavailable_host_and_retries_without_duplicate_claims(self):
         first = self.call('background.enqueue', id='job', interaction_ids=['u1'], concept_id='state')

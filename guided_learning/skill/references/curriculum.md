@@ -32,6 +32,16 @@ Coverage dispositions:
 
 Default `verification` is `pending`. Set `verified` only after checking the contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
 
+## Record source reviews
+
+`curriculum.verify` records reviews without resubmitting the model:
+
+```json
+{"op":"curriculum.verify","reviews":[{"source_id":"src-...","revision":"sha256...","unit_id":"page-3","verification":"verified","verification_note":"Compared extracted formulas with the page image"}]}
+```
+
+Each review needs a nonempty `verification_note`; use `pending` with a note to record what differs. Reviews must reference the current revision, `verified` requires successful extraction, and a unit without a coverage entry must be linked by a concept (it is recorded as `mapped` to those concepts). One invalid review rejects the whole request. The learning app reviews the next section's pending linked units while preparing it, so check `curriculum.coverage` before reviewing pages again.
+
 Changes to the relative order of existing concepts require the learner's agreement; then pass `confirm_reorder: true`. Adding a node without changing existing relative order is a local revision. Keep stable IDs and defer content instead of deleting concepts.
 
 ## Inspect and teach

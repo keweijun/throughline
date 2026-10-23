@@ -38,8 +38,8 @@ def start(store, request):
         for ref in context['concept'].get(field,[]):
             exact = {k:ref[k] for k in ('source_id','revision','unit_id')}
             if exact not in source_refs: source_refs.append(exact)
-    context['sources'] = [{**ref, **curriculum.source_unit(store,ref), 'stale':curriculum.is_stale(store,ref)} for ref in source_refs]
     model = curriculum.view(store,{})
+    context['sources'] = [curriculum.linked_unit(store,ref,model) for ref in source_refs]
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
     snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}

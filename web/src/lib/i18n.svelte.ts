@@ -143,6 +143,7 @@ const messages = {
   "Language applies to the interface and new teaching content.": "语言设置用于界面和新生成的教学内容。",
   "Choose English or Simplified Chinese": "请选择英语或简体中文",
   "Page {page}": "第 {page} 页",
+  "Review note: {note}": "核验记录：{note}",
   "Line {line}": "第 {line} 行",
   "Explain {title} and apply it to related problems": "能够解释{title}，并应用到相关问题",
   "Begin teaching this section": "开始本小节讲解",

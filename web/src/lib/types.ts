@@ -156,6 +156,7 @@ export type SourceView = Ref & {
   text?: string;
   locator?: { page?: number; line?: number };
   verification: string;
+  verification_note?: string;
   stale: boolean;
   image_url: string | null;
   pdf_url: string | null;

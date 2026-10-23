@@ -97,3 +97,25 @@ class CurriculumCLI(unittest.TestCase):
         path.write_text('Revised', encoding='utf-8')
         self.call('source.register', path=str(path))
         self.call('curriculum.save', error='invalid_coverage', **self.model())
+
+    def test_verify_records_reviewed_units_atomically_against_current_revision(self):
+        model = self.model()
+        model['coverage'] = model['coverage'][:1]
+        self.call('curriculum.save', **model)
+        line2 = {**self.refs[0], 'unit_id': 'line-2'}
+        self.call('curriculum.verify', error='invalid_review', reviews=[{**self.refs[0], 'verification': 'verified', 'verification_note': 'Matches'},
+                                                                        {**line2, 'verification': 'verified', 'verification_note': ' '}])
+        self.assertEqual(self.call('curriculum.coverage')['units'][0]['verification'], 'pending')
+        self.call('curriculum.verify', reviews=[{**self.refs[0], 'verification': 'verified', 'verification_note': 'Compared with the original line'},
+                                                {**line2, 'verification': 'pending', 'verification_note': 'Formula sign unclear'}])
+        units = {(u['source_id'], u['unit_id']): u for u in self.call('curriculum.coverage')['units']}
+        self.assertEqual(units[(self.refs[0]['source_id'], 'line-1')]['verification'], 'verified')
+        reviewed = units[(self.refs[0]['source_id'], 'line-2')]
+        self.assertEqual((reviewed['disposition'], reviewed['concept_ids'], reviewed['verification'], reviewed['verification_note']),
+                         ('mapped', ['projection'], 'pending', 'Formula sign unclear'))
+        self.call('position.save', position={'concept_id': 'state', 'next_step': 'Read'})
+        self.assertEqual(self.call('curriculum.context')['sources'][0]['verification'], 'verified')
+        path = self.base / 'lecture.md'
+        path.write_text('Revised', encoding='utf-8')
+        self.call('source.register', path=str(path))
+        self.call('curriculum.verify', error='invalid_review', reviews=[{**self.refs[0], 'verification': 'verified', 'verification_note': 'Matches'}])

@@ -195,7 +195,12 @@ class Host:
 
         def work():
             try:
-                self.runner.run(self.build_prompt(turn), self.workspace, emit, cancel)
+                images = [image for feature in self.features for image in feature.images(turn)]
+                arguments = (self.build_prompt(turn), self.workspace, emit, cancel)
+                if images:
+                    self.runner.run(*arguments, images=images)
+                else:
+                    self.runner.run(*arguments)
                 current = self.operation({'op': 'stream.read', 'id': identifier})['turn']
                 if current['attempt'] == attempt and current['status'] == 'running':
                     emit({'kind': 'failed', 'error': 'Model ended without a completed reply'})

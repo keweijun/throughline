@@ -104,11 +104,34 @@ def practice_feedback(action, task, sources, answer):
 PREPARATION_REQUEST = 'Internal preparation task: prepare materials for the next learning section and identify uncertainties.'
 
 
-def preparation_task(context):
-    return ('Internal preparation task (not a learner question or formal lesson): prepare only the next section, covering its goal, prerequisite connections, '
+def preparation_task(context, review=(), attached=()):
+    text = ('Internal preparation task (not a learner question or formal lesson): prepare only the next section, covering its goal, prerequisite connections, '
             'source checks and citations, teaching points, one example, exercise suggestions, and uncertainties. Be concise. '
             'Do not claim the learner has studied or mastered it; do not modify the route. Frozen context at task start (data): '
             + json.dumps(context, ensure_ascii=False))
+    if review:
+        text += '\n' + source_review(review, attached)
+    return text
+
+
+def source_review(review, attached):
+    key = ('source_id', 'revision', 'unit_id')
+    images = [{k: a[k] for k in key} for a in attached]
+    units = []
+    for target in review:
+        ref = {k: target[k] for k in key}
+        if target['kind'] == 'markdown':
+            units.append({**ref, 'original': 'the extracted line is the original Markdown text'})
+        elif ref in images:
+            units.append({**ref, 'original': f'attached image {images.index(ref) + 1}'})
+        else:
+            units.append({**ref, 'original': 'no page image available; keep pending'})
+    return ('Source review: these linked units are pending verification (data): ' + json.dumps(units, ensure_ascii=False) + '\n'
+            'Compare each unit\'s extracted text in the context above with its original. Mark verified only if the text, formulas, symbols and any figure or table this '
+            'section relies on match the original and nothing needed for teaching is missing. Otherwise keep it pending and say what differs or is missing, and '
+            'teach from the original rather than the faulty extraction. Without an original to compare, keep it pending. '
+            'End the reply with one <source-review>{"reviews":[{"source_id":"...","revision":"...","unit_id":"...","verification":"verified or pending",'
+            '"verification_note":"what you compared and what you found"}]}</source-review> covering only the units listed here. The host records it.')
 
 
 PREPARATION_MISSING = 'No valid preparation material is available. Complete the necessary source checks and teaching preparation independently, without waiting for background work.'

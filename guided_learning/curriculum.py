@@ -105,8 +105,40 @@ def coverage(store, request):
                 mapping = {'disposition': 'needs_review', 'reason': 'Source revision changed', 'verification': 'pending', 'concept_ids': prior.get('concept_ids', [])}
             if source['status'] == 'failed' or unit.get('status') in ('failed', 'needs_review'):
                 mapping = {**mapping, 'disposition': 'needs_review', 'reason': 'Source extraction requires review', 'verification': 'pending'}
-            units.append({**ref, 'locator': unit['locator'], 'disposition': mapping.get('disposition', 'unmapped'), 'concept_ids': mapping.get('concept_ids', []), 'reason': mapping.get('reason', ''), 'verification': mapping.get('verification', 'pending')})
+            units.append({**ref, 'locator': unit['locator'], 'disposition': mapping.get('disposition', 'unmapped'), 'concept_ids': mapping.get('concept_ids', []), 'reason': mapping.get('reason', ''), 'verification': mapping.get('verification', 'pending'), 'verification_note': mapping.get('verification_note', '')})
     return {'units': units, 'stale_mappings': [entry for entry in model['coverage'] if is_stale(store, entry)], 'sources': store.list('sources'), 'semantic_completeness': 'requires_teacher_review'}
+
+def verify(store, request):
+    reviews = request.get('reviews')
+    if not isinstance(reviews, list) or not reviews:
+        raise OperationError('invalid_request', 'reviews must be a nonempty array')
+    model = view(store, request)
+    seen, applied = set(), []
+    for review in reviews:
+        unit = source_unit(store, review)
+        key = (review['source_id'], review['revision'], review['unit_id'])
+        if key in seen:
+            raise OperationError('invalid_review', 'Duplicate review')
+        seen.add(key)
+        applied.append(dict(zip(('source_id', 'revision', 'unit_id'), key)))
+        if review.get('verification') not in ('pending', 'verified'):
+            raise OperationError('invalid_review', 'Unknown verification')
+        if not str(review.get('verification_note', '')).strip():
+            raise OperationError('invalid_review', 'A review requires a note describing what was compared')
+        if is_stale(store, review):
+            raise OperationError('invalid_review', 'Review the currently registered revision')
+        if review['verification'] == 'verified' and unit.get('status', 'read') != 'read':
+            raise OperationError('invalid_review', 'Extraction failed or is empty; re-register or map this unit instead')
+        entry = next((item for item in model['coverage'] if all(item.get(k) == v for k, v in zip(('source_id', 'revision', 'unit_id'), key))), None)
+        if entry is None:
+            concept_ids = [c['id'] for c in model['concepts'] if any(all(ref.get(k) == v for k, v in zip(('source_id', 'revision', 'unit_id'), key)) for ref in c.get('links', []))]
+            if not concept_ids:
+                raise OperationError('invalid_review', 'Unit has no coverage mapping or concept link')
+            entry = {'source_id': key[0], 'revision': key[1], 'unit_id': key[2], 'disposition': 'mapped', 'concept_ids': concept_ids}
+            model['coverage'].append(entry)
+        entry.update(verification=review['verification'], verification_note=str(review['verification_note']).strip())
+    store.put('curriculum', 'model', model)
+    return {'reviewed': applied}
 
 def is_stale(store, ref):
     source = store.get('sources', ref['source_id'], {})
@@ -121,6 +153,11 @@ def context(store, request):
         raise OperationError('unknown_concept', str(concept_id))
     concept = concepts[concept_id]
     index = model['route'].index(concept_id)
-    return {'concept': concept, 'position': position, 'prerequisites': [concepts[c] for c in concept.get('prerequisites', [])], 'next_concept_id': model['route'][index + 1] if index + 1 < len(model['route']) else None, 'sources': [{**ref, **source_unit(store, ref), 'stale': is_stale(store, ref)} for ref in concept.get('links', [])]}
+    return {'concept': concept, 'position': position, 'prerequisites': [concepts[c] for c in concept.get('prerequisites', [])], 'next_concept_id': model['route'][index + 1] if index + 1 < len(model['route']) else None, 'sources': [linked_unit(store, ref, model) for ref in concept.get('links', [])]}
 
-OPERATIONS = {'curriculum.save': save, 'curriculum.view': view, 'curriculum.coverage': coverage, 'curriculum.context': context}
+def linked_unit(store, ref, model):
+    mapping = next((item for item in model['coverage'] if all(item.get(k) == ref.get(k) for k in ('source_id', 'revision', 'unit_id'))), {})
+    return {**ref, **source_unit(store, ref), 'stale': is_stale(store, ref),
+            'verification': mapping.get('verification', 'pending'), 'verification_note': mapping.get('verification_note', '')}
+
+OPERATIONS = {'curriculum.save': save, 'curriculum.view': view, 'curriculum.coverage': coverage, 'curriculum.verify': verify, 'curriculum.context': context}

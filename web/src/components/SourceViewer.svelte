@@ -30,6 +30,9 @@
       {#if s.verification !== 'verified'}
         <p class="muted">{t("Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.")}</p>
       {/if}
+      {#if s.verification_note}
+        <p class="muted review-note">{t("Review note: {note}", { note: s.verification_note })}</p>
+      {/if}
     </header>
 
     {#if s.pdf_url && page}

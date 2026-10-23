@@ -26,7 +26,7 @@ class CodexRunner:
         self.model, self.effort, self.timeout = model, effort, timeout
         self.command = command
 
-    def run(self, prompt, cwd, emit, cancel):
+    def run(self, prompt, cwd, emit, cancel, images=()):
         command = self.command or [find_codex() or 'codex','app-server','--stdio']
         process = subprocess.Popen(command,cwd=cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
                                    text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -68,7 +68,7 @@ class CodexRunner:
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
-                    params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]}
+                    params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]+[{'type':'image','url':url} for url in images]}
                     if self.model: params['model'] = self.model
                     if cancel.is_set(): return
                     send({'id':3,'method':'turn/start','params':params})

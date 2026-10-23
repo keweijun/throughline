@@ -15,7 +15,7 @@ New lessons, side answers, supplements, exercises, feedback and preparation use 
 - **Sources**: hover over a citation to see the cited text. Click it to open the exact registered revision in the built-in reader: PDFs open at the cited page (outlined, with "Back to cited page" if you scroll away), with selectable text, zoom and fit-to-width; Markdown notes open at the highlighted line. Select text in the reader to ask about it. "Pending verification" stays visible even when the model cites the source. Drag the panel's left edge (or focus it and use the arrow keys) to resize it.
 - **Practice**: exercises are prepared after a lesson completes. "Check my answer" asks the teacher to assess; Hint, Key steps and Full solution are always available, but after any help a correct answer is recorded as solved with help, not on your own. "Do later" keeps an exercise open; open exercises from earlier sections follow you.
 - **Enter next section** moves your position; practice is optional.
-- **Preparation**: while nothing else runs, the next section is prepared in the background. Prepared material is teacher-only and never counts as learning. Your own requests always take priority.
+- **Preparation**: while nothing else runs, the next section is prepared in the background (the first section, before you start). Preparation also checks the section's sources that are still "Pending verification" against the original pages; a checked source shows "Verified" and the source panel shows the review note. Prepared material is teacher-only and never counts as learning. Your own requests always take priority.
 
 ## Teacher settings
 

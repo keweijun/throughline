@@ -1,4 +1,5 @@
 """Course features served by the host. Each may add prompt text and react to turn lifecycle."""
+import base64
 import hashlib
 import importlib.util
 import io
@@ -71,6 +72,9 @@ class Feature:
     def prompt(self, turn, context):
         return ''
 
+    def images(self, turn):
+        return []
+
     def before_start(self, request):
         pass
 
@@ -106,8 +110,6 @@ class Navigation(Feature):
         context['set_aside'] = [{**{k: m[k] for k in ('source_id', 'revision', 'unit_id')}, 'disposition': m['disposition'], 'reason': m.get('reason', '')}
                                 for m in model['coverage'] if m.get('disposition') in ('deferred', 'needs_review') and concept['id'] in m.get('concept_ids', [])]
         for source in context['sources']:
-            mapping = next((m for m in model['coverage'] if matching_ref(m, source)), {})
-            source['verification'] = mapping.get('verification', 'pending')
             source['url'] = source_url(source)
         return context
 
@@ -143,7 +145,8 @@ class Navigation(Feature):
         current = next((s for s in self.operation({'op': 'course.status'})['sources'] if s['id'] == source_id), {})
         available = renderer_available()
         return {**ref, **unit, 'title': Path(snapshot['path']).name, 'kind': kind,
-                'verification': mapping.get('verification', 'pending'), 'stale': current.get('revision') != revision,
+                'verification': mapping.get('verification', 'pending'), 'verification_note': mapping.get('verification_note', ''),
+                'stale': current.get('revision') != revision,
                 'image_url': source_url(ref, 'image') if kind == '.pdf' and page and available else None,
                 'render_message': None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.',
                 'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
@@ -394,11 +397,30 @@ class Preparation(Feature):
     def prompt(self, turn, context):
         if turn['channel'] == 'preparation':
             job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
-            return prompts.preparation_task(job['snapshot']['context'])
+            return prompts.preparation_task(job['snapshot']['context'], job.get('review', []), job.get('attached', []))
         material = self.state(turn['concept_id'])['ready']
         if material and material['snapshot'].get('language', 'en') != turn.get('language', 'en'):
             material = None
         return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING
+
+    def images(self, turn):
+        """Renders the job's pending PDF pages so the teacher compares extraction with the original."""
+        if turn['channel'] != 'preparation':
+            return []
+        job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
+        attached, images = [], []
+        for target in job.get('review', []):
+            if target['kind'] != 'pdf':
+                continue
+            ref = {k: target[k] for k in ('source_id', 'revision', 'unit_id')}
+            try:
+                data, _ = self.host.navigation.source(**ref, fmt='image')
+            except OperationError:
+                continue
+            attached.append(ref)
+            images.append('data:image/png;base64,' + base64.b64encode(data).decode())
+        self.operation({'op': 'preparation.attach', 'id': job['id'], 'attached': attached})
+        return images
 
     def schedule(self, retry=False):
         with self.host.lock:

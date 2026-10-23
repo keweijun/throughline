@@ -34,6 +34,9 @@ _Avoid_: Course manager, a second store of progress.
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
 
+**Source verification**: A recorded review, with a note, confirming that a source unit's extracted text, formulas, and figures match the original revision. It is recorded while the section is prepared, not when the course is created.
+_Avoid_: Extracted, cited, mapped, taught.
+
 **Unit overview**: An introduction to related learning content explaining its core problem, main steps, connections, and target ability.
 _Avoid_: Contents alone, a list of concepts alone.
 

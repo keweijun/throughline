@@ -23,7 +23,7 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
   - `Navigation`: concept previews (including source material the course plan set aside for the section) and exact-revision source views (Markdown text, PDF page PNG, original PDF). It also delivers pending explanations: a mainline lesson in a section with due explanations is asked to give them in full, and they are resolved when that lesson completes.
   - `Questions`: side questions, the `<teaching-decision>` protocol, foundation supplements, return to the mainline.
   - `Practice`: exercise generation, hints/steps/solutions/assessment, deferral, entering the next section.
-  - `Preparation`: idle-only preparation of the next section; foreground requests pause it.
+  - `Preparation`: idle-only preparation of the next section (the first route section before a position exists); foreground requests pause it. It attaches the section's pending PDF pages as images, and the job records the teacher's `<source-review>` with `curriculum.verify` when it becomes ready (ADR 0004).
 - `prompts.py` — every instruction sent to a model. Changing wording here changes teaching behavior.
 - `app.py` — the FastAPI routes, the loopback Host/Origin guard, the 1 MiB body limit, and static files. `Courses` holds the course library root and the one `Host` currently open; switching courses closes the old host (pausing its turns and releasing its lease) before opening the next. Routes reach the open course through `ActiveHost`, so they do not track switches, and the SSE `EventBus` is shared across switches.
 - `guided_learning/library.py` lists library courses read-only through operations; `guided_learning/commands.py` implements `setup`, `open`, `stop` and `courses`. `open` starts `guided_learning.web --record` detached and reuses it while `host.json` in the data directory points at a live host.
@@ -32,7 +32,7 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 
 ## Teacher (`guided_learning/codex.py`, `server/settings.py`)
 
-`CodexRunner` drives `codex app-server`. `TeacherSettings` keeps the Codex model and reasoning effort per user and builds a runner for each turn, so a change in Teacher settings applies to the next request. See ADR 0002.
+`CodexRunner` drives `codex app-server`, sending attached images as data URLs. `TeacherSettings` keeps the Codex model and reasoning effort per user and builds a runner for each turn, so a change in Teacher settings applies to the next request. See ADR 0002.
 
 ## HTTP API
 

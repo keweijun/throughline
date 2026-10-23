@@ -5,7 +5,6 @@ import os
 import shutil
 import subprocess
 import sys
-import threading
 import time
 import urllib.error
 import urllib.parse
@@ -22,33 +21,54 @@ SKILL = Path(__file__).resolve().parent / 'skill'
 ICON = Path(__file__).resolve().parent / 'web_dist' / 'favicon.svg'
 PROJECT_MARKER = '<!-- Written by guided-learning setup; rerunning setup replaces this file. -->'
 FIRST_PROMPT = '$guided-learning Help me create my first Throughline course.'
-LANGUAGES = {'en': 'English', 'zh-CN': 'Simplified Chinese'}
-WELCOME_TITLES = {'en': 'Welcome to Throughline', 'zh-CN': '欢迎使用贯学'}
-WELCOME_NAMING = {'en': 'Call the app Throughline. Its library buttons are labelled "Add files in Codex", "Review in Codex" and "New course in Codex".',
-                  'zh-CN': 'Call the app 贯学 (Throughline). Its library buttons are labelled "在 Codex 中添加文件", "在 Codex 中核对" and "在 Codex 中新建课程". The Codex project and the launcher are named "Throughline".'}
+LANGUAGES = ('en', 'zh-CN')
+LAUNCHER_HINTS = {
+    'nt': {'en': 'search for "Throughline" in the Start menu', 'zh-CN': '在开始菜单中搜索“Throughline”'},
+    'darwin': {'en': 'open Throughline from Launchpad, Spotlight, or Applications in your home folder', 'zh-CN': '从启动台、聚焦搜索或个人文件夹中的“应用程序”打开 Throughline'},
+    'linux': {'en': 'open Throughline from your app menu', 'zh-CN': '从应用菜单中打开 Throughline'},
+    None: {'en': 'ask Codex in the Throughline project to "open Throughline"', 'zh-CN': '在 Throughline 项目中让 Codex“打开贯学”'},
+}
 
 
-def launcher_hint():
-    if os.name == 'nt':
-        return 'search for "Throughline" in the Start menu'
-    if sys.platform == 'darwin':
-        return 'open Throughline from Launchpad, Spotlight or the Applications folder in your home folder'
-    return 'open Throughline from your desktop app menu'
+def welcome(root, launcher, moved, language):
+    """The guide setup prints for Codex to show the learner in the install chat."""
+    platform = None if not launcher else 'nt' if os.name == 'nt' else 'darwin' if sys.platform == 'darwin' else 'linux'
+    hint = LAUNCHER_HINTS[platform][language]
+    if language == 'zh-CN':
+        here = '这段对话已移入 Codex 的“Throughline”项目，以后创建和修改课程都在这个项目里进行。' if moved else f'在 Codex 中把 {root} 作为项目打开（项目名 Throughline），以后创建和修改课程都在那里进行。'
+        return f"""## 欢迎使用贯学（Throughline）
+
+贯学把你自己的 PDF、Markdown 笔记和习题集变成有引导的课程：分节讲解、针对任意段落提问、讲解旁边就是原文页面，还有练习。讲课由 Codex 在后台完成，学习时不需要打开 Codex。
+
+**文件在哪里**
+- 贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
+- {here}
+
+**创建第一门课程**
+在 Throughline 项目的对话里附上你的文件（或写出它们所在的文件夹），再用一句话说明想学什么、为什么学，例如准备考试。Codex 会给出课程名和学习路线，说明哪些内容还需核对，然后在贯学中打开课程。
+
+**之后怎么学习**
+{hint}。课程库会列出所有课程；需要添加资料或核对页面时，点“在 Codex 中添加文件”或“在 Codex 中核对”回到这个项目。界面顶部可以在 English 和简体中文之间切换。
+
+你想先用哪些文件建课？"""
+    here = 'This chat has been moved into the "Throughline" project in Codex; course work happens in that project from now on.' if moved else f'Open {root} as a project in Codex (name it Throughline); course work happens there.'
+    return f"""## Welcome to Throughline
+
+Throughline turns your own PDFs, Markdown notes and problem sets into a guided course: lessons section by section, questions about any passage, the original page beside each explanation, and practice. Codex teaches in the background, so you don't need Codex open to study.
+
+**Where things are**
+- Your Throughline folder: `{root}`. Each course is a folder inside it.
+- {here}
+
+**Create your first course**
+In a chat in the Throughline project, attach your files (or name the folder they're in) and say in a sentence what you want to learn and why, for example an exam. Codex proposes a course name and route, says what still needs checking, and opens the course in Throughline.
+
+**Study afterwards**
+To open Throughline, {hint}. The library lists every course; "Add files in Codex" and "Review in Codex" bring you back to the project. Switch between English and Simplified Chinese at the top.
+
+Which files would you like to start with?"""
 
 
-def welcome_prompt(root, launcher, language):
-    """Facts for the welcome chat; Codex words them, so they arrive in the learner's language."""
-    how_to_open = launcher_hint() if launcher else 'ask Codex in this project to "open Throughline"'
-    return f'''$guided-learning Throughline was just installed and this is the learner's first chat in the Throughline project.
-Write a short, friendly welcome in {LANGUAGES[language]}, using headings or a list, and include all of these facts. {WELCOME_NAMING[language]}
-
-- What Throughline is: a study app that turns their own PDFs, Markdown notes and problem sets into a guided course with lessons, questions about any passage, the original pages beside each explanation, and practice. Codex teaches in the background; they do not need Codex open to study.
-- Where things are: their Throughline folder is {root}. This chat lives in the Codex project "Throughline", which points at that folder; course work happens in this project.
-- To create the first course: in this chat, attach their files (or name the folder they are in) and say in a sentence what they want to learn and why, for example an exam or a project. Codex proposes a course name and route, says what still needs checking, and opens the course in Throughline.
-- To study afterwards: {how_to_open}. The library there lists every course, and its Codex buttons come back to this project to add files or review pages.
-- The app can switch between English and Simplified Chinese in Settings, the gear at the top.
-
-End by asking which files they want to start with. Do not run any commands or read any files.'''
 PROJECT_AGENTS = PROJECT_MARKER + '''
 # Throughline course library
 
@@ -65,7 +85,7 @@ New learners often start with a bare request such as "help me create my first co
 
 1. Throughline turns their own documents (PDFs, Markdown notes, problem sets) into a guided course; Codex builds it here, and they study it in the Throughline app.
 2. To create a course, attach the files to this chat or give the folder they are in, and say in a sentence what they want to learn (for example "quantum mechanics up to perturbation theory, for my exam").
-3. Codex then proposes a course name and route, shows what still needs checking, and opens the course in the app.
+3. Codex asks a few quick questions (goal and deadline, how well they know each prerequisite, how much detail they want), proposes a course name and route that fit the answers, shows what still needs checking, and opens the course in the app.
 
 Then wait for the files and the goal. Do not start building until both are clear.
 '''
@@ -146,19 +166,6 @@ def install_launcher():
     return target
 
 
-def welcome_thread(root, launcher, language):
-    """Create the Throughline project in the Codex app and send the first chat in it, so the learner opens it already answered."""
-    from .codex import CodexRunner, ensure_project
-    events = []
-    try:
-        project = ensure_project(root, 'Throughline')
-        CodexRunner(timeout=180, ephemeral=False, project_id=project, name=WELCOME_TITLES[language]).run(welcome_prompt(root, launcher, language), root, events.append, threading.Event())
-    except Exception:
-        return None
-    thread = next((e['id'] for e in events if e['kind'] == 'thread'), None)
-    return thread if any(e['kind'] == 'complete' for e in events) else None
-
-
 def setup(args):
     target = skills_dir() / 'guided-learning'
     marker = target / 'SKILL.md'
@@ -183,19 +190,27 @@ def setup(args):
         print(f'Launcher: {launcher}')
     elif not args.no_launcher:
         print('Warning: the launcher could not be created; open Throughline with "guided-learning open".')
-    thread = None if args.no_welcome or not find_codex() else welcome_thread(root, launcher, args.language)
-    if thread:
-        print(f'Open the welcome chat in the Codex app: codex://threads/{thread}')
-    print(f'Open the project in the Codex app: {project_link(root)}')
-    print(f'With the Codex CLI, start codex in {root}.')
+    moved = False
+    if os.environ.get('CODEX_THREAD_ID') and find_codex():
+        try:
+            from .codex import ensure_project
+            ensure_project(root, 'Throughline', os.environ['CODEX_THREAD_ID'])
+            moved = True
+        except Exception as exc:
+            print(f'Warning: could not create the Throughline project in Codex ({exc}).')
+    if not moved:
+        print(f'Open the project in the Codex app: {project_link(root)}')
+        print(f'With the Codex CLI, start codex in {root}.')
     if not find_codex():
         print('Warning: Codex was not found (neither the codex command nor the Codex app); lessons in the interface need it. Set CODEX_CLI_PATH if it is installed somewhere else.')
     try:
         import pypdf  # noqa: F401
     except ImportError:
         print('Warning: PDF support is missing; install the package with the [pdf] extra to read PDFs.')
-    print('Next: in the Throughline project, send "Help me create my first Throughline course", then attach your PDFs or notes and say what you want to learn.')
-    print('To study, open Throughline from the launcher.')
+    print()
+    print('Show the learner this welcome guide as written:')
+    print()
+    print(welcome(root, launcher, moved, args.language))
     return 0
 
 
@@ -285,8 +300,7 @@ def main(argv):
     commands = parser.add_subparsers(dest='command', required=True)
     setup_parser = commands.add_parser('setup', help='Install or update the Codex skill, the course library and the launcher')
     setup_parser.add_argument('--no-launcher', action='store_true')
-    setup_parser.add_argument('--no-welcome', action='store_true', help='Do not start the welcome chat in Codex')
-    setup_parser.add_argument('--language', choices=tuple(LANGUAGES), default='en', help='Language of the welcome chat')
+    setup_parser.add_argument('--language', choices=LANGUAGES, default='en', help='Language of the welcome guide')
     opener = commands.add_parser('open', help='Start the learning interface in the background and open it')
     opener.add_argument('course', nargs='?', help='Course name in the library')
     opener.add_argument('--port', type=int, default=8765)

@@ -43,6 +43,7 @@
     } else if (event.key === '[') step(-1);
     else if (event.key === ']') step(1);
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
+    else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === '?') app.shortcutsOpen = true;
   }
 </script>

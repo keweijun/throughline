@@ -43,6 +43,8 @@ def start(store, request):
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
     snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}
+    profile = store.get('course','profile')
+    if profile: snapshot['learner_profile'] = profile
     branch=next((b for b in store.list('web_branches') if identifier in [b['turn_id'],b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]),None)
     if branch:
         snapshot['branch']=branch

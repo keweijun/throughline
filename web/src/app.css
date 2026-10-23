@@ -13,6 +13,8 @@
   --on-accent: #ffffff;
   --marker: #f0d25c;
   --marker-wash: rgb(240 210 92 / 0.42);
+  --mine: #3f8f6b;
+  --mine-wash: rgb(92 196 148 / 0.3);
   --good: #2e6f55;
   --good-wash: #e2efe8;
   --caution: #8d5a12;
@@ -63,6 +65,8 @@
   --on-accent: #121a33;
   --marker: #e2c44f;
   --marker-wash: rgb(226 196 79 / 0.26);
+  --mine: #7cc4a2;
+  --mine-wash: rgb(124 196 162 / 0.24);
   --good: #7cc4a2;
   --good-wash: #1b2d26;
   --caution: #e0b46a;
@@ -89,6 +93,8 @@
     --on-accent: #121a33;
     --marker: #e2c44f;
     --marker-wash: rgb(226 196 79 / 0.26);
+  --mine: #7cc4a2;
+  --mine-wash: rgb(124 196 162 / 0.24);
     --good: #7cc4a2;
     --good-wash: #1b2d26;
     --caution: #e0b46a;
@@ -144,6 +150,10 @@ a {
 
 ::highlight(asked) {
   background-color: var(--marker-wash);
+}
+
+::highlight(mine) {
+  background-color: var(--mine-wash);
 }
 
 [hidden] {

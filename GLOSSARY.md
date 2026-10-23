@@ -19,6 +19,9 @@ _Avoid_: Off-topic, irrelevant question.
 **Route-aware question answering**: Choosing side-question depth using the current goal, prerequisites, upcoming topics, and known difficulties while preserving teaching continuity.
 _Avoid_: Always brief, always detailed, depth determined by question length.
 
+**Learner profile**: What the learner reported when the course was built: goal, desired depth, prior knowledge of each prerequisite and focus. It shapes the route and lesson depth.
+_Avoid_: Mastery, assessment, learning evidence.
+
 **Pending explanation**: Content answered sufficiently for current use whose full explanation is explicitly scheduled for a later concept.
 _Avoid_: Resolved, ignored question.
 
@@ -45,3 +48,15 @@ _Avoid_: A final script that must be read verbatim, evidence of learner mastery.
 
 **Preparation readiness**: The preparation material for a section is sufficient to begin teaching it.
 _Avoid_: Learning completed, mastered, all sources permanently valid.
+
+**Learner annotation**: A highlight, learner note or bookmark the learner keeps for themselves, attached to a route section and optionally to a passage or source location. The teacher does not read it (ADR 0005).
+_Avoid_: Notebook, evidence, side question, deferred item.
+
+**Highlight**: A learner annotation marking a passage in a lesson, side-question answer, exercise or source, optionally with a note.
+_Avoid_: Asked passage (a passage quoted in a side question).
+
+**Learner note**: Text the learner writes on a highlight or on a whole section.
+_Avoid_: Uncertainty notes in preparation material, progress note.
+
+**Bookmark**: A learner annotation marking a section or a source location to come back to.
+_Avoid_: Deferred item, mainline restore point.

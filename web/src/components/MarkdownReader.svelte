@@ -1,18 +1,30 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { mark, clear } from '../lib/highlight';
 
-  let { lines, target, label }: { lines: { id: string; text: string }[]; target: string; label: string } = $props();
+  let {
+    lines,
+    target,
+    label,
+    highlights = [],
+  }: { lines: { id: string; text: string }[]; target: string; label: string; highlights?: string[] } = $props();
 
   let container: HTMLElement | undefined = $state();
 
   onMount(() => {
     container?.querySelector('.cited')?.scrollIntoView({ block: 'center' });
   });
+
+  $effect(() => {
+    if (!container) return;
+    mark('mine', 'markdown-reader', container, highlights, { loose: true, skip: '.number' });
+    return () => clear('mine', 'markdown-reader');
+  });
 </script>
 
 <div class="doc" bind:this={container} data-source-label={label}>
   {#each lines as line, i (line.id)}
-    <div class="line" class:cited={line.id === target} class:blank={!line.text.trim()}>
+    <div class="line" class:cited={line.id === target} class:blank={!line.text.trim()} data-unit={line.id}>
       <span class="number" aria-hidden="true">{i + 1}</span>
       <span class="text">{line.text || ' '}</span>
     </div>

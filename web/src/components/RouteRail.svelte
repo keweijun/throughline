@@ -65,7 +65,7 @@
           aria-current={id === app.viewingId ? 'page' : undefined}
           onclick={() => app.view(id)}
         >
-          <span class="name">{concept?.title ?? id}</span>
+          <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
           {#if status === 'current' || count || waiting || prepared.has(id)}
             <span class="meta">
               {#if status === 'current'}<span>{t("You are here")}</span>{/if}
@@ -232,6 +232,10 @@
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
+  }
+
+  .star {
+    color: var(--mine);
   }
 
   @media (max-width: 56rem) {

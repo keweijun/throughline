@@ -1,14 +1,15 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
-  import { app } from '../lib/store.svelte';
+  import { app, type PanelTab } from '../lib/store.svelte';
   import Questions from './Questions.svelte';
   import SourceViewer from './SourceViewer.svelte';
+  import Notes from './Notes.svelte';
 
   // Each tab keeps its own scroll position when you switch between them.
   const scroll: Record<string, number> = {};
   let body: HTMLElement | undefined = $state();
 
-  function select(tab: 'questions' | 'source') {
+  function select(tab: PanelTab) {
     if (body) scroll[app.panelTab] = body.scrollTop;
     app.panelTab = tab;
     requestAnimationFrame(() => body && (body.scrollTop = scroll[tab] ?? 0));
@@ -51,12 +52,14 @@
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected={app.panelTab === 'questions'} onclick={() => select('questions')}>{t("Questions")}</button>
       <button role="tab" aria-selected={app.panelTab === 'source'} onclick={() => select('source')}>{t("Source")}</button>
+      <button role="tab" aria-selected={app.panelTab === 'notes'} onclick={() => select('notes')}>{t("Notes")}</button>
     </div>
     <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label={t("Close panel")}>{t("Close")}</button>
   </div>
   <div class="body" class:fill={app.panelTab === 'source'} bind:this={body}>
     <div class="tab" hidden={app.panelTab !== 'questions'}><Questions /></div>
     <div class="tab" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
+    <div class="tab" hidden={app.panelTab !== 'notes'}><Notes /></div>
   </div>
 </aside>
 

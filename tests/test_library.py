@@ -47,23 +47,23 @@ class CourseLibrary(unittest.TestCase):
 
     def test_setup_installs_the_bundled_skill_and_keeps_foreign_folders(self):
         with tempfile.TemporaryDirectory() as home:
-            result = cli(home, 'setup', '--no-welcome')
+            result = cli(home, 'setup')
             self.assertEqual(result.returncode, 0, result.stderr)
             skill = Path(home) / '.skills' / 'guided-learning'
             self.assertIn('name: guided-learning', (skill / 'SKILL.md').read_text(encoding='utf-8'))
             self.assertTrue((skill / 'references' / 'course-operations.md').is_file())
             self.assertTrue((skill / 'agents' / 'openai.yaml').is_file())
-            self.assertEqual(cli(home, 'setup', '--no-welcome').returncode, 0, 'setup is repeatable for updates')
+            self.assertEqual(cli(home, 'setup').returncode, 0, 'setup is repeatable for updates')
             for child in skill.rglob('*'):
                 if child.is_file():
                     child.unlink()
             (skill / 'SKILL.md').write_text('---\nname: something-else\n---\n', encoding='utf-8')
-            self.assertEqual(cli(home, 'setup', '--no-welcome').returncode, 1)
+            self.assertEqual(cli(home, 'setup').returncode, 1)
             self.assertIn('something-else', (skill / 'SKILL.md').read_text(encoding='utf-8'))
 
     def test_setup_makes_the_library_a_codex_project_with_a_launcher(self):
         with tempfile.TemporaryDirectory() as home:
-            result = cli(home, 'setup', '--no-welcome')
+            result = cli(home, 'setup')
             self.assertEqual(result.returncode, 0, result.stderr)
             agents = Path(home) / 'AGENTS.md'
             self.assertIn('$guided-learning', agents.read_text(encoding='utf-8'))
@@ -80,7 +80,7 @@ class CourseLibrary(unittest.TestCase):
                 self.assertIn('-m guided_learning open', launcher.read_text(encoding='utf-8'))
             self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'project files are not courses')
             agents.write_text('# My own notes\n', encoding='utf-8')
-            again = cli(home, 'setup', '--no-launcher', '--no-welcome')
+            again = cli(home, 'setup', '--no-launcher')
             self.assertEqual(again.returncode, 0, again.stderr)
             self.assertEqual(agents.read_text(encoding='utf-8'), '# My own notes\n')
             self.assertIn('Kept your own', again.stdout)

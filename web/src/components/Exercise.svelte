@@ -3,10 +3,15 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
+  import { highlights } from '../lib/highlight';
   import { evidenceLabels, helpLabels } from '../lib/format';
   import type { Task } from '../lib/types';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
+
+  const mine = $derived((app.state?.annotations ?? []).filter((a) => a.task_id === task.id));
+  const passages = $derived(mine.map((a) => a.passage));
+  const noted = $derived(mine.filter((a) => a.note));
 
   let answer = $state('');
   let busy = $state(false);
@@ -42,17 +47,22 @@
   }
 </script>
 
-<article class="exercise" class:solved aria-label={number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" class:solved aria-label={number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
       {number ? t('Exercise {number}', { number }) : t("Exercise")}
       <span class="origin">· {task.origin === 'source' ? t("from the course materials") : t("written by the teacher")}</span>
       {#if showSection}<span class="origin">· {app.concept(task.concept_id)?.title ?? task.concept_id}</span>{/if}
     </span>
+    {#if noted.length}
+      <button class="btn btn-quiet btn-small your-notes" onclick={() => app.showAnnotation(noted[0].id)}>
+        <span aria-hidden="true">✎</span> {noted.length === 1 ? t("1 note") : t("{count} notes", { count: noted.length })}
+      </button>
+    {/if}
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" use:markdown={{ language: locale.language, text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}
@@ -76,7 +86,7 @@
           {/if}
           <section class="teacher-feedback" aria-label={t("Teacher feedback")}>
             <p class="answer-label">{t("Teacher feedback")}</p>
-            <div class="prose feedback" use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+            <div class="prose feedback" data-exercise={task.id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
           </section>
         </details>
       {/each}
@@ -129,6 +139,7 @@
 </article>
 
 <style>
+  .your-notes { margin-left: auto; color: var(--mine); font-weight: 600; }
   .exercise {
     display: grid;
     gap: 0.85rem;

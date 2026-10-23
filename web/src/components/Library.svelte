@@ -63,6 +63,7 @@
                 <span>{t('Sections: {count}', { count: course.concepts ?? 0 })}</span>
                 {#if updated(course)}<span>{t('Updated {date}', { date: updated(course) })}</span>{/if}
               </p>
+              {#if course.goal}<p class="current">{t('Goal: {goal}', { goal: course.goal })}</p>{/if}
               {#if course.current}<p class="current">{t('Now studying: {section}', { section: course.current })}</p>{/if}
             {/if}
           </div>

@@ -3,6 +3,7 @@ import asyncio
 import json
 import socket
 import threading
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal, Optional
@@ -47,6 +48,20 @@ class QuestionRequest(Body):
     main_turn_id: Optional[str] = None
     anchor: Optional[dict] = None
     pause: bool = False
+
+
+class AnnotationRequest(Body):
+    kind: Literal['highlight', 'note', 'bookmark']
+    concept_id: Optional[str] = None
+    passage: Optional[str] = None
+    note: Optional[str] = None
+    turn_id: Optional[str] = None
+    task_id: Optional[str] = None
+    source: Optional[dict] = None
+
+
+class NoteRequest(Body):
+    note: str
 
 
 class ChoiceRequest(Body):
@@ -224,7 +239,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'questions': [_public_question(b) for b in current.questions.list()],
                 'practice': current.practice.state(),
                 'preparation': current.preparation.state(),
-                'settings': current.settings.public()}
+                'settings': current.settings.public(),
+                'annotations': current.operation({'op': 'annotations.list'})['annotations']}
 
     @app.get('/api/events')
     async def events(request: Request):
@@ -289,6 +305,24 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/questions/{identifier}/return')
     def return_to_mainline(identifier: str):
         return host.questions.return_to_mainline(identifier)
+
+    @app.post('/api/annotations')
+    def annotate(body: AnnotationRequest):
+        result = host.operation({'op': 'annotations.save', 'id': str(uuid.uuid4()), **body.model_dump(exclude_none=True)})
+        host.changed()
+        return result
+
+    @app.put('/api/annotations/{identifier}')
+    def edit_annotation(identifier: str, body: NoteRequest):
+        result = host.operation({'op': 'annotations.save', 'id': identifier, 'note': body.note})
+        host.changed()
+        return result
+
+    @app.delete('/api/annotations/{identifier}')
+    def remove_annotation(identifier: str):
+        result = host.operation({'op': 'annotations.delete', 'id': identifier})
+        host.changed()
+        return result
 
     @app.post('/api/practice/generate')
     def generate(body: GenerateRequest):

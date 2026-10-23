@@ -25,8 +25,8 @@ def find_codex():
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
-def ensure_project(root, name, timeout=60):
-    """The Codex app project whose root is `root`, created if missing; returns its id."""
+def ensure_project(root, name, thread_id=None, timeout=60):
+    """The Codex app project whose root is `root`, created if missing; moves `thread_id` into it. Returns the project id."""
     process = subprocess.Popen([find_codex() or 'codex', 'app-server', '--stdio'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace',
                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
@@ -53,16 +53,17 @@ def ensure_project(root, name, timeout=60):
     try:
         call('initialize', {'clientInfo': {'name': 'guided_learning', 'version': '0.4.0'}, 'capabilities': {'experimentalApi': True}})
         process.stdin.write(json.dumps({'method': 'initialized', 'params': {}}) + '\n')
-        cursor = None
-        while True:
+        cursor, found = None, None
+        while not found:
             page = call('project/list', {'cursor': cursor, 'limit': 100})
-            for project in page['data']:
-                if any(os.path.normcase(os.path.abspath(r['path'])) == wanted for r in project['roots']):
-                    return project['id']
+            found = next((p['id'] for p in page['data'] if any(os.path.normcase(os.path.abspath(r['path'])) == wanted for r in p['roots'])), None)
             cursor = page.get('nextCursor')
             if not cursor:
                 break
-        return call('project/create', {'idempotencyKey': 'throughline:' + wanted, 'name': name, 'roots': [{'path': str(root)}]})['project']['id']
+        found = found or call('project/create', {'idempotencyKey': 'throughline:' + wanted, 'name': name, 'roots': [{'path': str(root)}]})['project']['id']
+        if thread_id:
+            call('thread/metadata/update', {'threadId': thread_id, 'projectId': found})
+        return found
     finally:
         process.stdin.close()
         try:

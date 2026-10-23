@@ -200,6 +200,7 @@ export type LibraryCourse = {
   concepts?: number;
   needs_review?: number;
   current?: string | null;
+  goal?: string | null;
   updated?: number;
   error?: string;
 };

@@ -6,14 +6,21 @@ Run `guided-learning --course <course-name> --request <request.json>`. Course na
 
 1. Get the learner's files and goal. If either is missing, explain in a few lines: attach the files or name their folder, and say what they want to learn. Attachments may arrive as local paths; if a file's content is visible but not its path, ask where it is saved, or ask the learner to put it in `<root>/<course-name>/inputs/`.
 2. Propose a short course name from the files and goal, and check it is not already listed by `guided-learning courses`.
-3. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
-4. Run `course.init`, then `source.register` for each copy, then build the route (see curriculum operations).
-5. Open the course in the app with `guided-learning open <course-name>`.
+3. Interview the learner before building the route, in one short message in their language. Skim the files first so the questions are specific to them. Ask, offering choices they can answer in a word:
+   - **Goal:** what they want to be able to do, and by when (an exam on a date, a project, general understanding).
+   - **Prior knowledge:** list the three to six prerequisites these materials actually assume (for example "complex numbers", "linear algebra: eigenvalues", "Fourier transforms") and ask for each: none, some, or solid.
+   - **Depth:** overview (intuition and key results), standard (main derivations and worked examples), or rigorous (proofs, conditions and edge cases).
+   - **Focus:** anything to emphasize or skip, such as problem-solving for the exam, or chapters they already know.
+   Accept partial answers and use sensible defaults for the rest; do not ask a second round unless an answer changes the route a lot. Save the answers with `course.profile.save` after `course.init`.
+4. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
+5. Run `course.init`, then `course.profile.save`, then `source.register` for each copy, then build the route (see curriculum operations) to fit the profile: add short foundation sections for prerequisites marked none that the goal needs, start later for solid ones, and order by the goal (exam topics first when there is a deadline). Before saving, show the proposed route in a few lines with how it reflects their answers, and adjust if they object.
+6. Open the course in the app with `guided-learning open <course-name>`.
 
 ## Requests
 
 - `{"op":"course.init","title":"Quantum"}` creates a course; reopening via init preserves the existing title and state.
-- `{"op":"course.status"}` returns `course`, `position`, and `sources`.
+- `{"op":"course.status"}` returns `course`, `position`, `sources` and `profile`.
+- `{"op":"course.profile.save","profile":{"goal":"Pass the final on 15 Jan","depth":"standard","prerequisites":[{"topic":"Complex numbers","level":"solid"},{"topic":"Fourier transforms","level":"none"}],"focus":"Exam-style problems"}}` saves the learner profile from the interview, replacing any earlier one. `depth` is `overview`, `standard` or `rigorous`; levels are `none`, `some` or `solid`; `focus` and `notes` are optional. The app's teacher reads it for every lesson. It records what the learner reported, never mastery. Save again when the learner changes their mind.
 - `{"op":"source.register","path":"/absolute/path/slides.pdf"}` returns `source` containing stable `id`, normalized `path`, SHA256 `revision`, `status`, `verification`, and `errors`. Repeat after a file changes. Missing files stay visible with a failed latest registration; an earlier revision remains readable. A successful registration means the attempt was recorded, not necessarily that extraction succeeded.
 - `{"op":"source.read","source_id":"src-..."}` returns the latest available snapshot with `units`, `status`, `errors`, and `verification`; pass `revision` to retrieve a previous snapshot. Each unit has stable within-revision `id`, `locator` and `text`. Markdown uses `{ "line": 1 }`, PDF uses `{ "page": 1 }`. PDF empty/image-only pages are `needs_review`.
 - `{"op":"position.save","request_id":"checkpoint-1","position":{"goal":"Understand normalization","progress":"Introduced probability density","next_step":"Normalize the example"}}` saves a minimal mainline position object.

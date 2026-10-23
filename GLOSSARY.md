@@ -19,6 +19,9 @@ _Avoid_: Off-topic, irrelevant question.
 **Route-aware question answering**: Choosing side-question depth using the current goal, prerequisites, upcoming topics, and known difficulties while preserving teaching continuity.
 _Avoid_: Always brief, always detailed, depth determined by question length.
 
+**Learner profile**: What the learner reported when the course was built: goal, desired depth, prior knowledge of each prerequisite and focus. It shapes the route and lesson depth.
+_Avoid_: Mastery, assessment, learning evidence.
+
 **Pending explanation**: Content answered sufficiently for current use whose full explanation is explicitly scheduled for a later concept.
 _Avoid_: Resolved, ignored question.
 

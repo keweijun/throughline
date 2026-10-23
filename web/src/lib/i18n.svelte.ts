@@ -356,7 +356,8 @@ const messages = {
   "Create your first course": "创建你的第一门课程",
   "Choose New course in Codex. A Codex chat opens in your Throughline project with the request typed in.": "点击“在 Codex 中新建课程”。Codex 会在你的贯学项目中新建对话，并填好请求。",
   "Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.": "附上你的 PDF 或笔记（也可以写出它们所在的文件夹），并用一句话说明你想学什么。",
-  "Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.": "发送。Codex 会给出学习路线、说明仍需核对的内容，完成后在这里打开课程。"
+  "Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.": "发送。Codex 会给出学习路线、说明仍需核对的内容，完成后在这里打开课程。",
+  "Goal: {goal}": "目标：{goal}"
 } as const;
 export type MessageKey = keyof typeof messages;
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {

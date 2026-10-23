@@ -82,9 +82,9 @@
   {#if course}
     <section class="codex" aria-labelledby="codex-title">
       <h3 id="codex-title">{t('Change this course in Codex')}</h3>
-      <CodexLink prompt={t('$guided-learning add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+      <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
       {#if course.needs_review}
-        <CodexLink prompt={t('$guided-learning review the pages that still need review in the course {course}', { course: course.name })}>
+        <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
           {t('Review {count} locations in Codex', { count: course.needs_review })}
         </CodexLink>
       {/if}

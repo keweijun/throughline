@@ -41,13 +41,13 @@ test('Codex actions copy their request, and an open course links back to Codex',
   const library = await (await page.request.get(base + '/api/library')).json();
 
   await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' }).click();
-  expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$guided-learning add these files to the course quantum-v1:']);
-  await expect(page.getByRole('status').filter({ hasText: 'Request copied' })).toContainText(library.root);
+  expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$throughline add these files to the course quantum-v1:']);
+  await expect(page.getByRole('status').filter({ hasText: 'Request copied' })).toContainText('any Codex chat');
 
   await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
   const rail = page.getByRole('navigation', { name: 'Course route' });
   const add = new URL(await rail.getByRole('link', { name: 'Add files in Codex' }).getAttribute('href') ?? '');
-  expect(add.searchParams.get('prompt')).toBe('$guided-learning add these files to the course linear-algebra: ');
+  expect(add.searchParams.get('prompt')).toBe('$throughline add these files to the course linear-algebra: ');
   expect(add.searchParams.get('path')).toBe(library.root);
   expect(errors).toEqual([]);
 });
@@ -68,14 +68,14 @@ test('the library remembers the last language before a course is open', async ({
   await expect(page.locator('.topbar .course')).toHaveText('贯学');
 });
 
-test('course actions open Codex in the Throughline project, and new courses appear on their own', async ({ page, course }) => {
+test('course actions open Codex with a $throughline request, and new courses appear on their own', async ({ page, course }) => {
   const { base } = await course('library_browser_fixture');
   const library = await (await page.request.get(base + '/api/library')).json();
   const quantum = page.locator('.courses > li').filter({ hasText: 'Quantum' });
   const add = new URL(await quantum.getByRole('link', { name: 'Add files in Codex' }).getAttribute('href') ?? '');
   expect(add.protocol).toBe('codex:');
   expect(add.searchParams.get('path')).toBe(library.root);
-  expect(add.searchParams.get('prompt')).toBe('$guided-learning add these files to the course quantum-v1: ');
+  expect(add.searchParams.get('prompt')).toBe('$throughline add these files to the course quantum-v1: ');
   await expect(page.locator('.courses > li').filter({ hasText: 'Thermodynamics' }).getByRole('link', { name: 'Build the route in Codex' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveAttribute('href', /^codex:\/\/new\?prompt=/);
 

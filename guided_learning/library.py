@@ -1,4 +1,4 @@
-"""The course library: the learner's Throughline folder, holding every course workspace and doubling as a Codex project."""
+"""The course library: the learner's Throughline folder, holding every course workspace."""
 import hashlib
 import os
 import re
@@ -12,9 +12,21 @@ NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,63}$')
 
 
 def default_root():
+    """~/Throughline: easy to find, and outside Documents, which OneDrive or iCloud often sync. Synced SQLite courses can corrupt."""
     if os.environ.get('GUIDED_LEARNING_HOME'):
         return Path(os.environ['GUIDED_LEARNING_HOME'])
-    return Path.home() / ('Documents' if os.name == 'nt' else '') / 'Throughline'
+    return Path.home() / 'Throughline'
+
+
+def legacy_roots():
+    """Where earlier versions kept courses by default; setup moves them into the current library."""
+    if os.environ.get('GUIDED_LEARNING_HOME'):
+        return []
+    roots = [Path.home() / 'Documents' / 'Throughline']
+    if os.name == 'nt' and os.environ.get('LOCALAPPDATA'):
+        roots.append(Path(os.environ['LOCALAPPDATA']) / 'guided-learning' / 'courses')
+    roots.append(Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'guided-learning' / 'courses')
+    return roots
 
 
 def state_dir():

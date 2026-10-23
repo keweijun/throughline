@@ -1,6 +1,6 @@
 ---
-name: guided-learning
-description: Build or resume a course from multiple PDFs and notes, then open its local learning UI. Use when a learner asks to plan a cross-document route, study from their materials, continue a course, or launch the guided-learning app.
+name: throughline
+description: Build or resume a course from multiple PDFs and notes, then open its local learning UI. Use when a learner asks to plan a cross-document route, study from their materials, continue a course, or open Throughline. Learners invoke it as $throughline from any Codex chat.
 ---
 
 # Throughline: guided learning
@@ -9,7 +9,9 @@ Teach in English by default. Follow explicit learner requests for another langua
 
 The `guided-learning` command is the app; the browser interface it opens is the teaching surface. The learner should not need to type commands: run them yourself. If `guided-learning` is not found, ask the learner to install Throughline first (the project README has a prompt to paste) and stop.
 
-Use the course workspace as the only official state. Courses live in the learner's Throughline folder, which is also their Throughline project in Codex; `guided-learning courses` prints its `root` and lists courses by name. On entering an existing course, read its status before teaching; recover its saved goal and next step rather than infer them from the latest message.
+To update Throughline when the learner asks: run `guided-learning stop`, then `uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (or `pipx install --force` with the same package), then `guided-learning setup`, outside the sandbox. Courses are kept.
+
+Use the course workspace as the only official state. Courses live in the learner's Throughline folder; the learner may call this skill from any Codex chat or folder, so always address courses by name through the command, never by the current directory; `guided-learning courses` prints its `root` and lists courses by name. On entering an existing course, read its status before teaching; recover its saved goal and next step rather than infer them from the latest message.
 
 ## Prepare a course
 

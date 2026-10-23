@@ -15,31 +15,59 @@ The teacher makes instructional judgments from your materials. The program valid
 
 ## Install
 
-You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli); the app includes the command Throughline uses), and Python 3.10 or newer. Paste this into Codex:
+You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)), and Python 3.10 or newer. Then paste this into Codex:
 
 ```text
-Install Throughline for me: run `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"` (if uv is missing, use `pipx install --force` with the same quoted package, or `python -m pip install --user --upgrade` as a last resort), then run `guided-learning setup` (add `--language zh-CN` if I write to you in Chinese), then show me the welcome guide it prints.
+Install https://github.com/keweijun/throughline
 ```
 
-Codex installs the app (no Node.js needed), adds the `$guided-learning` skill to `~/.agents/skills/`, creates your Throughline folder and opens it as a Codex project, and adds a Throughline launcher to your app menu. Paste the same prompt again to update.
+Codex reads the steps below, installs the app (no Node.js needed), adds the `$throughline` skill, creates your Throughline folder and a **Throughline** launcher in your app menu, and shows a short welcome guide. To **update**, paste `Update https://github.com/keweijun/throughline`; your courses are kept.
+
+### For Codex: installing or updating Throughline
+
+When a user asks you to install or update Throughline, run these steps yourself, outside the sandbox (they need the network and write outside the workspace). The user should not have to type anything.
+
+1. If `guided-learning --version` already works, run `guided-learning stop` first. On Windows a running Throughline locks its own files and the upgrade would fail.
+2. Install the latest version from GitHub, using the first tool that is available:
+   - `uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `python -m pip install --user --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+
+   If `guided-learning` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
+3. Run `guided-learning setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher and never touches existing courses.
+4. Show the user the welcome guide that setup prints, as written. After an update, just say which version is installed (`guided-learning --version`).
+
+### Install or update by hand
+
+With [uv](https://docs.astral.sh/uv/) (recommended):
+
+```sh
+guided-learning stop                 # when updating; skip on a first install
+uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"
+guided-learning setup                # add --language zh-CN for the Chinese welcome guide
+```
+
+With pipx, replace the second line with `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`. Both forms always fetch the latest version, so the same three lines install and update. Run `guided-learning --version` to see what you have.
+
+To uninstall, run `guided-learning stop`, then `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`), and delete `~/.agents/skills/throughline` and the launcher. Your courses stay in your Throughline folder until you delete it.
 
 ## Create your first course
 
-After installing, the chat you installed from is moved into a new **Throughline** project in Codex and shows a short welcome guide.
+After installing, Codex shows a short welcome guide. From then on, start any Codex chat with **`$throughline`** to work on your courses.
 
-1. Attach your PDFs or notes (or name the folder they are in) and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
+1. Type `$throughline make a course from these files`, attach your PDFs or notes (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
 2. Codex asks a few quick questions: your goal and deadline, how well you know each prerequisite it found in the files, and how much detail you want. Then it suggests a course name, copies your files into the Throughline folder, builds a route across them and tells you what still needs checking.
 3. When it is done, the course opens in Throughline in your browser. Next time, open it from the **Throughline** launcher in your app menu.
 
-Later courses work the same way: choose **New course in Codex** in the Throughline library, or start a new chat in the Throughline project.
+Later courses work the same way: `$throughline` in any Codex chat, or **New course in Codex** in the Throughline library.
 
 ## How it works
 
 Throughline is where you study; Codex is where courses are built. You move between them in one click.
 
 - **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it). Lessons, questions and practice run Codex in the background, so you never need Codex open to study.
-- **Build courses in Codex.** Setup makes your Throughline folder a Codex project. In the library, **New course in Codex**, **Add files in Codex** and **Review in Codex** open a new chat in that project with the request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself.
-- **Or start in Codex.** In the Throughline project, just ask: "make a course from these slides", "add this problem set to quantum", "open quantum". Codex asks for permission the first time it starts Throughline, because the app keeps running in the background.
+- **Build courses in Codex.** Start any Codex chat with `$throughline`. In the library, **New course in Codex**, **Add files in Codex** and **Review in Codex** open a new Codex chat with the `$throughline` request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself.
+- **Ask for anything.** `$throughline add this problem set to quantum`, `$throughline make the quantum course more rigorous`, `$throughline open quantum`. Codex asks for permission the first time it starts Throughline, because the app keeps running in the background.
 
 ![The course library listing three courses with their sources, sections, review backlog and current section](docs/images/library-en.png)
 
@@ -66,7 +94,7 @@ The interface and new teaching default to English; switch to Simplified Chinese 
 
 ## Where things live
 
-- **Courses:** your Throughline folder, `~/Throughline` (`Documents\Throughline` on Windows; set `GUIDED_LEARNING_HOME` to use another folder). It is also your Codex project, with an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
+- **Courses:** your Throughline folder, `~/Throughline` (`C:\Users\<you>\Throughline` on Windows). It is deliberately outside Documents, which OneDrive and iCloud often sync: a course's database can be corrupted by sync. To use another folder, set `GUIDED_LEARNING_HOME`; if you point it at a synced folder, open each course on only one computer at a time. It holds an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
 - **Teacher settings:** open **Settings** (the gear in the top bar) to pick the Codex model and reasoning effort. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).

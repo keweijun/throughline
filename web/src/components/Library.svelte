@@ -7,7 +7,7 @@
   let opening = $state<string | null>(null);
 
   const library = $derived(app.library);
-  const newCourse = $derived(t('$guided-learning create a new course from these files: '));
+  const newCourse = $derived(t('$throughline create a new course from these files: '));
 
   function updated(course: LibraryCourse) {
     if (!course.updated) return '';
@@ -41,7 +41,7 @@
     <div class="empty">
       <h2>{t('Create your first course')}</h2>
       <ol>
-        <li>{t('Choose New course in Codex. A Codex chat opens in your Throughline project with the request typed in.')}</li>
+        <li>{t('Choose New course in Codex, or start any Codex chat with $throughline. A chat opens with the request typed in.')}</li>
         <li>{t('Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.')}</li>
         <li>{t('Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.')}</li>
       </ol>
@@ -84,11 +84,11 @@
           {#if !course.error && library.root}
             <div class="codex-actions">
               {#if !course.concepts}
-                <CodexLink prompt={t('$guided-learning build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
+                <CodexLink prompt={t('$throughline build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
               {/if}
-              <CodexLink prompt={t('$guided-learning add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+              <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
               {#if course.needs_review}
-                <CodexLink prompt={t('$guided-learning review the pages that still need review in the course {course}', { course: course.name })}>{t('Review in Codex')}</CodexLink>
+                <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>{t('Review in Codex')}</CodexLink>
               {/if}
             </div>
           {/if}
@@ -99,7 +99,7 @@
 
   <aside class="codex" aria-labelledby="codex-title">
     <h2 id="codex-title">{t('Courses are built in Codex')}</h2>
-    <p class="muted">{t('The Codex buttons open a new chat in your Throughline project with the request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
+    <p class="muted">{t('The Codex buttons open a new Codex chat with a $throughline request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
     <p class="muted">{t('Each Codex button also copies its request. Using the Codex CLI, or nothing opened? Paste it into Codex started in your Throughline folder.')}</p>
   </aside>
 </section>

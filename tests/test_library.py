@@ -7,7 +7,6 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
-from urllib.parse import parse_qs, urlsplit
 
 from fastapi.testclient import TestClient
 
@@ -47,10 +46,14 @@ class CourseLibrary(unittest.TestCase):
 
     def test_setup_installs_the_bundled_skill_and_keeps_foreign_folders(self):
         with tempfile.TemporaryDirectory() as home:
+            old = Path(home) / '.skills' / 'guided-learning'
+            old.mkdir(parents=True)
+            (old / 'SKILL.md').write_text('---\nname: guided-learning\n---\n', encoding='utf-8')
             result = cli(home, 'setup')
+            self.assertFalse(old.exists(), 'the skill under its old name is removed')
             self.assertEqual(result.returncode, 0, result.stderr)
-            skill = Path(home) / '.skills' / 'guided-learning'
-            self.assertIn('name: guided-learning', (skill / 'SKILL.md').read_text(encoding='utf-8'))
+            skill = Path(home) / '.skills' / 'throughline'
+            self.assertIn('name: throughline', (skill / 'SKILL.md').read_text(encoding='utf-8'))
             self.assertTrue((skill / 'references' / 'course-operations.md').is_file())
             self.assertTrue((skill / 'agents' / 'openai.yaml').is_file())
             self.assertEqual(cli(home, 'setup').returncode, 0, 'setup is repeatable for updates')
@@ -61,16 +64,17 @@ class CourseLibrary(unittest.TestCase):
             self.assertEqual(cli(home, 'setup').returncode, 1)
             self.assertIn('something-else', (skill / 'SKILL.md').read_text(encoding='utf-8'))
 
-    def test_setup_makes_the_library_a_codex_project_with_a_launcher(self):
+    def test_setup_prepares_the_library_launcher_and_welcome_guide(self):
         with tempfile.TemporaryDirectory() as home:
             result = cli(home, 'setup')
             self.assertEqual(result.returncode, 0, result.stderr)
             agents = Path(home) / 'AGENTS.md'
-            self.assertIn('$guided-learning', agents.read_text(encoding='utf-8'))
-            link = next(line for line in result.stdout.splitlines() if 'codex://new?' in line).split(': ', 1)[1]
-            params = parse_qs(urlsplit(link).query)
-            self.assertEqual(params['path'], [home])
-            self.assertIn('create my first Throughline course', params['prompt'][0])
+            self.assertIn('$throughline', agents.read_text(encoding='utf-8'))
+            self.assertIn('## Welcome to Throughline', result.stdout)
+            self.assertIn('$throughline make a course from these files', result.stdout)
+            self.assertNotIn('codex://', result.stdout)
+            chinese = cli(home, 'setup', '--no-launcher', '--language', 'zh-CN')
+            self.assertIn('欢迎使用贯学', chinese.stdout)
             self.assertIn('When the learner has not said what to do', agents.read_text(encoding='utf-8'))
             if os.name == 'nt':
                 launcher = Path(home) / '.appdata' / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Throughline.lnk'
@@ -78,7 +82,9 @@ class CourseLibrary(unittest.TestCase):
             elif sys.platform != 'darwin':
                 launcher = Path(home) / '.xdg' / 'applications' / 'throughline.desktop'
                 self.assertIn('-m guided_learning open', launcher.read_text(encoding='utf-8'))
-            self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'project files are not courses')
+                icon = next(l for l in launcher.read_text(encoding='utf-8').splitlines() if l.startswith('Icon='))[5:]
+                self.assertTrue(Path(icon).is_file(), icon)
+            self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'library files are not courses')
             agents.write_text('# My own notes\n', encoding='utf-8')
             again = cli(home, 'setup', '--no-launcher')
             self.assertEqual(again.returncode, 0, again.stderr)
@@ -171,3 +177,20 @@ class CourseLibrary(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Migration(unittest.TestCase):
+    def test_setup_moves_courses_from_the_old_documents_library(self):
+        with tempfile.TemporaryDirectory() as home:
+            old = Path(home) / 'Documents' / 'Throughline'
+            course(old / 'alpha', 'Alpha')
+            (old / 'AGENTS.md').write_text('<!-- Written by guided-learning setup; rerunning setup replaces this file. -->', encoding='utf-8')
+            env = {**os.environ, 'HOME': home, 'USERPROFILE': home, 'XDG_DATA_HOME': str(Path(home) / '.xdg'),
+                   'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills')}
+            env.pop('GUIDED_LEARNING_HOME', None)
+            result = subprocess.run([sys.executable, '-m', 'guided_learning', 'setup', '--no-launcher'], text=True, capture_output=True,
+                                    cwd=ROOT, env=env, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('Moved 1 course(s)', result.stdout)
+            self.assertTrue((Path(home) / 'Throughline' / 'alpha' / 'course.sqlite3').is_file())
+            self.assertFalse(old.exists(), 'the emptied old library is removed')

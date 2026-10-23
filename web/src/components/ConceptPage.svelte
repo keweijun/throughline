@@ -96,7 +96,7 @@
     <h2>{t("No learning route yet")}</h2>
     <p>{t("Codex builds the route from your files. This page updates by itself when it is done.")}</p>
     {#if app.libraryCourse}
-      <CodexLink class="btn btn-primary" prompt={t('$guided-learning build the route for the course {course}', { course: app.libraryCourse.name })}>
+      <CodexLink class="btn btn-primary" prompt={t('$throughline build the route for the course {course}', { course: app.libraryCourse.name })}>
         {t('Build the route in Codex')}
       </CodexLink>
     {/if}

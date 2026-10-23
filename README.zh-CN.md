@@ -15,13 +15,41 @@
 
 ## 安装
 
-你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可；桌面应用自带贯学所需的命令）以及 Python 3.10 或更高版本。把下面这段粘贴到 Codex：
+你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可）以及 Python 3.10 或更高版本。然后把这句话粘贴到 Codex：
 
 ```text
-帮我安装贯学（Throughline）：运行 `uv tool install --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`（如果没有 uv，就用 `pipx install --force` 安装同一个带引号的包，实在不行再用 `python -m pip install --user --upgrade`），然后运行 `guided-learning setup --language zh-CN`，然后把它输出的欢迎指南原样展示给我。
+安装 https://github.com/keweijun/throughline
 ```
 
-Codex 会安装应用（不需要 Node.js），把 `$throughline` 技能放进 `~/.agents/skills/`，创建贯学文件夹，并在应用菜单中添加 Throughline 启动器。以后再粘贴一次同样的内容即可更新。
+Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throughline` 技能，创建贯学文件夹，在应用菜单中添加 **Throughline** 启动器，并显示一份简短的欢迎指南。**更新**时粘贴 `更新 https://github.com/keweijun/throughline` 即可，已有课程不受影响。
+
+### 给 Codex 的说明：安装或更新贯学
+
+用户请你安装或更新贯学时，请自己在沙箱外执行以下步骤（需要联网，并会写入工作区以外的位置），不要让用户手动输入命令。
+
+1. 如果 `guided-learning --version` 已经可以运行，先执行 `guided-learning stop`。在 Windows 上，正在运行的贯学会锁住自身文件，导致升级失败。
+2. 用第一个可用的工具从 GitHub 安装最新版：
+   - `uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `python -m pip install --user --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+
+   如果之后找不到 `guided-learning` 命令，运行 `uv tool update-shell`（或 `pipx ensurepath`），并在下一步使用安装程序输出的完整路径。
+3. 运行 `guided-learning setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程。
+4. 把 setup 输出的欢迎指南原样展示给用户。如果是更新，只需告诉用户当前版本（`guided-learning --version`）。
+
+### 手动安装或更新
+
+使用 [uv](https://docs.astral.sh/uv/)（推荐）：
+
+```sh
+guided-learning stop                 # 更新时执行；首次安装可跳过
+uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"
+guided-learning setup --language zh-CN
+```
+
+使用 pipx 时，把第二行换成 `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`。两种方式都会获取最新版，所以安装和更新用的是同样三行命令。运行 `guided-learning --version` 可查看当前版本。
+
+卸载：先运行 `guided-learning stop`，再运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），然后删除 `~/.agents/skills/throughline` 和启动器。课程会一直保留在贯学文件夹中，直到你手动删除。
 
 ## 创建第一门课程
 

@@ -92,6 +92,7 @@
 
 <style>
   .banner {
+    animation: enter-drop var(--settle) var(--ease-out);
     position: sticky;
     top: var(--topbar);
     z-index: 25;

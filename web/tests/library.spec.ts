@@ -12,7 +12,7 @@ test('the library lists courses, opens one and switches back', async ({ page, co
   const courses = page.locator('.courses > li');
   await expect(courses).toHaveCount(3);
   await expect(courses.filter({ hasText: 'Thermodynamics' })).toContainText('Route not built yet');
-  await expect(page.getByRole('button', { name: 'Questions', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Questions', exact: true })).toHaveCount(0);
 
   await courses.filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
   await expect(page.getByRole('heading', { name: 'Eigenvectors' }).first()).toBeVisible();

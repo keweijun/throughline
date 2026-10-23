@@ -3,6 +3,7 @@
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import type { Annotation } from '../lib/types';
 
   let scope = $state<'section' | 'all'>('section');
@@ -72,7 +73,7 @@
       <textarea
         id="section-note"
         rows="2"
-        bind:value={draft}
+        bind:value={draft} use:autogrow={draft}
         placeholder={t("Add a note to this section…")}
         use:enterToSend
       ></textarea>
@@ -80,9 +81,9 @@
     </form>
   {/if}
 
-  <div class="scope" role="radiogroup" aria-label={t("Show notes from")}>
-    <label><input type="radio" bind:group={scope} value="section" /> {t("This section")}</label>
-    <label><input type="radio" bind:group={scope} value="all" /> {t("All sections ({count})", { count: total })}</label>
+  <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
+    <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
+    <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
   </div>
 
   {#each groups as group (group.concept!.id)}
@@ -103,7 +104,7 @@
             {#if editing === item.id}
               <textarea
                 rows="3"
-                bind:value={edit}
+                bind:value={edit} use:autogrow={edit}
                 aria-label={t("Note")}
                 use:enterToSend={() => void saveEdit(item)}
                 onkeydown={(e) => e.key === 'Escape' && (editing = null)}
@@ -158,18 +159,7 @@
   }
 
   .scope {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
     margin-top: 0.5rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-  }
-
-  .scope label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
   }
 
   h3 {

@@ -116,6 +116,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background: var(--ground);
+  /* Entering panels slide in from beyond the edge; clip (unlike hidden) keeps sticky positioning working. */
+  overflow-x: clip;
 }
 
 button,
@@ -195,7 +197,7 @@ a {
 
 .btn:disabled {
   opacity: 0.55;
-  cursor: progress;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -209,6 +211,33 @@ a {
   border-color: var(--accent-hover);
 }
 
+/* A primary action that is not ready yet (nothing typed) goes neutral rather than a faded accent. */
+.btn-primary:disabled,
+.btn-primary:disabled:hover {
+  opacity: 1;
+  background: var(--rule);
+  border-color: var(--rule);
+  color: var(--pencil);
+}
+
+/* Links that leave the app for Codex say so with an arrow. */
+.codex-link:not(.btn) {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.codex-link:not(.btn):hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.codex-link::after {
+  content: '↗';
+  margin-left: 0.25em;
+  font-size: 0.9em;
+}
+
 .btn-quiet {
   border-color: transparent;
   background: transparent;
@@ -219,6 +248,12 @@ a {
 .btn-quiet:hover {
   background: var(--accent-wash);
   border-color: transparent;
+}
+
+/* A toggle that is on (an open panel, the page you are on) stays marked, not just while hovered. */
+.btn-quiet[aria-pressed='true'] {
+  background: var(--accent-wash);
+  font-weight: 600;
 }
 
 .btn-small {
@@ -242,27 +277,148 @@ a {
 input[type='text'],
 input[type='password'],
 input[type='url'],
+input[type='search'],
 select,
 textarea {
   width: 100%;
-  padding: 0.55rem 0.7rem;
+  padding: 0.55rem 0.75rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--raised);
   font-size: var(--step-0);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--pencil);
+}
+
+::placeholder {
+  color: var(--pencil);
+  opacity: 0.75;
+}
+
+/* Text areas grow with what is typed (lib/autogrow.ts) instead of offering a drag handle, then scroll. */
 textarea {
-  resize: vertical;
+  display: block;
+  resize: none;
+  max-height: 18rem;
+  overflow-y: auto;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+/* Selects draw the same chevron as disclosures instead of each browser's arrow. */
+select {
+  appearance: none;
+  padding-right: 2.1rem;
+  /* The disclosure chevron, pointing down; a mid grey reads on both themes. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='%238a92a5' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 0.7rem center;
+  background-size: 0.8rem;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Every disclosure uses one chevron: right when closed, down when open. */
+summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary::before,
+.chevron {
+  content: '';
+  display: inline-block;
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  margin: 0 0.55em 0.12em 0.1em;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  vertical-align: middle;
+}
+
+details[open] > summary::before,
+.chevron.open {
+  transform: rotate(45deg);
+}
+
+summary:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: -1px;
-  border-color: transparent;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* A small set of exclusive choices, such as which questions to list. The radios stay for keyboard and screen readers. */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: var(--step--1);
+}
+
+.segmented label {
+  position: relative;
+  padding: 0.2rem 0.8rem;
+  border-radius: 999px;
+  color: var(--pencil);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented label:hover {
+  color: var(--ink);
+}
+
+.segmented input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.segmented label:has(input:checked) {
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* Status chips carry state, so each color has a meaning. */
@@ -468,6 +624,85 @@ textarea:focus {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * Motion: short and purposeful. Controls ease between states; things that appear arrive from where they come
+ * from. Keyframes animate `translate` and `scale`, never `transform`, so they never undo an element's positioning.
+ * Reduced motion turns all of it off (above).
+ */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --quick: 0.14s;
+  --settle: 0.22s;
+}
+
+.btn,
+.segmented label,
+summary,
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color var(--quick) ease,
+    border-color var(--quick) ease,
+    color var(--quick) ease,
+    box-shadow var(--quick) ease,
+    opacity var(--quick) ease,
+    translate var(--quick) ease;
+}
+
+.btn:active:not(:disabled) {
+  translate: 0 1px;
+}
+
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@keyframes enter-drop {
+  from {
+    opacity: 0;
+    translate: 0 -6px;
+  }
+}
+
+@keyframes enter-pop {
+  from {
+    opacity: 0;
+    scale: 0.97;
+    translate: 0 4px;
+  }
+}
+
+@keyframes enter-slide {
+  from {
+    opacity: 0;
+    translate: 1.25rem 0;
+  }
+}
+
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* What a disclosure reveals settles into place under its summary. */
+details[open] > :not(summary) {
+  animation: enter-rise var(--settle) var(--ease-out);
+}
+
+dialog[open] {
+  animation: enter-pop var(--settle) var(--ease-out);
+}
+
+dialog[open]::backdrop {
+  animation: enter-fade var(--settle) ease;
 }
 
 /* Thin scrollbars that take the theme's colours instead of the platform default. */

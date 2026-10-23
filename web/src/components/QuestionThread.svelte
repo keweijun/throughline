@@ -4,6 +4,7 @@
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
   import { lessonStatus } from '../lib/format';
   import type { Question, QuestionReply } from '../lib/types';
@@ -107,7 +108,7 @@
       aria-controls="thread-body-{question.id}"
       aria-label={open ? t("Collapse question") : t("Expand question")}
       onclick={() => (open = !open)}
-    ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
+    ><span aria-hidden="true" class="chevron" class:open></span></button>
     <!-- The whole summary opens the thread; the toggle button is the keyboard-accessible control. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="summary" onclick={() => (open = true)}>
@@ -211,7 +212,7 @@
     {/if}
     <label class="field">
       <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
     </label>
     <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
   </form>
@@ -268,6 +269,7 @@
   }
 
   .body {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.6rem;
     padding-left: 1.7rem;

@@ -148,7 +148,20 @@
     list-style: none;
   }
 
+  .courses > li:nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  .courses > li:nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  .courses > li:nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
+
   .courses > li {
+    animation: enter-rise var(--settle) var(--ease-out) backwards;
     display: flex;
     flex-wrap: wrap;
     align-items: center;

@@ -48,21 +48,24 @@
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
     {/if}
-    <button class="btn btn-quiet" aria-pressed={app.libraryOpen} disabled={app.libraryOpen && !app.state} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? (app.libraryOpen = false) : app.showLibrary())}>
+    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
+    <button class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
       <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
       <span class="wide-only">{t("Courses")}</span>
     </button>
-    <button class="btn btn-quiet" disabled={!studying} aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
-      {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
-    </button>
-    <button class="btn btn-quiet" disabled={!studying} aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Source")}</span>
-    </button>
-    <button class="btn btn-quiet" disabled={!studying} aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Notes")}</span>
-    </button>
+    {#if studying}
+      <button class="btn btn-quiet" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
+        {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
+      </button>
+      <button class="btn btn-quiet" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Source")}</span>
+      </button>
+      <button class="btn btn-quiet" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Notes")}</span>
+      </button>
+    {/if}
     <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: language, appearance and teacher")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.02 8.14L18.08 8.61L18.08 11.39L16.02 11.86L15.57 12.94L16.70 14.73L14.73 16.70L12.94 15.57L11.86 16.02L11.39 18.08L8.61 18.08L8.14 16.02L7.06 15.57L5.27 16.70L3.30 14.73L4.43 12.94L3.98 11.86L1.92 11.39L1.92 8.61L3.98 8.14L4.43 7.06L3.30 5.27L5.27 3.30L7.06 4.43L8.14 3.98L8.61 1.92L11.39 1.92L11.86 3.98L12.94 4.43L14.73 3.30L16.70 5.27L15.57 7.06Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
     </button>
@@ -130,6 +133,7 @@
   }
 
   .track span {
+    transition: width 0.4s var(--ease-out);
     display: block;
     height: 100%;
     background: var(--accent);

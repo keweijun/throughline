@@ -2,6 +2,7 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
+  import CodexLink from './CodexLink.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const currentIndex = $derived(app.routeIndex(app.currentId));
@@ -45,6 +46,8 @@
   }
 
   const label = { current: 'Current section', visited: 'Visited', upcoming: 'Not started' };
+
+  const course = $derived(app.libraryCourse);
 </script>
 
 <nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")}>
@@ -76,6 +79,17 @@
       </li>
     {/each}
   </ol>
+  {#if course}
+    <section class="codex" aria-labelledby="codex-title">
+      <h3 id="codex-title">{t('Change this course in Codex')}</h3>
+      <CodexLink prompt={t('$guided-learning add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+      {#if course.needs_review}
+        <CodexLink prompt={t('$guided-learning review the pages that still need review in the course {course}', { course: course.name })}>
+          {t('Review {count} locations in Codex', { count: course.needs_review })}
+        </CodexLink>
+      {/if}
+    </section>
+  {/if}
   <button class="btn btn-quiet btn-small settings" onclick={() => (app.settingsOpen = true)}>{t("Teacher settings")}</button>
 </nav>
 
@@ -204,6 +218,21 @@
 
   .meta .saved {
     color: var(--accent);
+  }
+
+  .codex {
+    display: grid;
+    justify-items: start;
+    gap: 0.3rem;
+    margin: 1.75rem 0 0 var(--gutter);
+    font-size: var(--step--1);
+  }
+
+  .codex h3 {
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    font-weight: 600;
+    color: var(--pencil);
   }
 
   .settings {

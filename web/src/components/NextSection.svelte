@@ -2,6 +2,7 @@
   import { t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { solved } from '../lib/format';
 
   let { conceptId }: { conceptId: string } = $props();
 
@@ -10,7 +11,7 @@
   const route = $derived(app.state?.curriculum.route ?? []);
   const next = $derived(app.concept(route[route.indexOf(conceptId) + 1]));
   const pending = $derived(
-    (app.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId && t.status !== 'attempted').length,
+    app.tasks(conceptId).filter((task) => !solved(task)).length,
   );
   const activeSupplement = $derived((app.state?.questions ?? []).some((q) => q.choice === 'accept' && !q.returned));
 

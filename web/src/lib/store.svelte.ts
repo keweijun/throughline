@@ -57,12 +57,19 @@ class AppStore {
   #sources = new Map<string, Promise<SourceView>>();
 
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  #noticeTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
   #again = false;
 
   get currentId(): string | null {
     const s = this.state;
     return s?.position?.concept_id ?? s?.curriculum.route[0] ?? null;
+  }
+
+  /** The open course as the library lists it; its folder name is how Codex requests name the course. */
+  get libraryCourse() {
+    const library = this.library;
+    return library?.root ? library.courses.find((c) => c.path === library.active) : undefined;
   }
 
   get viewingId(): string | null {
@@ -100,6 +107,7 @@ class AppStore {
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
       this.error = null;
+      if (!this.library) void this.loadLibrary(true);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_course') {
         this.state = null;
@@ -110,11 +118,12 @@ class AppStore {
     }
   }
 
-  async loadLibrary() {
+  /** While a course is open the library only feeds its Codex links, so a failure there stays quiet. */
+  async loadLibrary(quiet = false) {
     try {
       this.library = await api.get<Library>('/api/library');
     } catch (e) {
-      this.error = (e as Error).message;
+      if (!quiet) this.error = (e as Error).message;
     }
   }
 
@@ -170,7 +179,7 @@ class AppStore {
       return;
     }
     if (event.type === 'changed' && event.scope === 'library') {
-      if (this.libraryOpen) void this.loadLibrary();
+      if (this.libraryOpen || this.library) void this.loadLibrary(!this.libraryOpen);
       return;
     }
     const turns = this.state?.turns;
@@ -203,6 +212,13 @@ class AppStore {
       this.error = e instanceof ApiError || e instanceof Error ? e.message : String(e);
       return undefined;
     }
+  }
+
+  /** A short confirmation that clears itself. */
+  notify(text: string) {
+    this.notice = text;
+    if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
+    this.#noticeTimer = setTimeout(() => (this.notice = null), 8000);
   }
 
   view(conceptId: string) {

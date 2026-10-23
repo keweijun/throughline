@@ -12,6 +12,7 @@
   import NextSection from './NextSection.svelte';
   import Preparation from './Preparation.svelte';
   import EarlierHistory from './EarlierHistory.svelte';
+  import CodexLink from './CodexLink.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
 
@@ -93,7 +94,12 @@
 {#if !conceptId || !concept}
   <section class="empty">
     <h2>{t("No learning route yet")}</h2>
-    <p>{t("Plan a course route with the guided-learning skill, then reopen this page to start the first section.")}</p>
+    <p>{t("Codex builds the route from your files. This page updates by itself when it is done.")}</p>
+    {#if app.libraryCourse}
+      <CodexLink class="btn btn-primary" prompt={t('$guided-learning build the route for the course {course}', { course: app.libraryCourse.name })}>
+        {t('Build the route in Codex')}
+      </CodexLink>
+    {/if}
   </section>
 {:else}
   <article class="page" aria-labelledby="concept-title">

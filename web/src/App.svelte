@@ -58,6 +58,13 @@
   </div>
 {/if}
 
+{#if app.notice}
+  <div class="banner notice" role="status">
+    <p>{app.notice}</p>
+    <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
+  </div>
+{/if}
+
 <div class="layout" class:with-panel={app.panelOpen} style:--panel="{app.panelWidth}px">
   {#if app.libraryOpen}
     <Library />
@@ -96,6 +103,11 @@
     color: var(--danger);
     border-bottom: 1px solid var(--rule);
     font-size: var(--step-0);
+  }
+
+  .banner.notice {
+    background: var(--raised);
+    color: var(--ink-soft);
   }
 
   .layout {

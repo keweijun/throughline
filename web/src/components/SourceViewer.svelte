@@ -4,11 +4,13 @@
   import { verification } from '../lib/format';
   import PdfReader from './PdfReader.svelte';
   import MarkdownReader from './MarkdownReader.svelte';
+  import CodexLink from './CodexLink.svelte';
 
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
   const page = $derived(s?.locator?.page);
   const where = $derived(page ? t('Page {page}', { page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : t('Exact location missing'));
+  const course = $derived(app.libraryCourse);
   const label = $derived(s ? `${s.title}, ${page ? t('p. {page}', { page }) : t('line {line}', { line: s.locator?.line ?? '?' })}` : '');
 </script>
 
@@ -29,6 +31,13 @@
       </p>
       {#if s.verification !== 'verified'}
         <p class="muted">{t("Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.")}</p>
+        {#if course}
+          <p class="muted">
+            <CodexLink prompt={t('$guided-learning review {location} (source {source}, unit {unit}) in the course {course}', { location: label, source: s.source_id, unit: s.unit_id, course: course.name })}>
+              {t('Review this location in Codex')}
+            </CodexLink>
+          </p>
+        {/if}
       {/if}
     </header>
 

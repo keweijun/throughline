@@ -2,6 +2,7 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { solved } from '../lib/format';
   import Exercise from './Exercise.svelte';
 
   let { conceptId, isCurrent }: { conceptId: string; isCurrent: boolean } = $props();
@@ -11,11 +12,7 @@
   const practice = $derived(app.state?.practice ?? { tasks: [], jobs: [] });
   const running = $derived(new Set((app.state?.turns ?? []).filter((t) => t.status === 'running').map((t) => t.id)));
   const tasks = $derived(practice.tasks.filter((t) => t.concept_id === conceptId));
-  const unresolved = (task: (typeof practice.tasks)[number]) => {
-    const last = task.history.filter((h) => h.action === 'assess').at(-1);
-    return task.status !== 'attempted' || last?.outcome === 'needs_work';
-  };
-  const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && unresolved(t)) : []);
+  const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !solved(t)) : []);
   const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && running.has(j.id)));
   const failed = $derived(practice.jobs.filter((j) => j.concept_id === conceptId && j.action === 'generate' && j.error).at(-1));
   const interrupted = $derived(

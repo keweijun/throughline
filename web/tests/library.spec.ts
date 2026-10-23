@@ -30,6 +30,28 @@ test('the library lists courses, opens one and switches back', async ({ page, co
   expect(errors).toEqual([]);
 });
 
+test('Codex actions copy their request, and an open course links back to Codex', async ({ page, course }) => {
+  // Clicking a codex: link would leave the test page; the copy still runs.
+  await page.addInitScript(() => {
+    (window as unknown as { copied: string[] }).copied = [];
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text: string) => void (window as unknown as { copied: string[] }).copied.push(text) } });
+    document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
+  });
+  const { base, errors } = await course('library_browser_fixture');
+  const library = await (await page.request.get(base + '/api/library')).json();
+
+  await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' }).click();
+  expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$guided-learning add these files to the course quantum-v1:']);
+  await expect(page.getByRole('status').filter({ hasText: 'Request copied' })).toContainText(library.root);
+
+  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
+  const rail = page.getByRole('navigation', { name: 'Course route' });
+  const add = new URL(await rail.getByRole('link', { name: 'Add files in Codex' }).getAttribute('href') ?? '');
+  expect(add.searchParams.get('prompt')).toBe('$guided-learning add these files to the course linear-algebra: ');
+  expect(add.searchParams.get('path')).toBe(library.root);
+  expect(errors).toEqual([]);
+});
+
 test('the library fits a phone screen', async ({ page, course }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await course('library_browser_fixture');

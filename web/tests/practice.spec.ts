@@ -6,6 +6,8 @@ test('deferred and unfinished exercises follow the learner into the next section
   await expect(exercises).toHaveCount(4);
   await expect(exercises.nth(2)).toContainText('Needs another try');
   await expect(exercises.nth(3)).toContainText('Solved independently');
+  // An exercise that needs another try is still open when moving on.
+  await expect(page.getByRole('region', { name: 'Next section' })).toContainText('3 exercises stay open');
 
   await exercises.first().getByRole('button', { name: 'Do later' }).click();
   await expect(exercises.first()).toContainText('Saved for later');

@@ -1,38 +1,17 @@
 <script lang="ts">
-  import { t, locale, type MessageKey } from '../lib/i18n.svelte';
+  import { t, locale } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import type { LibraryCourse } from '../lib/types';
+  import CodexLink from './CodexLink.svelte';
 
-  const templates: MessageKey[] = [
-    '$guided-learning create a new course from these files: ',
-    '$guided-learning add these files to the course {course}: ',
-    '$guided-learning review the pages that still need review in the course {course}',
-  ];
-
-  let copied = $state<string | null>(null);
   let opening = $state<string | null>(null);
 
   const library = $derived(app.library);
-
-  /** A new Codex chat in the Throughline project with the request typed in but not sent, so files can be attached. */
-  function codexLink(key: MessageKey, course = '') {
-    const prompt = t(key, { course });
-    return `codex://new?prompt=${encodeURIComponent(prompt)}&path=${encodeURIComponent(library?.root ?? '')}`;
-  }
+  const newCourse = $derived(t('$guided-learning create a new course from these files: '));
 
   function updated(course: LibraryCourse) {
     if (!course.updated) return '';
     return new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(course.updated * 1000));
-  }
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = text;
-      setTimeout(() => copied === text && (copied = null), 1800);
-    } catch {
-      copied = null;
-    }
   }
 
   async function open(course: LibraryCourse) {
@@ -49,7 +28,7 @@
       {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
     </div>
     <div class="header-actions">
-      {#if library?.root}<a class="btn btn-primary btn-small" href={codexLink('$guided-learning create a new course from these files: ')}>{t('New course in Codex')}</a>{/if}
+      <CodexLink class="btn btn-primary btn-small" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
       {#if app.state}
         <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
       {/if}
@@ -66,7 +45,7 @@
         <li>{t('Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.')}</li>
         <li>{t('Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.')}</li>
       </ol>
-      {#if library.root}<a class="btn btn-primary" href={codexLink('$guided-learning create a new course from these files: ')}>{t('New course in Codex')}</a>{/if}
+      <CodexLink class="btn btn-primary" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
     </div>
   {:else}
     <ul class="courses">
@@ -104,11 +83,11 @@
           {#if !course.error && library.root}
             <div class="codex-actions">
               {#if !course.concepts}
-                <a href={codexLink('$guided-learning build the route for the course {course}', course.name)}>{t('Build the route in Codex')}</a>
+                <CodexLink prompt={t('$guided-learning build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
               {/if}
-              <a href={codexLink('$guided-learning add these files to the course {course}: ', course.name)}>{t('Add files in Codex')}</a>
+              <CodexLink prompt={t('$guided-learning add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
               {#if course.needs_review}
-                <a href={codexLink('$guided-learning review the pages that still need review in the course {course}', course.name)}>{t('Review in Codex')}</a>
+                <CodexLink prompt={t('$guided-learning review the pages that still need review in the course {course}', { course: course.name })}>{t('Review in Codex')}</CodexLink>
               {/if}
             </div>
           {/if}
@@ -120,16 +99,7 @@
   <aside class="codex" aria-labelledby="codex-title">
     <h2 id="codex-title">{t('Courses are built in Codex')}</h2>
     <p class="muted">{t('The Codex buttons open a new chat in your Throughline project with the request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
-    <p class="muted">{t('Using the Codex CLI, or nothing opened? Copy a request into Codex in your Throughline folder instead:')}</p>
-    <ul class="prompts">
-      {#each templates as key (key)}
-        {@const prompt = t(key, { course: 'my-course' }).trim()}
-        <li>
-          <code>{prompt}</code>
-          <button class="btn btn-quiet btn-small" onclick={() => copy(prompt)}>{copied === prompt ? t('Copied') : t('Copy')}</button>
-        </li>
-      {/each}
-    </ul>
+    <p class="muted">{t('Each Codex button also copies its request. Using the Codex CLI, or nothing opened? Paste it into Codex started in your Throughline folder.')}</p>
   </aside>
 </section>
 
@@ -265,30 +235,5 @@
   .codex h2 {
     font-size: var(--step-0);
     font-family: var(--sans);
-  }
-
-  .prompts {
-    display: grid;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-    padding: 0;
-    list-style: none;
-  }
-
-  .prompts li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.5rem 0.5rem 0.5rem 0.85rem;
-    border-radius: var(--radius);
-    background: var(--raised);
-    border: 1px solid var(--rule);
-  }
-
-  .prompts code {
-    font-family: var(--mono);
-    font-size: var(--step--1);
-    overflow-wrap: anywhere;
   }
 </style>

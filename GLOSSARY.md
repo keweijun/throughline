@@ -28,7 +28,7 @@ _Avoid_: End of chat, latest message.
 **Learning section**: A teaching unit organized around a complete goal that can be explained or applied; it may span sources and turns and ends with grouped practice.
 _Avoid_: Single reply, fixed page count, slide subheading.
 
-**Course library**: The per-user folder holding every course workspace, and the interface view that lists them for opening; it never edits a course.
+**Course library**: The learner's Throughline folder holding every course workspace, which is also their dedicated Codex project; and the app view that lists courses for opening. The view never edits a course; changes happen in Codex.
 _Avoid_: Course manager, a second store of progress.
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.

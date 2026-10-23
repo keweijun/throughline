@@ -4,6 +4,7 @@
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import QuestionThread from './QuestionThread.svelte';
+  import type { Question } from '../lib/types';
 
   let question = $state('');
   let pause = $state(false);
@@ -11,6 +12,49 @@
 
   const questions = $derived([...(app.state?.questions ?? [])].sort((a, b) => (b.created_at ?? app.turn(b.turn_id)?.started_at ?? 0) - (a.created_at ?? app.turn(a.turn_id)?.started_at ?? 0)));
   const currentLesson = $derived(app.lessons(app.currentId).at(-1));
+
+  // Many questions: show this section's by default, searchable, with only the newest and active ones expanded.
+  let scope = $state<'section' | 'all'>('section');
+  let scopeChosen = false;
+  let search = $state('');
+  let opened = $state<Record<string, boolean>>({});
+  const sectionOf = (q: Question) => q.anchor?.concept_id ?? q.restore_point?.concept_id;
+  const inSection = $derived(questions.filter((q) => sectionOf(q) === app.viewingId));
+  // Until the learner picks a scope, follow what is useful: this section if it has questions, otherwise all.
+  $effect(() => {
+    if (!scopeChosen) scope = inSection.length ? 'section' : 'all';
+  });
+  const turnsOf = (q: Question) => [q.turn_id, q.supplement_turn_id, ...(q.replies ?? []).map((r) => r.turn_id)].map((id) => app.turn(id));
+  const active = (q: Question) => q.status === 'suggested' || turnsOf(q).some((x) => x?.status === 'running');
+  // A few questions can all be read at once; with more, only one being answered opens by itself, and stays open after.
+  const isOpen = (q: Question) => opened[q.id] ?? (questions.length <= 3 || active(q));
+  $effect(() => {
+    for (const q of questions) if (opened[q.id] === undefined && active(q)) opened[q.id] = true;
+  });
+  const shown = $derived.by(() => {
+    const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+    const pool = scope === 'section' && !words.length ? inSection : questions;
+    if (!words.length) return pool;
+    return pool.filter((q) => {
+      const text = [q.question, q.selection, ...(q.replies ?? []).map((r) => r.question), ...turnsOf(q).map((x) => x?.text ?? '')].join(' ').toLowerCase();
+      return words.every((w) => text.includes(w));
+    });
+  });
+
+  // Opening a thread from elsewhere (a margin marker, a saved explanation) must find it whatever the filters say.
+  $effect(() => {
+    const id = app.focusThread;
+    if (!id) return;
+    const target = questions.find((q) => q.id === id);
+    if (!target) return;
+    if (!shown.includes(target)) {
+      search = '';
+      if (sectionOf(target) !== app.viewingId) {
+        scope = 'all';
+        scopeChosen = true;
+      }
+    }
+  });
 
   async function ask(event: SubmitEvent) {
     event.preventDefault();
@@ -68,10 +112,21 @@
   </form>
 
   {#if questions.length}
-    <h3 class="list-title">{t("Your questions")}</h3>
+    <div class="list-head">
+      <h3 class="list-title">{t("Your questions")}</h3>
+      <div class="scope" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
+        <label><input type="radio" bind:group={scope} value="section" /> {t("This section ({count})", { count: inSection.length })}</label>
+        <label><input type="radio" bind:group={scope} value="all" /> {t("All ({count})", { count: questions.length })}</label>
+      </div>
+      {#if questions.length > 4}
+        <input class="search" type="search" bind:value={search} aria-label={t("Search questions")} placeholder={t("Search questions and answers…")} />
+      {/if}
+    </div>
     <div class="list">
-      {#each questions as q (q.id)}
-        <QuestionThread question={q} />
+      {#each shown as q (q.id)}
+        <QuestionThread question={q} bind:open={() => isOpen(q), (value) => (opened[q.id] = value)} />
+      {:else}
+        <p class="none">{search.trim() ? t("No questions match your search.") : t("No questions from this section yet.")}</p>
       {/each}
     </div>
   {/if}
@@ -141,9 +196,38 @@
   }
 
   .list-title {
-    margin: 2rem 0 0.75rem;
+    margin: 0;
     font-size: var(--step--1);
     font-weight: 600;
+    color: var(--pencil);
+  }
+
+  .list-head {
+    display: grid;
+    gap: 0.5rem;
+    margin: 2rem 0 0.9rem;
+  }
+
+  .scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+
+  .scope label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .search {
+    font-size: var(--step--1);
+  }
+
+  .none {
+    font-size: var(--step--1);
     color: var(--pencil);
   }
 

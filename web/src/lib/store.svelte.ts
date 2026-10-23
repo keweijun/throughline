@@ -46,6 +46,8 @@ class AppStore {
   panelTab = $state<PanelTab>('questions');
   source = $state<SourceView | null>(null);
   sourceLoading = $state(false);
+  /** The Source tab shows every course document instead of the open one. */
+  sourceList = $state(false);
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
   routeOpen = $state(false);
@@ -338,6 +340,7 @@ class AppStore {
 
   async openSource(ref: Ref) {
     this.openPanel('source');
+    this.sourceList = false;
     this.sourceLoading = true;
     try {
       this.source = await this.sourceView(ref);

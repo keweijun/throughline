@@ -10,6 +10,8 @@ export type Concept = {
   goal?: string;
 };
 
+export type Coverage = Ref & { concept_ids?: string[]; disposition: 'mapped' | 'deferred' | 'needs_review'; reason?: string };
+
 export type Position = {
   concept_id?: string;
   goal?: string;
@@ -123,7 +125,7 @@ export type State = {
   course: { id: string; title: string };
   position: Position | null;
   sources: { id: string; path: string; revision: string; status: string }[];
-  curriculum: { concepts: Concept[]; route: string[] };
+  curriculum: { concepts: Concept[]; route: string[]; coverage?: Coverage[] };
   session: {
     recent_interactions: Interaction[];
     unanswered_questions: unknown[];

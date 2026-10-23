@@ -4,6 +4,7 @@
   import { verification } from '../lib/format';
   import PdfReader from './PdfReader.svelte';
   import MarkdownReader from './MarkdownReader.svelte';
+  import SourceList from './SourceList.svelte';
 
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
@@ -31,11 +32,17 @@
 </script>
 
 <section class="source-view" aria-busy={app.sourceLoading}>
+  {#if app.sourceList || (!s && !app.sourceLoading)}
+    <SourceList />
+  {/if}
+  <!-- The open document stays mounted behind the list, so returning keeps its page and zoom. -->
+  <div class="reading" hidden={app.sourceList || (!s && !app.sourceLoading)}>
   {#if app.sourceLoading && !s}
     <p class="muted">{t("Opening the source…")}</p>
   {:else if s}
     {#if app.sourceLoading}<p class="switching" role="status">{t("Opening the source…")}</p>{/if}
     <header>
+      <button class="btn btn-quiet btn-small all" onclick={() => (app.sourceList = true)}>{t("All sources ({count})", { count: app.state?.sources.length ?? 0 })}</button>
       <h2>{s.title}</h2>
       <p class="meta">
         <span>{where}</span>
@@ -80,12 +87,8 @@
     {#if s.render_message && !s.pdf_url}
       <p class="problem">{diagnostic(s.render_message)}</p>
     {/if}
-  {:else}
-    <div class="empty">
-      <p>{t("Choose a citation in a lesson, or a source in the unit overview, to read it here.")}</p>
-      <p class="muted">{t("PDFs open at the cited page; Markdown notes open at the cited line.")}</p>
-    </div>
   {/if}
+  </div>
 </section>
 
 <style>
@@ -95,6 +98,23 @@
     gap: 0.75rem;
     flex: 1;
     min-height: 0;
+  }
+
+  .reading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .reading[hidden] {
+    display: none;
+  }
+
+  .all {
+    justify-self: start;
+    padding-left: 0;
   }
 
   header {
@@ -156,12 +176,4 @@
     white-space: pre-wrap;
   }
 
-  .empty {
-    display: grid;
-    gap: 0.4rem;
-    margin-top: 2rem;
-    text-align: center;
-    color: var(--ink-soft);
-    font-size: var(--step-0);
-  }
 </style>

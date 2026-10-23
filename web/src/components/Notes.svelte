@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -73,7 +74,7 @@
         rows="2"
         bind:value={draft}
         placeholder={t("Add a note to this section…")}
-        onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
+        use:enterToSend
       ></textarea>
       <button class="btn btn-small" type="submit" disabled={!draft.trim()}>{t("Add note")}</button>
     </form>
@@ -104,10 +105,8 @@
                 rows="3"
                 bind:value={edit}
                 aria-label={t("Note")}
-                onkeydown={(e) => {
-                  if (e.key === 'Escape') editing = null;
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void saveEdit(item);
-                }}
+                use:enterToSend={() => void saveEdit(item)}
+                onkeydown={(e) => e.key === 'Escape' && (editing = null)}
               ></textarea>
               <div class="actions">
                 <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t("Cancel")}</button>

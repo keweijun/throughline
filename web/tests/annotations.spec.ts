@@ -59,3 +59,58 @@ test('highlight text in the PDF reader and bookmark the page', async ({ page, co
   await expect(page.locator('.notes-panel .item.bookmark')).toContainText('lecture-2.pdf, p. 2');
   expect(errors).toEqual([]);
 });
+
+test('highlight and note a side-question answer', async ({ page, course }) => {
+  const { base, errors } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await page.request.post(base + '/api/questions', { data: { id: 'q1', question: 'Why?' } });
+  await page.reload();
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  const thread = page.locator('#thread-q1');
+  const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
+  await expect(paragraph).toBeVisible();
+
+  const excerpt = await paragraph.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return window.getSelection()!.toString();
+  });
+  expect(excerpt.trim().length).toBeGreaterThan(5);
+  // Asking still works from an answer; it becomes a follow-up in the same thread.
+  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toBeVisible();
+  await page.getByRole('button', { name: 'Note', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Good intuition here');
+  await page.getByRole('button', { name: 'Save note' }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBeGreaterThan(0);
+
+  await thread.getByRole('button', { name: '1 note' }).click();
+  const item = page.locator('.notes-panel .item.highlight');
+  await expect(item).toContainText('Answer to a side question');
+  await expect(item).toContainText('Good intuition here');
+  await item.getByRole('button', { name: 'Go to' }).click();
+  await expect(thread).toBeInViewport();
+  expect(errors).toEqual([]);
+});
+
+test('highlight and note an exercise', async ({ page, course }) => {
+  const { errors } = await course('practice_continuity_browser_fixture');
+  const question = page.locator('#practice article').first().locator('.question');
+  await expect(question).toBeVisible();
+  expect((await dragSelect(page, question, 120)).trim().length).toBeGreaterThan(3);
+  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Note', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Watch the sign');
+  await page.getByRole('button', { name: 'Save note' }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  await page.locator('#practice article').first().getByRole('button', { name: '1 note' }).click();
+  await expect(page.locator('.notes-panel .item.highlight')).toContainText('Exercise');
+  await expect(page.locator('.notes-panel .item.highlight')).toContainText('Watch the sign');
+  expect(errors).toEqual([]);
+});

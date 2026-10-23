@@ -52,10 +52,11 @@ class QuestionRequest(Body):
 
 class AnnotationRequest(Body):
     kind: Literal['highlight', 'note', 'bookmark']
-    concept_id: str
+    concept_id: Optional[str] = None
     passage: Optional[str] = None
     note: Optional[str] = None
     turn_id: Optional[str] = None
+    task_id: Optional[str] = None
     source: Optional[dict] = None
 
 

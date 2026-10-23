@@ -146,6 +146,7 @@ export type Annotation = {
   kind: 'highlight' | 'note' | 'bookmark';
   concept_id: string;
   turn_id: string | null;
+  task_id?: string | null;
   source: AnnotationSource | null;
   passage: string;
   note: string;

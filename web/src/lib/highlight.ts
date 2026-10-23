@@ -73,3 +73,24 @@ export function clear(layer: Layer, key: string) {
   layers[layer].delete(key);
   publish(layer);
 }
+
+let nextKey = 0;
+
+/** Svelte action: keeps the learner's highlights painted in a rendered block as its text changes. */
+export function highlights(node: HTMLElement, params: { passages: string[]; text?: string }) {
+  const key = `block-${nextKey++}`;
+  let frame = 0;
+  const paint = (p: { passages: string[] }) => {
+    cancelAnimationFrame(frame);
+    // Wait for the Markdown action to finish patching this block.
+    frame = requestAnimationFrame(() => mark('mine', key, node, p.passages));
+  };
+  paint(params);
+  return {
+    update: paint,
+    destroy() {
+      cancelAnimationFrame(frame);
+      clear('mine', key);
+    },
+  };
+}

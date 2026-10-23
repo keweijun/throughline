@@ -52,23 +52,34 @@ def save(store, request):
     kind = request.get('kind')
     if kind not in KINDS:
         raise OperationError('invalid_request', 'kind must be highlight, note or bookmark')
-    concept_id = require_text(request, 'concept_id')
-    validate_concept(store, concept_id)
     passage = _text(request, 'passage', MAX_PASSAGE)
-    turn_id = request.get('turn_id')
+    turn_id, task_id = request.get('turn_id'), request.get('task_id')
     source = _source(request)
+    concept_id = request.get('concept_id')
+    # A lesson, side-question answer or exercise already belongs to a section, so that section wins.
     if turn_id is not None:
         turn = store.get('streams', turn_id) if isinstance(turn_id, str) else None
-        if not turn or turn['channel'] != 'mainline':
-            raise OperationError('invalid_request', 'turn_id must be a lesson')
-    if kind == 'highlight' and (not passage or (turn_id is None) == (source is None)):
-        raise OperationError('invalid_request', 'A highlight needs a passage in one lesson or one source')
+        if not turn or turn['channel'] not in ('mainline', 'sidequestion'):
+            raise OperationError('invalid_request', 'turn_id must be a lesson or a side-question answer')
+        concept_id = turn.get('concept_id') or concept_id
+    if task_id is not None:
+        task = store.get('practice_tasks', task_id) if isinstance(task_id, str) else None
+        if not task:
+            raise OperationError('invalid_request', 'task_id must be an exercise')
+        concept_id = task['concept_id']
+    concept_id = require_text({'concept_id': concept_id}, 'concept_id')
+    validate_concept(store, concept_id)
+    anchors = sum(anchor is not None for anchor in (turn_id, task_id, source))
+    if kind == 'highlight' and (not passage or anchors != 1):
+        raise OperationError('invalid_request', 'A highlight needs a passage in one lesson, answer, exercise or source')
+    if anchors > 1:
+        raise OperationError('invalid_request', 'An annotation points to at most one place')
     if kind == 'note' and not note:
         raise OperationError('invalid_request', 'A note needs text')
     if kind == 'bookmark' and passage:
         raise OperationError('invalid_request', 'A bookmark has no passage; highlight it instead')
     now = time.time()
-    annotation = {'id': identifier, 'kind': kind, 'concept_id': concept_id, 'turn_id': turn_id, 'source': source,
+    annotation = {'id': identifier, 'kind': kind, 'concept_id': concept_id, 'turn_id': turn_id, 'task_id': task_id, 'source': source,
                   'passage': passage, 'note': note, 'created_at': now, 'updated_at': now}
     return {'annotation': store.put('annotations', identifier, annotation)}
 

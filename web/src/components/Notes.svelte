@@ -94,7 +94,7 @@
         {#each group.items as item (item.id)}
           <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
             <p class="kind">
-              {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{/if}
+              {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
             </p>
             {#if item.passage}
               <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>

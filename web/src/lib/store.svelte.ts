@@ -247,7 +247,7 @@ class AppStore {
     );
   }
 
-  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'note' | 'turn_id' | 'source'>>) {
+  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'note' | 'turn_id' | 'task_id' | 'source'>>) {
     return this.act(() => api.post<{ annotation: Annotation }>('/api/annotations', annotation));
   }
 
@@ -276,7 +276,23 @@ class AppStore {
       void this.openSource({ ...annotation.source });
       return;
     }
+    const turn = this.turn(annotation.turn_id);
+    if (turn?.channel === 'sidequestion') {
+      const question = this.state?.questions.find(
+        (q) => q.turn_id === turn.id || q.supplement_turn_id === turn.id || q.replies?.some((r) => r.turn_id === turn.id),
+      );
+      if (question) {
+        this.focusThread = question.id;
+        this.openPanel('questions');
+      }
+      return;
+    }
     this.view(annotation.concept_id);
+    if (annotation.task_id) {
+      await tick();
+      requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      return;
+    }
     if (!annotation.turn_id) return;
     await tick();
     requestAnimationFrame(() => {

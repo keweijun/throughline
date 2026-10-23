@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { highlights } from '../lib/highlight';
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
@@ -75,14 +76,25 @@
     if (matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
     app.view(later!.id);
   }
+
+  // The learner's own highlights and notes on this thread's answers.
+  const threadTurns = $derived(new Set([question.turn_id, question.supplement_turn_id, ...(question.replies ?? []).map((r) => r.turn_id)]));
+  const mine = $derived((app.state?.annotations ?? []).filter((a) => a.turn_id && threadTurns.has(a.turn_id)));
+  const passages = (turnId: string) => mine.filter((a) => a.turn_id === turnId).map((a) => a.passage);
+  const noted = $derived(mine.filter((a) => a.note));
 </script>
 
 <article class="thread" class:flash id="thread-{question.id}" bind:this={node} data-question-id={question.id}>
   {#if question.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
   <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
+  {#if noted.length}
+    <button class="btn btn-quiet btn-small your-notes" onclick={() => app.showAnnotation(noted[0].id)}>
+      <span aria-hidden="true">✎</span> {noted.length === 1 ? t("1 note") : t("{count} notes", { count: noted.length })}
+    </button>
+  {/if}
 
   {#if answer?.text}
-    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
+    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:highlights={{ passages: passages(answer.id), text: answer.text }} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {/if}
   {#if answer && answer.status !== 'completed'}
     <div class="state">
@@ -133,7 +145,7 @@
         </span>
       </p>
       {#if supplement.text}
-        <div class="prose" data-question-answer data-turn-id={supplement.id} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose" data-question-answer data-turn-id={supplement.id} use:highlights={{ passages: passages(supplement.id), text: supplement.text }} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
       {/if}
       <TurnControls turn={supplement} pauseLabel={t("Pause supplement")} regenerateLabel={t("Regenerate supplement")} />
     </section>
@@ -145,7 +157,7 @@
       {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
       <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
       {#if turn}
-        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r) }}></div>
         {#if turn.status !== 'completed'}
           <span class="chip">{diagnostic(lessonStatus[turn.status].label)}</span>
           <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
@@ -179,6 +191,7 @@
 </article>
 
 <style>
+  .your-notes { justify-self: start; color: var(--mine); font-weight: 600; }
   .reply { border-top: 1px solid var(--rule); padding-top: 1rem; display: grid; gap: 0.6rem; }
   .followup { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
   .followup > button { justify-self: start; }

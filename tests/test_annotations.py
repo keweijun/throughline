@@ -2,7 +2,7 @@ import tempfile
 import unittest
 
 from guided_learning.api import execute
-from guided_learning.store import OperationError
+from guided_learning.store import OperationError, Store
 from support import host_client
 
 
@@ -51,6 +51,23 @@ class Annotations(unittest.TestCase):
             with self.assertRaises(OperationError) as raised:
                 execute(tmp, {'op': 'annotations.delete', 'id': 'n'})
             self.assertEqual(raised.exception.code, 'unknown_annotation')
+
+    def test_answers_and_exercises_take_their_own_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            course(tmp)
+            store = Store(tmp)
+            with store.db:
+                store.put('streams', 'answer', {'id': 'answer', 'channel': 'sidequestion', 'concept_id': 'spin'})
+                store.put('streams', 'prep', {'id': 'prep', 'channel': 'preparation', 'concept_id': 'spin'})
+                store.put('practice_tasks', 'task', {'id': 'task', 'concept_id': 'spin', 'question': 'Q'})
+            store.db.close()
+            save = lambda **fields: execute(tmp, {'op': 'annotations.save', **fields})['annotation']
+            answer = save(id='a', kind='highlight', concept_id='state', turn_id='answer', passage='in the answer')
+            exercise = save(id='e', kind='highlight', task_id='task', passage='in the exercise', note='tricky')
+            self.assertEqual((answer['concept_id'], exercise['concept_id'], exercise['task_id']), ('spin', 'spin', 'task'))
+            for fields in ({'turn_id': 'prep'}, {'task_id': 'missing'}, {'task_id': 'task', 'turn_id': 'answer'}):
+                with self.assertRaises(OperationError):
+                    save(id='bad', kind='highlight', passage='x', **fields)
 
     def test_learner_annotations_round_trip_and_never_reach_the_teacher(self):
         with tempfile.TemporaryDirectory() as tmp:

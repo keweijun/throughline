@@ -4,7 +4,7 @@
   import { app } from '../lib/store.svelte';
   import type { AnnotationSource } from '../lib/types';
 
-  type Pending = { text: string; turnId: string | null; source?: string; questionId?: string; unit?: string };
+  type Pending = { text: string; turnId: string | null; source?: string; questionId?: string; unit?: string; taskId?: string };
 
   let visible = $state(false);
   let writing = $state(false);
@@ -13,12 +13,13 @@
   let top = $state(0);
   let pending = $state<Pending | null>(null);
 
-  // Highlights and notes belong to a lesson or a source; a question's answer can only be asked about.
-  const annotatable = $derived(!!pending && !pending.questionId && (!!pending.turnId || !!pending.unit));
+  // Lessons, side-question answers, exercises and sources can all be highlighted; exercises are not asked about here.
+  const annotatable = $derived(!!pending && (!!pending.turnId || !!pending.unit || !!pending.taskId));
+  const askable = $derived(!!pending && !pending.taskId);
 
   // Keep answer selections attached to their existing side question.
   const scope = (node: Node | null | undefined) =>
-    (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer]') ?? null;
+    (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer], [data-exercise]') ?? null;
 
   function capture() {
     if (writing) return;
@@ -29,11 +30,13 @@
     if (!area || area !== scope(selection.focusNode)) return;
     const text = selectionMarkdown(selection, area);
     const anchor = selection.anchorNode instanceof Element ? selection.anchorNode : selection.anchorNode?.parentElement;
-    pending = area.dataset.sourceLabel
+    pending = area.dataset.exercise
+      ? { text: text.trim(), turnId: null, taskId: area.dataset.exercise }
+      : area.dataset.sourceLabel
       ? { text: text.replace(/\s+/g, ' ').trim(), turnId: null, source: area.dataset.sourceLabel, unit: anchor?.closest<HTMLElement>('[data-unit]')?.dataset.unit }
       : { text: text.trim(), turnId: area.closest<HTMLElement>('[data-turn-id]')?.dataset.turnId ?? null, questionId: area.closest<HTMLElement>('[data-question-id]')?.dataset.questionId };
     const rect = selection.getRangeAt(0).getBoundingClientRect();
-    const width = annotatable ? 340 : 198;
+    const width = (annotatable ? 160 : 0) + (askable ? 198 : 0);
     left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width));
     top = Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - (annotatable ? 170 : 52)));
     visible = true;
@@ -67,7 +70,8 @@
             ...(pending.unit.startsWith('page-') ? { page: Number(pending.unit.slice(5)) } : {}),
           }
         : undefined;
-    const conceptId = pending.turnId ? app.turn(pending.turnId)?.concept_id : app.viewingId;
+    // The host takes the section from the lesson, answer or exercise; a source passage belongs to the section being read.
+    const conceptId = (pending.turnId && app.turn(pending.turnId)?.concept_id) || app.viewingId;
     if (!conceptId) return;
     const text = withNote ? note.trim() : '';
     close();
@@ -77,7 +81,7 @@
       concept_id: conceptId,
       passage: pending.text,
       ...(text ? { note: text } : {}),
-      ...(source ? { source } : { turn_id: pending.turnId }),
+      ...(source ? { source } : pending.taskId ? { task_id: pending.taskId } : { turn_id: pending.turnId }),
     });
   }
 
@@ -129,7 +133,9 @@
       <button class="mine" onpointerdown={(e) => e.preventDefault()} onclick={() => save(false)}>{t("Highlight")}</button>
       <button class="mine" onpointerdown={(e) => e.preventDefault()} onclick={() => (writing = true)}>{t("Note")}</button>
     {/if}
-    <button class="ask" onpointerdown={(e) => e.preventDefault()} onclick={ask}>{t("Ask about this passage")}</button>
+    {#if askable}
+      <button class="ask" onpointerdown={(e) => e.preventDefault()} onclick={ask}>{t("Ask about this passage")}</button>
+    {/if}
   </div>
 {/if}
 

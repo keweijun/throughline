@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { highlights } from '../lib/highlight';
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
@@ -210,7 +211,7 @@
     {/if}
     <label class="field">
       <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
     </label>
     <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
   </form>

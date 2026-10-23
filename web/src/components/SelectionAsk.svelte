@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -87,10 +88,6 @@
 
   function onNoteKey(event: KeyboardEvent) {
     if (event.key === 'Escape') close();
-    if (event.key === 'Enter' && !event.shiftKey && note.trim()) {
-      event.preventDefault();
-      void save(true);
-    }
   }
 
   let settle: ReturnType<typeof setTimeout> | undefined;
@@ -121,7 +118,7 @@
   <form class="pop writing" style:left="{left}px" style:top="{top}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
     <label for="quick-note">{t("Note on this passage")}</label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea id="quick-note" rows="3" bind:value={note} onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
+    <textarea id="quick-note" rows="3" bind:value={note} use:enterToSend onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
     <div class="actions">
       <button type="button" class="btn btn-quiet btn-small" onclick={close}>{t("Cancel")}</button>
       <button type="submit" class="btn btn-small" disabled={!note.trim()}>{t("Save note")}</button>

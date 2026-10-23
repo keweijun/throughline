@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
@@ -25,7 +26,7 @@
         <textarea
           id="lesson-prompt"
           rows="2"
-          bind:value={prompt}
+          bind:value={prompt} use:enterToSend
           placeholder={t("For example: go deeper on the derivation, or explain it with a different example")}
         ></textarea>
       </label>
@@ -40,7 +41,7 @@
         <summary>{t("Change what the lesson focuses on")}</summary>
         <label class="field">
           <span class="visually-hidden">{t("Lesson request")}</span>
-          <textarea id="lesson-prompt" rows="3" bind:value={prompt} placeholder={t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}></textarea>
+          <textarea id="lesson-prompt" rows="3" bind:value={prompt} use:enterToSend placeholder={t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}></textarea>
         </label>
       </details>
       <div class="row">

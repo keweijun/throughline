@@ -94,3 +94,18 @@ test('mixed prose and math selections keep one TeX copy', async ({ page, course 
   await expect(page.locator('#branch-selection annotation')).toHaveText('P=|a+b|^2');
   await expect(page.locator('#branch-selection')).toContainText('Add probability amplitudes');
 });
+
+
+test('a follow-up saved before its stream started can be retried after reopening', async ({ page, course }) => {
+  await course('question_reply_browser_fixture');
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  const thread = page.locator('#thread-q');
+  await expect(thread.locator('.reply')).toContainText('This reply did not start. Try again.');
+  await thread.getByRole('button', { name: 'Answer again' }).click();
+  await expect(thread.locator('.reply .answer')).toHaveText('Recovered answer');
+  await expect(thread.locator('.reply')).toHaveCount(1);
+  await thread.getByRole('textbox', { name: 'Follow-up question' }).fill('One more question');
+  await expect(thread.getByRole('button', { name: 'Send follow-up' })).toBeEnabled();
+  await thread.getByRole('button', { name: 'Send follow-up' }).click();
+  await expect(thread.locator('.reply .answer')).toHaveCount(2);
+});

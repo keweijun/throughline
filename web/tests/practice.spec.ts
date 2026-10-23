@@ -42,3 +42,16 @@ test('learner answers render math in a distinct block', async ({ page, course })
   await expect(answer.locator('.answer-label')).toHaveText('Your answer');
   await expect(page.locator('.feedback').first().locator('.katex')).toHaveCount(1);
 });
+
+
+test('failed assessment keeps the submitted answer recoverable even with older feedback', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').nth(2);
+  await task.getByRole('textbox', { name: 'Exercise answer' }).fill('First line\nSecond line');
+  await task.getByRole('button', { name: 'Check my answer' }).click();
+  await expect(task.locator('.problem')).toBeVisible();
+  await expect(task.locator('.submitted-answer')).toContainText('First line');
+  await expect(task.locator('.submitted-answer br')).toHaveCount(1);
+  await task.getByRole('button', { name: 'Restore submitted answer' }).click();
+  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('First line\nSecond line');
+});

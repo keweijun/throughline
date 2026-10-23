@@ -3,6 +3,10 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Submitted answer": "已提交的作答",
+  "Restore submitted answer": "恢复这次作答",
+  "The response was interrupted. Please try again.": "回复已中断，请重试。",
+  "This reply did not start. Try again.": "这条回复未能开始，请重试。",
   "Follow up": "继续追问",
   "Follow-up question": "追问内容",
   "Continue this question…": "继续讨论这个问题…",

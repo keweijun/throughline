@@ -8,7 +8,9 @@ export function selectionMarkdown(selection: Selection, area: HTMLElement): stri
   if (last?.contains(range.endContainer)) range.setEndAfter(last);
   const fragment = range.cloneContents();
   for (const formula of fragment.querySelectorAll<HTMLElement>('[data-tex]')) {
-    formula.replaceWith(document.createTextNode(`$${formula.dataset.tex}$`));
+    const tex = formula.dataset.tex ?? '';
+    const delimiter = formula.querySelector('.katex-display') || tex.includes('\n') ? '$$' : '$';
+    formula.replaceWith(document.createTextNode(`${delimiter}${tex}${delimiter}`));
   }
   for (const block of fragment.querySelectorAll('p,div,li,blockquote,tr,h1,h2,h3,h4')) block.append(document.createTextNode('\n'));
   return (fragment.textContent ?? '').trim();

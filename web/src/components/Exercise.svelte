@@ -14,7 +14,10 @@
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
   const working = $derived(jobs.some((j) => app.turn(j.id)?.status === 'running'));
-  const failedJob = $derived(jobs.filter((j) => j.error).at(-1));
+  const latestJob = $derived([...jobs].sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1));
+  const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
+  const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
+  const submittedAnswer = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob.answer : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(lastAssessment?.outcome === 'passed');
   const helped = $derived(task.history.some((h) => h.action !== 'assess'));
@@ -68,7 +71,7 @@
           {#if entry.answer}
             <section class="your-answer" aria-label={t("Your answer")}>
               <p class="answer-label">{t("Your answer")}</p>
-              <div class="prose" use:markdown={{ language: locale.language, text: entry.answer }}></div>
+              <div class="prose" use:markdown={{ language: locale.language, text: entry.answer, breaks: true }}></div>
             </section>
           {/if}
           <section class="teacher-feedback" aria-label={t("Teacher feedback")}>
@@ -80,11 +83,21 @@
     </div>
   {/if}
 
+  {#if submittedAnswer}
+    <section class="your-answer submitted-answer" aria-label={t("Submitted answer")}>
+      <p class="answer-label">{t("Submitted answer")}</p>
+      <div class="prose" use:markdown={{ language: locale.language, text: submittedAnswer, breaks: true }}></div>
+      {#if failedJob}
+        <button class="btn btn-small" onclick={() => (answer = submittedAnswer ?? '')}>{t("Restore submitted answer")}</button>
+      {/if}
+    </section>
+  {/if}
+
   {#if working}
     <p class="working"><span class="chip"><span class="live-dot"></span>{t("The teacher is responding")}</span></p>
   {:else}
-    {#if failedJob && !task.history.length}
-      <p class="problem">{t("The last request did not finish:")} {diagnostic(failedJob.error ?? "")}</p>
+    {#if failedJob}
+      <p class="problem">{t("The last request did not finish:")} {diagnostic(failedJob.error ?? latestTurn?.error ?? t("The response was interrupted. Please try again."))}</p>
     {/if}
     <label class="field">
       <span class="visually-hidden">{t("Exercise answer")}</span>

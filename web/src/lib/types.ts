@@ -84,6 +84,7 @@ export type Task = {
 };
 
 export type PracticeJob = {
+  answer?: string;
   id: string;
   concept_id: string;
   action: string;

@@ -4,7 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
   import { lessonStatus } from '../lib/format';
-  import type { Question } from '../lib/types';
+  import type { Question, QuestionReply } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
 
   let { question }: { question: Question } = $props();
@@ -30,6 +30,14 @@
   let busy = $state(false);
   const quote = $derived(app.quote?.questionId === question.id ? app.quote : null);
   const canReply = $derived(answer?.status === 'completed' && (!supplement || supplement.status === 'completed') && (question.replies ?? []).every((r) => app.turn(r.turn_id)?.status === 'completed'));
+
+  async function retryMissing(item: QuestionReply) {
+    busy = true;
+    await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/replies`, {
+      id: item.id, question: item.question, selection: item.selection,
+    }));
+    busy = false;
+  }
 
   async function reply(event: SubmitEvent) {
     event.preventDefault();
@@ -142,6 +150,9 @@
           <span class="chip">{diagnostic(lessonStatus[turn.status].label)}</span>
           <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
         {/if}
+      {:else}
+        <p class="decision">{t("This reply did not start. Try again.")}</p>
+        <button class="btn btn-small" disabled={busy} onclick={() => retryMissing(item)}>{t("Answer again")}</button>
       {/if}
     </section>
   {/each}
@@ -200,8 +211,8 @@
     font-family: var(--serif);
     font-size: var(--step--1);
     color: var(--ink-soft);
-    max-height: 5rem;
-    overflow: hidden;
+    max-height: 8rem;
+    overflow: auto;
   }
 
   .title {

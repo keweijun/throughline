@@ -8,7 +8,7 @@ const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
 const DECISION = /<teaching-decision>[\s\S]*$/;
 
-function parse(text: string): DocumentFragment {
+function parse(text: string, breaks = false): DocumentFragment {
   const math: { tex: string; display: boolean }[] = [];
   const token = 'MATH' + crypto.randomUUID().replaceAll('-', '');
   const prepared = text.replace(MATH, (whole, code, _expr, a, b, c, d) => {
@@ -16,7 +16,7 @@ function parse(text: string): DocumentFragment {
     math.push({ tex: a ?? b ?? c ?? d, display: a !== undefined || b !== undefined });
     return token + (math.length - 1) + 'END';
   });
-  const fragment = DOMPurify.sanitize(marked.parse(prepared, { async: false }) as string, {
+  const fragment = DOMPurify.sanitize(marked.parse(prepared, { async: false, breaks }) as string, {
     RETURN_DOM_FRAGMENT: true,
     USE_PROFILES: { html: true },
     FORBID_TAGS: ['img', 'style', 'iframe', 'form', 'input', 'button', 'video', 'audio'],
@@ -97,13 +97,13 @@ export function labelFor(ref: Ref) {
   return page ? t('p. {number}', { number: page[1] }) : line ? t('line {number}', { number: line[1] }) : ref.unit_id;
 }
 
-export type MarkdownOptions = { language?: Language; text: string; refs?: Ref[]; onSource?: (ref: Ref) => void };
+export type MarkdownOptions = { language?: Language; text: string; breaks?: boolean; refs?: Ref[]; onSource?: (ref: Ref) => void };
 
 /** Renders sanitized Markdown, patching only changed blocks so streaming keeps selections and scroll. */
-export function render(node: HTMLElement, { text, refs = [], onSource }: MarkdownOptions) {
-  const key = locale.language + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
+export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource }: MarkdownOptions) {
+  const key = locale.language + breaks + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
   if (node.dataset.key === key) return;
-  const fragment = parse(text.replace(DECISION, ''));
+  const fragment = parse(text.replace(DECISION, ''), breaks);
   linkCitations(fragment, refs, onSource);
   const scrollY = window.scrollY;
   const incoming = [...fragment.childNodes];

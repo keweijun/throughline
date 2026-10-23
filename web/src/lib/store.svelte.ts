@@ -2,9 +2,9 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
-import type { HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
-export type PanelTab = 'questions' | 'source';
+export type PanelTab = 'questions' | 'source' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -52,6 +52,8 @@ class AppStore {
   shortcutsOpen = $state(false);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
+  /** Annotation to scroll to and flash in the Notes tab. */
+  focusAnnotation = $state<string | null>(null);
   panelWidth = $state(storedWidth());
   #widthChosen = storedWidth() !== DEFAULT_PANEL;
   #sources = new Map<string, Promise<SourceView>>();
@@ -231,6 +233,59 @@ class AppStore {
 
   explanationsFor(conceptId: string | null) {
     return (this.state?.deferred_explanations ?? []).filter((e) => e.target_concept_id === conceptId);
+  }
+
+  annotationsFor(conceptId: string | null): Annotation[] {
+    return (this.state?.annotations ?? []).filter((a) => a.concept_id === conceptId);
+  }
+
+  bookmark(conceptId: string | null, source?: AnnotationSource | null): Annotation | undefined {
+    return this.annotationsFor(conceptId).find(
+      (a) =>
+        a.kind === 'bookmark' &&
+        (source ? a.source?.source_id === source.source_id && a.source.revision === source.revision && a.source.unit_id === source.unit_id : !a.source),
+    );
+  }
+
+  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'note' | 'turn_id' | 'source'>>) {
+    return this.act(() => api.post<{ annotation: Annotation }>('/api/annotations', annotation));
+  }
+
+  editNote(id: string, note: string) {
+    return this.act(() => api.put(`/api/annotations/${encodeURIComponent(id)}`, { note }));
+  }
+
+  removeAnnotation(id: string) {
+    return this.act(() => api.delete(`/api/annotations/${encodeURIComponent(id)}`));
+  }
+
+  toggleBookmark(conceptId: string, source?: AnnotationSource | null) {
+    const existing = this.bookmark(conceptId, source);
+    if (existing) return this.removeAnnotation(existing.id);
+    return this.annotate({ kind: 'bookmark', concept_id: conceptId, ...(source ? { source } : {}) });
+  }
+
+  showAnnotation(id: string) {
+    this.focusAnnotation = id;
+    this.openPanel('notes');
+  }
+
+  /** Brings an annotation's lesson passage or source back into view. */
+  async goTo(annotation: Annotation) {
+    if (annotation.source) {
+      void this.openSource({ ...annotation.source });
+      return;
+    }
+    this.view(annotation.concept_id);
+    if (!annotation.turn_id) return;
+    await tick();
+    requestAnimationFrame(() => {
+      const lesson = document.getElementById(`turn-${annotation.turn_id}`);
+      const body = lesson?.querySelector<HTMLElement>('.lesson-body');
+      const range = body && annotation.passage ? locate(body, annotation.passage) : null;
+      const box = range?.getBoundingClientRect() ?? lesson?.getBoundingClientRect();
+      if (box) window.scrollTo({ top: Math.max(0, box.top + window.scrollY - window.innerHeight / 3), behavior: 'instant' });
+    });
   }
 
   tasks(conceptId: string | null): Task[] {

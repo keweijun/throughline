@@ -82,6 +82,16 @@
     >
       {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
     </button>
+    <button
+      class="btn btn-quiet"
+      disabled={!app.state || app.libraryOpen}
+      aria-pressed={app.panelOpen && app.panelTab === 'notes'}
+      aria-label={t("Notes")}
+      onclick={() => (app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes'))}
+    >
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Notes")}</span>
+    </button>
     <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>?</button>
     <button class="btn btn-quiet icon" onclick={toggleTheme} aria-label={t("Switch light or dark theme")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3a7 7 0 1 0 0 14V3Z" fill="currentColor" /><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
@@ -189,7 +199,7 @@
     font-weight: 600;
   }
 
-  @media (hover: none) {
+  @media (hover: none), (max-width: 30rem) {
     .shortcuts {
       display: none;
     }

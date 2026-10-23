@@ -8,8 +8,26 @@
   const s = $derived(app.source);
   const v = $derived(verification(s?.verification));
   const page = $derived(s?.locator?.page);
+  let shown = $state(1);
+  $effect(() => {
+    if (page) shown = page;
+  });
   const where = $derived(page ? t('Page {page}', { page }) : s?.locator?.line ? t('Line {line}', { line: s.locator.line }) : t('Exact location missing'));
   const label = $derived(s ? `${s.title}, ${page ? t('p. {page}', { page }) : t('line {line}', { line: s.locator?.line ?? '?' })}` : '');
+  const mine = $derived(
+    (app.state?.annotations ?? []).filter(
+      (a) => a.kind !== 'bookmark' && a.source?.source_id === s?.source_id && a.source?.revision === s?.revision,
+    ),
+  );
+  const pageRef = $derived(
+    s
+      ? s.pdf_url && page
+        ? { source_id: s.source_id, revision: s.revision, unit_id: `page-${shown}`, page: shown, label: `${s.title}, ${t('p. {page}', { page: shown })}` }
+        : { source_id: s.source_id, revision: s.revision, unit_id: s.unit_id, label }
+      : null,
+  );
+  const concept = $derived(app.viewingId);
+  const marked = $derived(!!(concept && pageRef && app.bookmark(concept, pageRef)));
 </script>
 
 <section class="source-view" aria-busy={app.sourceLoading}>
@@ -23,6 +41,16 @@
         <span>{where}</span>
         <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
         {#if s.stale}<span class="chip chip-caution">{t("Older revision of this file")}</span>{/if}
+        {#if concept && pageRef}
+          <button
+            class="btn btn-quiet btn-small bookmark"
+            aria-pressed={marked}
+            onclick={() => app.toggleBookmark(concept, pageRef)}
+            title={t("Bookmarks are yours. The teacher does not see them.")}
+          >
+            {marked ? t("Bookmarked") : page ? t("Bookmark page") : t("Bookmark line")}
+          </button>
+        {/if}
         {#if s.pdf_url}
           <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">{t("Open original ↗")}</a>
         {/if}
@@ -34,11 +62,17 @@
 
     {#if s.pdf_url && page}
       {#key s.pdf_url}
-        <PdfReader url={s.pdf_url.split('#')[0]} {page} {label} />
+        <PdfReader
+          url={s.pdf_url.split('#')[0]}
+          {page}
+          {label}
+          bind:current={shown}
+          highlights={mine.map((a) => ({ page: Number(a.source!.unit_id.replace('page-', '')), passage: a.passage }))}
+        />
       {/key}
     {:else if s.document}
       {#key `${s.source_id}/${s.revision}/${s.unit_id}`}
-        <MarkdownReader lines={s.document} target={s.unit_id} {label} />
+        <MarkdownReader lines={s.document} target={s.unit_id} {label} highlights={mine.map((a) => a.passage)} />
       {/key}
     {:else}
       <pre>{s.text || t("No text was extracted at this location.")}</pre>
@@ -94,6 +128,11 @@
 
   .original {
     margin-left: auto;
+  }
+
+  .bookmark[aria-pressed='true'] {
+    color: var(--mine);
+    font-weight: 600;
   }
 
   .muted {

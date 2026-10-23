@@ -45,3 +45,15 @@ _Avoid_: A final script that must be read verbatim, evidence of learner mastery.
 
 **Preparation readiness**: The preparation material for a section is sufficient to begin teaching it.
 _Avoid_: Learning completed, mastered, all sources permanently valid.
+
+**Learner annotation**: A highlight, learner note or bookmark the learner keeps for themselves, attached to a route section and optionally to a lesson passage or source location. The teacher does not read it (ADR 0005).
+_Avoid_: Notebook, evidence, side question, deferred item.
+
+**Highlight**: A learner annotation marking a passage in a lesson or source, optionally with a note.
+_Avoid_: Asked passage (a passage quoted in a side question).
+
+**Learner note**: Text the learner writes on a highlight or on a whole section.
+_Avoid_: Uncertainty notes in preparation material, progress note.
+
+**Bookmark**: A learner annotation marking a section or a source location to come back to.
+_Avoid_: Deferred item, mainline restore point.

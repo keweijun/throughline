@@ -14,7 +14,7 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
 
 ## Domain operations
 
-`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice` and `preparation`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through the `guided-learning` command (`--course <name>` resolves inside the course library, `--workspace` takes any folder); their names and semantics are a stable contract documented in `guided_learning/skill/references/`, which `guided-learning setup` copies to `~/.agents/skills/guided-learning`. The host calls the same operations and keeps no state of its own besides worker threads.
+`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice`, `preparation`, `preferences` and `annotations`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through the `guided-learning` command (`--course <name>` resolves inside the course library, `--workspace` takes any folder); their names and semantics are a stable contract documented in `guided_learning/skill/references/`, which `guided-learning setup` copies to `~/.agents/skills/guided-learning`. The host calls the same operations and keeps no state of its own besides worker threads.
 
 ## Host (`guided_learning/server/`)
 
@@ -54,12 +54,16 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | POST | `/api/sections/next` | Enter the next route section |
 | POST | `/api/preparation/retry` | Retry failed preparation |
 | GET/PUT | `/api/settings` | Codex model and reasoning effort |
+| POST | `/api/annotations` | Save a learner annotation (highlight, note or bookmark); `/api/state` lists them |
+| PUT/DELETE | `/api/annotations/{id}` | Edit an annotation's note, or delete it |
 
 The browser cannot call domain operations directly; there is no generic operation passthrough.
 
 ## Interface (`web/`)
 
-`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Before a course is open, and from **Courses** in the top bar, `Library` lists the courses and links each course action to a new Codex chat (`codex://new?prompt=…&path=<library>`); opening a course reloads the page so the store starts clean. Components map to the page: `TopBar`; `Library`; `RouteRail`; `ConceptPage` (goal, next step derived from the section's lessons and practice, questions saved for the section, `UnitOverview`, `Lesson` with `TurnControls`, `Composer`, `Practice` with `Exercise`, `NextSection`, `Preparation`, `EarlierHistory`); `SidePanel` (`Questions` with `QuestionThread`, and `SourceViewer` with `PdfReader` and `MarkdownReader`); `SelectionAsk`, `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer.
+`lib/store.svelte.ts` holds one reactive copy of `/api/state`, applies SSE deltas to running turns, and refetches after `changed` events. `lib/markdown.ts` renders sanitized Markdown with KaTeX and turns `[Source id / unit]` citations into source buttons, patching only changed blocks so streaming keeps selections and scroll. Before a course is open, and from **Courses** in the top bar, `Library` lists the courses and links each course action to a new Codex chat (`codex://new?prompt=…&path=<library>`); opening a course reloads the page so the store starts clean. Components map to the page: `TopBar`; `Library`; `RouteRail`; `ConceptPage` (goal, next step derived from the section's lessons and practice, questions saved for the section, `UnitOverview`, `Lesson` with `TurnControls`, `Composer`, `Practice` with `Exercise`, `NextSection`, `Preparation`, `EarlierHistory`); `SidePanel` (`Questions` with `QuestionThread`, `SourceViewer` with `PdfReader` and `MarkdownReader`, and `Notes`); `SelectionAsk` (Highlight, Note and Ask on a selected passage), `CitationPeek`, `SettingsDialog`, `Shortcuts`. `PdfReader` uses pdf.js (`lib/pdf.ts`), loaded only when a PDF is first opened; it renders pages near the viewport and a selectable text layer. `lib/highlight.ts` paints asked passages and learner highlights with the CSS Custom Highlight API, so lesson and reader DOM is never modified.
+
+Learner annotations are never part of a prompt snapshot or prompt (ADR 0005).
 
 ## Adding behavior
 

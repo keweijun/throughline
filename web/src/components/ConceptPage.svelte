@@ -27,6 +27,7 @@
   const position = $derived(app.state?.position);
   const seenKey = $derived(`overview-seen:${app.state?.course.id}:${conceptId}`);
   const explanations = $derived(app.explanationsFor(conceptId));
+  const bookmarked = $derived(!!app.bookmark(conceptId));
   const goal = $derived(
     position?.goal ||
       concept?.objective ||
@@ -108,7 +109,18 @@
     {/if}
 
     <header class="head">
-      <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
+      <div class="eyebrow-row">
+        <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
+        <button
+          class="btn btn-quiet btn-small bookmark"
+          aria-pressed={bookmarked}
+          onclick={() => app.toggleBookmark(concept.id)}
+          title={t("Bookmarks are yours. The teacher does not see them.")}
+        >
+          <span aria-hidden="true">{bookmarked ? '★' : '☆'}</span>
+          {bookmarked ? t("Bookmarked") : t("Bookmark section")}
+        </button>
+      </div>
       <h1 id="concept-title">{concept.title}</h1>
       {#if isCurrent}
         <dl class="position">
@@ -226,6 +238,22 @@
 
   .head {
     margin-bottom: 1.75rem;
+  }
+
+  .eyebrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .bookmark {
+    color: var(--pencil);
+  }
+
+  .bookmark[aria-pressed='true'] {
+    color: var(--mine);
+    font-weight: 600;
   }
 
   .eyebrow {

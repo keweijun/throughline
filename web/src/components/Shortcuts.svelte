@@ -15,6 +15,7 @@
     ['[', 'Previous section'],
     [']', 'Next section'],
     ['s', 'Show or hide the source reader'],
+    ['n', 'Show or hide your notes'],
     ['Esc', 'Close a drawer or popup'],
     ['?', 'Show these shortcuts'],
   ];

@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import threading
 import time
+from pathlib import Path
 
 
 def find_codex():
@@ -17,14 +18,19 @@ def find_codex():
         return found
     bundled = ['/Applications/Codex.app/Contents/Resources/codex', os.path.expanduser('~/Applications/Codex.app/Contents/Resources/codex')]
     if os.environ.get('LOCALAPPDATA'):
-        bundled.append(os.path.join(os.environ['LOCALAPPDATA'], 'OpenAI', 'Codex', 'bin', 'codex.exe'))
+        # The Windows app unpacks its CLI into a per-version folder; prefer the newest.
+        windows = Path(os.environ['LOCALAPPDATA']) / 'OpenAI' / 'Codex' / 'bin'
+        bundled += sorted((str(p) for p in windows.glob('*/codex.exe')), key=os.path.getmtime, reverse=True)
+        bundled.append(str(windows / 'codex.exe'))
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
 class CodexRunner:
-    def __init__(self, model=None, effort='medium', command=None, timeout=600):
+    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True):
         self.model, self.effort, self.timeout = model, effort, timeout
         self.command = command
+        # A kept thread is saved like any Codex chat, so the Codex app can open it.
+        self.ephemeral = ephemeral
 
     def run(self, prompt, cwd, emit, cancel):
         command = self.command or [find_codex() or 'codex','app-server','--stdio']
@@ -62,12 +68,13 @@ class CodexRunner:
                     raise RuntimeError('Codex rejected initialization or generation; check CLI authentication and model configuration')
                 if event.get('id') == 1 and 'result' in event:
                     send({'method':'initialized','params':{}})
-                    params = {'cwd':str(cwd),'ephemeral':True,'approvalPolicy':'never','sandbox':'read-only',
+                    params = {'cwd':str(cwd),'ephemeral':self.ephemeral,'approvalPolicy':'never','sandbox':'read-only',
                               'config':{'model_reasoning_effort':self.effort}}
                     if self.model: params['model'] = self.model
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
+                    if not self.ephemeral: emit({'kind':'thread','id':thread_id})
                     params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]}
                     if self.model: params['model'] = self.model
                     if cancel.is_set(): return

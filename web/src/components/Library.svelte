@@ -59,7 +59,15 @@
   {#if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
   {:else if !library.courses.length}
-    <p class="empty">{t('No courses yet. Use New course in Codex above; your course appears here when Codex is done.')}</p>
+    <div class="empty">
+      <h2>{t('Create your first course')}</h2>
+      <ol>
+        <li>{t('Choose New course in Codex. A Codex chat opens in your Throughline project with the request typed in.')}</li>
+        <li>{t('Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.')}</li>
+        <li>{t('Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.')}</li>
+      </ol>
+      {#if library.root}<a class="btn btn-primary" href={codexLink('$guided-learning create a new course from these files: ')}>{t('New course in Codex')}</a>{/if}
+    </div>
   {:else}
     <ul class="courses">
       {#each library.courses as course (course.path)}
@@ -233,11 +241,19 @@
   }
 
   .empty {
-    padding: 2rem 1.25rem;
+    display: grid;
+    justify-items: start;
+    gap: 0.9rem;
+    padding: 1.5rem 1.5rem 1.75rem;
     border: 1px dashed var(--rule-strong);
     border-radius: 10px;
-    color: var(--pencil);
-    text-align: center;
+  }
+
+  .empty ol {
+    display: grid;
+    gap: 0.45rem;
+    padding-left: 1.25rem;
+    color: var(--ink-soft);
   }
 
   .codex {

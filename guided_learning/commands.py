@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -20,6 +21,10 @@ from .codex import find_codex
 SKILL = Path(__file__).resolve().parent / 'skill'
 ICON = Path(__file__).resolve().parent / 'web_dist' / 'favicon.svg'
 PROJECT_MARKER = '<!-- Written by guided-learning setup; rerunning setup replaces this file. -->'
+FIRST_PROMPT = '$guided-learning Help me create my first Throughline course.'
+WELCOME_PROMPT = ('$guided-learning Throughline was just installed and this is my first chat in the Throughline project. '
+                  'Welcome me in two or three sentences, then give the short guide from AGENTS.md for creating my first course. '
+                  'Do not run any commands.')
 PROJECT_AGENTS = PROJECT_MARKER + '''
 # Throughline course library
 
@@ -29,6 +34,16 @@ This folder is the learner's Throughline course library. Each subfolder containi
 - Copy a course's source files into `<course>/inputs/` before registering them. Never edit `course.sqlite3`, `sources/` or `.throughline/` by hand.
 - When course work is done, run `guided-learning open <course>` so the learner can study it in the Throughline app.
 - Studying happens in the app. Teach in this chat only when the learner asks for it.
+
+## When the learner has not said what to do
+
+New learners often start with a bare request such as "help me create my first course". Reply briefly, in the learner's language:
+
+1. Throughline turns their own documents (PDFs, Markdown notes, problem sets) into a guided course; Codex builds it here, and they study it in the Throughline app.
+2. To create a course, attach the files to this chat or give the folder they are in, and say in a sentence what they want to learn (for example "quantum mechanics up to perturbation theory, for my exam").
+3. Codex then proposes a course name and route, shows what still needs checking, and opens the course in the app.
+
+Then wait for the files and the goal. Do not start building until both are clear.
 '''
 COMMANDS = ('setup', 'open', 'stop', 'courses')
 
@@ -48,8 +63,17 @@ def host_record():
     return library.state_dir() / 'host.json'
 
 
+def windowless_python():
+    """pythonw.exe on Windows, so neither the host nor the launcher opens a console window."""
+    if os.name == 'nt':
+        gui = Path(sys.executable).with_name('pythonw.exe')
+        if gui.is_file():
+            return str(gui)
+    return sys.executable
+
+
 def project_link(root):
-    return 'codex://new?' + urllib.parse.urlencode({'path': str(root)}, quote_via=urllib.parse.quote)
+    return 'codex://new?' + urllib.parse.urlencode({'prompt': FIRST_PROMPT, 'path': str(root)}, quote_via=urllib.parse.quote)
 
 
 def write_project_agents(root):
@@ -63,15 +87,15 @@ def write_project_agents(root):
 def install_launcher():
     """An app-menu entry that runs `guided-learning open`; returns where it was put, or None."""
     if os.name == 'nt':
-        executable = Path(sys.executable).with_name('pythonw.exe')
-        executable = executable if executable.is_file() else Path(sys.executable)
+        executable = windowless_python()
         folder = Path(os.environ.get('APPDATA', Path.home())) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
         folder.mkdir(parents=True, exist_ok=True)
         target = folder / 'Throughline.lnk'
         script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:GL_LNK);"
                   "$s.TargetPath=$env:GL_EXE;$s.Arguments='-m guided_learning open';$s.Description='Throughline';$s.Save()")
         result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True,
-                                env={**os.environ, 'GL_LNK': str(target), 'GL_EXE': str(executable)})
+                                env={**os.environ, 'GL_LNK': str(target), 'GL_EXE': executable},
+                                creationflags=subprocess.CREATE_NO_WINDOW)
         return target if result.returncode == 0 else None
     command = f'"{sys.executable}" -m guided_learning open'
     if sys.platform == 'darwin':
@@ -98,6 +122,18 @@ def install_launcher():
     return target
 
 
+def welcome_thread(root):
+    """Start the first chat in the Throughline project and let Codex send the guide, so the learner opens it already answered."""
+    from .codex import CodexRunner
+    events = []
+    try:
+        CodexRunner(timeout=180, ephemeral=False).run(WELCOME_PROMPT, root, events.append, threading.Event())
+    except Exception:
+        return None
+    thread = next((e['id'] for e in events if e['kind'] == 'thread'), None)
+    return thread if any(e['kind'] == 'complete' for e in events) else None
+
+
 def setup(args):
     target = skills_dir() / 'guided-learning'
     marker = target / 'SKILL.md'
@@ -122,6 +158,9 @@ def setup(args):
         print(f'Launcher: {launcher}')
     elif not args.no_launcher:
         print('Warning: the launcher could not be created; open Throughline with "guided-learning open".')
+    thread = None if args.no_welcome or not find_codex() else welcome_thread(root)
+    if thread:
+        print(f'Open the welcome chat in the Codex app: codex://threads/{thread}')
     print(f'Open the project in the Codex app: {project_link(root)}')
     print(f'With the Codex CLI, start codex in {root}.')
     if not find_codex():
@@ -130,7 +169,8 @@ def setup(args):
         import pypdf  # noqa: F401
     except ImportError:
         print('Warning: PDF support is missing; install the package with the [pdf] extra to read PDFs.')
-    print('Next: in the Throughline project, ask Codex to create a course from your files; open Throughline from the launcher to study.')
+    print('Next: in the Throughline project, send "Help me create my first Throughline course", then attach your PDFs or notes and say what you want to learn.')
+    print('To study, open Throughline from the launcher.')
     return 0
 
 
@@ -155,12 +195,13 @@ def running():
 def _spawn(port):
     log = library.state_dir() / 'host.log'
     log.parent.mkdir(parents=True, exist_ok=True)
-    command = [sys.executable, '-m', 'guided_learning.web', '--port', str(port), '--record']
+    command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
     launch_id = str(uuid.uuid4())
     options = {'stdin': subprocess.DEVNULL, 'stderr': subprocess.STDOUT,
                'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
     if os.name == 'nt':
-        options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+        # Not DETACHED_PROCESS: a venv's python.exe is a launcher, and a detached launcher's child gets a visible console.
+        options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     else:
         options['start_new_session'] = True
     with log.open('ab') as output:
@@ -219,6 +260,7 @@ def main(argv):
     commands = parser.add_subparsers(dest='command', required=True)
     setup_parser = commands.add_parser('setup', help='Install or update the Codex skill, the course library and the launcher')
     setup_parser.add_argument('--no-launcher', action='store_true')
+    setup_parser.add_argument('--no-welcome', action='store_true', help='Do not start the welcome chat in Codex')
     opener = commands.add_parser('open', help='Start the learning interface in the background and open it')
     opener.add_argument('course', nargs='?', help='Course name in the library')
     opener.add_argument('--port', type=int, default=8765)

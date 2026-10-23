@@ -1,6 +1,6 @@
 # Codex is the only teacher
 
-A course only exists after the Codex skill has prepared it: registering documents, extracting concepts, building the route and checking sources all happen in Codex. A learner of this app therefore always has a working Codex CLI and sign-in.
+A course only exists after Codex has prepared it: registering documents, extracting concepts, building the route and checking sources all happen in Codex (ADR 0004). A learner of this app therefore always has Codex installed and signed in, either the CLI or the desktop app. The host runs the `codex` binary it finds through `CODEX_CLI_PATH`, then `PATH`, then the copy bundled with the desktop app.
 
 An earlier draft of this ADR let the interface use any OpenAI-compatible provider as the teacher. That added a provider registry, API key storage and a second model client without serving anyone who could not already run Codex, so it was removed. The host runs every lesson, side question, practice request and preparation through `codex app-server`. The learner chooses only the Codex model and reasoning effort, stored per user (`~/.config/guided-learning/settings.json`) and never in a course workspace; `--model` and `--effort` override them for one run.
 

@@ -1,4 +1,5 @@
 """Durable side lanes: teacher decisions never mutate the course checkpoint."""
+import time
 from .store import OperationError
 from .teaching import require_text, create_deferred
 
@@ -32,7 +33,7 @@ def begin(store, request):
     branch={'id':identifier,'question':question,'selection':request.get('selection',''), 'anchor':anchor,
             'restore_point':position,'main_turn_id':current_id,
             'selected_turn_id':selected_id,'selected_lecture':selected, 'turn_id':'branch:'+identifier,
-            'status':'unanswered','decision':None,'choice':None}
+            'status':'unanswered','decision':None,'choice':None,'created_at':time.time(),'replies':[]}
     store.put('web_branches',identifier,branch)
     return {'branch':branch}
 
@@ -92,3 +93,39 @@ def return_mainline(store,request):
     return {'branch':branch,'position':store.get('course','position')}
 
 OPERATIONS.update({'branch.decide':decide,'branch.choose':choose,'branch.return':return_mainline})
+
+
+def listing(store, request):
+    branches = store.list('web_branches')
+    for branch in branches:
+        turn = store.get('streams', branch['turn_id']) or {}
+        branch.setdefault('created_at', turn.get('started_at', 0))
+    return {'branches': sorted(branches, key=lambda b: (b['created_at'], b['id']))}
+
+
+def reply(store, request):
+    branch = read(store, request)['branch']
+    identifier = require_text(request, 'reply_id')
+    question = require_text(request, 'question')
+    selection = request.get('selection', '')
+    if not isinstance(selection, str):
+        raise OperationError('invalid_request', 'selection must be text')
+    replies = branch.setdefault('replies', [])
+    previous = next((r for r in replies if r['id'] == identifier), None)
+    if previous:
+        if previous['question'] != question or previous['selection'] != selection:
+            raise OperationError('id_conflict', identifier)
+        return {'branch': branch, 'reply': previous}
+    turns = [branch['turn_id'], branch.get('supplement_turn_id')] + [r['turn_id'] for r in replies]
+    for turn_id in filter(None, turns):
+        turn = store.get('streams', turn_id)
+        if not turn or turn['status'] != 'completed':
+            raise OperationError('incomplete_answer', 'Finish or regenerate the earlier reply before following up')
+    item = {'id': identifier, 'question': question, 'selection': selection,
+            'turn_id': 'reply:' + branch['id'] + ':' + identifier, 'created_at': time.time()}
+    replies.append(item)
+    store.put('web_branches', branch['id'], branch)
+    return {'branch': branch, 'reply': item}
+
+
+OPERATIONS.update({'branch.list': listing, 'branch.reply': reply})

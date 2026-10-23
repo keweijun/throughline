@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { t } from '../lib/i18n.svelte';
+  import { markdown } from '../lib/markdown';
+  import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import QuestionThread from './QuestionThread.svelte';
@@ -8,14 +9,14 @@
   let pause = $state(false);
   let busy = $state(false);
 
-  const questions = $derived([...(app.state?.questions ?? [])].reverse());
+  const questions = $derived([...(app.state?.questions ?? [])].sort((a, b) => (b.created_at ?? app.turn(b.turn_id)?.started_at ?? 0) - (a.created_at ?? app.turn(a.turn_id)?.started_at ?? 0)));
   const currentLesson = $derived(app.lessons(app.currentId).at(-1));
 
   async function ask(event: SubmitEvent) {
     event.preventDefault();
     if (!question.trim()) return;
     busy = true;
-    const quote = app.quote;
+    const quote = app.quote?.questionId ? null : app.quote;
     const result = await app.act(() =>
       api.post('/api/questions', {
         id: newId(),
@@ -40,9 +41,9 @@
   <form class="ask" onsubmit={ask}>
     <h2>{t("Ask a side question")}</h2>
     <p class="intro">{t("Select a sentence or formula in a lesson or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
-    {#if app.quote}
+    {#if app.quote && !app.quote.questionId}
       <div class="quote">
-        <blockquote id="branch-selection">{app.quote.text}</blockquote>
+        <blockquote id="branch-selection" class="prose" use:markdown={{ language: locale.language, text: app.quote.text }}></blockquote>
         {#if app.quote.source}<p class="from">{t("From {source}", { source: app.quote.source })}</p>{/if}
         <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
       </div>

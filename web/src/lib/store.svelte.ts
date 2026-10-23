@@ -6,7 +6,7 @@ import type { HostEvent, Library, Question, Ref, Settings, SourceView, State, Ta
 
 export type PanelTab = 'questions' | 'source';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
-export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string };
+export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
 const DEFAULT_PANEL = 400;
 

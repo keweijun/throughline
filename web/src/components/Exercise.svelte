@@ -66,9 +66,15 @@
             {diagnostic(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {diagnostic(evidenceLabels[entry.kind] ?? entry.kind)}</span>{/if}
           </summary>
           {#if entry.answer}
-            <p class="your-answer"><span>{t("Your answer")}</span> {entry.answer}</p>
+            <section class="your-answer" aria-label={t("Your answer")}>
+              <p class="answer-label">{t("Your answer")}</p>
+              <div class="prose" use:markdown={{ language: locale.language, text: entry.answer }}></div>
+            </section>
           {/if}
-          <div class="prose feedback" use:markdown={{ language: locale.language, text: entry.feedback }}></div>
+          <section class="teacher-feedback" aria-label={t("Teacher feedback")}>
+            <p class="answer-label">{t("Teacher feedback")}</p>
+            <div class="prose feedback" use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+          </section>
         </details>
       {/each}
     </div>
@@ -178,13 +184,22 @@
     margin-top: 0.4rem;
     font-size: var(--step-0);
     color: var(--ink-soft);
-    white-space: pre-wrap;
+    padding: 0.8rem 1rem;
+    background: var(--accent-wash);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
   }
 
-  .your-answer span {
+  .answer-label {
     font-weight: 600;
     color: var(--pencil);
-    margin-right: 0.3rem;
+    margin-bottom: 0.5rem;
+    font-size: var(--step--1);
+  }
+
+  .teacher-feedback {
+    margin-top: 1rem;
+    padding: 0.5rem 0;
   }
 
   .feedback {

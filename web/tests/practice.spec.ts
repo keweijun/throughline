@@ -15,6 +15,9 @@ test('deferred and unfinished exercises follow the learner into the next section
   await expect(page.getByText('Still open from earlier sections')).toBeVisible();
   const open = page.locator('#practice article');
   await expect(open).toHaveCount(3);
+  await expect(open.first()).not.toBeVisible();
+  await page.getByText('Still open from earlier sections').click();
+  await expect(open.first()).toBeVisible();
   await expect(open.first()).toContainText('Original section');
   await expect(page.locator('#practice')).not.toContainText('Passed exercise');
 
@@ -29,4 +32,13 @@ test('a full solution asks for confirmation first', async ({ page, course }) => 
   await expect(first.getByRole('group', { name: 'Confirm full solution' })).toContainText('counts as solved with help');
   await first.getByRole('button', { name: 'Keep trying' }).click();
   await expect(first.getByRole('group', { name: 'Confirm full solution' })).toHaveCount(0);
+});
+
+
+test('learner answers render math in a distinct block', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const answer = page.locator('.your-answer').first();
+  await expect(answer.locator('.katex')).toHaveCount(1);
+  await expect(answer.locator('.answer-label')).toHaveText('Your answer');
+  await expect(page.locator('.feedback').first().locator('.katex')).toHaveCount(1);
 });

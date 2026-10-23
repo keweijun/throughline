@@ -45,7 +45,11 @@ export type Decision = {
   target_concept_id?: string;
 };
 
+export type QuestionReply = { id: string; question: string; selection: string; turn_id: string; created_at: number };
+
 export type Question = {
+  created_at?: number;
+  replies?: QuestionReply[];
   id: string;
   question: string;
   selection: string;

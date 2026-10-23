@@ -49,6 +49,7 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | GET | `/api/concepts/{id}/preview` | Overview, prerequisites, sources and set-aside material, without moving the position |
 | GET | `/api/sources/{source}/{revision}/{unit}?format=image\|pdf` | Exact source revision; Markdown responses include the whole document for the reader |
 | POST | `/api/questions`, `/api/questions/{id}/choice`, `/return` | Side questions and supplements |
+| POST | `/api/questions/{id}/replies` | Follow up in the same side question; accepts `id`, `question`, and optional `selection` |
 | POST | `/api/practice/generate`, `/api/practice/tasks/{id}/{action}` | Exercises and help |
 | POST | `/api/sections/next` | Enter the next route section |
 | POST | `/api/preparation/retry` | Retry failed preparation |
@@ -66,3 +67,7 @@ The browser cannot call domain operations directly; there is no generic operatio
 - Tests: `tests/test_web*.py` drive `Host` directly or through `support.host_client`; `web/tests/*.spec.ts` drive the built UI against fixture courses in `tests/*_fixture.py`.
 
 Language preferences are domain operations (`preferences.view` / `preferences.save`) in the course workspace. Each stream attempt freezes its language alongside its source snapshot. The host emits a preference change notice so connected interfaces refresh their labels without rewriting saved teaching content. Preparation fingerprints include language.
+
+Side questions have a creation timestamp; older records fall back to the original stream start time. The interface shows newest questions first. `branch.reply` appends an idempotent reply (`id` is the branch ID, `reply_id` identifies the reply, with `question` and optional `selection`) without creating another branch or changing the mainline restore point. Earlier answers must be complete. Each reply is a normal pausable/resumable stream, with completed question/answer history frozen in its prompt snapshot. Follow-ups keep the original supplement and pending-explanation decisions; they do not run the branch decision protocol again.
+
+Practice separates learner answers and teacher feedback visually and renders Markdown/LaTeX in both. Unfinished exercises from other sections are initially collapsed. Hints give one cue; key steps provide a symbolic plan, leaving results to the learner; full solutions remain explicit. Assessment considers cumulative learner attempts and accepts correct assisted answers without requiring paraphrasing. Evidence provenance still distinguishes assisted completion from independent work.

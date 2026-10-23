@@ -3,6 +3,10 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Follow up": "继续追问",
+  "Follow-up question": "追问内容",
+  "Continue this question…": "继续讨论这个问题…",
+  "Send follow-up": "发送追问",
   "This source location could not be loaded.": "无法加载此来源位置。",
   "Looking up the source…": "正在查找来源…",
   "p. {page}": "第 {page} 页",

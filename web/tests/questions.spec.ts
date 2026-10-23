@@ -38,7 +38,59 @@ test('a formula selection keeps its original TeX and the quote can be removed', 
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 10 });
   await page.mouse.up();
   await page.getByRole('button', { name: 'Ask about this passage' }).click();
-  await expect(page.locator('#branch-selection')).toHaveText('P=|a+b|^2');
+  await expect(page.locator('#branch-selection .katex')).toHaveCount(1);
+  await expect(page.locator('#branch-selection annotation')).toHaveText('P=|a+b|^2');
   await page.getByRole('button', { name: 'Remove quote' }).click();
   await expect(page.locator('#branch-selection')).toHaveCount(0);
+});
+
+
+test('newest questions sort by time and selected follow-ups stay in their thread', async ({ page, course }) => {
+  const { base } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await page.request.post(base + '/api/questions', { data: { id: 'z-old', question: 'Older question' } });
+  await page.request.post(base + '/api/questions', { data: { id: 'a-new', question: 'Newer question' } });
+  await page.reload();
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  const threads = page.locator('#branch-panel .thread');
+  await expect(threads).toHaveCount(2);
+  const thread = threads.first();
+  await expect(thread.locator('.title').first()).toHaveText('Newer question');
+  const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
+  const excerpt = await paragraph.evaluate((node) => {
+    const range = document.createRange(); range.selectNodeContents(node);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return window.getSelection()!.toString();
+  });
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await expect(thread.locator('.followup blockquote')).toHaveText(excerpt.trim());
+  await thread.getByRole('textbox', { name: 'Follow-up question' }).fill('Explain this step more slowly.');
+  await thread.getByRole('button', { name: 'Send follow-up' }).click();
+  await expect(thread.locator('.reply .answer .katex').first()).toBeVisible();
+  await expect(threads).toHaveCount(2);
+  await page.reload();
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  await expect(page.locator('#thread-a-new .reply .title')).toHaveText('Explain this step more slowly.');
+  await expect(page.locator('#thread-a-new .reply blockquote')).toHaveText(excerpt.trim());
+});
+
+test('mixed prose and math selections keep one TeX copy', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await page.evaluate(() => {
+    const body = document.querySelector('.lesson-body')!;
+    const start = [...body.querySelectorAll('p')].find((p) => p.textContent?.startsWith('Add'))!;
+    const formula = body.querySelector('[data-tex]')!;
+    const range = document.createRange();
+    range.setStartBefore(start); range.setEndAfter(formula);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await expect(page.locator('#branch-selection .katex')).toHaveCount(1);
+  await expect(page.locator('#branch-selection annotation')).toHaveText('P=|a+b|^2');
+  await expect(page.locator('#branch-selection')).toContainText('Add probability amplitudes');
 });

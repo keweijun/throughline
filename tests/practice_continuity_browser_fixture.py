@@ -16,7 +16,7 @@ def complete(job,result):
  execute(root,{'op':'practice.complete','id':job['id']})
 complete({'id':'questions','concept_id':'a','action':'generate'},{'questions':[{'question':q,'origin':'self_created','source_refs':[]} for q in ('First exercise','Second exercise','Needs work exercise','Passed exercise')]})
 for index,outcome in ((2,'needs_work'),(3,'passed')):
- complete({'id':'assess'+str(index),'concept_id':'a','action':'assess','task_id':'questions:'+str(index),'answer':'An attempt'},{'feedback':'Teacher feedback','outcome':outcome})
+ complete({'id':'assess'+str(index),'concept_id':'a','action':'assess','task_id':'questions:'+str(index),'answer':r'An attempt: \(E=mc^2\)'},{'feedback':r'Teacher feedback: \[E=mc^2\]','outcome':outcome})
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
   emit({'kind':'final','text':'New section explanation'});emit({'kind':'complete'})

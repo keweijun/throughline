@@ -10,6 +10,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+import uuid
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
@@ -65,6 +66,7 @@ def install_launcher():
         executable = Path(sys.executable).with_name('pythonw.exe')
         executable = executable if executable.is_file() else Path(sys.executable)
         folder = Path(os.environ.get('APPDATA', Path.home())) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
+        folder.mkdir(parents=True, exist_ok=True)
         target = folder / 'Throughline.lnk'
         script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:GL_LNK);"
                   "$s.TargetPath=$env:GL_EXE;$s.Arguments='-m guided_learning open';$s.Description='Throughline';$s.Save()")
@@ -154,16 +156,19 @@ def _spawn(port):
     log = library.state_dir() / 'host.log'
     log.parent.mkdir(parents=True, exist_ok=True)
     command = [sys.executable, '-m', 'guided_learning.web', '--port', str(port), '--record']
-    options = {'stdin': subprocess.DEVNULL, 'stdout': log.open('ab'), 'stderr': subprocess.STDOUT}
+    launch_id = str(uuid.uuid4())
+    options = {'stdin': subprocess.DEVNULL, 'stderr': subprocess.STDOUT,
+               'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
     if os.name == 'nt':
         options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
     else:
         options['start_new_session'] = True
-    process = subprocess.Popen(command, **options)
+    with log.open('ab') as output:
+        process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         record = running()
-        if record and record.get('pid') == process.pid:
+        if record and record.get('launch_id') == launch_id:
             return record
         if process.poll() is not None:
             return None

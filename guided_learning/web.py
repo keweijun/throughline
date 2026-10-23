@@ -12,7 +12,7 @@ from .server import serve
 def _record(port):
     path = host_record()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({'pid': os.getpid(), 'port': port}), encoding='utf-8')
+    path.write_text(json.dumps({'pid': os.getpid(), 'port': port, 'launch_id': os.environ.get('GUIDED_LEARNING_LAUNCH_ID')}), encoding='utf-8')
 
 
 def _forget():

@@ -57,10 +57,14 @@
     {/each}
 
     {#if earlier.length}
-      <h3>{t("Still open from earlier sections")}</h3>
+      <details class="earlier">
+      <summary>{t("Still open from earlier sections")} <span>({earlier.length})</span></summary>
+      <div class="earlier-tasks">
       {#each earlier as task (task.id)}
         <Exercise {task} showSection />
       {/each}
+      </div>
+      </details>
     {/if}
   </section>
 {/if}
@@ -86,7 +90,10 @@
     font-size: var(--step-0);
   }
 
-  h3 {
+  .earlier-tasks { display: grid; gap: 1rem; margin-top: 1rem; }
+
+  summary {
+    cursor: pointer;
     margin-top: 1rem;
     font-size: var(--step-0);
     font-weight: 600;

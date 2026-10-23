@@ -1,31 +1,27 @@
 <script lang="ts">
+  import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
 
   let visible = $state(false);
   let left = $state(0);
   let top = $state(0);
-  let pending: { text: string; turnId: string | null; source?: string } | null = null;
+  let pending: { text: string; turnId: string | null; source?: string; questionId?: string } | null = null;
 
-  // Lessons and the source readers are the places a passage can be quoted from.
+  // Keep answer selections attached to their existing side question.
   const scope = (node: Node | null | undefined) =>
-    node?.parentElement?.closest<HTMLElement>('.lesson-body, [data-source-label]') ?? null;
+    (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer]') ?? null;
 
   function capture() {
+    visible = false;
     const selection = window.getSelection();
     if (!selection?.rangeCount || !selection.toString().trim()) return;
     const area = scope(selection.anchorNode);
     if (!area || area !== scope(selection.focusNode)) return;
-    const start = selection.anchorNode?.parentElement;
-    const formula = start?.closest('.katex');
-    // KaTeX holds both MathML and glyphs; a formula-only selection keeps its original TeX.
-    const text =
-      formula && formula === selection.focusNode?.parentElement?.closest('.katex')
-        ? (formula.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? selection.toString())
-        : selection.toString();
+    const text = selectionMarkdown(selection, area);
     pending = area.dataset.sourceLabel
       ? { text: text.replace(/\s+/g, ' ').trim(), turnId: null, source: area.dataset.sourceLabel }
-      : { text: text.trim(), turnId: area.closest<HTMLElement>('[data-turn-id]')!.dataset.turnId! };
+      : { text: text.trim(), turnId: area.closest<HTMLElement>('[data-turn-id]')?.dataset.turnId ?? null, questionId: area.closest<HTMLElement>('[data-question-id]')?.dataset.questionId };
     const rect = selection.getRangeAt(0).getBoundingClientRect();
     left = Math.max(8, Math.min(rect.left + rect.width / 2 - 95, window.innerWidth - 198));
     top = Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - 52));
@@ -38,7 +34,7 @@
     visible = false;
     window.getSelection()?.removeAllRanges();
     app.openPanel('questions');
-    requestAnimationFrame(() => document.getElementById('question-input')?.focus());
+    requestAnimationFrame(() => document.getElementById(pending?.questionId ? `reply-input-${pending.questionId}` : 'question-input')?.focus());
   }
 
   let settle: ReturnType<typeof setTimeout> | undefined;

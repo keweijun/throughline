@@ -197,6 +197,16 @@ class Questions(Feature):
             self.host.changed()
             return {'branch': branch, **result}
 
+    def reply(self, identifier, body):
+        with self.host.lock:
+            result = self.operation({**body, 'op': 'branch.reply', 'id': identifier,
+                                     'reply_id': body.get('id') or str(uuid.uuid4())})
+            branch, reply = result['branch'], result['reply']
+            started = self.host.start_turn({'id': reply['turn_id'], 'channel': 'sidequestion',
+                                           'concept_id': branch['restore_point']['concept_id'], 'prompt': reply['question']})
+            self.host.changed()
+            return {**result, **started}
+
     def choose(self, identifier, choice):
         with self.host.lock:
             branch = self.operation({'op': 'branch.read', 'id': identifier})['branch']
@@ -219,7 +229,7 @@ class Questions(Feature):
         return result
 
     def _branch_for(self, turn):
-        return next((b for b in self.list() if turn['id'] in (b['turn_id'], b.get('supplement_turn_id'))), None)
+        return next((b for b in self.list() if turn['id'] in [b['turn_id'], b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]), None)
 
     def prompt(self, turn, context):
         branch = self._branch_for(turn)
@@ -228,6 +238,8 @@ class Questions(Feature):
         branch = turn.get('prompt_snapshot', {}).get('branch', branch)
         main_text = self.operation({'op': 'stream.read', 'id': branch['main_turn_id']})['turn']['text'] if branch.get('main_turn_id') else None
         common = prompts.question_context(branch, main_text)
+        if turn['id'].startswith('reply:'):
+            return common + prompts.QUESTION_FOLLOWUP
         if turn['id'] == branch.get('supplement_turn_id'):
             return common + prompts.SUPPLEMENT
         return common + prompts.question_protocol(turn.get('language', 'en'))

@@ -7,6 +7,7 @@ import time
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.parse import quote
 
 from fastapi.testclient import TestClient
 
@@ -23,7 +24,7 @@ def course(path, title):
 
 def cli(home, *args, stdin=''):
     env = {**os.environ, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
-           'XDG_DATA_HOME': str(Path(home) / '.xdg')}
+           'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata')}
     return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
 
@@ -66,9 +67,13 @@ class CourseLibrary(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             agents = Path(home) / 'AGENTS.md'
             self.assertIn('$guided-learning', agents.read_text(encoding='utf-8'))
-            self.assertIn('codex://new?path=' + home.replace('/', '%2F'), result.stdout)
-            launcher = Path(home) / '.xdg' / 'applications' / 'throughline.desktop'
-            self.assertIn('-m guided_learning open', launcher.read_text(encoding='utf-8'))
+            self.assertIn('codex://new?path=' + quote(home, safe=''), result.stdout)
+            if os.name == 'nt':
+                launcher = Path(home) / '.appdata' / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Throughline.lnk'
+                self.assertTrue(launcher.is_file())
+            elif sys.platform != 'darwin':
+                launcher = Path(home) / '.xdg' / 'applications' / 'throughline.desktop'
+                self.assertIn('-m guided_learning open', launcher.read_text(encoding='utf-8'))
             self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'project files are not courses')
             agents.write_text('# My own notes\n', encoding='utf-8')
             again = cli(home, 'setup', '--no-launcher')
@@ -148,7 +153,12 @@ class CourseLibrary(unittest.TestCase):
             finally:
                 for _ in range(100):
                     if not (Path(home) / '.throughline' / 'host.json').exists():
-                        break
+                        try:
+                            # Windows can retain the child's log handle briefly after record cleanup.
+                            (Path(home) / '.throughline' / 'host.log').unlink(missing_ok=True)
+                            break
+                        except PermissionError:
+                            pass
                     time.sleep(0.1)
                 else:
                     os.kill(record['pid'], 9)

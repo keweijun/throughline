@@ -1,6 +1,6 @@
 <script lang="ts">
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
-  import { api } from '../lib/api';
+  import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
   import { lessonStatus } from '../lib/format';
@@ -26,6 +26,22 @@
 
   let node: HTMLElement | undefined = $state();
   let flash = $state(false);
+  let replyText = $state('');
+  let busy = $state(false);
+  const quote = $derived(app.quote?.questionId === question.id ? app.quote : null);
+  const canReply = $derived(answer?.status === 'completed' && (!supplement || supplement.status === 'completed') && (question.replies ?? []).every((r) => app.turn(r.turn_id)?.status === 'completed'));
+
+  async function reply(event: SubmitEvent) {
+    event.preventDefault();
+    if (!replyText.trim() || !canReply || busy) return;
+    busy = true;
+    const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/replies`, {
+      id: newId(), question: replyText, selection: quote?.text ?? '',
+    }));
+    busy = false;
+    if (result) { replyText = ''; if (quote) app.quote = null; }
+  }
+
 
   $effect(() => {
     if (app.focusThread !== question.id || !node || !app.panelOpen) return;
@@ -53,12 +69,12 @@
   }
 </script>
 
-<article class="thread" class:flash id="thread-{question.id}" bind:this={node}>
-  {#if question.selection}<blockquote>{question.selection}</blockquote>{/if}
+<article class="thread" class:flash id="thread-{question.id}" bind:this={node} data-question-id={question.id}>
+  {#if question.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
   <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
 
   {#if answer?.text}
-    <div class="prose answer" use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
+    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {/if}
   {#if answer && answer.status !== 'completed'}
     <div class="state">
@@ -109,11 +125,38 @@
         </span>
       </p>
       {#if supplement.text}
-        <div class="prose" use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose" data-question-answer data-turn-id={supplement.id} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
       {/if}
       <TurnControls turn={supplement} pauseLabel={t("Pause supplement")} regenerateLabel={t("Regenerate supplement")} />
     </section>
   {/if}
+
+  {#each question.replies ?? [] as item (item.id)}
+    {@const turn = app.turn(item.turn_id)}
+    <section class="reply">
+      {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
+      <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
+      {#if turn}
+        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        {#if turn.status !== 'completed'}
+          <span class="chip">{diagnostic(lessonStatus[turn.status].label)}</span>
+          <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
+        {/if}
+      {/if}
+    </section>
+  {/each}
+
+  <form class="followup" onsubmit={reply}>
+    {#if quote}
+      <blockquote class="prose" use:markdown={{ language: locale.language, text: quote.text }}></blockquote>
+      <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
+    {/if}
+    <label class="field">
+      <span>{t("Follow up")}</span>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+    </label>
+    <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
+  </form>
 
   {#if canReturn}
     <div class="row end">
@@ -125,6 +168,10 @@
 </article>
 
 <style>
+  .reply { border-top: 1px solid var(--rule); padding-top: 1rem; display: grid; gap: 0.6rem; }
+  .followup { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
+  .followup > button { justify-self: start; }
+
   .thread.flash {
     animation: flash 1.6s ease-out;
   }

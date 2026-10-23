@@ -278,6 +278,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         result = host.questions.ask(body.model_dump(exclude_none=True))
         return {**result, 'turn': turn_summary(result['turn'])}
 
+    @app.post('/api/questions/{identifier}/replies')
+    def reply(identifier: str, body: QuestionRequest):
+        result = host.questions.reply(identifier, body.model_dump(exclude_none=True))
+        return {**result, 'turn': turn_summary(result['turn'])}
+
     @app.post('/api/questions/{identifier}/choice')
     def choose(identifier: str, body: ChoiceRequest):
         return host.questions.choose(identifier, body.choice)

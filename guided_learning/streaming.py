@@ -43,9 +43,15 @@ def start(store, request):
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
     snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}
-    branch=next((b for b in store.list('web_branches') if identifier in (b['turn_id'],b.get('supplement_turn_id'))),None)
+    branch=next((b for b in store.list('web_branches') if identifier in [b['turn_id'],b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]),None)
     if branch:
         snapshot['branch']=branch
+        history_ids = [branch['turn_id'], branch.get('supplement_turn_id')] + [r['turn_id'] for r in branch.get('replies', [])]
+        snapshot['branch']['conversation'] = [
+            {'question': prior['prompt'], 'answer': prior['final_text']}
+            for tid in history_ids if tid and tid != identifier
+            for prior in [store.get('streams', tid)] if prior and prior['status'] == 'completed'
+        ]
         selected=branch.get('selected_lecture')
         if selected:
             for ref in selected.get('source_refs',[]):

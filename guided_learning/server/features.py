@@ -67,6 +67,24 @@ def matching_ref(item, ref):
     return all(item.get(k) == ref[k] for k in ('source_id', 'revision', 'unit_id'))
 
 
+# Shown for a section the teacher has not written an overview for, in the course language.
+OVERVIEW_FALLBACK = {
+    'en': {'builds_on': 'Builds on {}', 'separator': ', ', 'continues': 'Continues from {}',
+           'start': 'Start with the fundamental questions of this course',
+           'core_problem': 'How can we understand {} and what problem does it solve?',
+           'steps': ['Develop an intuitive picture of {}', 'Identify key relationships, notation, and conditions',
+                     'Check understanding with an example, then try exercises'],
+           'prepares': 'Prepares for {}', 'review': 'Review this section and apply the concepts to combined problems',
+           'target_ability': 'Explain {} and apply it to related problems'},
+    'zh-CN': {'builds_on': '建立在{}之上', 'separator': '、', 'continues': '承接{}',
+              'start': '从本课程最基本的问题开始',
+              'core_problem': '如何理解{}？它解决什么问题？',
+              'steps': ['建立对{}的直观理解', '弄清关键关系、记号和适用条件', '用例题检验理解，然后做练习'],
+              'prepares': '为{}做准备', 'review': '复习本小节，并把这些概念用于综合问题',
+              'target_ability': '能够解释{}并用它解决相关问题'},
+}
+
+
 class Feature:
     def __init__(self, host):
         self.host = host
@@ -96,17 +114,19 @@ class Navigation(Feature):
         previous = next((c for c in model['concepts'] if index and c['id'] == model['route'][index - 1]), None)
         following = next((c for c in model['concepts'] if c['id'] == context['next_concept_id']), None)
         overview = concept.get('overview') if isinstance(concept.get('overview'), dict) else {}
+        chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
+        text = OVERVIEW_FALLBACK['zh-CN' if chinese else 'en']
         title = concept['title']
         if context['prerequisites']:
-            prior = 'Builds on ' + ', '.join(c['title'] for c in context['prerequisites'])
+            prior = text['builds_on'].format(text['separator'].join(c['title'] for c in context['prerequisites']))
         else:
-            prior = 'Continues from ' + previous['title'] if previous else 'Start with the fundamental questions of this course'
+            prior = text['continues'].format(previous['title']) if previous else text['start']
         context['overview'] = {
-            'core_problem': overview.get('core_problem') or concept.get('core_question') or f'How can we understand {title} and what problem does it solve?',
-            'steps': overview.get('steps') or [f'Develop an intuitive picture of {title}', 'Identify key relationships, notation, and conditions', 'Check understanding with an example, then try exercises'],
+            'core_problem': overview.get('core_problem') or concept.get('core_question') or text['core_problem'].format(title),
+            'steps': overview.get('steps') or [step.format(title) for step in text['steps']],
             'prior': overview.get('prior') or prior,
-            'next': overview.get('next') or ('Prepares for ' + following['title'] if following else 'Review this unit and apply the concepts to combined problems'),
-            'target_ability': overview.get('target_ability') or concept.get('objective') or concept.get('goal') or f'Explain {title} and apply it to related problems',
+            'next': overview.get('next') or (text['prepares'].format(following['title']) if following else text['review']),
+            'target_ability': overview.get('target_ability') or concept.get('objective') or concept.get('goal') or text['target_ability'].format(title),
             'origin': 'teacher' if overview else 'route_summary',
         }
         context['set_aside'] = [{**{k: m[k] for k in ('source_id', 'revision', 'unit_id')}, 'disposition': m['disposition'], 'reason': m.get('reason', '')}

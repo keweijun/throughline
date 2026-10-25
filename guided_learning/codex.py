@@ -25,6 +25,17 @@ def find_codex():
     return next((path for path in bundled if os.path.isfile(path)), None)
 
 
+def _message(error):
+    """The human-readable text of a JSON-RPC or turn error, if Codex sent one."""
+    if isinstance(error, dict):
+        return str(error.get('message') or error.get('error') or '').strip()
+    return str(error or '').strip()
+
+
+def _explain(summary, detail):
+    return f'{summary}: {detail}' if detail else summary
+
+
 def list_models(command=None, timeout=20):
     """The models the signed-in Codex account can use, from the App Server's paginated model/list."""
     command = command or [find_codex() or 'codex','app-server','--stdio']
@@ -54,7 +65,7 @@ def list_models(command=None, timeout=20):
                 raise RuntimeError('Codex closed before listing models')
             if event.get('id') != request or 'method' in event: continue
             if 'error' in event:
-                raise RuntimeError('Codex could not list models; check CLI authentication')
+                raise RuntimeError(_explain('Codex could not list models; check CLI authentication', _message(event['error'])))
             result = event.get('result') or {}
             if request == 1:
                 send({'method':'initialized','params':{}})
@@ -80,14 +91,13 @@ def list_models(command=None, timeout=20):
 
 
 class CodexRunner:
-    def __init__(self, model=None, effort='medium', command=None, timeout=600, ephemeral=True, project_id=None, name=None, service_tier=None):
-        self.model, self.effort, self.timeout = model, effort, timeout
+    """One ephemeral Codex thread per turn. A turn fails when Codex stays silent for `idle_timeout` seconds,
+    or, however lively, runs past the `timeout` cap."""
+
+    def __init__(self, model=None, effort='medium', command=None, timeout=3600, idle_timeout=300, service_tier=None):
+        self.model, self.effort, self.timeout, self.idle_timeout = model, effort, timeout, idle_timeout
         self.service_tier = service_tier
         self.command = command
-        # A kept thread is saved like any Codex chat, so the Codex app can open it.
-        self.ephemeral = ephemeral
-        self.project_id = project_id
-        self.name = name
 
     def run(self, prompt, cwd, emit, cancel):
         command = self.command or [find_codex() or 'codex','app-server','--stdio']
@@ -107,10 +117,13 @@ class CodexRunner:
         phases, chunks, finals = {}, {}, {}
         order = []
         interrupted_at = None
-        started = time.monotonic()
+        started = last_heard = time.monotonic()
+        last_error = ''
         try:
             send({'id':1,'method':'initialize','params':{'clientInfo':{'name':'guided_learning','version':'0.2.0'},'capabilities':{'experimentalApi':True}}})
             while time.monotonic()-started < self.timeout:
+                if time.monotonic()-last_heard > self.idle_timeout:
+                    raise TimeoutError(f'Codex sent nothing for {self.idle_timeout} seconds')
                 if cancel.is_set() and interrupted_at is None:
                     if not (thread_id and turn_id): return
                     send({'id':4,'method':'turn/interrupt','params':{'threadId':thread_id,'turnId':turn_id}})
@@ -119,22 +132,20 @@ class CodexRunner:
                     return
                 try: event = incoming.get(timeout=.1)
                 except queue.Empty: continue
+                last_heard = time.monotonic()
                 if event is None:
-                    raise RuntimeError('Model connection closed before completion')
+                    raise RuntimeError(_explain('Model connection closed before completion', last_error))
                 if event.get('error') and event.get('id') in (1,2,3):
-                    raise RuntimeError('Codex rejected initialization or generation; check CLI authentication and model configuration')
+                    raise RuntimeError(_explain('Codex rejected initialization or generation; check CLI authentication and model configuration', _message(event['error'])))
                 if event.get('id') == 1 and 'result' in event:
                     send({'method':'initialized','params':{}})
-                    params = {'cwd':str(cwd),'ephemeral':self.ephemeral,'approvalPolicy':'never','sandbox':'read-only',
+                    params = {'cwd':str(cwd),'ephemeral':True,'approvalPolicy':'never','sandbox':'read-only',
                               'config':{'model_reasoning_effort':self.effort}}
                     if self.model: params['model'] = self.model
                     if self.service_tier: params['serviceTier'] = self.service_tier
-                    if self.project_id: params['projectId'] = self.project_id
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
-                    if not self.ephemeral: emit({'kind':'thread','id':thread_id})
-                    if self.name: send({'id':5,'method':'thread/name/set','params':{'threadId':thread_id,'name':self.name}})
                     params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]}
                     if self.model: params['model'] = self.model
                     if cancel.is_set(): return
@@ -145,6 +156,8 @@ class CodexRunner:
                 if 'id' in event and method:
                     send({'id':event['id'],'error':{'code':-32601,'message':'Interactive tool requests are unavailable'}})
                 if params.get('threadId',thread_id) != thread_id: continue
+                if method == 'error':
+                    last_error = _message(params.get('error')) or last_error
                 if method == 'turn/started': turn_id = params['turn']['id']
                 if params.get('turnId',turn_id) != turn_id: continue
                 if method in ('item/started','item/completed'):
@@ -165,7 +178,7 @@ class CodexRunner:
                 if method == 'turn/completed':
                     if cancel.is_set(): return
                     if params['turn'].get('status') != 'completed':
-                        raise RuntimeError('Model turn did not complete successfully')
+                        raise RuntimeError(_explain('Model turn did not complete successfully', _message(params['turn'].get('error')) or last_error))
                     if not any(phases.get(k)=='final_answer' for k in finals):
                         raise RuntimeError('Model finished without an authoritative final answer')
                     emit({'kind':'complete'})

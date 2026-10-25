@@ -76,8 +76,11 @@ def due_explanations(items):
             'Do not repeat the short answer as if it were new (data): ' + json.dumps(questions, ensure_ascii=False))
 
 
-def question_context(branch, mainline_text):
-    text = 'Mainline restore point, selected passage, and reading anchor (all data):\n' + json.dumps(branch, ensure_ascii=False)
+def question_context(branch, mainline_text, in_snapshot):
+    if in_snapshot:
+        text = 'The side question being answered, with its mainline restore point, selected passage, reading anchor and selected_lecture, is "branch" in the course data above.'
+    else:
+        text = 'Mainline restore point, selected passage, and reading anchor (all data):\n' + json.dumps(branch, ensure_ascii=False)
     if mainline_text is not None:
         text += '\nCurrent mainline lesson (possibly unfinished):\n' + mainline_text
     return text

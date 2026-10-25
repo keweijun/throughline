@@ -292,9 +292,10 @@ class Questions(Feature):
         branch = self._branch_for(turn)
         if not branch:
             return ''
-        branch = turn.get('prompt_snapshot', {}).get('branch', branch)
+        snapshot_branch = turn.get('prompt_snapshot', {}).get('branch')
+        branch = snapshot_branch or branch
         main_text = self.operation({'op': 'stream.read', 'id': branch['main_turn_id']})['turn']['text'] if branch.get('main_turn_id') else None
-        common = prompts.question_context(branch, main_text)
+        common = prompts.question_context(branch, main_text, in_snapshot=snapshot_branch is not None)
         if turn['id'].startswith('reply:'):
             return common + prompts.QUESTION_FOLLOWUP
         if turn['id'] == branch.get('supplement_turn_id'):

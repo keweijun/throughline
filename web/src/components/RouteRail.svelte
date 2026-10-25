@@ -48,37 +48,93 @@
   const label = { current: 'Current section', visited: 'Visited', upcoming: 'Not started' };
 
   const course = $derived(app.libraryCourse);
+  const chapters = $derived(app.chapters);
+  const currentChapter = $derived(app.chapterOf(app.currentId)?.id);
+
+  // The chapter being studied stays open; the learner can open or close any other.
+  let toggled = $state<Record<string, boolean>>({});
+  const expanded = (id: string) => toggled[id] ?? (id === currentChapter || id === app.chapterOf(app.viewingId)?.id || id === app.viewingChapter);
+  const studied = (ids: string[]) => ids.filter((id) => app.hasLesson(id)).length;
 </script>
+
+{#snippet section(id: string)}
+  {@const index = route.indexOf(id)}
+  {@const concept = app.concept(id)}
+  {@const status = stateOf(id, index)}
+  {@const count = exercises.get(id)}
+  {@const waiting = saved.get(id)}
+  {@const skipped = app.isSkipped(id)}
+  <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
+    <span class="node" aria-hidden="true"></span>
+    <button
+      class:viewing={id === app.viewingId && !app.viewingChapter}
+      aria-current={id === app.viewingId && !app.viewingChapter ? 'page' : undefined}
+      onclick={() => app.view(id)}
+    >
+      <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
+      {#if status === 'current' || count || waiting || skipped || prepared.has(id)}
+        <span class="meta">
+          {#if status === 'current'}<span>{t("You are here")}</span>{/if}
+          {#if skipped && status !== 'current'}<span class="skipped">{t("Skipped")}</span>{/if}
+          {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
+          {#if waiting}<span class="saved">{waiting === 1 ? t("1 saved question") : t("{count} saved questions", { count: waiting })}</span>{/if}
+          {#if prepared.has(id) && status !== 'current'}<span>{t("Prepared")}</span>{/if}
+        </span>
+      {/if}
+      <span class="visually-hidden">{diagnostic(label[status])}</span>
+    </button>
+  </li>
+{/snippet}
 
 <nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")}>
   <h2>{t("Route")}</h2>
-  <ol>
-    {#each route as id, index (id)}
-      {@const concept = app.concept(id)}
-      {@const status = stateOf(id, index)}
-      {@const count = exercises.get(id)}
-      {@const waiting = saved.get(id)}
-      <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
-        <span class="node" aria-hidden="true"></span>
-        <button
-          class:viewing={id === app.viewingId}
-          aria-current={id === app.viewingId ? 'page' : undefined}
-          onclick={() => app.view(id)}
-        >
-          <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
-          {#if status === 'current' || count || waiting || prepared.has(id)}
-            <span class="meta">
-              {#if status === 'current'}<span>{t("You are here")}</span>{/if}
-              {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
-              {#if waiting}<span class="saved">{waiting === 1 ? t("1 saved question") : t("{count} saved questions", { count: waiting })}</span>{/if}
-              {#if prepared.has(id) && status !== 'current'}<span>{t("Prepared")}</span>{/if}
-            </span>
+  {#if chapters.length}
+    <ol class="chapters">
+      {#each chapters as chapter, number (chapter.id)}
+        {@const open = expanded(chapter.id)}
+        <li class="chapter" class:here={chapter.id === currentChapter}>
+          <div class="chapter-head">
+            <button
+              class="toggle"
+              aria-expanded={open}
+              aria-controls="chapter-{chapter.id}"
+              aria-label={open ? t("Collapse chapter") : t("Expand chapter")}
+              disabled={!chapter.concept_ids.length}
+              onclick={() => (toggled[chapter.id] = !open)}
+            ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
+            <button
+              class="chapter-name"
+              class:viewing={app.viewingChapter === chapter.id}
+              aria-current={app.viewingChapter === chapter.id ? 'page' : undefined}
+              onclick={() => app.viewChapter(chapter.id)}
+            >
+              <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>
+              <span class="meta">
+                {#if chapter.concept_ids.length}
+                  <span>{t("{studied}/{total} sections studied", { studied: studied(chapter.concept_ids), total: chapter.concept_ids.length })}</span>
+                {:else}
+                  <span>{t("Not built yet")}</span>
+                {/if}
+              </span>
+            </button>
+          </div>
+          {#if open && chapter.concept_ids.length}
+            <ol id="chapter-{chapter.id}">
+              {#each chapter.concept_ids as id (id)}
+                {@render section(id)}
+              {/each}
+            </ol>
           {/if}
-          <span class="visually-hidden">{diagnostic(label[status])}</span>
-        </button>
-      </li>
-    {/each}
-  </ol>
+        </li>
+      {/each}
+    </ol>
+  {:else}
+    <ol>
+      {#each route as id (id)}
+        {@render section(id)}
+      {/each}
+    </ol>
+  {/if}
   {#if course}
     <section class="codex" aria-labelledby="codex-title">
       <h3 id="codex-title">{t('Change this course in Codex')}</h3>
@@ -217,6 +273,59 @@
 
   .meta .saved {
     color: var(--accent);
+  }
+
+  .meta .skipped {
+    color: var(--caution);
+  }
+
+  .chapters > li {
+    display: block;
+    padding-bottom: 0;
+  }
+
+  .chapters > li::before {
+    content: none;
+  }
+
+  .chapters > li + li {
+    margin-top: 0.6rem;
+  }
+
+  .chapter-head {
+    display: grid;
+    grid-template-columns: var(--gutter) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .toggle {
+    justify-self: center;
+    padding: 0.4rem 0;
+    color: var(--pencil);
+  }
+
+  .toggle:disabled {
+    visibility: hidden;
+  }
+
+  .toggle:hover {
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .chapter-name .name {
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink-soft);
+  }
+
+  .chapter.here .chapter-name .name {
+    color: var(--ink);
+  }
+
+  .chapter ol {
+    margin-top: 0.15rem;
   }
 
   .codex {

@@ -28,8 +28,20 @@ _Avoid_: Resolved, ignored question.
 **Mainline restore point**: The unfinished teaching position before a branch, including the current goal, explanation progress, and remaining steps.
 _Avoid_: End of chat, latest message.
 
-**Learning section**: A teaching unit organized around a complete goal that can be explained or applied; it may span sources and turns and ends with grouped practice.
-_Avoid_: Single reply, fixed page count, slide subheading.
+**Learning section**: A teaching unit that answers one core question, explaining closely related ideas together; it may span sources and turns and ends with grouped practice.
+_Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
+
+**Chapter**: A table-of-contents grouping of consecutive learning sections, built and revised one at a time; it is never taught as one block. A chapter with no sections is not built yet (ADR 0006).
+_Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number of chapters.
+
+**Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
+_Avoid_: Unit overview repeated in every section.
+
+**Chapter recap**: An optional lesson at the end of a chapter that connects its sections and lists set-aside exercises, without new material or exercises.
+_Avoid_: Quiz, review test, chapter exam.
+
+**Skipped section**: A section deferred when the learner skipped the rest of its chapter; it stays on the route until a lesson there is studied.
+_Avoid_: Excluded, completed, mastered.
 
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening. The view never edits a course; changes happen in Codex.
 _Avoid_: Course manager, a second store of progress.
@@ -37,7 +49,7 @@ _Avoid_: Course manager, a second store of progress.
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
 
-**Unit overview**: An introduction to related learning content explaining its core problem, main steps, connections, and target ability.
+**Unit overview**: An introduction to a section in a course without chapters, explaining its core problem, main steps, connections, and target ability.
 _Avoid_: Contents alone, a list of concepts alone.
 
 **Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.

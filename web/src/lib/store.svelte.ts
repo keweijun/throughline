@@ -2,7 +2,7 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
-import type { Annotation, AnnotationSource, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, Chapter, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -41,6 +41,8 @@ class AppStore {
 
   /** Concept shown in the reading column; null follows the formal position. */
   viewing = $state<string | null>(null);
+  /** Chapter whose page replaces the section in the reading column. */
+  viewingChapter = $state<string | null>(null);
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -82,6 +84,18 @@ class AppStore {
 
   concept(id: string | null | undefined) {
     return this.state?.curriculum.concepts.find((c) => c.id === id);
+  }
+
+  get chapters(): Chapter[] {
+    return this.state?.curriculum.chapters ?? [];
+  }
+
+  chapterOf(conceptId: string | null | undefined): Chapter | undefined {
+    return this.chapters.find((c) => conceptId && c.concept_ids.includes(conceptId));
+  }
+
+  isSkipped(conceptId: string | null | undefined) {
+    return (this.state?.skipped ?? []).some((s) => s.concept_id === conceptId);
   }
 
   routeIndex(id: string | null | undefined) {
@@ -226,6 +240,7 @@ class AppStore {
   }
 
   view(conceptId: string) {
+    this.viewingChapter = null;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
     window.scrollTo({ top: 0 });
@@ -368,6 +383,32 @@ class AppStore {
     } finally {
       this.sourceLoading = false;
     }
+  }
+
+  viewChapter(chapterId: string) {
+    this.viewingChapter = chapterId;
+    this.routeOpen = false;
+    window.scrollTo({ top: 0 });
+  }
+
+  /** Moving the position always lands on the new section. */
+  async #move(action: () => Promise<unknown>) {
+    if (await this.act(action)) {
+      this.viewing = this.viewingChapter = null;
+      window.scrollTo({ top: 0 });
+    }
+  }
+
+  recapChapter(chapterId: string) {
+    return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+  }
+
+  skipChapter(chapterId: string) {
+    return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/skip`, { request_id: newId() }));
+  }
+
+  studySkipped(conceptId: string) {
+    return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId() }));
   }
 
   startLesson(prompt: string) {

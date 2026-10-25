@@ -10,7 +10,18 @@ export type Concept = {
   goal?: string;
 };
 
-export type Coverage = Ref & { concept_ids?: string[]; disposition: 'mapped' | 'deferred' | 'needs_review'; reason?: string };
+export type Coverage = Ref & {
+  concept_ids?: string[];
+  disposition: 'mapped' | 'deferred' | 'needs_review';
+  reason?: string;
+  verification?: 'pending' | 'verified';
+};
+
+/** A table-of-contents grouping of route sections; a chapter with no sections is not built yet. */
+export type Chapter = { id: string; title: string; summary?: string; concept_ids: string[] };
+
+/** A section deferred when the learner skipped its chapter, until a lesson there is studied. */
+export type Skipped = { id: string; concept_id: string; section_id: string; target_concept_id?: string };
 
 export type Position = {
   concept_id?: string;
@@ -125,7 +136,7 @@ export type State = {
   course: { id: string; title: string };
   position: Position | null;
   sources: { id: string; path: string; revision: string; status: string }[];
-  curriculum: { concepts: Concept[]; route: string[]; coverage?: Coverage[] };
+  curriculum: { concepts: Concept[]; route: string[]; coverage?: Coverage[]; chapters?: Chapter[] };
   session: {
     recent_interactions: Interaction[];
     unanswered_questions: unknown[];
@@ -138,6 +149,7 @@ export type State = {
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };
   settings: Settings;
   annotations: Annotation[];
+  skipped: Skipped[];
 };
 
 export type AnnotationSource = Ref & { label?: string; page?: number };

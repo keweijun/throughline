@@ -44,7 +44,9 @@ def start(store, request):
     model = curriculum.view(store,{})
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
-    snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}
+    session = session_resume(store,{})
+    session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
+    snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
     if model['chapters']: snapshot['chapters'] = [{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']]
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile

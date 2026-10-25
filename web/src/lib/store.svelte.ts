@@ -2,7 +2,7 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
-import type { Annotation, AnnotationSource, Chapter, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, Chapter, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -26,6 +26,38 @@ function storedWidth() {
     return Number(localStorage.getItem('panel-width')) || DEFAULT_PANEL;
   } catch {
     return DEFAULT_PANEL;
+  }
+}
+
+/**
+ * Unsent text the learner typed (exercise answers, lesson requests, follow-ups), keyed by what it belongs to, so it
+ * survives moving between sections and reloads within the tab.
+ */
+class Drafts {
+  #values = $state<Record<string, string>>(readDrafts());
+
+  get(key: string): string {
+    return this.#values[key] ?? '';
+  }
+
+  set(key: string, value: string) {
+    if (value === this.get(key)) return;
+    if (value) this.#values[key] = value;
+    else delete this.#values[key];
+    try {
+      sessionStorage.setItem('drafts', JSON.stringify(this.#values));
+    } catch {
+      // The draft still lives for this page.
+    }
+  }
+}
+
+function readDrafts(): Record<string, string> {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem('drafts') ?? '{}');
+    return stored && typeof stored === 'object' ? stored : {};
+  } catch {
+    return {};
   }
 }
 
@@ -61,11 +93,16 @@ class AppStore {
   panelWidth = $state(storedWidth());
   #widthChosen = storedWidth() !== DEFAULT_PANEL;
   #sources = new Map<string, Promise<SourceView>>();
+  /** Only the newest source request may update the reader. */
+  #sourceRequest = 0;
+  readonly drafts = new Drafts();
 
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #noticeTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
   #again = false;
+  /** Deltas that arrive while a state snapshot is in flight; replayed onto the snapshot so no text is lost. */
+  #inflight: DeltaEvent[] | null = null;
 
   get currentId(): string | null {
     const s = this.state;
@@ -118,9 +155,18 @@ class AppStore {
     return this.state?.turns.find((t) => t.channel === 'mainline' && t.status === 'running') ?? null;
   }
 
-  async load() {
+  isRunning(turnId: string | null | undefined) {
+    return this.turn(turnId)?.status === 'running';
+  }
+
+  /** Loads the course state; sync() is the entry point, so two loads never race. */
+  async #load() {
+    this.#inflight = [];
     try {
-      this.state = await api.get<State>('/api/state');
+      const state = await api.get<State>('/api/state');
+      const missed = this.#inflight;
+      this.state = state;
+      for (const delta of missed) this.#delta(delta);
       this.settings = this.state.settings;
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
@@ -131,8 +177,14 @@ class AppStore {
         this.state = null;
         this.libraryOpen = true;
         locale.language = rememberLanguage() ?? locale.language;
-        [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+        try {
+          [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+        } catch (error) {
+          this.error = (error as Error).message;
+        }
       } else this.error = (e as Error).message;
+    } finally {
+      this.#inflight = null;
     }
   }
 
@@ -160,29 +212,39 @@ class AppStore {
     if (this.#refreshTimer) return;
     this.#refreshTimer = setTimeout(() => {
       this.#refreshTimer = null;
-      void this.#runRefresh();
+      void this.sync();
     }, 120);
   }
 
-  async #runRefresh() {
+  /**
+   * Reloads the state, one load at a time. A request made while a load runs queues one more load, and the returned
+   * promise settles once the state reflects everything requested so far.
+   */
+  sync(): Promise<void> {
     if (this.#refreshing) {
       this.#again = true;
-      return;
+      return this.#refreshing;
     }
-    this.#refreshing = this.load();
-    await this.#refreshing;
-    this.#refreshing = null;
-    if (this.#again) {
-      this.#again = false;
-      await this.#runRefresh();
-    }
+    this.#refreshing = (async () => {
+      try {
+        do {
+          this.#again = false;
+          await this.#load();
+        } while (this.#again);
+      } catch (e) {
+        this.error = (e as Error).message;
+      } finally {
+        this.#refreshing = null;
+      }
+    })();
+    return this.#refreshing;
   }
 
   connect() {
     const events = new EventSource('/api/events');
     events.onopen = () => {
       // Anything may have changed while disconnected.
-      if (this.connection !== 'connecting') void this.load();
+      if (this.connection !== 'connecting') void this.sync();
       this.connection = 'live';
     };
     events.onerror = () => {
@@ -200,15 +262,14 @@ class AppStore {
       if (this.libraryOpen || this.library) void this.loadLibrary(!this.libraryOpen);
       return;
     }
+    if (event.type === 'delta') this.#inflight?.push(event);
     const turns = this.state?.turns;
     if (!turns) {
       if (event.type === 'changed') this.refresh();
       return;
     }
     if (event.type === 'delta') {
-      const turn = turns.find((t) => t.id === event.id);
-      if (turn && turn.attempt === event.attempt && turn.status === 'running') turn.text += event.text;
-      else this.refresh();
+      this.#delta(event);
     } else if (event.type === 'turn') {
       const index = turns.findIndex((t) => t.id === event.turn.id);
       if (index >= 0) turns[index] = event.turn;
@@ -219,12 +280,26 @@ class AppStore {
     }
   }
 
-  /** Runs an action, reporting failures in the shared error banner. Returns undefined on failure. */
+  /** Appends streamed text only when it is the turn's next event; anything else means this copy is out of step. */
+  #delta(event: DeltaEvent) {
+    const turn = this.state?.turns.find((t) => t.id === event.id);
+    if (turn && event.attempt < turn.attempt) return;
+    if (!turn || turn.attempt !== event.attempt || turn.status !== 'running') return this.refresh();
+    if (event.sequence <= turn.sequence) return; // already part of this copy
+    if (event.sequence !== turn.sequence + 1) return this.refresh();
+    turn.text += event.text;
+    turn.sequence = event.sequence;
+  }
+
+  /**
+   * Runs an action, reporting failures in the shared error banner. Returns undefined on failure. On success it
+   * resolves once the state shows the action's effect, so a caller that stays busy until then cannot submit twice.
+   */
   async act<T>(action: () => Promise<T>): Promise<T | undefined> {
     this.error = null;
     try {
       const result = await action();
-      this.refresh();
+      await this.sync();
       return result;
     } catch (e) {
       this.error = e instanceof ApiError || e instanceof Error ? e.message : String(e);
@@ -246,21 +321,31 @@ class AppStore {
     window.scrollTo({ top: 0 });
   }
 
-  /** Brings the reading column back to the passage a question was about, falling back to where the learner was reading. */
-  async returnTo(question: Question) {
-    if (this.currentId) this.view(this.currentId);
+  /**
+   * Once the reading column has re-rendered, scrolls to a passage in a lesson, else to `fallback` (a page offset),
+   * else to the lesson itself. `near` picks between repeated occurrences of the passage.
+   */
+  async #scrollToLesson(turnId: string | null | undefined, passage: string | null | undefined, options: { near?: number; fallback?: number } = {}) {
     await tick();
     requestAnimationFrame(() => {
-      const lesson = document.getElementById(`turn-${question.selected_turn_id ?? question.main_turn_id}`);
+      const lesson = turnId ? document.getElementById(`turn-${turnId}`) : null;
       const body = lesson?.querySelector<HTMLElement>('.lesson-body');
-      const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
-      const near = sameSection ? question.anchor.scroll_y! + window.innerHeight / 2 : undefined;
-      const range = body && question.selection ? locate(body, question.selection, near) : null;
+      const range = body && passage ? locate(body, passage, options.near) : null;
       let top: number | null = null;
       if (range) top = range.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
-      else if (sameSection) top = question.anchor.scroll_y!;
+      else if (options.fallback !== undefined) top = options.fallback;
       else if (lesson) top = lesson.getBoundingClientRect().top + window.scrollY - 80;
-      window.scrollTo({ top: Math.max(0, top ?? 0), behavior: 'instant' });
+      if (top !== null) window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+    });
+  }
+
+  /** Brings the reading column back to the passage a question was about, falling back to where the learner was reading. */
+  returnTo(question: Question) {
+    if (this.currentId) this.view(this.currentId);
+    const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
+    return this.#scrollToLesson(question.selected_turn_id ?? question.main_turn_id, question.selection, {
+      near: sameSection ? question.anchor.scroll_y! + window.innerHeight / 2 : undefined,
+      fallback: sameSection ? question.anchor.scroll_y! : undefined,
     });
   }
 
@@ -326,15 +411,7 @@ class AppStore {
       requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
       return;
     }
-    if (!annotation.turn_id) return;
-    await tick();
-    requestAnimationFrame(() => {
-      const lesson = document.getElementById(`turn-${annotation.turn_id}`);
-      const body = lesson?.querySelector<HTMLElement>('.lesson-body');
-      const range = body && annotation.passage ? locate(body, annotation.passage) : null;
-      const box = range?.getBoundingClientRect() ?? lesson?.getBoundingClientRect();
-      if (box) window.scrollTo({ top: Math.max(0, box.top + window.scrollY - window.innerHeight / 3), behavior: 'instant' });
-    });
+    if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage);
   }
 
   tasks(conceptId: string | null): Task[] {
@@ -346,11 +423,17 @@ class AppStore {
     this.panelOpen = true;
   }
 
-  resizePanel(width: number, chosen = true) {
+  /** Sets the panel width; a width the learner chose is kept for later visits unless `save` defers that. */
+  resizePanel(width: number, chosen = true, save = chosen) {
     this.panelWidth = Math.round(Math.min(Math.max(width, 320), window.innerWidth * 0.62));
     if (!chosen) return;
     this.#widthChosen = true;
+    if (save) this.savePanelWidth();
+  }
+
+  savePanelWidth() {
     try {
+
       localStorage.setItem('panel-width', String(this.panelWidth));
     } catch {
       // The width still applies for this visit.
@@ -370,18 +453,22 @@ class AppStore {
   }
 
   async openSource(ref: Ref) {
+    const request = ++this.#sourceRequest;
     this.openPanel('source');
     this.sourceList = false;
     this.sourceLoading = true;
     try {
-      this.source = await this.sourceView(ref);
+      const view = await this.sourceView(ref);
+      if (request !== this.#sourceRequest) return;
+      this.source = view;
       // A page of a PDF needs room; widen once unless the learner has chosen a width.
-      if (this.source.pdf_url && !this.#widthChosen) this.resizePanel(Math.max(this.panelWidth, window.innerWidth * 0.42), false);
+      if (view.pdf_url && !this.#widthChosen) this.resizePanel(Math.max(this.panelWidth, window.innerWidth * 0.42), false);
     } catch (e) {
+      if (request !== this.#sourceRequest) return;
       this.source = null;
       this.error = (e as Error).message;
     } finally {
-      this.sourceLoading = false;
+      if (request === this.#sourceRequest) this.sourceLoading = false;
     }
   }
 

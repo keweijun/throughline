@@ -54,14 +54,14 @@
       <span class="wide-only">{t("Courses")}</span>
     </button>
     {#if studying}
-      <button class="btn btn-quiet" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
+      <button id="toggle-questions" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
         {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
       </button>
-      <button class="btn btn-quiet" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
+      <button id="toggle-source" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Source")}</span>
       </button>
-      <button class="btn btn-quiet" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
+      <button id="toggle-notes" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Notes")}</span>
       </button>

@@ -28,6 +28,7 @@ def reconcile(store, request):
     upcoming = target(store)
     for job in store.list('preparation_jobs'):
         if job['status'] not in ('running','ready'): continue
+        before=json.dumps(job,sort_keys=True)
         if job['concept_id'] not in (current,upcoming) or capture(store,job['concept_id'])['fingerprint'] != job['snapshot']['fingerprint']:
             job.update(status='stale',reason='Route, sources, or teaching language changed; the main teacher will prepare independently')
             job.pop('content',None)
@@ -36,7 +37,9 @@ def reconcile(store, request):
             if turn and turn['status']=='completed': job.update(status='ready',content=turn['final_text'])
             elif turn and turn['status'] in ('failed','interrupted','paused'):
                 job.update(status='deferred' if turn['status']=='paused' else 'failed',reason=turn.get('error','Foreground learning takes priority'))
-        store.put('preparation_jobs',job['id'],job)
+        # Unchanged jobs are not rewritten, so idle polling writes nothing to the course.
+        if json.dumps(job,sort_keys=True)!=before:
+            store.put('preparation_jobs',job['id'],job)
     return {'jobs':sorted(store.list('preparation_jobs'),key=lambda j:j.get('created_at',0))}
 
 

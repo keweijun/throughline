@@ -8,10 +8,15 @@ class OperationError(ValueError):
         self.code = code
 
 class Store:
-    def __init__(self, workspace):
+    def __init__(self, workspace, create=False):
+        """Open a course database; only `create` (course.init) may make a new one."""
         self.workspace = Path(workspace).resolve()
-        self.workspace.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.workspace / 'course.sqlite3', timeout=30)
+        database = self.workspace / 'course.sqlite3'
+        if create:
+            self.workspace.mkdir(parents=True, exist_ok=True)
+        elif not database.is_file():
+            raise OperationError('unknown_course', f'No course at {self.workspace}; run course.init first')
+        self.db = sqlite3.connect(database, timeout=30)
         self.db.execute('CREATE TABLE IF NOT EXISTS documents (namespace TEXT, key TEXT, value TEXT NOT NULL, PRIMARY KEY(namespace, key))')
         self.db.commit()
 

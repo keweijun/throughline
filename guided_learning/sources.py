@@ -4,6 +4,7 @@ import io
 import os
 from pathlib import Path
 from .store import OperationError
+from .curriculum import source_unit
 
 def extract(path, data):
     if path.suffix.lower() in ('.md', '.markdown'):
@@ -23,6 +24,22 @@ def extract(path, data):
                 units.append({'id': f'page-{n}', 'locator': {'page': n}, 'text': '', 'status': 'failed', 'error': str(exc), 'verification': 'pending'})
         return units
     raise ValueError('Supported sources are Markdown and PDF')
+
+def write_snapshot(folder, revision, data):
+    """Store the exact bytes under their hash; a crash never leaves a truncated snapshot behind."""
+    target = folder / revision
+    try:
+        if hashlib.sha256(target.read_bytes()).hexdigest() == revision:
+            return
+    except OSError:
+        pass
+    folder.mkdir(parents=True, exist_ok=True)
+    temporary = folder / f'.{revision}.{os.getpid()}.tmp'
+    try:
+        temporary.write_bytes(data)
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 def register(store, request):
     raw_path = request.get('path')
@@ -48,9 +65,7 @@ def register(store, request):
         units = []
         source['errors'] = [str(exc)]
     snapshot = {'source_id': source_id, 'revision': revision, 'path': str(path), 'status': source['status'], 'verification': 'pending', 'units': units, 'errors': source['errors']}
-    folder = store.workspace / 'sources' / source_id
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / revision).write_bytes(data)
+    write_snapshot(store.workspace / 'sources' / source_id, revision, data)
     store.put('source_revisions', source_id + ':' + revision, snapshot)
     store.put('sources', source_id, source)
     return {'source': source}
@@ -66,4 +81,11 @@ def read(store, request):
         raise OperationError('unknown_revision', str(revision))
     return snapshot
 
-OPERATIONS = {'source.register': register, 'source.read': read}
+def units(store, request):
+    """The exact source units behind a list of {source_id, revision, unit_id} references."""
+    refs = request.get('refs')
+    if not isinstance(refs, list):
+        raise OperationError('invalid_request', 'refs must be a list')
+    return {'sources': [{**ref, 'unit': source_unit(store, ref)} for ref in refs]}
+
+OPERATIONS = {'source.register': register, 'source.read': read, 'source.units': units}

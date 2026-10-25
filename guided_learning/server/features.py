@@ -3,14 +3,16 @@ import hashlib
 import importlib.util
 import io
 import json
+import logging
 import re
 import threading
 import uuid
 from pathlib import Path
 
-from ..curriculum import source_unit
-from ..store import OperationError, Store
+from ..store import OperationError
 from . import prompts
+
+log = logging.getLogger(__name__)
 
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
 _PDF_LOCK = threading.Lock()
@@ -65,6 +67,24 @@ def matching_ref(item, ref):
     return all(item.get(k) == ref[k] for k in ('source_id', 'revision', 'unit_id'))
 
 
+# Shown for a section the teacher has not written an overview for, in the course language.
+OVERVIEW_FALLBACK = {
+    'en': {'builds_on': 'Builds on {}', 'separator': ', ', 'continues': 'Continues from {}',
+           'start': 'Start with the fundamental questions of this course',
+           'core_problem': 'How can we understand {} and what problem does it solve?',
+           'steps': ['Develop an intuitive picture of {}', 'Identify key relationships, notation, and conditions',
+                     'Check understanding with an example, then try exercises'],
+           'prepares': 'Prepares for {}', 'review': 'Review this section and apply the concepts to combined problems',
+           'target_ability': 'Explain {} and apply it to related problems'},
+    'zh-CN': {'builds_on': '建立在{}之上', 'separator': '、', 'continues': '承接{}',
+              'start': '从本课程最基本的问题开始',
+              'core_problem': '如何理解{}？它解决什么问题？',
+              'steps': ['建立对{}的直观理解', '弄清关键关系、记号和适用条件', '用例题检验理解，然后做练习'],
+              'prepares': '为{}做准备', 'review': '复习本小节，并把这些概念用于综合问题',
+              'target_ability': '能够解释{}并用它解决相关问题'},
+}
+
+
 class Feature:
     def __init__(self, host):
         self.host = host
@@ -94,17 +114,19 @@ class Navigation(Feature):
         previous = next((c for c in model['concepts'] if index and c['id'] == model['route'][index - 1]), None)
         following = next((c for c in model['concepts'] if c['id'] == context['next_concept_id']), None)
         overview = concept.get('overview') if isinstance(concept.get('overview'), dict) else {}
+        chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
+        text = OVERVIEW_FALLBACK['zh-CN' if chinese else 'en']
         title = concept['title']
         if context['prerequisites']:
-            prior = 'Builds on ' + ', '.join(c['title'] for c in context['prerequisites'])
+            prior = text['builds_on'].format(text['separator'].join(c['title'] for c in context['prerequisites']))
         else:
-            prior = 'Continues from ' + previous['title'] if previous else 'Start with the fundamental questions of this course'
+            prior = text['continues'].format(previous['title']) if previous else text['start']
         context['overview'] = {
-            'core_problem': overview.get('core_problem') or concept.get('core_question') or f'How can we understand {title} and what problem does it solve?',
-            'steps': overview.get('steps') or [f'Develop an intuitive picture of {title}', 'Identify key relationships, notation, and conditions', 'Check understanding with an example, then try exercises'],
+            'core_problem': overview.get('core_problem') or concept.get('core_question') or text['core_problem'].format(title),
+            'steps': overview.get('steps') or [step.format(title) for step in text['steps']],
             'prior': overview.get('prior') or prior,
-            'next': overview.get('next') or ('Prepares for ' + following['title'] if following else 'Review this unit and apply the concepts to combined problems'),
-            'target_ability': overview.get('target_ability') or concept.get('objective') or concept.get('goal') or f'Explain {title} and apply it to related problems',
+            'next': overview.get('next') or (text['prepares'].format(following['title']) if following else text['review']),
+            'target_ability': overview.get('target_ability') or concept.get('objective') or concept.get('goal') or text['target_ability'].format(title),
             'origin': 'teacher' if overview else 'route_summary',
         }
         context['set_aside'] = [{**{k: m[k] for k in ('source_id', 'revision', 'unit_id')}, 'disposition': m['disposition'], 'reason': m.get('reason', '')}
@@ -165,7 +187,7 @@ class Navigation(Feature):
         chapter = context.get('chapter')
         if is_recap(turn):
             return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
-        earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
+        earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
         if earlier:
             text = prompts.LESSON_CONTINUES
@@ -307,13 +329,17 @@ class Practice(Feature):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
         for job in self.operation({'op': 'practice.list'})['jobs']:
             if not job.get('processed'):
-                self.operation({'op': 'practice.complete', 'id': job['id']})
+                try:
+                    self.operation({'op': 'practice.complete', 'id': job['id']})
+                except OperationError:
+                    # The course refused the record (a conflicting ID, say); the job stays unprocessed rather than half-recorded.
+                    log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
     def _launch(self, concept_id, action, task=None, answer=None):
         with self.host.lock:
             jobs = self.state()['jobs']
-            running = {t['id'] for t in self.host.turns() if t['status'] == 'running'}
+            running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
             for job in jobs:
                 if job['id'] not in running:
                     continue
@@ -374,7 +400,7 @@ class Practice(Feature):
         return session.get('position') or {}
 
     def _enter(self, concept_id, request_id):
-        for turn in self.host.turns():
+        for turn in self.host.brief_turns():
             if turn['channel'] == 'mainline' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
         concept = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['concept']
@@ -386,12 +412,8 @@ class Practice(Feature):
 
     def skipped(self):
         """Sections the learner skipped with their chapter and has not studied since."""
-        store = Store(self.host.workspace)
-        try:
-            resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
-            return [d for d in store.list('evidence_deferred') if d['id'].startswith('chapter-skip:') and d['id'] not in resolved]
-        finally:
-            store.db.close()
+        deferred = self.operation({'op': 'evidence.unresolved'})['deferred']
+        return [d for d in deferred if d['id'].startswith('chapter-skip:')]
 
     def skip_chapter(self, chapter_id, request_id):
         """Move on to the next chapter; the skipped sections stay on the route as deferred."""
@@ -430,11 +452,7 @@ class Practice(Feature):
                     continue
 
     def _sources(self, refs):
-        store = Store(self.host.workspace)
-        try:
-            return [{**ref, 'unit': source_unit(store, ref)} for ref in refs]
-        finally:
-            store.db.close()
+        return self.operation({'op': 'source.units', 'refs': refs})['sources']
 
     def prompt(self, turn, context):
         state = self.operation({'op': 'practice.list'})
@@ -455,11 +473,15 @@ class Practice(Feature):
 
 class Preparation(Feature):
     """Prepares the next section only while the learner's own work is idle."""
+    INTERVAL = 2  # seconds between checks when nothing wakes the loop
+    START_DELAY = .5
+    MAX_BACKOFF = 60
 
     def __init__(self, host):
         super().__init__(host)
         self.operation({'op': 'preparation.recover'})
         self._stop = threading.Event()
+        self._wake = threading.Event()
         self._thread = threading.Thread(target=self._loop, daemon=True, name='preparation')
         self._last = None
 
@@ -468,6 +490,11 @@ class Preparation(Feature):
 
     def stop(self):
         self._stop.set()
+        self._wake.set()
+
+    def wake(self):
+        """Something changed (a turn ended or paused, or the position moved): look for idle work now."""
+        self._wake.set()
 
     def join(self, timeout):
         if self._thread.is_alive():
@@ -482,7 +509,7 @@ class Preparation(Feature):
     def before_start(self, request):
         if request.get('channel', 'mainline') == 'preparation':
             return
-        for turn in self.host.turns():
+        for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
         self.operation({'op': 'preparation.reconcile'})
@@ -501,10 +528,10 @@ class Preparation(Feature):
             if self.host.closing:
                 return {'scheduled': False, 'reason': 'host_closing'}
             stale = {j['id'] for j in self.state()['jobs'] if j['status'] == 'stale'}
-            for turn in self.host.turns():
+            for turn in self.host.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':
                     self.host.pause_turn(turn['id'])
-            turns = self.host.turns()
+            turns = self.host.brief_turns()
             # A paused process can still be shutting down; never start a second preparation process.
             if any(t['status'] == 'running' for t in turns) or any(t['channel'] == 'preparation' and self.host.worker_alive(t) for t in turns):
                 return {'scheduled': False, 'reason': 'foreground_or_worker_active'}
@@ -530,17 +557,29 @@ class Preparation(Feature):
                 raise
 
     def _loop(self):
-        while not self._stop.wait(.35):
-            if self.host.closing:
+        # Host events wake the loop; the interval only catches changes made outside the host, such as Codex editing the route.
+        # The first check waits briefly, so a lesson requested as the course opens goes first.
+        failures = 0
+        self._stop.wait(self.START_DELAY)
+        self._wake.set()
+        while not self._stop.is_set():
+            self._wake.wait(min(self.INTERVAL * 2 ** failures, self.MAX_BACKOFF))
+            self._wake.clear()
+            if self._stop.is_set() or self.host.closing:
                 return
             try:
                 self.schedule()
                 summary = [(j['id'], j['status']) for j in self.state()['jobs']]
                 if summary != self._last:
                     self._last = summary
-                    self.host.changed('preparation')
+                    # Publish directly: host.changed() would wake this loop again.
+                    self.host.events.publish({'type': 'changed', 'scope': 'preparation'})
+                failures = 0
             except OperationError:
-                if self.host.closing:
-                    return
                 # Invalid or changing course sources never block the teacher.
                 continue
+            except Exception:
+                if self.host.closing:
+                    return
+                failures += 1
+                log.exception('Preparation scheduling failed; retrying')

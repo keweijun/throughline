@@ -55,7 +55,20 @@ def resume(store, request):
     recent = sorted(store.list('interactions'), key=lambda item: item['sequence'])
     position = store.get('course', 'position') or {}
     focused = curriculum.context(store, {}) if position.get('concept_id') in curriculum.view(store, {})['route'] else None
-    return {'position': store.get('course', 'position'), 'context': focused, 'active_branch': active_branch(store), 'due_explanations': due(store), 'unanswered_questions': [item for item in store.list('sidequestions') if not item.get('answer_interaction_id')], 'recent_interactions': recent[-limit:] if limit else []}
+    return {'position': store.get('course', 'position'), 'context': focused, 'active_branch': active_branch(store), 'due_explanations': due(store), 'unanswered_questions': [item for item in store.list('sidequestions') if not item.get('answer_interaction_id')], 'app_questions': app_questions(store), 'recent_interactions': recent[-limit:] if limit else []}
+
+
+def app_questions(store):
+    """Side questions asked in the app that still need attention: unanswered, awaiting the learner's supplement choice, or in an accepted supplement."""
+    open_items = []
+    for branch in store.list('web_branches'):
+        if branch.get('status') in ('unanswered', 'suggested') or (branch.get('choice') == 'accept' and not branch.get('returned')):
+            selection = branch.get('selection') or ''
+            open_items.append({'id': branch['id'], 'question': branch['question'], 'status': branch['status'],
+                               'concept_id': (branch.get('restore_point') or {}).get('concept_id'),
+                               'selection': selection if len(selection) <= 300 else selection[:300] + '…',
+                               'replies': len(branch.get('replies', [])), 'created_at': branch.get('created_at')})
+    return sorted(open_items, key=lambda item: item['created_at'] or 0)
 
 OPERATIONS = {'interaction.record': record_interaction, 'session.resume': resume}
 

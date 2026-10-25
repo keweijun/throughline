@@ -60,8 +60,11 @@ Rules the host enforces: one running mainline lesson at a time; side questions r
 | GET | `/api/models` | Models the Codex sign-in can use, with their reasoning efforts and service tiers; 502 when Codex cannot list them |
 | POST | `/api/annotations` | Save a learner annotation (highlight, note or bookmark); `/api/state` lists them |
 | PUT/DELETE | `/api/annotations/{id}` | Edit an annotation's note, or delete it |
+| GET | `/api/health` | Process id and launch id; the cheap liveness probe `guided-learning open` and `stop` use |
 
-The browser cannot call domain operations directly; there is no generic operation passthrough.
+The browser cannot call domain operations directly; there is no generic operation passthrough. Domain errors return `{error, code}`: 404 for codes starting `unknown_`, 409 for the rest, 400 for invalid request bodies; anything unexpected is logged and returns 500 with code `internal_error`. Besides the Host/Origin guard, any `/api/` request whose `Sec-Fetch-Site` is present and not `same-origin` or `none` is refused.
+
+`/api/state` reads turns through `stream.summaries`, which drops frozen prompt snapshots inside SQLite; the host's own status checks use its brief form. `session.resume` lists open app side questions under `app_questions`, so Codex can see what the learner asked in the app.
 
 ## Interface (`web/`)
 

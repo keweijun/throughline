@@ -134,3 +134,11 @@ def resolve(store, request):
     return {'resolution': immutable(store, 'evidence_resolutions', item)}
 
 OPERATIONS['evidence.resolve'] = resolve
+
+
+def unresolved(store, request):
+    """Deferred items that no learner confirmation has resolved yet."""
+    resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
+    return {'deferred': [item for item in store.list('evidence_deferred') if item['id'] not in resolved]}
+
+OPERATIONS['evidence.unresolved'] = unresolved

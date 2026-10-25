@@ -6,6 +6,15 @@ from .store import OperationError
 from .teaching import require_text
 
 STATE_NAMESPACES = ('course', 'curriculum', 'sources', 'interactions', 'evidence', 'evidence_deferred', 'evidence_resolutions', 'sidequestions', 'teaching', 'deferred_explanations')
+FALLBACK_MODEL = 'gpt-6-luna'  # the documented default auxiliary model when the learner chose none
+
+
+def no_saved_models():
+    return {}
+
+
+# The caller supplies the learner's Teacher settings ({model, small_model}); the CLI sets this before running an operation.
+teacher_models = no_saved_models
 
 def fingerprint(store):
     state = {name: store.list(name) for name in STATE_NAMESPACES}
@@ -13,12 +22,8 @@ def fingerprint(store):
 
 def handoff_model():
     """The learner's small model, else their teacher model, else the default auxiliary model."""
-    from .server.settings import TeacherSettings
-    try:
-        settings = TeacherSettings().current()
-    except OperationError:
-        settings = {}
-    return settings.get('small_model') or settings.get('model') or 'gpt-6-luna'
+    settings = teacher_models() or {}
+    return settings.get('small_model') or settings.get('model') or FALLBACK_MODEL
 
 def capture(store, spec):
     messages = [store.get('interactions', identifier) for identifier in spec['interaction_ids']]

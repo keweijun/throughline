@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
   import { evidenceLabels, helpLabels } from '../lib/format';
@@ -111,7 +113,7 @@
     {/if}
     <label class="field">
       <span class="visually-hidden">{t("Exercise answer")}</span>
-      <textarea rows="3" bind:value={answer} placeholder={t("Write your reasoning and answer")} aria-label={t("Exercise answer")}></textarea>
+      <textarea rows="3" bind:value={answer} use:autogrow={answer} use:enterToSend={() => !busy && answer.trim() && act('assess')} placeholder={t("Write your reasoning and answer")} aria-label={t("Exercise answer")}></textarea>
     </label>
     <div class="actions">
       <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>{t("Check my answer")}</button>
@@ -141,6 +143,7 @@
 <style>
   .your-notes { margin-left: auto; color: var(--mine); font-weight: 600; }
   .exercise {
+    animation: enter-rise var(--settle) var(--ease-out) backwards;
     display: grid;
     gap: 0.85rem;
     padding: 1.25rem 1.35rem;

@@ -197,6 +197,10 @@
   }
 
   .node {
+    transition:
+      background-color var(--settle) ease,
+      border-color var(--settle) ease,
+      box-shadow var(--settle) ease;
     position: relative;
     z-index: 1;
     justify-self: center;

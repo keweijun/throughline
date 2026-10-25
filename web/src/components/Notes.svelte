@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
+  import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import type { Annotation } from '../lib/types';
 
   let scope = $state<'section' | 'chapter' | 'all'>('section');
@@ -94,18 +97,18 @@
       <textarea
         id="section-note"
         rows="2"
-        bind:value={draft}
+        bind:value={draft} use:autogrow={draft}
         placeholder={t("Add a note to this section…")}
-        onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
+        use:enterToSend
       ></textarea>
       <button class="btn btn-small" type="submit" disabled={!draft.trim()}>{t("Add note")}</button>
     </form>
   {/if}
 
-  <div class="scope" role="radiogroup" aria-label={t("Show notes from")}>
-    <label><input type="radio" bind:group={scope} value="section" /> {t("This section")}</label>
-    {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" /> {t("This chapter")}</label>{/if}
-    <label><input type="radio" bind:group={scope} value="all" /> {t("All sections ({count})", { count: total })}</label>
+  <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
+    <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
+    {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
+    <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
   </div>
 
   {#if shown}
@@ -123,7 +126,7 @@
       {/if}
       <ul>
         {#each group.items as item (item.id)}
-          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
+          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id} transition:slide={{ duration: 200 }}>
             <p class="kind">
               {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
             </p>
@@ -133,12 +136,10 @@
             {#if editing === item.id}
               <textarea
                 rows="3"
-                bind:value={edit}
+                bind:value={edit} use:autogrow={edit}
                 aria-label={t("Note")}
-                onkeydown={(e) => {
-                  if (e.key === 'Escape') editing = null;
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void saveEdit(item);
-                }}
+                use:enterToSend={() => void saveEdit(item)}
+                onkeydown={(e) => e.key === 'Escape' && (editing = null)}
               ></textarea>
               <div class="actions">
                 <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t("Cancel")}</button>
@@ -190,12 +191,7 @@
   }
 
   .scope {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
     margin-top: 0.5rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
   }
 
   .export {
@@ -207,12 +203,6 @@
     margin-top: 1.4rem;
     font-size: var(--step-0);
     color: var(--ink);
-  }
-
-  .scope label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
   }
 
   h3 {

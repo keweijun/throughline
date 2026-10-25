@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
+  import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import QuestionThread from './QuestionThread.svelte';
   import type { Question } from '../lib/types';
 
@@ -97,10 +100,10 @@
       <textarea
         id="question-input"
         rows="3"
-        bind:value={question}
+        bind:value={question} use:autogrow={question}
         aria-label={t("Side question")}
         placeholder={app.quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
-        onkeydown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.currentTarget.form as HTMLFormElement).requestSubmit()}
+        use:enterToSend
       ></textarea>
     </label>
     <div class="row">
@@ -114,9 +117,9 @@
   {#if questions.length}
     <div class="list-head">
       <h3 class="list-title">{t("Your questions")}</h3>
-      <div class="scope" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
-        <label><input type="radio" bind:group={scope} value="section" /> {t("This section ({count})", { count: inSection.length })}</label>
-        <label><input type="radio" bind:group={scope} value="all" /> {t("All ({count})", { count: questions.length })}</label>
+      <div class="scope segmented" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
+        <label><input type="radio" bind:group={scope} value="section" />{t("This section ({count})", { count: inSection.length })}</label>
+        <label><input type="radio" bind:group={scope} value="all" />{t("All ({count})", { count: questions.length })}</label>
       </div>
       {#if questions.length > 4}
         <input class="search" type="search" bind:value={search} aria-label={t("Search questions")} placeholder={t("Search questions and answers…")} />
@@ -124,7 +127,9 @@
     </div>
     <div class="list">
       {#each shown as q (q.id)}
-        <QuestionThread question={q} bind:open={() => isOpen(q), (value) => (opened[q.id] = value)} />
+        <div transition:slide={{ duration: 200 }}>
+          <QuestionThread question={q} bind:open={() => isOpen(q), (value) => (opened[q.id] = value)} />
+        </div>
       {:else}
         <p class="none">{search.trim() ? t("No questions match your search.") : t("No questions from this section yet.")}</p>
       {/each}
@@ -209,17 +214,7 @@
   }
 
   .scope {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-  }
-
-  .scope label {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    align-self: flex-start;
   }
 
   .search {

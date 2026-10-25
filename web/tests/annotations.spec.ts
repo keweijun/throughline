@@ -32,9 +32,17 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await page.locator('.notes-panel .item').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.notes-panel')).toContainText('Edited note');
 
-  await page.getByRole('textbox', { name: 'Add a note to this section' }).fill('Overall: revisit interference');
-  await page.getByRole('button', { name: 'Add note', exact: true }).first().click();
-  await expect(page.locator('.notes-panel .item.note')).toContainText('Overall: revisit interference');
+  // Enter sends; Shift+Enter and Ctrl+Enter break the line.
+  const sectionNote = page.getByRole('textbox', { name: 'Add a note to this section' });
+  await sectionNote.fill('Overall:');
+  await sectionNote.press('Shift+Enter');
+  await sectionNote.pressSequentially('revisit');
+  await sectionNote.press('Control+Enter');
+  await sectionNote.pressSequentially('interference');
+  await expect(sectionNote).toHaveValue('Overall:\nrevisit\ninterference');
+  await sectionNote.press('Enter');
+  await expect(sectionNote).toHaveValue('');
+  await expect(page.locator('.notes-panel .item.note')).toContainText('revisit');
 
   await page.locator('.notes-panel .item.bookmark').getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('.head .bookmark')).toHaveAttribute('aria-pressed', 'false');

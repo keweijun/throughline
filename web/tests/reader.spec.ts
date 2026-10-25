@@ -73,14 +73,47 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
 
 test('teacher settings save the Codex model and effort', async ({ page, course }) => {
   const { base } = await course('demo_course_fixture');
+  // Without a model list from Codex, models are typed.
+  await page.route('**/api/models', (route) => route.fulfill({ status: 502, json: { error: 'Codex CLI not found' } }));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Model' }).fill('gpt-6.1-sol');
-  await page.getByRole('combobox', { name: 'Reasoning effort' }).selectOption('high');
+  await expect(page.getByText('Codex CLI not found')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Model', exact: true }).fill('gpt-6.1-sol');
+  await page.getByRole('combobox', { name: 'Reasoning effort', exact: true }).selectOption('high');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Model' })).toHaveValue('gpt-6.1-sol');
+  await expect(page.getByRole('textbox', { name: 'Model', exact: true })).toHaveValue('gpt-6.1-sol');
   const settings = await (await page.request.get(base + '/api/settings')).json();
   expect([settings.model, settings.effort]).toEqual(['gpt-6.1-sol', 'high']);
+});
+
+test('teacher settings offer the models Codex lists, a small model and fast mode', async ({ page, course }) => {
+  const { base } = await course('demo_course_fixture');
+  const fast = [{ id: 'priority', name: 'Fast', description: '2x speed, increased usage' }];
+  const models = [
+    { id: 'gpt-6.1-sol', name: 'GPT-6.1-Sol', description: '', default: true, efforts: ['low', 'high'], tiers: fast },
+    { id: 'gpt-6-luna', name: 'GPT-6-Luna', description: '', default: false, efforts: ['low'], tiers: [] },
+  ];
+  await page.route('**/api/models', (route) => route.fulfill({ json: { models } }));
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const model = page.getByRole('combobox', { name: 'Model', exact: true });
+  await expect(model.locator('option')).toHaveText(['Codex default', 'GPT-6.1-Sol', 'GPT-6-Luna']);
+  // The Codex default model offers Fast; a model without a Fast tier hides the choice.
+  await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toBeVisible();
+  await model.selectOption('gpt-6-luna');
+  await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toHaveCount(0);
+  await model.selectOption('gpt-6.1-sol');
+  await page.getByRole('checkbox', { name: 'Fast mode' }).check();
+  await page.getByRole('combobox', { name: 'Small model', exact: true }).selectOption('gpt-6-luna');
+  await page.getByRole('combobox', { name: 'Small model reasoning effort' }).selectOption('low');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  const settings = await (await page.request.get(base + '/api/settings')).json();
+  expect([settings.model, settings.small_model, settings.small_effort, settings.service_tier]).toEqual([
+    'gpt-6.1-sol',
+    'gpt-6-luna',
+    'low',
+    'priority',
+  ]);
 });

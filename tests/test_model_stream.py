@@ -30,6 +30,41 @@ for line in sys.stdin:
             CodexRunner(command=[sys.executable,str(script)]).run('teach',tmp,events.append,threading.Event())
             self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},{'kind':'complete'}])
 
+    def test_model_list_follows_pages_and_hides_hidden_models(self):
+        from guided_learning.codex import list_models
+        with tempfile.TemporaryDirectory() as tmp:
+            script=Path(tmp)/'server.py'
+            script.write_text('''import sys,json
+pages={None:{'data':[{'id':'a','displayName':'A','isDefault':True,'supportedReasoningEfforts':[{'reasoningEffort':'low'}],
+                      'serviceTiers':[{'id':'priority','name':'Fast','description':'2x speed'}]},
+                     {'id':'secret','hidden':True}],'nextCursor':'p2'},
+       'p2':{'data':[{'id':'b','description':'Small'}],'nextCursor':None}}
+for line in sys.stdin:
+ r=json.loads(line); m=r.get('method'); i=r.get('id')
+ if m=='initialize': print(json.dumps({'id':i,'result':{}}),flush=True)
+ if m=='model/list': print(json.dumps({'id':i,'result':pages[r['params'].get('cursor')]}),flush=True)
+''',encoding='utf-8')
+            self.assertEqual(list_models(command=[sys.executable,str(script)]), [
+                {'id':'a','name':'A','description':'','default':True,'efforts':['low'],
+                 'tiers':[{'id':'priority','name':'Fast','description':'2x speed'}]},
+                {'id':'b','name':'b','description':'Small','default':False,'efforts':[],'tiers':[]}])
+
+    def test_service_tier_is_sent_when_starting_the_thread(self):
+        from guided_learning.codex import CodexRunner
+        with tempfile.TemporaryDirectory() as tmp:
+            script=Path(tmp)/'server.py'
+            seen=Path(tmp)/'thread.json'
+            script.write_text('''import sys,json
+for line in sys.stdin:
+ r=json.loads(line); m=r.get('method'); i=r.get('id')
+ if m=='initialize': print(json.dumps({'id':i,'result':{}}),flush=True)
+ if m=='thread/start':
+  open(%r,'w').write(json.dumps(r['params'])); sys.exit(0)
+''' % str(seen),encoding='utf-8')
+            with self.assertRaises(RuntimeError):
+                CodexRunner(command=[sys.executable,str(script)],service_tier='priority').run('teach',tmp,lambda e:None,threading.Event())
+            self.assertEqual(json.loads(seen.read_text())['serviceTier'],'priority')
+
     def test_commentary_only_and_connection_loss_never_complete_a_lesson(self):
         from guided_learning.codex import CodexRunner
         for terminal in ('completed','disconnect'):

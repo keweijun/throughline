@@ -65,6 +65,7 @@
 
 <style>
   .panel {
+    animation: enter-slide var(--settle) var(--ease-out);
     position: sticky;
     top: var(--topbar);
     display: flex;
@@ -123,6 +124,11 @@
   [role='tab'][aria-selected='true'] {
     color: var(--ink);
     border-bottom-color: var(--accent);
+  }
+
+  /* A tab that comes into view fades in rather than replacing the last one in a blink. */
+  .tab:not([hidden]) {
+    animation: enter-fade var(--quick) ease;
   }
 
   .body {

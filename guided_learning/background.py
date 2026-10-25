@@ -11,6 +11,15 @@ def fingerprint(store):
     state = {name: store.list(name) for name in STATE_NAMESPACES}
     return hashlib.sha256(json.dumps(state, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
+def handoff_model():
+    """The learner's small model, else their teacher model, else the default auxiliary model."""
+    from .server.settings import TeacherSettings
+    try:
+        settings = TeacherSettings().current()
+    except OperationError:
+        settings = {}
+    return settings.get('small_model') or settings.get('model') or 'gpt-6-luna'
+
 def capture(store, spec):
     messages = [store.get('interactions', identifier) for identifier in spec['interaction_ids']]
     if any(message is None for message in messages):
@@ -68,7 +77,7 @@ def mutate(store, request):
             raise OperationError('id_conflict', 'Use a new attempt ID after retry')
         job.update(status='running', attempt_id=attempt)
         job['attempt_ids'].append(attempt)
-        result = {'job': job, 'handoff': {'model': 'gpt-6-luna', **job['snapshot']}, 'model_call_performed': False}
+        result = {'job': job, 'handoff': {'model': handoff_model(), **job['snapshot']}, 'model_call_performed': False}
     elif op == 'background.submit':
         if job['status'] != 'running' or request.get('attempt_id') != job.get('attempt_id'):
             raise OperationError('invalid_transition', 'Result must match the current running attempt')

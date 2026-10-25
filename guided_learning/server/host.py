@@ -99,6 +99,10 @@ class Host:
     def runner(self):
         return self._runner or self.settings.runner()
 
+    def runner_for(self, turn):
+        # Preparation is background work, so it runs on the small model when one is chosen.
+        return self._runner or self.settings.runner(small=turn['channel'] == 'preparation')
+
     def operation(self, request):
         return execute(self.workspace, request)
 
@@ -195,7 +199,7 @@ class Host:
 
         def work():
             try:
-                self.runner.run(self.build_prompt(turn), self.workspace, emit, cancel)
+                self.runner_for(turn).run(self.build_prompt(turn), self.workspace, emit, cancel)
                 current = self.operation({'op': 'stream.read', 'id': identifier})['turn']
                 if current['attempt'] == attempt and current['status'] == 'running':
                     emit({'kind': 'failed', 'error': 'Model ended without a completed reply'})

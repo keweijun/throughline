@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { enterToSend } from '../lib/keys';
+  import { slide } from 'svelte/transition';
   import { highlights } from '../lib/highlight';
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
   import { lessonStatus } from '../lib/format';
   import type { Question, QuestionReply } from '../lib/types';
@@ -106,7 +109,7 @@
       aria-controls="thread-body-{question.id}"
       aria-label={open ? t("Collapse question") : t("Expand question")}
       onclick={() => (open = !open)}
-    ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
+    ><span aria-hidden="true" class="chevron" class:open></span></button>
     <!-- The whole summary opens the thread; the toggle button is the keyboard-accessible control. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="summary" onclick={() => (open = true)}>
@@ -125,16 +128,13 @@
   </div>
 
   {#if open}
-  <div class="body" id="thread-body-{question.id}">
+  <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: 200 }}>
   {#if question.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
   {#if answer?.text}
     <div class="prose answer" data-question-answer data-turn-id={answer.id} use:highlights={{ passages: passages(answer.id), text: answer.text }} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {/if}
   {#if answer && answer.status !== 'completed'}
     <div class="state">
-      <span class="chip chip-{lessonStatus[answer.status].tone}">
-        {#if answer.status === 'running'}<span class="live-dot"></span>{t("Answering")}{:else}{diagnostic(lessonStatus[answer.status].label)}{/if}
-      </span>
       <TurnControls turn={answer} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
     </div>
   {/if}
@@ -174,9 +174,9 @@
     <section class="supplement" aria-label={t("Foundation supplement")}>
       <p class="supplement-status">
         {t("Foundation:")} {decision?.supplement_goal}
-        <span class="chip chip-{lessonStatus[supplement.status].tone}">
-          {#if supplement.status === 'running'}<span class="live-dot"></span>{/if}{diagnostic(lessonStatus[supplement.status].label)}
-        </span>
+        {#if supplement.status !== 'running' && supplement.status !== 'completed'}
+          <span class="chip chip-{lessonStatus[supplement.status].tone}">{diagnostic(lessonStatus[supplement.status].label)}</span>
+        {/if}
       </p>
       {#if supplement.text}
         <div class="prose" data-question-answer data-turn-id={supplement.id} use:highlights={{ passages: passages(supplement.id), text: supplement.text }} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
@@ -193,7 +193,7 @@
       {#if turn}
         <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r) }}></div>
         {#if turn.status !== 'completed'}
-          <span class="chip">{diagnostic(lessonStatus[turn.status].label)}</span>
+          {#if turn.status !== 'running'}<span class="chip chip-{lessonStatus[turn.status].tone}">{diagnostic(lessonStatus[turn.status].label)}</span>{/if}
           <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
         {/if}
       {:else}
@@ -210,7 +210,7 @@
     {/if}
     <label class="field">
       <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
     </label>
     <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
   </form>

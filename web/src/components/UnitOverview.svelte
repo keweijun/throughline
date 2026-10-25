@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t, diagnostic } from '../lib/i18n.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { labelFor } from '../lib/markdown';
   import { verification } from '../lib/format';
@@ -59,7 +59,7 @@
             <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
               {sourceTitle(ref.source_id)}, {labelFor(ref)}
             </button>
-            <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
+            <span class="chip chip-{v.tone}">{t(v.label)}</span>
           </li>
         {/each}
       </ul>

@@ -27,11 +27,20 @@
   const recapped = $derived(app.lessons(conceptId).some((l) => l.id.startsWith('recap:')));
   const activeSupplement = $derived((app.state?.questions ?? []).some((q) => q.choice === 'accept' && !q.returned));
 
+  // Each stays busy until the refreshed state shows the move, so a second click cannot repeat it.
   async function advance() {
+    if (busy) return;
     busy = true;
-    await app.act(() => api.post('/api/sections/next', { concept_id: conceptId, request_id: newId() }));
+    const moved = await app.act(() => api.post('/api/sections/next', { concept_id: conceptId, request_id: newId() }));
     busy = false;
-    window.scrollTo({ top: 0 });
+    if (moved) window.scrollTo({ top: 0 });
+  }
+
+  async function recap(chapterId: string) {
+    if (busy) return;
+    busy = true;
+    await app.recapChapter(chapterId);
+    busy = false;
   }
 </script>
 
@@ -41,7 +50,7 @@
       <p class="label">{t("End of chapter {chapter}", { chapter: chapter.title })}</p>
       <p class="note">{t("A recap connects the chapter's sections and lists exercises you set aside. No new material, no new exercises.")}</p>
     </div>
-    <button class="btn" disabled={!!app.runningLesson} onclick={() => app.recapChapter(chapter.id)}>
+    <button class="btn" disabled={busy || !!app.runningLesson} onclick={() => recap(chapter.id)}>
       {recapped ? t("Recap again") : t("Recap this chapter")}
     </button>
   </section>
@@ -55,7 +64,10 @@
       {#if activeSupplement}
         <p class="note">{t("Finish or close the foundation supplement in Questions before moving on.")}</p>
       {:else if pending}
-        <p class="note">{t('{count} exercises stay open and will be waiting for you.', { count: pending })}</p>
+        <p class="note">
+          {pending === 1 ? t('1 exercise stays open and will be waiting for you.') : t('{count} exercises stay open and will be waiting for you.', { count: pending })}
+        </p>
+
       {/if}
       <Preparation />
     </div>

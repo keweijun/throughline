@@ -1,13 +1,15 @@
 <script lang="ts">
   import { enterToSend } from '../lib/keys';
+  import { panelCoversLesson } from '../lib/media';
   import { slide } from 'svelte/transition';
   import { highlights } from '../lib/highlight';
-  import { locale, t, diagnostic } from '../lib/i18n.svelte';
+  import { locale, t } from '../lib/i18n.svelte';
+
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
-  import { lessonStatus } from '../lib/format';
+  import { lessonStatus, questionCategory, questionTurnIds } from '../lib/format';
   import type { Question, QuestionReply } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
 
@@ -20,17 +22,12 @@
   const scheduled = $derived(app.state?.deferred_explanations.find((e) => e.id === `web:${question.id}`));
   // Returning restores reading inside the section the question was asked from; once the route moves on there is nothing to return to.
   const canReturn = $derived(question.restore_point?.concept_id === app.currentId);
-  const categories: Record<string, string> = {
-    local: 'about this passage',
-    prerequisite: 'a missing foundation',
-    future: 'covered fully later',
-    repeated: 'a repeated difficulty',
-    extension: 'an extension',
-  };
-
   let node: HTMLElement | undefined = $state();
   let flash = $state(false);
-  let replyText = $state('');
+  // The follow-up draft outlives this component, which is rebuilt whenever the thread list changes.
+  const draftKey = $derived(`followup:${question.id}`);
+  const replyText = $derived(app.drafts.get(draftKey));
+  const setReplyText = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
   const quote = $derived(app.quote?.questionId === question.id ? app.quote : null);
   const canReply = $derived(answer?.status === 'completed' && (!supplement || supplement.status === 'completed') && (question.replies ?? []).every((r) => app.turn(r.turn_id)?.status === 'completed'));
@@ -47,11 +44,16 @@
     event.preventDefault();
     if (!replyText.trim() || !canReply || busy) return;
     busy = true;
+    const text = replyText;
+    const key = draftKey;
     const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/replies`, {
-      id: newId(), question: replyText, selection: quote?.text ?? '',
+      id: newId(), question: text, selection: quote?.text ?? '',
     }));
     busy = false;
-    if (result) { replyText = ''; if (quote) app.quote = null; }
+    if (result) {
+      if (app.drafts.get(key) === text) app.drafts.set(key, '');
+      if (quote) app.quote = null;
+    }
   }
 
 
@@ -65,24 +67,30 @@
     return () => clearTimeout(timer);
   });
 
-  function choose(choice: 'accept' | 'decline') {
-    return app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/choice`, { choice }));
+  async function choose(choice: 'accept' | 'decline') {
+    if (busy) return;
+    busy = true;
+    await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/choice`, { choice }));
+    busy = false;
   }
 
   async function backToLesson() {
+    if (busy) return;
+    busy = true;
     const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/return`));
+    busy = false;
     if (!result) return;
-    if (matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+    if (panelCoversLesson()) app.panelOpen = false;
     await app.returnTo(question);
   }
 
   function previewLater() {
-    if (matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+    if (panelCoversLesson()) app.panelOpen = false;
     app.view(later!.id);
   }
 
   // The learner's own highlights and notes on this thread's answers.
-  const threadTurns = $derived(new Set([question.turn_id, question.supplement_turn_id, ...(question.replies ?? []).map((r) => r.turn_id)]));
+  const threadTurns = $derived(new Set(questionTurnIds(question)));
   const mine = $derived((app.state?.annotations ?? []).filter((a) => a.turn_id && threadTurns.has(a.turn_id)));
   const passages = (turnId: string) => mine.filter((a) => a.turn_id === turnId).map((a) => a.passage);
   const noted = $derived(mine.filter((a) => a.note));
@@ -90,9 +98,8 @@
   // A long list stays scannable: each thread shows a one-line summary until it is opened.
   const section = $derived(app.concept(question.anchor?.concept_id ?? question.restore_point?.concept_id));
   const summary = $derived.by((): { label: string; tone: string; live?: boolean } => {
-    const busy = [answer, supplement, ...(question.replies ?? []).map((r) => app.turn(r.turn_id))].find((x) => x?.status === 'running');
-    if (busy) return { label: t("Answering"), tone: 'accent', live: true };
-    if (answer && answer.status !== 'completed') return { label: diagnostic(lessonStatus[answer.status].label), tone: lessonStatus[answer.status].tone };
+    if (questionTurnIds(question).some((id) => app.isRunning(id))) return { label: t("Answering"), tone: 'accent', live: true };
+    if (answer && answer.status !== 'completed') return { label: t(lessonStatus[answer.status].label), tone: lessonStatus[answer.status].tone };
     if (question.status === 'suggested') return { label: t("Foundation suggested"), tone: 'caution' };
     if (scheduled?.status === 'pending') return { label: t("Explanation pending"), tone: 'accent' };
     if (scheduled?.status === 'resolved') return { label: t("Explained"), tone: 'good' };
@@ -131,7 +138,7 @@
   <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: 200 }}>
   {#if question.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
   {#if answer?.text}
-    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:highlights={{ passages: passages(answer.id), text: answer.text }} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r) }}></div>
+    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:highlights={{ passages: passages(answer.id), text: answer.text }} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r), streaming: answer.status === 'running' }}></div>
   {/if}
   {#if answer && answer.status !== 'completed'}
     <div class="state">
@@ -141,7 +148,7 @@
 
   {#if decision}
     <p class="decision">
-      {decision.depth === 'short' ? t("Short answer") : t("Detailed answer")}, {diagnostic(categories[decision.category] ?? decision.category)}.
+      {t(decision.depth === 'short' ? "Short answer, {category}." : "Detailed answer, {category}.", { category: questionCategory(decision.category) })}
       <span>{decision.rationale}</span>
     </p>
     {#if later}
@@ -161,11 +168,12 @@
   {/if}
 
   {#if question.status === 'suggested' && decision}
+    {@const [before, after] = t("The teacher suggests studying a foundation first: {goal}. The lesson pauses while you do.").split('{goal}')}
     <div class="suggest">
-      <p>{t("The teacher suggests studying a foundation first:")} <strong>{decision.supplement_goal}</strong>{t(". The lesson pauses while you do.")}</p>
+      <p>{before}<strong>{decision.supplement_goal}</strong>{after}</p>
       <div class="row">
-        <button class="btn btn-small btn-primary" onclick={() => choose('accept')}>{t("Study the foundations first")}</button>
-        <button class="btn btn-small" onclick={() => choose('decline')}>{t("Continue current topic")}</button>
+        <button class="btn btn-small btn-primary" disabled={busy} onclick={() => choose('accept')}>{t("Study the foundations first")}</button>
+        <button class="btn btn-small" disabled={busy} onclick={() => choose('decline')}>{t("Continue current topic")}</button>
       </div>
     </div>
   {/if}
@@ -175,11 +183,11 @@
       <p class="supplement-status">
         {t("Foundation:")} {decision?.supplement_goal}
         {#if supplement.status !== 'running' && supplement.status !== 'completed'}
-          <span class="chip chip-{lessonStatus[supplement.status].tone}">{diagnostic(lessonStatus[supplement.status].label)}</span>
+          <span class="chip chip-{lessonStatus[supplement.status].tone}">{t(lessonStatus[supplement.status].label)}</span>
         {/if}
       </p>
       {#if supplement.text}
-        <div class="prose" data-question-answer data-turn-id={supplement.id} use:highlights={{ passages: passages(supplement.id), text: supplement.text }} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose" data-question-answer data-turn-id={supplement.id} use:highlights={{ passages: passages(supplement.id), text: supplement.text }} use:markdown={{ language: locale.language, text: supplement.text, refs: supplement.source_refs, onSource: (r) => app.openSource(r), streaming: supplement.status === 'running' }}></div>
       {/if}
       <TurnControls turn={supplement} pauseLabel={t("Pause supplement")} regenerateLabel={t("Regenerate supplement")} />
     </section>
@@ -191,9 +199,9 @@
       {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
       <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
       {#if turn}
-        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r) }}></div>
+        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r), streaming: turn.status === 'running' }}></div>
         {#if turn.status !== 'completed'}
-          {#if turn.status !== 'running'}<span class="chip chip-{lessonStatus[turn.status].tone}">{diagnostic(lessonStatus[turn.status].label)}</span>{/if}
+          {#if turn.status !== 'running'}<span class="chip chip-{lessonStatus[turn.status].tone}">{t(lessonStatus[turn.status].label)}</span>{/if}
           <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
         {/if}
       {:else}
@@ -210,14 +218,15 @@
     {/if}
     <label class="field">
       <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={replyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={() => replyText, setReplyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
     </label>
     <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
   </form>
 
   {#if canReturn}
     <div class="row end">
-      <button class="btn btn-quiet btn-small" onclick={backToLesson}>
+      <button class="btn btn-quiet btn-small" disabled={busy} onclick={backToLesson}>
+
         {question.selection && question.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
       </button>
     </div>

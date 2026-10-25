@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
@@ -73,13 +73,33 @@
       seen = false;
     }
     overviewOpen = !app.hasLesson(conceptId) && !seen;
-    try {
-      preview = await api.get<Preview>(`/api/concepts/${encodeURIComponent(conceptId)}/preview`);
-    } catch (e) {
-      previewFailed = true;
-      app.error = (e as Error).message;
-    }
   });
+
+  // The preview follows the course plan and its sources, so fetch it again when Codex changes them. Only the newest
+  // reply counts, and none after this page has gone.
+  const planVersion = $derived(
+    JSON.stringify([app.state?.curriculum, app.state?.sources, app.state?.preferences.language]),
+  );
+  $effect(() => {
+    void planVersion;
+    const id = conceptId;
+    if (!id) return;
+    let current = true;
+    untrack(async () => {
+      try {
+        const reply = await api.get<Preview>(`/api/concepts/${encodeURIComponent(id)}/preview`);
+        if (!current) return;
+        preview = reply;
+        previewFailed = false;
+      } catch (e) {
+        if (!current) return;
+        previewFailed = true;
+        app.error = (e as Error).message;
+      }
+    });
+    return () => (current = false);
+  });
+
 
   function toggleOverview(event: Event) {
     overviewOpen = (event.currentTarget as HTMLDetailsElement).open;

@@ -14,7 +14,9 @@ Build chapter by chapter so no single call carries the whole route:
 2. `curriculum.chapter.save` with `chapter_id`, `concepts` in teaching order (concept objects, below), optional `title`/`summary`, and `coverage` entries for that chapter's source units. List every concept of the chapter, existing ones included: a concept you leave out drops off the route and the save is rejected. Listing a concept from another chapter moves it here. Coverage entries are upserted by source unit; entries you do not send stay. A unit that another chapter maps keeps that chapter's concepts too and stays `mapped`.
 3. Read a chapter back with `curriculum.chapter.view {chapter_id}` (its concepts and coverage) instead of the whole model when revising it.
 
-Prerequisites must be in the same or an earlier chapter that is already built. Build chapters in order and read only that chapter's sources for each. Open the course after the first chapter so the learner can start, then build the rest in the same run unless the learner asked for one chapter at a time. A request like `$throughline build the chapter "<title>" of the course <name>` means: build that outlined chapter. A chapter with no concepts shows as not built yet.
+Prerequisites must be in the same or an earlier chapter that is already built. Build chapters in order and read only that chapter's sources for each. Open the course after the first chapter so the learner can start. The app can build an outlined chapter itself, in the background, from the registered sources: when the learner starts the last built chapter, or chooses "Build this chapter". So outline every chapter first; then build the rest in the same run, or stop after the first chapter if the learner prefers to let the app build them. A chapter with no concepts shows as not built yet.
+
+A request like `$throughline build the chapter "<title>" of the course <name>` comes from the app's fallback link and means the app's own build of that chapter failed: build that outlined chapter here, checking its sources and `curriculum.coverage` for what made the build hard (unreadable pages, material that belongs to another chapter).
 
 ## Concept objects
 

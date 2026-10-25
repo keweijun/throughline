@@ -15,7 +15,7 @@ Run `guided-learning --course <course-name> --request <request.json>`. Course na
 4. Copy the learner's files into `<root>/<course-name>/inputs/`, keeping the originals. Sources are identified by absolute path, so register these stable copies, not files in Downloads or a temporary folder.
 5. Run `course.init`, then `course.profile.save`, then `preferences.save` with the teaching language when the learner writes in a supported language other than English, then `source.register` for each copy.
 6. Build the route chapter by chapter (see curriculum operations) to fit the profile: add short foundation sections for prerequisites marked none that the goal needs, start later for solid ones, and order by the goal (exam topics first when there is a deadline). Before `curriculum.outline`, show the chapter outline in a few lines, with the first chapter's sections and how it reflects their answers, and adjust if they object. Once they agree, build the chapters without asking again.
-7. Open the course in the app with `guided-learning open <course-name>` as soon as the first chapter is built, then build the rest.
+7. Open the course in the app with `guided-learning open <course-name>` as soon as the first chapter is built, then build the rest, unless the learner prefers to let the app build the outlined chapters as they study (see curriculum operations).
 
 ## Requests
 

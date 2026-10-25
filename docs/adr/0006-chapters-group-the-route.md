@@ -25,4 +25,4 @@ Codex builds a course chapter by chapter: `curriculum.outline` saves the ordered
 ## Consequences
 
 - Moving concepts between chapters or reordering chapters needs the learner's agreement when it changes the relative order of existing concepts or chapters (`confirm_reorder`).
-- Building a later chapter happens in Codex (ADR 0004); the app links to it with a `$throughline` request.
+- Building a later chapter happens in the app in the background, or in Codex (ADR 0004).

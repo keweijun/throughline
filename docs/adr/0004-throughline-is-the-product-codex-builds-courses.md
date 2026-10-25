@@ -5,7 +5,7 @@ The project began as a Codex skill with a local web view attached. It is now a s
 Codex has two roles, split so the learner moves between the two tools in one step:
 
 - **Teacher, inside the app.** Every lesson, side question, exercise and preparation runs through `codex app-server` in the background (ADR 0002). Studying never requires opening Codex.
-- **Course builder, in Codex itself.** Creating a course, adding files, rebuilding a route and reviewing pages happen in a Codex chat. Codex already handles attaching files and images, reading them and asking follow-up questions; rebuilding that intake in the app would duplicate it and be worse. The app could run building turns over the same app-server connection, but deliberately does not.
+- **Course builder, in Codex itself.** Creating a course, adding files, rebuilding a route and reviewing pages happen in a Codex chat. Codex already handles attaching files and images, reading them and asking follow-up questions; rebuilding that intake in the app would duplicate it and be worse. The app runs a building turn over the same app-server connection only for a chapter that is already outlined (below).
 
 ## How the two connect
 
@@ -15,6 +15,12 @@ Codex has two roles, split so the learner moves between the two tools in one ste
 - **Codex to app.** The skill ends course work by opening that course with `guided-learning open <course>`. An open Throughline tab notices changes to the course files and updates by itself.
 - **Starting the app.** `guided-learning setup` adds a launcher (Start menu or desktop, `~/Applications`, or a `.desktop` entry) that starts the host if needed and opens the browser. Nothing starts at login.
 - **One host** serves the library and owns one open course at a time; switching closes the previous `Host` and releases its lease.
+
+## The app builds later chapters
+
+Creating a course and adding files still happen in Codex, because they need file intake. Building a chapter that is already outlined needs none: its sources are registered and its place in the route is fixed. When the learner starts the last built chapter, or chooses "Build this chapter" on a chapter page, the host builds the next outlined chapter in the background, after the learner's own requests, like preparation.
+
+The build is a read-only Codex turn on the teacher model, like every other turn (ADR 0002). Its prompt carries the outline, the learner profile, the built route's titles and IDs, and the text of source units no built chapter maps yet; it returns the chapter's concepts and coverage as JSON. The host saves them with `curriculum.chapter.save`, so the usual validation (prerequisites, cycles, stable IDs, coverage) applies, and retries once with the validation error if the save is rejected. Codex never gets write access to the course. If the build still fails, the chapter page shows the error and the `$throughline` link to build it in Codex, as before.
 
 ## Teaching in Codex's chat is deprecated
 
@@ -26,7 +32,7 @@ Throughline is a Python package that bundles the skill (`guided_learning/skill/`
 
 ## Considered and not chosen
 
-- **Building courses in the app.** Not because orchestrating Codex is hard (the app-server connection exists), but because it means building file and image intake, progress and resume that Codex already does well.
+- **Building courses in the app.** Not because orchestrating Codex is hard (the app-server connection exists), but because it means building file and image intake, progress and resume that Codex already does well. Building an already-outlined chapter needs none of that, so the app does it (above).
 - **A standalone desktop app.** Every learner already needs Codex, so an installer, auto-update and signing add cost without removing a dependency.
 - **A Codex plugin as the package format.** A plugin can bundle the skill but not the Python app. It can wrap the package later.
 - **Skill only.** The course store, operation CLI and host are code that must be installed and versioned.

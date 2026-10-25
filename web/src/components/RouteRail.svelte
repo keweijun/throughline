@@ -112,6 +112,8 @@
               <span class="meta">
                 {#if chapter.concept_ids.length}
                   <span>{t("{studied}/{total} sections studied", { studied: studied(chapter.concept_ids), total: chapter.concept_ids.length })}</span>
+                {:else if ['queued', 'building'].includes(app.buildOf(chapter.id)?.status ?? '')}
+                  <span class="building"><span class="live-dot" aria-hidden="true"></span>{t("Building…")}</span>
                 {:else}
                   <span>{t("Not built yet")}</span>
                 {/if}
@@ -281,6 +283,13 @@
 
   .meta .skipped {
     color: var(--caution);
+  }
+
+  .meta .building {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--accent);
   }
 
   .chapters > li {

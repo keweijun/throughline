@@ -2,7 +2,7 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
-import type { Annotation, AnnotationSource, Chapter, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, Chapter, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -131,6 +131,15 @@ class AppStore {
 
   chapterOf(conceptId: string | null | undefined): Chapter | undefined {
     return this.chapters.find((c) => conceptId && c.concept_ids.includes(conceptId));
+  }
+
+  buildOf(chapterId: string | null | undefined): ChapterBuild | undefined {
+    return (this.state?.builds ?? []).find((b) => b.chapter_id === chapterId);
+  }
+
+  /** The chapter the app is building or about to build; only one builds at a time. */
+  get activeBuild(): ChapterBuild | undefined {
+    return (this.state?.builds ?? []).find((b) => b.status === 'queued' || b.status === 'building');
   }
 
   isSkipped(conceptId: string | null | undefined) {
@@ -508,6 +517,10 @@ class AppStore {
 
   recapChapter(chapterId: string) {
     return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+  }
+
+  buildChapter(chapterId: string) {
+    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/build`));
   }
 
   skipChapter(chapterId: string) {

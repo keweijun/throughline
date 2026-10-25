@@ -538,7 +538,8 @@ class Preparation(Feature):
         return self.operation(request)
 
     def before_start(self, request):
-        if request.get('channel', 'mainline') == 'preparation':
+        # A chapter build runs alongside preparation; only the learner's own requests go first.
+        if request.get('channel', 'mainline') in ('preparation', 'build'):
             return
         for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':
@@ -564,7 +565,7 @@ class Preparation(Feature):
                     self.host.pause_turn(turn['id'])
             turns = self.host.brief_turns()
             # A paused process can still be shutting down; never start a second preparation process.
-            if any(t['status'] == 'running' for t in turns) or any(t['channel'] == 'preparation' and self.host.worker_alive(t) for t in turns):
+            if any(t['status'] == 'running' and t['channel'] != 'build' for t in turns) or any(t['channel'] == 'preparation' and self.host.worker_alive(t) for t in turns):
                 return {'scheduled': False, 'reason': 'foreground_or_worker_active'}
             values = self.state()
             concept_id = values['next_concept_id']

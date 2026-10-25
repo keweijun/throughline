@@ -74,6 +74,7 @@ turn_summary = summarize
 class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
         from .features import Navigation, Practice, Preparation, Questions
+        from .builds import ChapterBuilds
         from .review import Review
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
@@ -89,18 +90,20 @@ class Host:
         self.questions = Questions(self)
         self.practice = Practice(self)
         self.preparation = Preparation(self)
+        self.builds = ChapterBuilds(self)
         self.review = Review(self)
         # Order matters: prompt additions are appended in this order.
-        self.features = (self.navigation, self.questions, self.practice, self.preparation)
+        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds)
         self.questions.recover()
         self.preparation.start()
+        self.builds.start()
 
     @property
     def runner(self):
         return self._runner or self.settings.runner()
 
     def runner_for(self, turn):
-        # Preparation is background work, so it runs on the small model when one is chosen.
+        # Preparation is background work, so it runs on the small model when one is chosen; a chapter build needs the teacher.
         return self._runner or self.settings.runner(small=turn['channel'] == 'preparation')
 
     def operation(self, request):
@@ -108,12 +111,13 @@ class Host:
 
     def changed(self, scope='state'):
         self.events.publish({'type': 'changed', 'scope': scope})
-        self._wake_preparation()
+        self._wake_background()
 
-    def _wake_preparation(self):
-        preparation = getattr(self, 'preparation', None)
-        if preparation:
-            preparation.wake()
+    def _wake_background(self):
+        for name in ('preparation', 'builds'):
+            feature = getattr(self, name, None)
+            if feature:
+                feature.wake()
 
     def turns(self):
         """Every turn in full, with frozen prompt snapshots; prefer `brief_turns` when only status matters."""
@@ -144,6 +148,8 @@ class Host:
     def build_prompt(self, turn):
         if turn.get('prompt_snapshot') is None:
             raise OperationError('missing_snapshot', 'This older turn has no source snapshot; start a new lesson')
+        if turn['channel'] == 'build':
+            return self.builds.build_prompt(turn)  # not a teaching turn: none of the teaching additions apply
         prompt = prompts.base(turn)
         context = turn['prompt_snapshot']['context']
         for feature in self.features:
@@ -235,7 +241,7 @@ class Host:
             finally:
                 if self.workers.get(key, (None,))[0] is threading.current_thread():
                     self.workers.pop(key, None)
-                self._wake_preparation()
+                self._wake_background()
 
         thread = threading.Thread(target=work, daemon=True, name=f'turn-{identifier}')
         self.workers[key] = (thread, cancel)
@@ -248,7 +254,7 @@ class Host:
             if worker:
                 worker[1].set()
             self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
-            self._wake_preparation()
+            self._wake_background()
             return result
 
     def resume_turn(self, identifier, request_id):
@@ -285,6 +291,7 @@ class Host:
                 return
             self.closing = True
             self.preparation.stop()
+            self.builds.stop()
             workers = list(self.workers.items())
             for (identifier, _), (_, cancel) in workers:
                 self.pause_turn(identifier)
@@ -294,4 +301,5 @@ class Host:
         for _, (thread, _) in workers:
             thread.join(max(0, deadline - time.monotonic()))
         self.preparation.join(2)
+        self.builds.join(2)
         self._lease.close()

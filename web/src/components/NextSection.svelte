@@ -4,7 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
   import Preparation from './Preparation.svelte';
-  import CodexLink from './CodexLink.svelte';
+  import ChapterBuild from './ChapterBuild.svelte';
 
   let { conceptId }: { conceptId: string } = $props();
 
@@ -18,7 +18,7 @@
   const chapter = $derived(app.chapterOf(conceptId));
   const endsChapter = $derived(!!chapter && chapter.concept_ids.at(-1) === conceptId);
   const nextChapter = $derived(next ? app.chapterOf(next.id) : undefined);
-  // The chapter after this one when it has no sections yet: Codex builds it on request.
+  // The chapter after this one when it has no sections yet: the app (or Codex) builds it on request.
   const unbuilt = $derived.by(() => {
     const chapters = app.chapters;
     const later = chapters.slice(chapters.findIndex((c) => c.id === chapter?.id) + 1);
@@ -77,11 +77,7 @@
   <section class="next done" aria-label={t("Next chapter")}>
     <div>
       <p class="title">{t("The next chapter, {chapter}, is not built yet.", { chapter: unbuilt.title })}</p>
-      {#if app.libraryCourse}
-        <CodexLink prompt={t('$throughline build the chapter "{chapter}" of the course {course}', { chapter: unbuilt.title, course: app.libraryCourse.name })}>
-          {t("Build this chapter in Codex")}
-        </CodexLink>
-      {/if}
+      <ChapterBuild chapter={unbuilt} compact />
     </div>
   </section>
 {:else if !next && app.hasLesson(conceptId)}

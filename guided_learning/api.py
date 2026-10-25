@@ -3,7 +3,7 @@ from . import migrations
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
-MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations')
+MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds')
 
 def execute(workspace, request):
     if not isinstance(request, dict) or not isinstance(request.get('op'), str):

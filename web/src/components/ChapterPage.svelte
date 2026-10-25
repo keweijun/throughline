@@ -3,6 +3,7 @@
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
   import CodexLink from './CodexLink.svelte';
+  import ChapterBuild from './ChapterBuild.svelte';
 
   let { chapterId }: { chapterId: string } = $props();
 
@@ -84,12 +85,7 @@
     {#if !ids.length}
       <section class="unbuilt">
         <h2>{t("This chapter is not built yet")}</h2>
-        <p>{t("Codex builds one chapter at a time from your files. Earlier chapters can be studied meanwhile; this page updates by itself when the chapter is ready.")}</p>
-        {#if course}
-          <CodexLink class="btn btn-primary" prompt={t('$throughline build the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })}>
-            {t("Build this chapter in Codex")}
-          </CodexLink>
-        {/if}
+        <ChapterBuild {chapter} />
       </section>
     {:else}
       <section aria-labelledby="sections-title">
@@ -237,8 +233,7 @@
     color: var(--accent);
   }
 
-  .coverage p,
-  .unbuilt p {
+  .coverage p {
     font-size: var(--step-0);
   }
 

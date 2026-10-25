@@ -35,7 +35,7 @@ export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'f
 export type Turn = {
   id: string;
   concept_id: string;
-  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation';
+  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build';
   prompt: string;
   status: TurnStatus;
   attempt: number;
@@ -119,6 +119,16 @@ export type PreparationJob = {
   reason?: string;
 };
 
+/** The app building an outlined chapter in the background; `interrupted` means the host stopped mid-build. */
+export type ChapterBuild = {
+  chapter_id: string;
+  status: 'queued' | 'building' | 'failed' | 'interrupted' | 'done';
+  trigger: 'learner' | 'auto';
+  attempt: number;
+  error?: string;
+  discarded?: boolean;
+};
+
 export type Settings = {
   model: string;
   small_model: string;
@@ -171,6 +181,7 @@ export type State = {
   settings: Settings;
   annotations: Annotation[];
   skipped: Skipped[];
+  builds: ChapterBuild[];
 };
 
 export type AnnotationSource = Ref & { label?: string; page?: number };

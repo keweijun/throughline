@@ -138,7 +138,7 @@ class Courses:
                 host = self.host
                 if host and current.get(host.workspace) != seen.get(host.workspace):
                     self.events.publish({'type': 'changed', 'scope': 'state'})
-                    host.preparation.wake()
+                    host._wake_background()
             seen = current
 
     def open(self, path):
@@ -267,7 +267,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
-                'skipped': current.practice.skipped()}
+                'skipped': current.practice.skipped(),
+                'builds': current.builds.state()}
 
     @app.get('/api/events')
     async def events(request: Request):
@@ -372,6 +373,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/chapters/{chapter_id}/skip')
     def skip_chapter(chapter_id: str, body: SkipChapterRequest):
         return host.practice.skip_chapter(chapter_id, body.request_id)
+
+    @app.post('/api/chapters/{chapter_id}/build')
+    def build_chapter(chapter_id: str):
+        return host.builds.request(chapter_id)
 
     @app.post('/api/chapters/{chapter_id}/recap')
     def recap(chapter_id: str, body: RecapRequest):

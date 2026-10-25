@@ -24,7 +24,7 @@ def start(store, request):
     if not isinstance(request.get('record_user', True), bool):
         raise OperationError('invalid_request','record_user must be boolean')
     identity = {'record_user':request.get('record_user',True), 'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
-    if identity['channel'] not in ('mainline','sidequestion','practice','preparation'):
+    if identity['channel'] not in ('mainline','sidequestion','practice','preparation','build'):
         raise OperationError('invalid_channel','Unknown teaching channel')
     old = store.get('streams', identifier)
     # Omitted language on a retry means the original request, not today's preference.
@@ -96,7 +96,8 @@ def event(store, request):
         if not turn['final_text']:
             raise OperationError('missing_final','No authoritative final answer')
         begin = time.perf_counter()
-        if turn['channel'] != 'preparation':
+        # Background work is not a teaching interaction.
+        if turn['channel'] not in ('preparation', 'build'):
             record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'

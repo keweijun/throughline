@@ -5,7 +5,7 @@
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
-  import type { Annotation } from '../lib/types';
+  import type { Annotation, Chapter } from '../lib/types';
 
   let scope = $state<'section' | 'chapter' | 'all'>('section');
   let draft = $state('');
@@ -15,13 +15,25 @@
 
   const viewing = $derived(app.viewingId);
   const chapter = $derived(app.chapterOf(viewing));
+  // Notes on a chapter recap or quiz question are grouped with their chapter, after its sections, not in the anchor section.
   const groups = $derived.by(() => {
     const all = app.state?.annotations ?? [];
+    const owner = new Map(all.map((a) => [a.id, app.ownerChapter(a)]));
     const route = app.state?.curriculum.route ?? [];
     const ids = scope === 'section' ? [viewing] : scope === 'chapter' ? (chapter?.concept_ids ?? []) : route;
-    return ids
-      .map((id) => ({ concept: app.concept(id), chapter: app.chapterOf(id), items: all.filter((a) => a.concept_id === id) }))
-      .filter((g) => g.concept && (g.items.length || scope === 'section'));
+    const result: { key: string; title: string; chapter?: Chapter; items: Annotation[] }[] = [];
+    for (const id of ids) {
+      const concept = app.concept(id);
+      const home = app.chapterOf(id);
+      if (!concept) continue;
+      const items = all.filter((a) => a.concept_id === id && !owner.get(a.id));
+      if (items.length || scope === 'section') result.push({ key: concept.id, title: concept.title, chapter: home, items });
+      if (scope !== 'section' && home && home.concept_ids.at(-1) === id) {
+        const chapterItems = all.filter((a) => owner.get(a.id) === home.id);
+        if (chapterItems.length) result.push({ key: `chapter:${home.id}`, title: t("Chapter recap and quiz"), chapter: home, items: chapterItems });
+      }
+    }
+    return result;
   });
   const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
 
@@ -37,14 +49,14 @@
     let heading: string | undefined;
     for (const group of groups) {
       if (group.chapter && group.chapter.title !== heading) lines.push('', `## ${(heading = group.chapter.title)}`);
-      lines.push('', `${group.chapter ? '###' : '##'} ${group.concept!.title}`);
+      lines.push('', `${group.chapter ? '###' : '##'} ${group.title}`);
       for (const item of group.items) {
         lines.push('', `- ${label(item)}${item.source?.label ? ` (${item.source.label})` : ''}`);
         if (item.passage) lines.push(...item.passage.split('\n').map((line) => `  > ${line}`));
         if (item.note) lines.push(...item.note.split('\n').map((line) => `  ${line}`));
       }
     }
-    const name = scope === 'chapter' ? chapter?.title : scope === 'section' ? groups[0]?.concept?.title : app.state?.course.title;
+    const name = scope === 'chapter' ? chapter?.title : scope === 'section' ? groups[0]?.title : app.state?.course.title;
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' }));
     link.download = `${(name ?? 'notes').replace(/[\\/:*?"<>|]+/g, '-')}.md`;
@@ -85,7 +97,7 @@
     const id = app.focusAnnotation;
     if (!id || !app.panelOpen || app.panelTab !== 'notes') return;
     const item = app.state?.annotations.find((a) => a.id === id);
-    if (item && item.concept_id !== viewing) scope = 'all';
+    if (item && (item.concept_id !== viewing || app.ownerChapter(item))) scope = 'all';
     app.focusAnnotation = null;
     flash = id;
     requestAnimationFrame(() => document.getElementById(`annotation-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
@@ -122,12 +134,12 @@
     <button class="btn btn-quiet btn-small export" onclick={exportNotes}>{t("Export these notes as Markdown")}</button>
   {/if}
 
-  {#each groups as group, i (group.concept!.id)}
+  {#each groups as group, i (group.key)}
     {#if scope === 'all' && group.chapter && group.chapter.id !== groups[i - 1]?.chapter?.id}
       <h3 class="chapter">{group.chapter.title}</h3>
     {/if}
     <section class="group">
-      <h3>{group.concept!.title}</h3>
+      <h3>{group.title}</h3>
       {#if !group.items.length}
         <p class="empty">{t("Nothing saved for this section yet.")}</p>
       {/if}

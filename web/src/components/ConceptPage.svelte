@@ -42,7 +42,7 @@
     if (lessons.some((l) => l.status === 'running')) return t("Follow the lesson as it is written. Select any passage to ask about it.");
     if (!lessons.some((l) => l.status === 'completed'))
       return lessons.length ? t("Regenerate the unfinished lesson, or start a new one.") : t("Start the lesson for this section.");
-    const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.processed);
+    const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
     if (generating) return t("Exercises are being prepared from this lesson.");
     const open = app.tasks(conceptId).filter((task) => !solved(task)).length;
     const last = index === total - 1;

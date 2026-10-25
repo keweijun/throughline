@@ -14,9 +14,16 @@ A section becomes reviewable once one of its exercises is assessed `passed` (ind
 - Each practice task is its own assessment session (`practice:<task id>`), so a review is always another session. Its assessment is recorded through `evidence.assess` with `retest_of` set to the section's latest independent pass when there is one, so an unaided review pass becomes `retest_passed`.
 - **Not now** (`review.postpone`) postpones a due section by one day. Reviews never gate the route: the learner can always move on, and sections skipped with their chapter (ADR 0006) are not scheduled until studied.
 
-## Chapter recap
+## Chapter quiz
 
-The chapter recap (ADR 0006) now ends with two or three short retrieval questions that span the chapter's sections. When the recap lesson completes, a separate practice job (`purpose: "recap"`) creates them as practice tasks in the chapter's last section with `origin: "recap"` and `tests_concept_ids`, the sections each one tests; they show there under "Chapter recap questions". Answering one counts as a review of those sections. Recapping again while earlier recap questions are still unsolved asks for no more. The recap lesson itself still teaches nothing new and sets no exercises.
+The chapter page offers an optional chapter quiz, separate from the chapter recap (ADR 0006), which teaches and asks nothing. "Take the chapter quiz" is available once any section of the chapter has a completed lesson, wherever the learner is; it never moves the position and needs no recap first.
+
+- **Composition.** Up to three earlier exercises from the chapter's sections, asked again, plus two or three new questions spanning the chapter. Earlier ones come from studied sections that are not skipped, never from review or quiz questions, and in this order: ones last assessed as solved with help or needing another try, then ones set aside ("Do later"), then ones solved independently. Exercises never answered nor set aside are still open and are not asked. The first pass takes at most one per section, so the quiz spreads across sections; remaining room goes to the next best. Among equals, an exercise asked in fewer earlier quizzes comes first.
+- **Storage.** A practice job with `purpose: "chapter_quiz"` and `chapter_id` freezes the chosen exercises when it is created and asks the teacher for the new questions, passing the earlier ones so it does not duplicate them. On completion every question becomes a practice task with `origin: "chapter_quiz"`, `chapter_id`, `quiz_id` and `tests_concept_ids` (the earlier exercise's section, or the sections a new question spans). An earlier exercise is a new task with its question and sources copied and `from_task_id`; the original keeps its history. The anchor `concept_id` is the chapter's last section, as for the recap; quiz questions never count among that section's exercises.
+- **Assessment.** A quiz question's help and assessment are recorded for the first section it tests, and when it tests one section with an earlier independent pass from another session, through `retest_of`, so an unaided pass is `retest_passed`. The review schedule treats each answer as a review of every section the question tests. A quiz question is not set aside; it can simply stay unanswered.
+- **Retaking.** A new quiz waits until every question of the chapter's quizzes so far is answered (passed or needs work); then "Take the quiz again" makes a fresh quiz, and earlier quizzes stay listed with their results. The page shows the current quiz's progress.
+
+Migration 5 (ADR 0007) moves earlier recap questions (`origin: "recap"`, created after a recap in the chapter's last section) to the chapter as `chapter_quiz` tasks, keeping their `tests_concept_ids`.
 
 ## Not chosen
 

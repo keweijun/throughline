@@ -53,14 +53,15 @@ def recap_request(title, chinese):
     return f'回顾本章：{title}' if chinese else f'Recap the chapter: {title}'
 
 
-def chapter_recap(chapter, sections, deferred, language):
+def chapter_recap(chapter, sections, deferred, not_studied, language):
     heading = '## 本章回顾' if language == 'zh-CN' else '## Chapter recap'
     return (f'The learner asked for a recap of the chapter "{chapter["title"]}". Begin with "{heading}". Do not teach new material and do not set exercises in the lesson: '
-            'two or three retrieval questions spanning the chapter are set separately after it, so do not announce or answer any. '
+            'the app offers an optional chapter quiz separately, so do not announce, set or answer any questions. '
             'Retrace the chain of reasoning through the chapter\'s sections in order, state the key results with the conditions under which they hold, '
             'show how the sections depend on each other, and point out the confusions most worth checking. Base it on the route and sources; '
-            'the learner may not have studied every section closely. If deferred exercises are listed, mention briefly that they wait in their sections. '
-            'Chapter data: ' + json.dumps({'sections': sections, 'deferred_exercises': deferred}, ensure_ascii=False))
+            'the learner may not have studied every section closely. Sections listed as not studied yet have no lesson so far: recap what was studied '
+            'and only name what those sections will add. If deferred exercises are listed, mention briefly that they wait in their sections. '
+            'Chapter data: ' + json.dumps({'sections': sections, 'not_studied_yet': not_studied, 'deferred_exercises': deferred}, ensure_ascii=False))
 
 
 def due_explanations(items):
@@ -127,12 +128,14 @@ def review_question(section, seen):
             + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
 
 
-def recap_questions(chapter, sections, seen):
-    """Retrieval questions that close a chapter recap; each names the sections it tests (ADR 0008)."""
-    return ('Practice only (chapter recap): return JSON {"questions":[{"question":"Question only, without answers or hints","tests_concept_ids":["section id"]}]} '
-            f'with two or three questions that together span the chapter "{chapter["title"]}". Prefer questions that connect two or more sections; '
+def chapter_quiz(chapter, sections, seen, earlier):
+    """The new questions of a chapter quiz; each names the sections it tests. The quiz also asks earlier exercises again (ADR 0008)."""
+    return ('Practice only (chapter quiz): return JSON {"questions":[{"question":"Question only, without answers or hints","tests_concept_ids":["section id"]}]} '
+            f'with two or three new questions that together span the chapter "{chapter["title"]}". Prefer questions that connect two or more sections; '
             'tests_concept_ids lists the ids of the sections each question tests, taken from the sections below. ' + RETRIEVAL
+            + ' The quiz also asks the learner these earlier exercises again, so make the new questions test something different from them.'
             + ' Sections (data): ' + json.dumps(sections, ensure_ascii=False)
+            + '\nEarlier exercises already in this quiz (data): ' + json.dumps(earlier, ensure_ascii=False)
             + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
 
 

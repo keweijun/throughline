@@ -86,6 +86,50 @@ class Migrations(unittest.TestCase):
         finally:
             store.db.close()
 
+    def test_recaps_and_their_questions_move_to_the_chapter_from_a_version_4_course(self):
+        import json
+        from guided_learning.store import Store
+        execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
+        execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
+        self.put('course', 'schema', {'version': 4})
+        recap = {'id': 'recap:1', 'concept_id': 'b', 'channel': 'mainline', 'status': 'completed', 'started_at': 1,
+                 'prompt_snapshot': {'context': {'concept': {'id': 'b'}, 'chapter': {'id': 'one', 'title': 'States', 'concept_ids': ['a', 'b']}}}}
+        moved = {'id': 'recap:2', 'concept_id': 'gone', 'channel': 'mainline', 'status': 'completed', 'started_at': 2}
+        lesson = {'id': 'lesson-1', 'concept_id': 'b', 'channel': 'mainline', 'status': 'completed', 'started_at': 0}
+        job = {'id': 'practice-1', 'concept_id': 'b', 'action': 'generate', 'purpose': 'recap', 'processed': True}
+        tasks = [{'id': f'practice-1:{i}', 'concept_id': 'b', 'question': f'Q{i}', 'origin': 'recap', 'source_refs': [],
+                  'status': 'pending', 'history': [], 'tests_concept_ids': tests} for i, tests in enumerate((['a', 'b'], ['b']))]
+        orphan = {'id': 'practice-2:0', 'concept_id': 'gone', 'question': 'Q', 'origin': 'recap', 'source_refs': [], 'status': 'pending',
+                  'history': [], 'tests_concept_ids': ['gone']}
+        exercise = {'id': 'practice-3:0', 'concept_id': 'b', 'question': 'E', 'origin': 'self_created', 'source_refs': [], 'status': 'pending', 'history': []}
+        for turn in (recap, moved, lesson):
+            self.put('streams', turn['id'], turn)
+        self.put('practice_jobs', job['id'], job)
+        for task in (*tasks, orphan, exercise):
+            self.put('practice_tasks', task['id'], task)
+
+        execute(self.workspace, {'op': 'course.status'})
+
+        self.assertEqual(self.stored_version(), migrations.VERSION)
+        stored = lambda ns: {json.loads(v)['id']: json.loads(v) for (v,) in self.raw('SELECT value FROM documents WHERE namespace=?', ns)}
+        turns, jobs, migrated = stored('streams'), stored('practice_jobs'), stored('practice_tasks')
+        self.assertEqual(turns['recap:1'], {**recap, 'chapter_id': 'one'}, 'owned by the chapter, still anchored to its last section')
+        self.assertEqual(turns['recap:2'], moved, 'a recap whose section left every chapter stays anchored to it')
+        self.assertEqual(turns['lesson-1'], lesson)
+        self.assertEqual(jobs['practice-1'], {**job, 'purpose': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1', 'earlier': []})
+        for task in tasks:
+            self.assertEqual(migrated[task['id']], {**task, 'origin': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1'})
+        self.assertEqual(migrated[orphan['id']], {**orphan, 'origin': 'chapter_quiz'})
+        self.assertEqual(migrated[exercise['id']], exercise)
+        store = Store(self.workspace)
+        try:
+            migrations.chapter_owned_recaps(store)  # idempotent on an already migrated course
+            self.assertEqual({t['id']: t for t in store.list('practice_tasks')}, migrated)
+            self.assertEqual({t['id']: t for t in store.list('streams')}, turns)
+            self.assertEqual({j['id']: j for j in store.list('practice_jobs')}, jobs)
+        finally:
+            store.db.close()
+
     def test_a_course_from_a_newer_throughline_is_refused_and_listed_with_the_reason(self):
         self.put('course', 'schema', {'version': migrations.VERSION + 1})
         with self.assertRaises(OperationError) as raised:

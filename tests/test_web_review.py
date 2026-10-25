@@ -1,4 +1,4 @@
-"""Spaced review through the HTTP host (ADR 0008): review questions, retests and chapter recap questions."""
+"""Spaced review through the HTTP host (ADR 0008): review questions, retests and the chapter quiz."""
 import json
 import tempfile
 import time
@@ -22,7 +22,7 @@ class Runner:
         self.prompts.append(prompt)
         if 'Practice only (spaced review)' in prompt:
             text = json.dumps({'questions': [{'question': 'A new situation: why does the norm stay 1?'}]})
-        elif 'Practice only (chapter recap)' in prompt:
+        elif 'Practice only (chapter quiz)' in prompt:
             text = json.dumps({'questions': [{'question': 'Connect states and superposition.', 'tests_concept_ids': ['a', 'b']},
                                              {'question': 'Superposition in a new basis.', 'tests_concept_ids': ['b']}]})
         elif 'Question and help history' in prompt:
@@ -130,32 +130,58 @@ class ReviewFlow(unittest.TestCase):
         self.host.review.clock = lambda: now + 4 * DAY + 60
         self.assertEqual(len(self.state()['review']['due']), 1)
 
-    def test_a_chapter_recap_ends_with_retrieval_questions_that_count_as_reviews(self):
-        self.study('a')
+    def test_a_chapter_quiz_mixes_earlier_exercises_with_new_questions_and_counts_as_reviews(self):
+        first = self.study('a')
         self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-1'})
         self.post('/api/lessons', {})
         self.settle()
-        self.post('/api/chapters/one/recap', {})
+        second = next(t for t in self.state()['practice']['tasks'] if t['concept_id'] == 'b')
+        self.post(f'/api/practice/tasks/{second["id"]}/hint')
         self.settle()
-        recap_prompt = next(p for p in self.runner.prompts if '## Chapter recap' in p)
-        self.assertIn('Do not teach new material', recap_prompt)
-        questions_prompt = next(p for p in self.runner.prompts if 'Practice only (chapter recap)' in p)
-        self.assertIn('"id": "a"', questions_prompt)
-        self.assertIn('Normalize the state (1, 1).', questions_prompt, 'exercises already seen are passed to avoid')
+        self.answer(second['id'])
+        self.post('/api/sections/next', {'concept_id': 'b', 'request_id': 'next-2'})
+        originals = {t['id']: t for t in self.state()['practice']['tasks']}
 
-        recap = [t for t in self.state()['practice']['tasks'] if t['origin'] == 'recap']
-        self.assertEqual([(t['concept_id'], t['tests_concept_ids']) for t in recap], [('b', ['a', 'b']), ('b', ['b'])])
-        self.post('/api/chapters/one/recap', {})
+        self.post('/api/chapters/two/quiz', {}, status=409)  # nothing studied in chapter two yet
+        self.post('/api/chapters/one/quiz')
         self.settle()
-        self.assertEqual(len([t for t in self.state()['practice']['tasks'] if t['origin'] == 'recap']), 2,
-                         'recapping again while those questions are open asks for no more')
+        state = self.state()
+        self.assertEqual(state['position']['concept_id'], 'c', 'taking a quiz never moves the learner')
+        prompt = next(p for p in self.runner.prompts if 'Practice only (chapter quiz)' in p)
+        self.assertIn('"id": "a"', prompt)
+        self.assertIn('Earlier exercises already in this quiz (data): [{"section": "What a state represents"', prompt)
 
-        self.answer(recap[0]['id'])
+        quiz = [t for t in state['practice']['tasks'] if t['origin'] == 'chapter_quiz']
+        self.assertEqual([(t.get('from_task_id'), t['tests_concept_ids']) for t in quiz],
+                         [(first['id'], ['a']), (second['id'], ['b']), (None, ['a', 'b']), (None, ['b'])],
+                         'earlier exercises first, in route order, then the new questions')
+        self.assertEqual({(t['chapter_id'], t['concept_id'], t['quiz_id']) for t in quiz}, {('one', 'b', quiz[0]['quiz_id'])})
+        self.assertEqual(quiz[0]['question'], first['question'])
+        self.assertEqual({t['id']: t for t in state['practice']['tasks'] if t['id'] in originals}, originals, 'the originals are untouched')
+        self.assertEqual(self.post('/api/practice/generate', {'concept_id': 'b'})['tasks'], [originals[second['id']]],
+                         "quiz questions anchored to b are not b's exercises")
+        self.post('/api/chapters/one/quiz', {}, status=409)  # the current quiz is still open
+        self.post(f'/api/practice/tasks/{quiz[0]["id"]}/defer', {}, status=409)
+
+        self.answer(quiz[0]['id'])
+        latest = execute(self.root, {'op': 'evidence.view', 'concept_id': 'a'})['latest_assessment']
+        self.assertEqual(latest['kind'], 'retest_passed', 'an unaided pass of an earlier exercise is a retest of its section')
+        first_job = next(j['id'] for j in self.host.practice.state()['jobs'] if j.get('task_id') == first['id'])
+        self.assertEqual(latest['retest_of'], 'practice-evidence:' + first_job)
         review = self.state()['review']
         sections = {s['concept_id']: s for s in review['sections']}
-        self.assertEqual(sections['a']['interval_days'], 3, 'the recap question reviewed a')
-        self.assertEqual(sections['b']['interval_days'], 1, 'b had no pass before, so the recap pass makes it reviewable')
+        self.assertEqual(sections['a']['interval_days'], 3, 'the quiz answer reviewed a')
         self.assertEqual(review['done_today'], 1)
+
+        self.answer(quiz[2]['id'])
+        sections = {s['concept_id']: s for s in self.state()['review']['sections']}
+        self.assertEqual(sections['b']['interval_days'], 3, 'a new question reviews every section it tests')
+        for task in quiz[1::2]:
+            self.answer(task['id'], 'needs_work')
+        self.post('/api/chapters/one/quiz')
+        self.settle()
+        self.assertEqual(len({t['quiz_id'] for t in self.state()['practice']['tasks'] if t['origin'] == 'chapter_quiz'}), 2,
+                         'once every question is answered the quiz can be taken again')
 
 
 if __name__ == '__main__':

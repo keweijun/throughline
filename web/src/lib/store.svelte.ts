@@ -150,8 +150,26 @@ class AppStore {
     return id ? (this.state?.curriculum.route.indexOf(id) ?? -1) : -1;
   }
 
+  /** A section's own lessons; a chapter recap anchored to it belongs to the chapter page instead. */
   lessons(conceptId: string | null): Turn[] {
-    return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && t.concept_id === conceptId);
+    return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && t.concept_id === conceptId && !t.chapter_id);
+  }
+
+  recaps(chapterId: string | null | undefined): Turn[] {
+    return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && !!chapterId && t.chapter_id === chapterId);
+  }
+
+  /** Whether any section of the chapter has a completed lesson, which a recap and the chapter quiz need. */
+  chapterStudied(chapterId: string | null | undefined) {
+    const ids = this.chapters.find((c) => c.id === chapterId)?.concept_ids ?? [];
+    return ids.some((id) => this.lessons(id).some((t) => t.status === 'completed'));
+  }
+
+  /** The chapter owning a lesson or exercise an annotation or question points at, when it is a recap or quiz question. */
+  ownerChapter(item: { turn_id?: string | null; task_id?: string | null }): string | undefined {
+    if (item.turn_id) return this.turn(item.turn_id)?.chapter_id;
+    if (item.task_id) return this.state?.practice.tasks.find((t) => t.id === item.task_id)?.chapter_id;
+    return undefined;
   }
 
   turn(id: string | null | undefined) {
@@ -353,9 +371,15 @@ class AppStore {
 
   /** Brings the reading column back to the passage a question was about, falling back to where the learner was reading. */
   returnTo(question: Question) {
+    const turnId = question.selected_turn_id ?? question.main_turn_id;
+    const chapter = this.ownerChapter({ turn_id: turnId });
+    if (chapter) {
+      this.viewChapter(chapter);
+      return this.#scrollToLesson(turnId, question.selection);
+    }
     if (this.currentId) this.view(this.currentId);
     const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
-    return this.#scrollToLesson(question.selected_turn_id ?? question.main_turn_id, question.selection, {
+    return this.#scrollToLesson(turnId, question.selection, {
       near: sameSection ? question.anchor.scroll_y! + window.innerHeight / 2 : undefined,
       fallback: sameSection ? question.anchor.scroll_y! : undefined,
     });
@@ -417,7 +441,9 @@ class AppStore {
       }
       return;
     }
-    this.view(annotation.concept_id);
+    const chapter = this.ownerChapter(annotation);
+    if (chapter) this.viewChapter(chapter);
+    else this.view(annotation.concept_id);
     if (annotation.task_id) {
       await tick();
       requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
@@ -426,8 +452,14 @@ class AppStore {
     if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage);
   }
 
+  /** A section's own exercises; chapter quiz questions anchored to it are listed on the chapter page. */
   tasks(conceptId: string | null): Task[] {
-    return (this.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId);
+    return (this.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId && !t.chapter_id);
+  }
+
+  /** The chapter's quiz questions, oldest quiz first. */
+  quizTasks(chapterId: string | null | undefined): Task[] {
+    return (this.state?.practice.tasks ?? []).filter((t) => !!chapterId && t.chapter_id === chapterId).sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
   }
 
   openPanel(tab: PanelTab) {
@@ -515,8 +547,13 @@ class AppStore {
     return this.act(() => api.post('/api/review/postpone', { concept_id: conceptId }));
   }
 
+  /** A recap and the chapter quiz stay on the chapter page and never move the learner's position. */
   recapChapter(chapterId: string) {
-    return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+  }
+
+  takeQuiz(chapterId: string) {
+    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/quiz`));
   }
 
   buildChapter(chapterId: string) {

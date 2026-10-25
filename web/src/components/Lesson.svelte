@@ -64,7 +64,7 @@
   }
 </script>
 
-<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={lessons.length > 1 ? t('Lesson {number}', { number }) : t('Lesson')}>
+<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={turn.id.startsWith('recap:') ? t("Chapter recap") : lessons.length > 1 ? t('Lesson {number}', { number }) : t('Lesson')}>
   <div class="meta">
     {#if turn.id.startsWith('recap:')}<span class="number">{t("Chapter recap")}</span>
     {:else if lessons.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}

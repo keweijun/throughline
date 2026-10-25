@@ -19,6 +19,7 @@
   const exercises = $derived.by(() => {
     const counts = new Map<string, { solved: number; total: number }>();
     for (const task of app.state?.practice.tasks ?? []) {
+      if (task.chapter_id) continue; // a chapter quiz question counts on the chapter page, not in its anchor section
       const entry = counts.get(task.concept_id) ?? { solved: 0, total: 0 };
       entry.total += 1;
       if (solved(task)) entry.solved += 1;

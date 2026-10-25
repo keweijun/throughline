@@ -38,6 +38,7 @@
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
   const helped = $derived(task.history.some((h) => h.action !== 'assess'));
+  const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
 
   const status = $derived.by(() => {
     if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
@@ -63,14 +64,18 @@
   }
 </script>
 
-<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? t("Review question") : number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? t("Review question") : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
       {#if task.origin === 'review'}
         {t("Review question")}
-      {:else if task.origin === 'recap'}
-        {number ? t('Recap question {number}', { number }) : t("Recap question")}
-        <span class="origin">· {t("tests {sections}", { sections: (task.tests_concept_ids ?? []).map((id) => app.concept(id)?.title ?? id).join(', ') })}</span>
+      {:else if task.origin === 'chapter_quiz'}
+        {number ? t('Quiz question {number}', { number }) : t("Quiz question")}
+        {#if task.from_task_id}
+          <span class="origin">· {t("earlier exercise from {section}", { section: titles(task.tests_concept_ids) })}</span>
+        {:else}
+          <span class="origin">· {t("tests {sections}", { sections: titles(task.tests_concept_ids) })}</span>
+        {/if}
       {:else}
         {number ? t('Exercise {number}', { number }) : t("Exercise")}
         <span class="origin">· {task.origin === 'source' ? t("from the course materials") : t("written by the teacher")}</span>
@@ -158,7 +163,7 @@
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>{t("Full solution")}</button>
-        {#if task.status !== 'deferred' && task.origin !== 'review'}
+        {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}
       </span>

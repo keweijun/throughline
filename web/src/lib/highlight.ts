@@ -1,4 +1,7 @@
+import { RENDERED } from './markdown';
+
 /** Marks passages using the CSS Custom Highlight API (no DOM changes): ones the learner asked about, and their own highlights. */
+
 const layers = { asked: new Map<string, Range[]>(), mine: new Map<string, Range[]>() };
 type Layer = keyof typeof layers;
 
@@ -80,16 +83,22 @@ let nextKey = 0;
 export function highlights(node: HTMLElement, params: { passages: string[]; text?: string }) {
   const key = `block-${nextKey++}`;
   let frame = 0;
+  let current = params;
   const paint = (p: { passages: string[] }) => {
+    current = p;
     cancelAnimationFrame(frame);
     // Wait for the Markdown action to finish patching this block.
     frame = requestAnimationFrame(() => mark('mine', key, node, p.passages));
   };
+  // Streaming blocks are patched a frame later than their text changes; paint again once they are.
+  const repaint = () => current.passages.length && mark('mine', key, node, current.passages);
+  node.addEventListener(RENDERED, repaint);
   paint(params);
   return {
     update: paint,
     destroy() {
       cancelAnimationFrame(frame);
+      node.removeEventListener(RENDERED, repaint);
       clear('mine', key);
     },
   };

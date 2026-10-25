@@ -1,17 +1,26 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
-  import { onDestroy, onMount, tick } from 'svelte';
-  import type { PDFDocumentProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
   import { openPdf, pdfjs } from '../lib/pdf';
   import { mark, clear } from '../lib/highlight';
 
   let {
     url,
+    document: documentKey = url,
     page: target,
     label,
     highlights = [],
     current = $bindable(target),
-  }: { url: string; page: number; label: string; highlights?: { page: number; passage: string }[]; current?: number } = $props();
+  }: {
+    url: string;
+    /** Identifies the file whatever page the URL was asked for, so the loaded document is reused. */
+    document?: string;
+    page: number;
+    label: string;
+    highlights?: { page: number; passage: string }[];
+    current?: number;
+  } = $props();
 
   let scroller: HTMLDivElement | undefined = $state();
   let doc = $state<PDFDocumentProxy | null>(null);
@@ -25,40 +34,76 @@
   const scale = $derived(fit && width ? Math.max(0.4, (width - 32) / base.width) : zoom);
   const pages = $derived(doc ? Array.from({ length: doc.numPages }, (_, i) => i + 1) : []);
 
-  const rendered = new Map<number, { scale: number; task?: RenderTask }>();
+  type Rendering = { scale: number; task?: RenderTask; page?: PDFPageProxy };
+  const rendered = new Map<number, Rendering>();
   const elements = new Map<number, HTMLElement>();
+  // Highlight keys are global, so each reader uses its own and remembers which it painted.
+  const prefix = `pdf-${Math.random().toString(36).slice(2)}-`;
+  const marked = new Set<number>();
   let observer: IntersectionObserver | null = null;
+  let release: IntersectionObserver | null = null;
   let resize: ResizeObserver | null = null;
+  let ready = $state(false);
+
+  // Pages are drawn as they come near the viewport and freed again once far away, so a long PDF does not keep a
+  // canvas for every page it has shown. Approaching a freed page draws it again.
+  const NEAR = 600;
+  const FAR = 2400;
 
   onMount(async () => {
     try {
-      doc = await openPdf(url);
-      const first = (await doc.getPage(1)).getViewport({ scale: 1 });
-      base = { width: first.width, height: first.height };
+      doc = await openPdf(url, documentKey);
+      const first = await doc.getPage(1);
+      const viewport = first.getViewport({ scale: 1 });
+      base = { width: viewport.width, height: viewport.height };
     } catch {
       failed = true;
       return;
     }
     await tick();
+    if (!scroller) return; // unmounted while loading
     observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) if (entry.isIntersecting) void draw(Number((entry.target as HTMLElement).dataset.page));
       },
-      { root: scroller, rootMargin: '600px 0px' },
+      { root: scroller, rootMargin: `${NEAR}px 0px` },
     );
-    for (const element of elements.values()) observer.observe(element);
-    width = scroller!.clientWidth;
+    release = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) if (!entry.isIntersecting) free(Number((entry.target as HTMLElement).dataset.page));
+      },
+      { root: scroller, rootMargin: `${FAR}px 0px` },
+    );
+    for (const element of elements.values()) {
+      observer.observe(element);
+      release.observe(element);
+    }
+    width = scroller.clientWidth;
     resize = new ResizeObserver(() => (width = scroller!.clientWidth));
-    resize.observe(scroller!);
+    resize.observe(scroller);
     await tick();
-    go(target, 'instant');
+    ready = true;
+  });
+
+  // Open at the cited page, and follow later citations into the same document without rebuilding the reader.
+  let landed = false;
+  $effect(() => {
+    const page = target;
+    if (!ready) return;
+    untrack(() => go(page, landed ? 'smooth' : 'instant'));
+    landed = true;
   });
 
   function markPage(number: number) {
     const text = elements.get(number)?.querySelector<HTMLElement>('.textLayer');
     if (!text) return;
     const passages = highlights.filter((h) => h.page === number).map((h) => h.passage);
-    mark('mine', `pdf-${number}`, text, passages, { loose: true });
+    mark('mine', prefix + number, text, passages, { loose: true });
+    marked.add(number);
+  }
+
+  function unmark(number: number) {
+    if (marked.delete(number)) clear('mine', prefix + number);
   }
 
   $effect(() => {
@@ -67,45 +112,72 @@
   });
 
   onDestroy(() => {
-    for (const number of elements.keys()) clear('mine', `pdf-${number}`);
+    // Page elements may already be gone here, so clear what was painted rather than what is on screen.
+    for (const number of [...marked]) unmark(number);
     observer?.disconnect();
+    release?.disconnect();
     resize?.disconnect();
-    for (const r of rendered.values()) r.task?.cancel();
+    for (const r of rendered.values()) {
+      r.task?.cancel();
+      r.page?.cleanup();
+    }
+    rendered.clear();
   });
+
+  /** Drops a page's canvas and text layer; its element keeps its size so scrolling does not jump. */
+  function free(number: number) {
+    const r = rendered.get(number);
+    if (!r) return;
+    rendered.delete(number);
+    r.task?.cancel();
+    unmark(number);
+    const layers = elements.get(number)?.querySelector('.layers');
+    const canvas = layers?.querySelector('canvas');
+    // Shrinking the canvas releases its backing memory straight away instead of at garbage collection.
+    if (canvas) canvas.width = canvas.height = 0;
+    layers?.replaceChildren();
+    r.page?.cleanup();
+  }
 
   // Redraw visible pages when the scale changes (zoom, or the panel being resized in fit mode).
   $effect(() => {
     const s = scale;
     for (const [number, r] of rendered) {
       if (r.scale === s) continue;
-      r.task?.cancel();
-      rendered.delete(number);
       const element = elements.get(number);
-      if (element && visible(element)) void draw(number);
+      if (element && visible(element)) {
+        r.task?.cancel();
+        rendered.delete(number);
+        void draw(number); // the old canvas stays, stretched, until the new one replaces it
+      } else free(number);
     }
+
   });
 
   function visible(element: HTMLElement) {
     const box = element.getBoundingClientRect();
     const view = scroller!.getBoundingClientRect();
-    return box.bottom > view.top - 600 && box.top < view.bottom + 600;
+    return box.bottom > view.top - NEAR && box.top < view.bottom + NEAR;
   }
 
   function register(node: HTMLElement, number: number) {
     elements.set(number, node);
     observer?.observe(node);
+    release?.observe(node);
     return { destroy: () => elements.delete(number) };
   }
 
   async function draw(number: number) {
     if (!doc || rendered.has(number)) return;
     const s = scale;
-    const entry: { scale: number; task?: RenderTask } = { scale: s };
+    const entry: Rendering = { scale: s };
     rendered.set(number, entry);
     const element = elements.get(number);
     if (!element) return;
     const pdf = await pdfjs();
     const page = await doc.getPage(number);
+    if (rendered.get(number) !== entry) return; // freed or rescaled meanwhile
+    entry.page = page;
     const viewport: PageViewport = page.getViewport({ scale: s });
     const ratio = window.devicePixelRatio || 1;
     const canvas = document.createElement('canvas');
@@ -122,15 +194,21 @@
     try {
       await entry.task.promise;
     } catch {
-      return; // cancelled by a newer scale
+      canvas.width = canvas.height = 0;
+      return; // cancelled by a newer scale, or freed
     }
-    if (rendered.get(number) !== entry) return;
+    if (rendered.get(number) !== entry) {
+      canvas.width = canvas.height = 0;
+      return;
+    }
     element.style.width = `${viewport.width}px`;
     element.style.height = `${viewport.height}px`;
     element.style.setProperty('--total-scale-factor', String(s));
+    const old = element.querySelector('.layers canvas');
+    if (old instanceof HTMLCanvasElement) old.width = old.height = 0;
     element.querySelector('.layers')!.replaceChildren(canvas, text);
     await new pdf.TextLayer({ textContentSource: page.streamTextContent(), container: text, viewport }).render();
-    markPage(number);
+    if (rendered.get(number) === entry) markPage(number);
   }
 
   function onScroll() {
@@ -148,6 +226,10 @@
 
   function go(number: number, behavior: ScrollBehavior = 'smooth') {
     if (!doc) return;
+    if (!Number.isInteger(number)) {
+      pageInput = String(current); // not a page number: show where the reader is again
+      return;
+    }
     const n = Math.min(Math.max(1, number), doc.numPages);
     const element = elements.get(n);
     if (!element || !scroller) return;
@@ -174,8 +256,8 @@
   <div class="toolbar" role="toolbar" aria-label={t("PDF reader")}>
     <div class="group">
       <button class="btn btn-quiet btn-small" onclick={() => go(current - 1)} disabled={current <= 1} aria-label={t("Previous page")}>‹</button>
-      <form class="page" onsubmit={(e) => (e.preventDefault(), go(Number(pageInput)))}>
-        <input aria-label={t("Page number")} inputmode="numeric" bind:value={pageInput} />
+      <form class="page" onsubmit={(e) => (e.preventDefault(), go(/^\s*\d+\s*$/.test(pageInput) ? Number(pageInput) : NaN))}>
+        <input aria-label={t("Page number")} inputmode="numeric" pattern="[0-9]*" bind:value={pageInput} onblur={() => (pageInput = String(current))} />
         <span>{t("of {count}", { count: doc?.numPages ?? '…' })}</span>
       </form>
       <button class="btn btn-quiet btn-small" onclick={() => go(current + 1)} disabled={!doc || current >= doc.numPages} aria-label={t("Next page")}>›</button>
@@ -191,7 +273,10 @@
     {/if}
   </div>
 
-  <div class="pages" bind:this={scroller} onscroll={onScroll} data-source-label={label} tabindex="-1">
+  <!-- Focusable so the pages can be scrolled with the keyboard. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <div class="pages" bind:this={scroller} onscroll={onScroll} data-source-label={label} tabindex="0" role="region" aria-label={label}>
+
     {#if failed}
       <p class="problem">{t("This PDF could not be displayed here. Open the original instead.")}</p>
     {/if}

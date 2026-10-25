@@ -1,7 +1,7 @@
 <script lang="ts">
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { markdown } from '../lib/markdown';
+  import { markdown, RENDERED } from '../lib/markdown';
   import { mark, clear } from '../lib/highlight';
   import { lessonStatus } from '../lib/format';
   import type { Turn } from '../lib/types';
@@ -24,10 +24,18 @@
   let width = $state(0);
   let fonts = $state(false);
   document.fonts?.ready.then(() => (fonts = true));
+  // While streaming, the body is patched a frame after the text changes; re-place markers once it is.
+  let renders = $state(0);
+  $effect(() => {
+    if (!body) return;
+    const count = () => renders++;
+    body.addEventListener(RENDERED, count);
+    return () => body?.removeEventListener(RENDERED, count);
+  });
 
   $effect(() => {
     if (!body) return;
-    void turn.text;
+    void renders;
     void width;
     void fonts;
     const origin = body.getBoundingClientRect().top;
@@ -61,9 +69,9 @@
     {#if turn.id.startsWith('recap:')}<span class="number">{t("Chapter recap")}</span>
     {:else if lessons.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}
     {#if turn.status === 'running'}
-      <span class="chip"><span class="live-dot"></span>{diagnostic(status.label)}</span>
+      <span class="chip"><span class="live-dot"></span>{t(status.label)}</span>
     {:else if turn.status !== 'completed'}
-      <span class="chip chip-{status.tone}">{diagnostic(status.label)}</span>
+      <span class="chip chip-{status.tone}">{t(status.label)}</span>
     {/if}
     <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Regenerate lesson")} />
   </div>
@@ -103,7 +111,8 @@
       class="prose lesson-body"
       bind:clientWidth={width}
       bind:this={body}
-      use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref) }}
+      use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref), streaming: turn.status === 'running' }}
+
     ></div>
   {:else if turn.status === 'running'}
     <p class="waiting">{t("The teacher is reading the goal and sources. Text appears here as it is written.")}</p>

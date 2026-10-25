@@ -200,7 +200,7 @@ class Host:
             if result.get('ignored'):
                 return
             if event['kind'] == 'delta':
-                self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'text': event.get('text', '')})
+                self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, 'text': event.get('text', '')})
             elif event['kind'] in ('complete', 'failed'):
                 self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
                 if event['kind'] == 'complete':

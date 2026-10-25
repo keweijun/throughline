@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import { app } from './lib/store.svelte';
+  import { panelCoversLesson } from './lib/media';
   import TopBar from './components/TopBar.svelte';
   import RouteRail from './components/RouteRail.svelte';
   import ConceptPage from './components/ConceptPage.svelte';
@@ -15,7 +16,7 @@
   import Library from './components/Library.svelte';
 
   onMount(() => {
-    void app.load();
+    void app.sync();
     app.connect();
   });
 
@@ -33,7 +34,8 @@
   function onKey(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (app.routeOpen) app.routeOpen = false;
-      else if (app.panelOpen && matchMedia('(max-width: 79.99rem)').matches) app.panelOpen = false;
+      else if (app.panelOpen && panelCoversLesson()) app.panelOpen = false;
+
       return;
     }
     const target = event.target as HTMLElement;

@@ -48,7 +48,7 @@
       <h2>{s.title}</h2>
       <p class="meta">
         <span>{where}</span>
-        <span class="chip chip-{v.tone}">{diagnostic(v.label)}</span>
+        <span class="chip chip-{v.tone}">{t(v.label)}</span>
         {#if s.stale}<span class="chip chip-caution">{t("Older revision of this file")}</span>{/if}
         {#if concept && pageRef}
           <button
@@ -77,9 +77,12 @@
     </header>
 
     {#if s.pdf_url && page}
-      {#key s.pdf_url}
+      <!-- Keyed on the document, not the cited page, so citations into the same PDF keep its zoom and only scroll. -->
+      {#key `${s.source_id}/${s.revision}`}
         <PdfReader
           url={s.pdf_url.split('#')[0]}
+          document="{s.source_id}/{s.revision}"
+
           {page}
           {label}
           bind:current={shown}

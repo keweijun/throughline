@@ -34,9 +34,10 @@ function parse(text: string, breaks = false): DocumentFragment {
     }
     return span;
   });
+  // Only web links stay live, opening in a new tab; in-page anchors have no targets because ids are stripped.
   for (const link of fragment.querySelectorAll('a')) {
     const href = link.getAttribute('href') ?? '';
-    if (!/^(https?:\/\/|#)/i.test(href)) link.removeAttribute('href');
+    if (!/^https?:\/\//i.test(href)) link.removeAttribute('href');
     else {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -102,7 +103,18 @@ export function hasMath(text: string) {
   return [...text.matchAll(MATH)].some((match) => match[2] !== undefined);
 }
 
-export type MarkdownOptions = { language?: Language; text: string; breaks?: boolean; refs?: Ref[]; onSource?: (ref: Ref) => void };
+export type MarkdownOptions = {
+  language?: Language;
+  text: string;
+  breaks?: boolean;
+  refs?: Ref[];
+  onSource?: (ref: Ref) => void;
+  /** The text is still streaming: re-render at most once per animation frame. */
+  streaming?: boolean;
+};
+
+/** Fired on a block after the Markdown action has patched it, so overlays such as highlights can re-measure. */
+export const RENDERED = 'markdown-rendered';
 
 /** Renders sanitized Markdown, patching only changed blocks so streaming keeps selections and scroll. */
 export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource }: MarkdownOptions) {
@@ -120,9 +132,31 @@ export function render(node: HTMLElement, { text, breaks = false, refs = [], onS
   while (node.childNodes.length > incoming.length) node.lastChild!.remove();
   node.dataset.key = key;
   if (window.scrollY !== scrollY) window.scrollTo(window.scrollX, scrollY);
+  node.dispatchEvent(new CustomEvent(RENDERED));
 }
 
 export function markdown(node: HTMLElement, options: MarkdownOptions) {
+  let frame = 0;
+  let latest = options;
   render(node, options);
-  return { update: (next: MarkdownOptions) => render(node, next) };
+  return {
+    update(next: MarkdownOptions) {
+      latest = next;
+      // Streaming text arrives in many small deltas; parsing and typesetting each one would block the page.
+      if (next.streaming) {
+        frame ||= requestAnimationFrame(() => {
+          frame = 0;
+          render(node, latest);
+        });
+        return;
+      }
+      cancelAnimationFrame(frame);
+      frame = 0;
+      render(node, next);
+    },
+    destroy() {
+      cancelAnimationFrame(frame);
+    },
+  };
 }
+

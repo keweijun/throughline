@@ -135,6 +135,7 @@ class Courses:
                 host = self.host
                 if host and current.get(host.workspace) != seen.get(host.workspace):
                     self.events.publish({'type': 'changed', 'scope': 'state'})
+                    host.preparation.wake()
             seen = current
 
     def open(self, path):
@@ -251,7 +252,6 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         current = courses.require()
         snapshot = current.snapshot()
         return {**snapshot,
-                'turns': [turn_summary(t) for t in snapshot['turns']],
                 'questions': [_public_question(b) for b in current.questions.list()],
                 'practice': current.practice.state(),
                 'preparation': current.preparation.state(),

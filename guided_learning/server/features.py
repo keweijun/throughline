@@ -3,14 +3,16 @@ import hashlib
 import importlib.util
 import io
 import json
+import logging
 import re
 import threading
 import uuid
 from pathlib import Path
 
-from ..curriculum import source_unit
-from ..store import OperationError, Store
+from ..store import OperationError
 from . import prompts
+
+log = logging.getLogger(__name__)
 
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
 _PDF_LOCK = threading.Lock()
@@ -165,7 +167,7 @@ class Navigation(Feature):
         chapter = context.get('chapter')
         if is_recap(turn):
             return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
-        earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
+        earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
         if earlier:
             text = prompts.LESSON_CONTINUES
@@ -307,13 +309,17 @@ class Practice(Feature):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
         for job in self.operation({'op': 'practice.list'})['jobs']:
             if not job.get('processed'):
-                self.operation({'op': 'practice.complete', 'id': job['id']})
+                try:
+                    self.operation({'op': 'practice.complete', 'id': job['id']})
+                except OperationError:
+                    # The course refused the record (a conflicting ID, say); the job stays unprocessed rather than half-recorded.
+                    log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
     def _launch(self, concept_id, action, task=None, answer=None):
         with self.host.lock:
             jobs = self.state()['jobs']
-            running = {t['id'] for t in self.host.turns() if t['status'] == 'running'}
+            running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
             for job in jobs:
                 if job['id'] not in running:
                     continue
@@ -374,7 +380,7 @@ class Practice(Feature):
         return session.get('position') or {}
 
     def _enter(self, concept_id, request_id):
-        for turn in self.host.turns():
+        for turn in self.host.brief_turns():
             if turn['channel'] == 'mainline' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
         concept = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['concept']
@@ -386,12 +392,8 @@ class Practice(Feature):
 
     def skipped(self):
         """Sections the learner skipped with their chapter and has not studied since."""
-        store = Store(self.host.workspace)
-        try:
-            resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
-            return [d for d in store.list('evidence_deferred') if d['id'].startswith('chapter-skip:') and d['id'] not in resolved]
-        finally:
-            store.db.close()
+        deferred = self.operation({'op': 'evidence.unresolved'})['deferred']
+        return [d for d in deferred if d['id'].startswith('chapter-skip:')]
 
     def skip_chapter(self, chapter_id, request_id):
         """Move on to the next chapter; the skipped sections stay on the route as deferred."""
@@ -430,11 +432,7 @@ class Practice(Feature):
                     continue
 
     def _sources(self, refs):
-        store = Store(self.host.workspace)
-        try:
-            return [{**ref, 'unit': source_unit(store, ref)} for ref in refs]
-        finally:
-            store.db.close()
+        return self.operation({'op': 'source.units', 'refs': refs})['sources']
 
     def prompt(self, turn, context):
         state = self.operation({'op': 'practice.list'})
@@ -455,11 +453,15 @@ class Practice(Feature):
 
 class Preparation(Feature):
     """Prepares the next section only while the learner's own work is idle."""
+    INTERVAL = 2  # seconds between checks when nothing wakes the loop
+    START_DELAY = .5
+    MAX_BACKOFF = 60
 
     def __init__(self, host):
         super().__init__(host)
         self.operation({'op': 'preparation.recover'})
         self._stop = threading.Event()
+        self._wake = threading.Event()
         self._thread = threading.Thread(target=self._loop, daemon=True, name='preparation')
         self._last = None
 
@@ -468,6 +470,11 @@ class Preparation(Feature):
 
     def stop(self):
         self._stop.set()
+        self._wake.set()
+
+    def wake(self):
+        """Something changed (a turn ended or paused, or the position moved): look for idle work now."""
+        self._wake.set()
 
     def join(self, timeout):
         if self._thread.is_alive():
@@ -482,7 +489,7 @@ class Preparation(Feature):
     def before_start(self, request):
         if request.get('channel', 'mainline') == 'preparation':
             return
-        for turn in self.host.turns():
+        for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
         self.operation({'op': 'preparation.reconcile'})
@@ -501,10 +508,10 @@ class Preparation(Feature):
             if self.host.closing:
                 return {'scheduled': False, 'reason': 'host_closing'}
             stale = {j['id'] for j in self.state()['jobs'] if j['status'] == 'stale'}
-            for turn in self.host.turns():
+            for turn in self.host.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':
                     self.host.pause_turn(turn['id'])
-            turns = self.host.turns()
+            turns = self.host.brief_turns()
             # A paused process can still be shutting down; never start a second preparation process.
             if any(t['status'] == 'running' for t in turns) or any(t['channel'] == 'preparation' and self.host.worker_alive(t) for t in turns):
                 return {'scheduled': False, 'reason': 'foreground_or_worker_active'}
@@ -530,17 +537,29 @@ class Preparation(Feature):
                 raise
 
     def _loop(self):
-        while not self._stop.wait(.35):
-            if self.host.closing:
+        # Host events wake the loop; the interval only catches changes made outside the host, such as Codex editing the route.
+        # The first check waits briefly, so a lesson requested as the course opens goes first.
+        failures = 0
+        self._stop.wait(self.START_DELAY)
+        self._wake.set()
+        while not self._stop.is_set():
+            self._wake.wait(min(self.INTERVAL * 2 ** failures, self.MAX_BACKOFF))
+            self._wake.clear()
+            if self._stop.is_set() or self.host.closing:
                 return
             try:
                 self.schedule()
                 summary = [(j['id'], j['status']) for j in self.state()['jobs']]
                 if summary != self._last:
                     self._last = summary
-                    self.host.changed('preparation')
+                    # Publish directly: host.changed() would wake this loop again.
+                    self.host.events.publish({'type': 'changed', 'scope': 'preparation'})
+                failures = 0
             except OperationError:
-                if self.host.closing:
-                    return
                 # Invalid or changing course sources never block the teacher.
                 continue
+            except Exception:
+                if self.host.closing:
+                    return
+                failures += 1
+                log.exception('Preparation scheduling failed; retrying')

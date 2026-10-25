@@ -1,5 +1,6 @@
 """The learning host: owns a course workspace and runs every model turn through one engine."""
 import asyncio
+import logging
 import os
 import threading
 import time
@@ -7,9 +8,12 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
+from ..streaming import summarize
 from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
+
+log = logging.getLogger(__name__)
 
 
 class EventBus:
@@ -64,13 +68,7 @@ def _acquire_lease(workspace):
     return lease
 
 
-def turn_summary(turn):
-    """A turn without its frozen prompt snapshot, which the browser never needs."""
-    summary = {k: v for k, v in turn.items() if k not in ('prompt_snapshot', 'resume_requests')}
-    summary['attempts'] = [{'attempt': a.get('attempt'), 'text': a.get('text'), 'status': a.get('status')} for a in turn.get('attempts', [])]
-    concept = (turn.get('prompt_snapshot') or {}).get('context', {}).get('concept') or {}
-    summary['title'] = concept.get('title')
-    return summary
+turn_summary = summarize
 
 
 class Host:
@@ -108,9 +106,20 @@ class Host:
 
     def changed(self, scope='state'):
         self.events.publish({'type': 'changed', 'scope': scope})
+        self._wake_preparation()
+
+    def _wake_preparation(self):
+        preparation = getattr(self, 'preparation', None)
+        if preparation:
+            preparation.wake()
 
     def turns(self):
+        """Every turn in full, with frozen prompt snapshots; prefer `brief_turns` when only status matters."""
         return self.operation({'op': 'stream.list'})['turns']
+
+    def brief_turns(self):
+        """Each turn's id, channel, section, attempt and status, without its text or snapshot."""
+        return self.operation({'op': 'stream.summaries', 'brief': True})['turns']
 
     def snapshot(self):
         return {**self.operation({'op': 'course.status'}),
@@ -118,13 +127,13 @@ class Host:
                 'curriculum': self.operation({'op': 'curriculum.view'}),
                 'session': self.operation({'op': 'session.resume', 'recent_limit': 20}),
                 'deferred_explanations': self.operation({'op': 'deferred.list'})['deferred_explanations'],
-                'turns': self.turns()}
+                'turns': self.operation({'op': 'stream.summaries'})['turns']}
 
     def set_language(self, language):
         with self.lock:
             result = self.operation({'op': 'preferences.save', 'language': language})
             stale = {job['id'] for job in self.preparation.state()['jobs'] if job['status'] == 'stale'}
-            for turn in self.turns():
+            for turn in self.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':
                     self.pause_turn(turn['id'])
             self.changed('preferences')
@@ -142,7 +151,7 @@ class Host:
         return prompt
 
     def _ensure_single_mainline(self, identifier, message):
-        for other in self.turns():
+        for other in self.brief_turns():
             if other['id'] != identifier and other['channel'] == 'mainline' and other['status'] == 'running':
                 raise OperationError('active_turn', message)
 
@@ -180,37 +189,54 @@ class Host:
     def _launch(self, turn):
         cancel = threading.Event()
         identifier, attempt = turn['id'], turn['attempt']
+        key = (identifier, attempt)
         self.events.publish({'type': 'turn', 'turn': turn_summary(turn)})
 
         def emit(event):
-            emit.sequence += 1
-            result = self.operation({'op': 'stream.event', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, **event})
+            sequence = emit.sequence + 1
+            result = self.operation({'op': 'stream.event', 'id': identifier, 'attempt': attempt, 'sequence': sequence, **event})
+            # Count an event only once it is stored, so one failed write cannot leave a gap for every later event.
+            emit.sequence = sequence
             if result.get('ignored'):
                 return
             if event['kind'] == 'delta':
-                self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'text': event.get('text', '')})
+                self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, 'text': event.get('text', '')})
             elif event['kind'] in ('complete', 'failed'):
                 self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
                 if event['kind'] == 'complete':
                     for feature in self.features:
-                        feature.on_complete(result['turn'])
+                        try:
+                            feature.on_complete(result['turn'])
+                        except Exception:
+                            log.exception('%s could not finish turn %s', feature.__class__.__name__, identifier)
                 self.changed()
         emit.sequence = 0
+
+        def fail(message):
+            """Mark this attempt failed from whatever sequence is stored, whatever happened to earlier events."""
+            current = self.operation({'op': 'stream.read', 'id': identifier})['turn']
+            if current['attempt'] != attempt or current['status'] != 'running':
+                return
+            emit.sequence = current['sequence']
+            emit({'kind': 'failed', 'error': message})
 
         def work():
             try:
                 self.runner_for(turn).run(self.build_prompt(turn), self.workspace, emit, cancel)
-                current = self.operation({'op': 'stream.read', 'id': identifier})['turn']
-                if current['attempt'] == attempt and current['status'] == 'running':
-                    emit({'kind': 'failed', 'error': 'Model ended without a completed reply'})
+                fail('Model ended without a completed reply')
             except Exception as exc:
+                log.info('Turn %s attempt %s failed', identifier, attempt, exc_info=True)
                 try:
-                    emit({'kind': 'failed', 'error': str(exc) or exc.__class__.__name__})
+                    fail(str(exc) or exc.__class__.__name__)
                 except Exception:
-                    pass
+                    log.exception('Could not mark turn %s attempt %s failed', identifier, attempt)
+            finally:
+                if self.workers.get(key, (None,))[0] is threading.current_thread():
+                    self.workers.pop(key, None)
+                self._wake_preparation()
 
         thread = threading.Thread(target=work, daemon=True, name=f'turn-{identifier}')
-        self.workers[(identifier, attempt)] = (thread, cancel)
+        self.workers[key] = (thread, cancel)
         thread.start()
 
     def pause_turn(self, identifier):
@@ -220,6 +246,7 @@ class Host:
             if worker:
                 worker[1].set()
             self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
+            self._wake_preparation()
             return result
 
     def resume_turn(self, identifier, request_id):

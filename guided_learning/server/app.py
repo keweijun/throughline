@@ -1,6 +1,8 @@
 """HTTP surface of the learning host. Loopback only; course operations stay the state authority."""
 import asyncio
 import json
+import logging
+import os
 import socket
 import threading
 import uuid
@@ -19,6 +21,7 @@ from ..store import OperationError
 from .host import EventBus, Host, turn_summary
 from .settings import TeacherSettings
 
+log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
 MAX_BODY = 1024 * 1024
 
@@ -135,6 +138,7 @@ class Courses:
                 host = self.host
                 if host and current.get(host.workspace) != seen.get(host.workspace):
                     self.events.publish({'type': 'changed', 'scope': 'state'})
+                    host.preparation.wake()
             seen = current
 
     def open(self, path):
@@ -226,6 +230,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         origin = request.headers.get('origin')
         if request.headers.get('host') not in allowed or (origin is not None and origin not in origins):
             return JSONResponse({'error': 'Invalid local origin'}, 403)
+        # A cross-site page can still send a GET without Origin (an <img>, say); browsers label it with Sec-Fetch-Site.
+        site = request.headers.get('sec-fetch-site')
+        if request.url.path.startswith('/api/') and site is not None and site not in ('same-origin', 'none'):
+            return JSONResponse({'error': 'Invalid local origin'}, 403)
         if has_body and size and request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
             return JSONResponse({'error': 'JSON required'}, 415)
         response = await call_next(request)
@@ -235,7 +243,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.exception_handler(OperationError)
     async def operation_error(request, exc):
-        return JSONResponse({'error': str(exc), 'code': exc.code}, 409)
+        return JSONResponse({'error': str(exc), 'code': exc.code}, 404 if exc.code.startswith('unknown_') else 409)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
@@ -243,15 +251,17 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         field = '.'.join(str(p) for p in first.get('loc', [])[1:])
         return JSONResponse({'error': f"{field}: {first.get('msg', 'invalid request')}" if field else 'Invalid request'}, 400)
 
-    for error in (ValueError, KeyError, TypeError):
-        app.add_exception_handler(error, lambda request, exc: JSONResponse({'error': str(exc)}, 400))
+    @app.exception_handler(Exception)
+    async def internal_error(request, exc):
+        # Anything but an OperationError is a bug: log it, and answer in the shape the interface reads.
+        log.error('Unhandled error in %s %s', request.method, request.url.path, exc_info=exc)
+        return JSONResponse({'error': f'Internal error ({exc.__class__.__name__}); see the host log', 'code': 'internal_error'}, 500)
 
     @app.get('/api/state')
     def state():
         current = courses.require()
         snapshot = current.snapshot()
         return {**snapshot,
-                'turns': [turn_summary(t) for t in snapshot['turns']],
                 'questions': [_public_question(b) for b in current.questions.list()],
                 'practice': current.practice.state(),
                 'preparation': current.preparation.state(),
@@ -390,6 +400,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return courses.settings.models()
         except (OSError, RuntimeError) as exc:
             return JSONResponse({'error': str(exc)}, 502)
+
+    @app.get('/api/health')
+    def health():
+        """A cheap liveness probe for `guided-learning open` and `stop`."""
+        return {'pid': os.getpid(), 'launch_id': os.environ.get('GUIDED_LEARNING_LAUNCH_ID')}
 
     @app.get('/api/library')
     def library_view():

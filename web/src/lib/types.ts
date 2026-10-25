@@ -39,6 +39,8 @@ export type Turn = {
   prompt: string;
   status: TurnStatus;
   attempt: number;
+  /** The last stream event applied to `text`; streamed deltas carry the next one. */
+  sequence: number;
   text: string;
   final_text?: string | null;
   error?: string;
@@ -78,11 +80,13 @@ export type Question = {
   returned?: boolean;
 };
 
+export type EvidenceKind = 'independent' | 'hinted' | 'needs_work';
+
 export type PracticeHistory = {
-  action: 'hint' | 'steps' | 'solution' | 'assess';
+  action: PracticeAction;
   feedback: string;
   outcome?: 'passed' | 'needs_work';
-  kind?: string;
+  kind?: EvidenceKind;
   answer?: string;
 };
 
@@ -96,11 +100,13 @@ export type Task = {
   history: PracticeHistory[];
 };
 
+export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess';
+
 export type PracticeJob = {
   answer?: string;
   id: string;
   concept_id: string;
-  action: string;
+  action: 'generate' | PracticeAction;
   task_id?: string;
   processed?: boolean;
   error?: string;
@@ -152,9 +158,10 @@ export type State = {
   sources: { id: string; path: string; revision: string; status: string }[];
   curriculum: { concepts: Concept[]; route: string[]; coverage?: Coverage[]; chapters?: Chapter[] };
   session: {
+    position?: Position | null;
     recent_interactions: Interaction[];
-    unanswered_questions: unknown[];
-    due_explanations: unknown[];
+    unanswered_questions: { id: string; question?: string; concept_id?: string }[];
+    due_explanations: DeferredExplanation[];
   };
   deferred_explanations: DeferredExplanation[];
   turns: Turn[];
@@ -213,10 +220,13 @@ export type SourceView = Ref & {
   document: { id: string; text: string }[] | null;
 };
 
-export type HostEvent =
-  | { type: 'delta'; id: string; attempt: number; text: string }
-  | { type: 'turn'; turn: Turn }
-  | { type: 'changed'; scope: string };
+/** Streamed text for a running turn; `sequence` is the turn's stream event it came from. */
+export type DeltaEvent = { type: 'delta'; id: string; attempt: number; sequence: number; text: string };
+
+export type ChangeScope = 'state' | 'course' | 'library' | 'settings' | 'preferences' | 'preparation';
+
+export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope };
+
 
 export type LibraryCourse = {
   name: string;

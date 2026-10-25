@@ -87,3 +87,30 @@ test('an answer with math shows a live preview before it is submitted', async ({
   await box.fill('');
   await expect(preview).toHaveCount(0);
 });
+
+test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').nth(2);
+  const box = task.getByRole('textbox', { name: 'Exercise answer' });
+  await expect(task).toContainText('Ctrl+Enter to check · Enter for a new line');
+  await box.fill('First line');
+  await box.press('Enter');
+  await box.pressSequentially('Second line');
+  await expect(box).toHaveValue('First line\nSecond line');
+  await expect(task.locator('.submitted-answer')).toHaveCount(0);
+  await box.press('Control+Enter');
+  await expect(task.locator('.submitted-answer')).toContainText('Second line');
+});
+
+test('an unsent answer survives looking at another section', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const box = page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' });
+  await box.fill('Half-written reasoning');
+  await page.locator('#route').getByRole('button', { name: /Next section/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
+  await page.getByRole('button', { name: 'Back to current section' }).click();
+  await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
+  // It also survives a reload of the tab.
+  await page.reload();
+  await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
+});

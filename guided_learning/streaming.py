@@ -1,4 +1,6 @@
 """Durable model delivery state; partial text never becomes teaching evidence."""
+import json
+import sqlite3
 import time
 from .store import OperationError
 from . import curriculum
@@ -42,7 +44,9 @@ def start(store, request):
     model = curriculum.view(store,{})
     route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
              for cid in model['route'] for c in model['concepts'] if c['id']==cid]
-    snapshot = {'context':context,'route':route,'session':session_resume(store,{}),'language':identity['language']}
+    session = session_resume(store,{})
+    session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
+    snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
     if model['chapters']: snapshot['chapters'] = [{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']]
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile
@@ -105,6 +109,39 @@ def event(store, request):
 
 OPERATIONS = {'stream.start':start, 'stream.read':read, 'stream.event':event,
               'stream.list':lambda s,r:{'turns':sorted(s.list('streams'),key=lambda t:t['started_at'])}}
+
+
+def summarize(turn):
+    """A turn without its frozen prompt snapshot, which the browser never needs."""
+    summary = {k: v for k, v in turn.items() if k not in ('prompt_snapshot', 'resume_requests')}
+    summary['attempts'] = [{'attempt': a.get('attempt'), 'text': a.get('text'), 'status': a.get('status')} for a in turn.get('attempts', [])]
+    concept = (turn.get('prompt_snapshot') or {}).get('context', {}).get('concept') or {}
+    summary['title'] = concept.get('title')
+    return summary
+
+
+BRIEF_DROP = ('prompt_snapshot', 'resume_requests', 'attempts', 'text', 'final_text', 'metrics', 'source_refs', 'prompt')
+# SQLite trims the frozen snapshots, so polling never decodes them in Python.
+SUMMARY_SQL = '''SELECT json_set(json_remove(d.value, '$.prompt_snapshot', '$.resume_requests', '$.attempts'),
+    '$.title', json_extract(d.value, '$.prompt_snapshot.context.concept.title'),
+    '$.attempts', json((SELECT json_group_array(json_object('attempt', json_extract(a.value, '$.attempt'),
+        'text', json_extract(a.value, '$.text'), 'status', json_extract(a.value, '$.status'))) FROM json_each(d.value, '$.attempts') a)))
+    FROM documents d WHERE namespace = 'streams' '''
+BRIEF_SQL = "SELECT json_remove(value, " + ', '.join(f"'$.{k}'" for k in BRIEF_DROP) + ") FROM documents WHERE namespace = 'streams'"
+
+
+def summaries(store, request):
+    """Turns as the interface shows them, oldest first. `brief` keeps only identity, channel, section and status."""
+    brief = request.get('brief') is True
+    try:
+        turns = [json.loads(row[0]) for row in store.db.execute(BRIEF_SQL if brief else SUMMARY_SQL)]
+    except sqlite3.OperationalError:  # SQLite built without JSON functions
+        turns = [summarize(t) for t in store.list('streams')]
+        if brief:
+            turns = [{k: v for k, v in t.items() if k not in BRIEF_DROP and k != 'title'} for t in turns]
+    return {'turns': sorted(turns, key=lambda t: t['started_at'])}
+
+OPERATIONS['stream.summaries'] = summaries
 
 
 def pause(store, request):

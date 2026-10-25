@@ -89,7 +89,7 @@ class Annotations(unittest.TestCase):
                 host.wait('two', 5)
                 self.assertNotIn('PRIVATE', runner.prompts[-1])
                 self.assertEqual(client.delete(f'/api/annotations/{identifier}').status_code, 200)
-                self.assertEqual(client.delete(f'/api/annotations/{identifier}').status_code, 409)
+                self.assertEqual(client.delete(f'/api/annotations/{identifier}').status_code, 404)
                 self.assertEqual(client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'state', 'note': 'x', 'extra': 1}).status_code, 400)
 
 

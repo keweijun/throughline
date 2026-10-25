@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { enterToSend } from '../lib/keys';
+  import { modEnterToSend, sendKeys } from '../lib/keys';
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
   import { markdown, hasMath } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
-  import { evidenceLabels, helpLabels } from '../lib/format';
+  import { evidenceLabel, helpLabels, solved as isSolved } from '../lib/format';
   import type { Task } from '../lib/types';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
@@ -15,7 +15,10 @@
   const passages = $derived(mine.map((a) => a.passage));
   const noted = $derived(mine.filter((a) => a.note));
 
-  let answer = $state('');
+  // The answer is kept as a draft, so it survives moving to another section and back.
+  const draftKey = $derived(`exercise:${task.id}`);
+  const answer = $derived(app.drafts.get(draftKey));
+  const setAnswer = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
   let confirmSolution = $state(false);
   let preview = $state('');
@@ -27,32 +30,36 @@
   });
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
-  const working = $derived(jobs.some((j) => app.turn(j.id)?.status === 'running'));
+  const working = $derived(jobs.some((j) => app.isRunning(j.id)));
   const latestJob = $derived([...jobs].sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1));
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
   const submittedAnswer = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob.answer : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
-  const solved = $derived(lastAssessment?.outcome === 'passed');
+  const solved = $derived(isSolved(task));
   const helped = $derived(task.history.some((h) => h.action !== 'assess'));
 
   const status = $derived.by(() => {
     if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
     if (lastAssessment?.kind) {
       const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' ? 'good' : 'accent';
-      return { label: diagnostic(evidenceLabels[lastAssessment.kind] ?? lastAssessment.kind), tone };
+      return { label: evidenceLabel(lastAssessment.kind), tone };
     }
     return null;
   });
 
   async function act(action: string) {
+    if (busy) return;
     busy = true;
     confirmSolution = false;
+    const submitted = answer;
+    const key = draftKey;
     const result = await app.act(() =>
-      api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, action === 'assess' ? { answer } : {}),
+      api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, action === 'assess' ? { answer: submitted } : {}),
     );
     busy = false;
-    if (result && action === 'assess') answer = '';
+    // Keep anything typed while the answer was being sent.
+    if (result && action === 'assess' && app.drafts.get(key) === submitted) app.drafts.set(key, '');
   }
 </script>
 
@@ -85,7 +92,7 @@
       {#each task.history as entry, i}
         <details open={i === task.history.length - 1}>
           <summary>
-            {diagnostic(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {diagnostic(evidenceLabels[entry.kind] ?? entry.kind)}</span>{/if}
+            {t(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}
           </summary>
           {#if entry.answer}
             <section class="your-answer" aria-label={t("Your answer")}>
@@ -107,7 +114,7 @@
       <p class="answer-label">{t("Submitted answer")}</p>
       <div class="prose" use:markdown={{ language: locale.language, text: submittedAnswer, breaks: true }}></div>
       {#if failedJob}
-        <button class="btn btn-small" onclick={() => (answer = submittedAnswer ?? '')}>{t("Restore submitted answer")}</button>
+        <button class="btn btn-small" onclick={() => setAnswer(submittedAnswer ?? '')}>{t("Restore submitted answer")}</button>
       {/if}
     </section>
   {/if}
@@ -120,7 +127,15 @@
     {/if}
     <label class="field">
       <span class="visually-hidden">{t("Exercise answer")}</span>
-      <textarea rows="3" bind:value={answer} use:autogrow={answer} use:enterToSend={() => !busy && answer.trim() && act('assess')} placeholder={t("Write your reasoning and answer. Use $…$ for math.")} aria-label={t("Exercise answer")}></textarea>
+      <textarea
+        rows="3"
+        bind:value={() => answer, setAnswer}
+        use:autogrow={answer}
+        use:modEnterToSend={() => !busy && answer.trim() && act('assess')}
+        placeholder={t("Write your reasoning and answer. Use $…$ for math.")}
+        aria-label={t("Exercise answer")}
+        aria-describedby="exercise-keys-{task.id}"
+      ></textarea>
     </label>
     {#if preview && answer}
       <section class="answer-preview" aria-label={t("Answer preview")}>
@@ -130,6 +145,8 @@
     {/if}
     <div class="actions">
       <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>{t("Check my answer")}</button>
+      <span class="keys" id="exercise-keys-{task.id}">{t("{keys} to check · Enter for a new line", { keys: sendKeys })}</span>
+
       <span class="help">
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
@@ -261,6 +278,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1rem;
+  }
+
+  .keys {
+    font-size: var(--step--1);
+    color: var(--pencil);
   }
 
   .help {

@@ -1,27 +1,36 @@
+/*
+ * Each colour is written once as light-dark(light, dark). The `color-scheme` set below picks the side: the system
+ * preference by default, or the theme chosen in Settings (data-theme on the root element).
+ */
 :root {
-  --ground: #eef1f5;
-  --sheet: #fbfcfd;
-  --raised: #ffffff;
-  --ink: #1b2235;
-  --ink-soft: #3a4357;
-  --pencil: #5f677a;
-  --rule: #d8dde6;
-  --rule-strong: #c3cad6;
-  --accent: #24366e;
-  --accent-hover: #1a2853;
-  --accent-wash: #e3e8f5;
-  --on-accent: #ffffff;
-  --marker: #f0d25c;
-  --marker-wash: rgb(240 210 92 / 0.42);
-  --mine: #3f8f6b;
-  --mine-wash: rgb(92 196 148 / 0.3);
-  --good: #2e6f55;
-  --good-wash: #e2efe8;
-  --caution: #8d5a12;
-  --caution-wash: #f6ecd8;
-  --danger: #a3372f;
-  --danger-wash: #f7e2df;
-  --shadow: 0 1px 2px rgb(27 34 53 / 0.06), 0 8px 28px rgb(27 34 53 / 0.08);
+  --ground: light-dark(#eef1f5, #11141b);
+  --sheet: light-dark(#fbfcfd, #171b24);
+  --raised: light-dark(#ffffff, #1d2230);
+  --ink: light-dark(#1b2235, #e3e6ee);
+  --ink-soft: light-dark(#3a4357, #c3c8d4);
+  --pencil: light-dark(#5f677a, #969db0);
+  --rule: light-dark(#d8dde6, #2b3140);
+  --rule-strong: light-dark(#c3cad6, #3a4256);
+  --accent: light-dark(#24366e, #a9bbf3);
+  --accent-hover: light-dark(#1a2853, #c4d1fa);
+  --accent-wash: light-dark(#e3e8f5, #232c47);
+  --on-accent: light-dark(#ffffff, #121a33);
+  --marker: light-dark(#f0d25c, #e2c44f);
+  --marker-wash: light-dark(rgb(240 210 92 / 0.42), rgb(226 196 79 / 0.26));
+  --mine: light-dark(#3f8f6b, #7cc4a2);
+  --mine-wash: light-dark(rgb(92 196 148 / 0.3), rgb(124 196 162 / 0.24));
+  --good: light-dark(#2e6f55, #7cc4a2);
+  --good-wash: light-dark(#e2efe8, #1b2d26);
+  --caution: light-dark(#8d5a12, #e0b46a);
+  --caution-wash: light-dark(#f6ecd8, #30271a);
+  --danger: light-dark(#a3372f, #f09a90);
+  --danger-wash: light-dark(#f7e2df, #35201e);
+  /* Shadows differ in size as well as colour, so only their colours can follow the scheme. */
+  --shadow-near: light-dark(rgb(27 34 53 / 0.06), rgb(0 0 0 / 0.3));
+  --shadow-far: light-dark(rgb(27 34 53 / 0.08), rgb(0 0 0 / 0.35));
+  --shadow: 0 1px 2px var(--shadow-near), 0 var(--shadow-far-y) var(--shadow-far-blur) var(--shadow-far);
+  --shadow-far-y: 8px;
+  --shadow-far-blur: 28px;
 
   --serif: 'Source Serif 4 Variable', 'Source Serif Pro', Georgia, 'Times New Roman', serif;
   --sans: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -50,59 +59,18 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The only rules that differ between the themes: which side of each colour applies, and the deeper dark shadow. */
 :root[data-theme='dark'] {
-  --ground: #11141b;
-  --sheet: #171b24;
-  --raised: #1d2230;
-  --ink: #e3e6ee;
-  --ink-soft: #c3c8d4;
-  --pencil: #969db0;
-  --rule: #2b3140;
-  --rule-strong: #3a4256;
-  --accent: #a9bbf3;
-  --accent-hover: #c4d1fa;
-  --accent-wash: #232c47;
-  --on-accent: #121a33;
-  --marker: #e2c44f;
-  --marker-wash: rgb(226 196 79 / 0.26);
-  --mine: #7cc4a2;
-  --mine-wash: rgb(124 196 162 / 0.24);
-  --good: #7cc4a2;
-  --good-wash: #1b2d26;
-  --caution: #e0b46a;
-  --caution-wash: #30271a;
-  --danger: #f09a90;
-  --danger-wash: #35201e;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px rgb(0 0 0 / 0.35);
   color-scheme: dark;
+  --shadow-far-y: 10px;
+  --shadow-far-blur: 30px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --ground: #11141b;
-    --sheet: #171b24;
-    --raised: #1d2230;
-    --ink: #e3e6ee;
-    --ink-soft: #c3c8d4;
-    --pencil: #969db0;
-    --rule: #2b3140;
-    --rule-strong: #3a4256;
-    --accent: #a9bbf3;
-    --accent-hover: #c4d1fa;
-    --accent-wash: #232c47;
-    --on-accent: #121a33;
-    --marker: #e2c44f;
-    --marker-wash: rgb(226 196 79 / 0.26);
-  --mine: #7cc4a2;
-  --mine-wash: rgb(124 196 162 / 0.24);
-    --good: #7cc4a2;
-    --good-wash: #1b2d26;
-    --caution: #e0b46a;
-    --caution-wash: #30271a;
-    --danger: #f09a90;
-    --danger-wash: #35201e;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px rgb(0 0 0 / 0.35);
     color-scheme: dark;
+    --shadow-far-y: 10px;
+    --shadow-far-blur: 30px;
   }
 }
 

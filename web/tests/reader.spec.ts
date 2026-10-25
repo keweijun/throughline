@@ -38,6 +38,46 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   expect(errors).toEqual([]);
 });
 
+test('another citation into the same PDF moves the open reader and keeps its zoom', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'View source p. 2' }).first().click();
+  await expect(page.locator('.pdf-page.cited canvas')).toBeVisible();
+  const pageNumber = page.getByRole('textbox', { name: 'Page number' });
+  await expect(pageNumber).toHaveValue('2');
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  const zoom = await page.locator('.reader .zoom').innerText();
+
+  // The exercise cites page 3 of the same PDF.
+  await page.locator('#practice article').first().getByRole('button', { name: 'View source' }).click();
+  await expect(pageNumber).toHaveValue('3');
+  await expect(page.locator('.pdf-page.cited')).toHaveAttribute('data-page', '3');
+  await expect(page.getByRole('button', { name: 'Fit width' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.reader .zoom')).toHaveText(zoom);
+
+  // A page number that is not a number leaves the reader where it is.
+  await pageNumber.fill('abc');
+  await pageNumber.press('Enter');
+  await expect(pageNumber).toHaveValue('3');
+  expect(errors).toEqual([]);
+});
+
+test('the side panel tabs follow the keyboard and focus returns to the toggle on close', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  const questions = page.getByRole('tab', { name: 'Questions' });
+  await expect(questions).toBeFocused();
+  await expect(questions).toHaveAttribute('aria-controls', 'panel-questions');
+  await expect(page.getByRole('tabpanel', { name: 'Questions' })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Source' })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Source' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Questions' })).toHaveAttribute('tabindex', '-1');
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Notes' })).toBeFocused();
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await expect(page.locator('#toggle-notes')).toBeFocused();
+});
+
 test('a Markdown citation opens the whole note at the cited line', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'View source line 2' }).first().click();
@@ -101,11 +141,17 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(model.locator('option')).toHaveText(['Codex default', 'GPT-6.1-Sol', 'GPT-6-Luna']);
   // The Codex default model offers Fast; a model without a Fast tier hides the choice.
   await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toBeVisible();
+  // Reasoning efforts follow what the chosen model supports.
+  const effort = page.getByRole('combobox', { name: 'Reasoning effort', exact: true });
+  await expect(effort.locator('option')).toHaveText(['Low', 'High']);
   await model.selectOption('gpt-6-luna');
+  await expect(effort.locator('option')).toHaveText(['Low']);
+  await expect(effort).toHaveValue('low');
   await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toHaveCount(0);
   await model.selectOption('gpt-6.1-sol');
   await page.getByRole('checkbox', { name: 'Fast mode' }).check();
   await page.getByRole('combobox', { name: 'Small model', exact: true }).selectOption('gpt-6-luna');
+  await expect(page.getByRole('combobox', { name: 'Small model reasoning effort' }).locator('option')).toHaveText(['Same as the teacher', 'Low']);
   await page.getByRole('combobox', { name: 'Small model reasoning effort' }).selectOption('low');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();

@@ -37,7 +37,7 @@ def begin(store, request):
     store.put('web_branches',identifier,branch)
     return {'branch':branch}
 
-OPERATIONS={'branch.begin':begin,'branch.read':read,'branch.list':lambda s,r:{'branches':s.list('web_branches')}}
+OPERATIONS={'branch.begin':begin,'branch.read':read}
 
 
 def decide(store,request):

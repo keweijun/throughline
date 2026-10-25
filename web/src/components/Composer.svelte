@@ -6,16 +6,22 @@
 
   let { conceptId, hasLesson }: { conceptId: string; hasLesson: boolean } = $props();
 
-  let prompt = $state('');
+  // The request is a draft per section, so it survives looking at another section.
+  const draftKey = $derived(`lesson:${conceptId}`);
+  const prompt = $derived(app.drafts.get(draftKey));
+  const setPrompt = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
   const running = $derived(app.runningLesson);
 
   async function start(event: SubmitEvent) {
     event.preventDefault();
+    if (busy || running) return;
     busy = true;
-    const result = await app.startLesson(prompt);
+    const sent = prompt;
+    const key = draftKey;
+    const result = await app.startLesson(sent);
     busy = false;
-    if (result) prompt = '';
+    if (result && app.drafts.get(key) === sent) app.drafts.set(key, '');
   }
 </script>
 
@@ -27,7 +33,7 @@
         <textarea
           id="lesson-prompt"
           rows="2"
-          bind:value={prompt} use:autogrow={prompt} use:enterToSend
+          bind:value={() => prompt, setPrompt} use:autogrow={prompt} use:enterToSend
           placeholder={t("For example: go deeper on the derivation, or explain it with a different example")}
         ></textarea>
       </label>
@@ -47,7 +53,8 @@
         <summary>{t("Change what the lesson focuses on")}</summary>
         <label class="field">
           <span class="visually-hidden">{t("Lesson request")}</span>
-          <textarea id="lesson-prompt" rows="3" bind:value={prompt} use:autogrow={prompt} use:enterToSend placeholder={t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}></textarea>
+          <textarea id="lesson-prompt" rows="3" bind:value={() => prompt, setPrompt} use:autogrow={prompt} use:enterToSend
+ placeholder={t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}></textarea>
         </label>
       </details>
       <div class="row">

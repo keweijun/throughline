@@ -28,6 +28,34 @@
   // Without a model list, a saved tier can still be switched off.
   const fastId = $derived(fastTier?.id ?? (models ? '' : serviceTier));
 
+  // Offer only the reasoning efforts the chosen model supports; the saved one stays selectable either way.
+  const EFFORTS: { id: Settings['effort']; label: MessageKey }[] = [
+    { id: 'minimal', label: 'Minimal' },
+    { id: 'low', label: 'Low' },
+    { id: 'medium', label: 'Medium' },
+    { id: 'high', label: 'High' },
+  ];
+  function effortsFor(id: string) {
+    const chosen = models?.find((m) => (id ? m.id === id : m.default));
+    const offered = EFFORTS.filter((e) => chosen?.efforts?.includes(e.id));
+    return offered.length ? offered : EFFORTS;
+  }
+  const teacherEfforts = $derived(effortsFor(model));
+  const smallEfforts = $derived(effortsFor(smallModel || model));
+  // Switching to a model without the chosen effort picks the nearest one it has, at or below the old choice if possible.
+  function nearest(current: Settings['effort'], offered: typeof EFFORTS) {
+    if (offered.some((e) => e.id === current)) return current;
+    const rank = EFFORTS.findIndex((e) => e.id === current);
+    return ([...offered].reverse().find((e) => EFFORTS.indexOf(e) < rank) ?? offered[0]).id;
+  }
+  $effect(() => {
+    effort = nearest(effort, teacherEfforts);
+  });
+  $effect(() => {
+    if (smallEffort) smallEffort = nearest(smallEffort, smallEfforts);
+  });
+
+
   async function loadModels() {
     if (models) return;
     modelsError = '';
@@ -174,21 +202,20 @@
         <label class="field">
           <span>{t("Reasoning effort")}</span>
           <select bind:value={effort}>
-            <option value="minimal">{t("Minimal")}</option>
-            <option value="low">{t("Low")}</option>
-            <option value="medium">{t("Medium")}</option>
-            <option value="high">{t("High")}</option>
+            {#each teacherEfforts as option (option.id)}
+              <option value={option.id}>{t(option.label)}</option>
+            {/each}
           </select>
         </label>
         <label class="field">
           <span>{t("Small model reasoning effort")}</span>
           <select bind:value={smallEffort}>
             <option value="">{t("Same as the teacher")}</option>
-            <option value="minimal">{t("Minimal")}</option>
-            <option value="low">{t("Low")}</option>
-            <option value="medium">{t("Medium")}</option>
-            <option value="high">{t("High")}</option>
+            {#each smallEfforts as option (option.id)}
+              <option value={option.id}>{t(option.label)}</option>
+            {/each}
           </select>
+
         </label>
         {#if fastId}
           <label class="check">

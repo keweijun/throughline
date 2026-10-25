@@ -139,7 +139,6 @@ const messages = {
   "covered fully later": "后续会完整讲解",
   "a repeated difficulty": "反复遇到的困难",
   "an extension": "延伸问题",
-  "Short answer": "简答",
   "Current section": "当前小节",
   "Visited": "已看过",
   "Not started": "尚未开始",
@@ -191,7 +190,6 @@ const messages = {
   "Ask about this passage": "就这句提问",
   "Pause supplement": "暂停补讲",
   "Regenerate supplement": "重新生成补讲",
-  "Detailed answer": "展开",
   "Study the foundations first": "先补一下",
   "Continue current topic": "继续当前内容",
   "Answer again": "重新回答",
@@ -295,8 +293,6 @@ const messages = {
   "Look at that section": "查看该小节",
   "Back to the passage": "回到原段落",
   "The teacher's unit overview is at the start of the first lesson below.": "老师的单元导览在下方第一次讲解的开头。",
-  "The teacher suggests studying a foundation first:": "老师建议先补充基础：",
-  ". The lesson pauses while you do.": "。补讲期间主线暂停。",
   "Foundation supplement": "基础补讲",
   "Foundation:": "基础：",
   "Return to the lesson": "返回讲解",
@@ -424,8 +420,14 @@ const messages = {
   "Review this chapter's locations in Codex": "在 Codex 中核对本章的位置",
   "The teacher opens with an overview of the whole chapter, then teaches this section. You can pause at any time.": "老师先给出整章导览，再讲解本小节。你可以随时暂停。",
   "The teacher connects this section to the previous one, then teaches it. You can pause at any time.": "老师先衔接上一小节，再讲解本小节。你可以随时暂停。",
+  "{keys} to check · Enter for a new line": "{keys} 检查作答 · Enter 换行",
+  "Short answer, {category}.": "简答，{category}。",
+  "Detailed answer, {category}.": "详细解答，{category}。",
+  "The teacher suggests studying a foundation first: {goal}. The lesson pauses while you do.": "老师建议先补充基础：{goal}。补讲期间主线暂停。",
+  "1 exercise stays open and will be waiting for you.": "1 道练习仍保留待完成。",
 } as const;
-export type MessageKey = keyof typeof messages;
+export type MessageKey
+ = keyof typeof messages;
 export function t(key: MessageKey, values: Record<string, string | number> = {}): string {
   const template = locale.language === 'zh-CN' ? messages[key] : key;
   return template.replace(/\{(\w+)\}/g, (match, name) => String(values[name] ?? match));

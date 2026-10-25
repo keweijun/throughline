@@ -25,6 +25,12 @@
   });
   const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
 
+  // A section outside any chapter has no "This chapter" choice; fall back rather than show nothing.
+  $effect(() => {
+    if (scope === 'chapter' && !chapter) scope = 'section';
+  });
+
+
   /** Your notes as a Markdown file, grouped by chapter and section, for keeping outside the app. */
   function exportNotes() {
     const lines = [`# ${app.state?.course.title ?? ''}`];
@@ -43,7 +49,8 @@
     link.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' }));
     link.download = `${(name ?? 'notes').replace(/[\\/:*?"<>|]+/g, '-')}.md`;
     link.click();
-    URL.revokeObjectURL(link.href);
+    // Revoking at once can cancel the download before the browser has read the file.
+    setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
   }
   const total = $derived(app.state?.annotations.length ?? 0);
 

@@ -6,6 +6,8 @@
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
+  import { questionTurnIds } from '../lib/format';
+
   import QuestionThread from './QuestionThread.svelte';
   import type { Question } from '../lib/types';
 
@@ -27,8 +29,8 @@
   $effect(() => {
     if (!scopeChosen) scope = inSection.length ? 'section' : 'all';
   });
-  const turnsOf = (q: Question) => [q.turn_id, q.supplement_turn_id, ...(q.replies ?? []).map((r) => r.turn_id)].map((id) => app.turn(id));
-  const active = (q: Question) => q.status === 'suggested' || turnsOf(q).some((x) => x?.status === 'running');
+  const turnsOf = (q: Question) => questionTurnIds(q).map((id) => app.turn(id));
+  const active = (q: Question) => q.status === 'suggested' || questionTurnIds(q).some((id) => app.isRunning(id));
   // A few questions can all be read at once; with more, only one being answered opens by itself, and stays open after.
   const isOpen = (q: Question) => opened[q.id] ?? (questions.length <= 3 || active(q));
   $effect(() => {

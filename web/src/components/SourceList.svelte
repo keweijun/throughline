@@ -40,7 +40,9 @@
     }),
   );
   const here = $derived(entries.filter((e) => e.sections.includes(app.viewingId ?? '')));
-  const others = $derived(entries.filter((e) => !e.sections.includes(app.viewingId ?? '')));
+  const chapter = $derived(app.chapterOf(app.viewingId));
+  const inChapter = $derived(entries.filter((e) => !here.includes(e) && e.sections.some((id) => chapter?.concept_ids.includes(id))));
+  const others = $derived(entries.filter((e) => !here.includes(e) && !inChapter.includes(e)));
 </script>
 
 <section class="source-list" aria-labelledby="sources-title">
@@ -51,7 +53,11 @@
   {#if !entries.length}
     <p class="muted">{t("No documents are registered in this course yet. Add files from Codex.")}</p>
   {/if}
-  {#each [{ title: t("Used in this section"), items: here }, { title: here.length ? t("Other sources") : '', items: others }] as group}
+  {#each [
+    { title: t("Used in this section"), items: here },
+    { title: t("Used elsewhere in this chapter"), items: inChapter },
+    { title: here.length || inChapter.length ? t("Other sources") : '', items: others },
+  ] as group}
     {#if group.items.length}
       {#if group.title}<h3>{group.title}</h3>{/if}
       <ul>

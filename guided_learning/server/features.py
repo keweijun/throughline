@@ -57,6 +57,10 @@ def source_url(ref, fmt=None):
     return url + (f'?format={fmt}' if fmt else '')
 
 
+def is_recap(turn):
+    return turn['id'].startswith('recap:')
+
+
 def matching_ref(item, ref):
     return all(item.get(k) == ref[k] for k in ('source_id', 'revision', 'unit_id'))
 
@@ -157,14 +161,45 @@ class Navigation(Feature):
     def prompt(self, turn, context):
         if turn['channel'] != 'mainline':
             return ''
+        language = turn.get('language', 'en')
+        chapter = context.get('chapter')
+        if is_recap(turn):
+            return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
         earlier = [t for t in self.host.turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
-        text = prompts.LESSON_CONTINUES if earlier else prompts.first_lesson(turn.get('language', 'en'))
+        if earlier:
+            text = prompts.LESSON_CONTINUES
+        elif chapter:
+            text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language)
+        else:
+            text = prompts.first_lesson(language)
+        text += '\n' + prompts.SECTION_FOCUS
         due = [i for i in self._due(turn) if i['status'] == 'pending']
         return text + '\n' + prompts.due_explanations(due) if due else text
 
+    def _recap_data(self, chapter):
+        model = self.operation({'op': 'curriculum.view'})
+        titles = {c['id']: c['title'] for c in model['concepts']}
+        deferred = [{'section': titles[t['concept_id']], 'question': t['question']}
+                    for t in self.operation({'op': 'practice.list'})['tasks'] if t['status'] == 'deferred' and t['concept_id'] in chapter['concept_ids']]
+        return [titles[cid] for cid in chapter['concept_ids']], deferred
+
+    def start_recap(self, chapter_id, identifier=None):
+        """A recap is a mainline turn in the chapter's last section; it explains nothing new and adds no exercises."""
+        with self.host.lock:
+            position = self.operation({'op': 'course.status'})['position'] or {}
+            chapter = self.operation({'op': 'curriculum.context'})['chapter'] if position.get('concept_id') else None
+            if not chapter or chapter['id'] != chapter_id or chapter['concept_ids'][-1] != position['concept_id']:
+                raise OperationError('not_at_chapter_end', 'A chapter recap is offered in the last section of the chapter you are studying')
+            chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
+            return self.host.start_turn({'id': 'recap:' + (identifier or str(uuid.uuid4())).removeprefix('recap:'), 'concept_id': position['concept_id'],
+                                         'channel': 'mainline', 'prompt': prompts.recap_request(chapter['title'], chinese)})
+
     def on_complete(self, turn):
         if turn['channel'] != 'mainline':
+            return
+        self.host.practice.resolve_skip(turn)
+        if is_recap(turn):
             return
         for item in self._due(turn):
             if item['status'] != 'pending':
@@ -324,26 +359,75 @@ class Practice(Feature):
 
     def next_section(self, concept_id, request_id):
         with self.host.lock:
-            session = self.operation({'op': 'session.resume'})
-            if session.get('active_branch'):
-                raise OperationError('active_branch', 'Return to the teaching mainline before entering the next section')
-            if any(b.get('choice') == 'accept' and not b.get('returned') for b in self.host.questions.list()):
-                raise OperationError('active_branch', 'Return to the teaching mainline first')
-            current = session.get('position') or {}
+            current = self._guard_mainline()
             if current.get('concept_id') not in (None, concept_id):
                 raise OperationError('stale_position', 'The current position has changed; refresh the page')
             target = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['next_concept_id']
             if not target:
                 return {'finished': True}
-            for turn in self.host.turns():
-                if turn['concept_id'] == concept_id and turn['status'] == 'running':
-                    self.host.pause_turn(turn['id'])
-            concept = self.operation({'op': 'curriculum.context', 'concept_id': target})['concept']
-            chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
-            result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': target,
-                                     'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''})
-            self.host.changed()
-            return result
+            return self._enter(target, request_id)
+
+    def _guard_mainline(self):
+        session = self.operation({'op': 'session.resume'})
+        if session.get('active_branch') or any(b.get('choice') == 'accept' and not b.get('returned') for b in self.host.questions.list()):
+            raise OperationError('active_branch', 'Return to the teaching mainline first')
+        return session.get('position') or {}
+
+    def _enter(self, concept_id, request_id):
+        for turn in self.host.turns():
+            if turn['channel'] == 'mainline' and turn['status'] == 'running':
+                self.host.pause_turn(turn['id'])
+        concept = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['concept']
+        chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
+        result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': concept_id,
+                                 'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''})
+        self.host.changed()
+        return result
+
+    def skipped(self):
+        """Sections the learner skipped with their chapter and has not studied since."""
+        store = Store(self.host.workspace)
+        try:
+            resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
+            return [d for d in store.list('evidence_deferred') if d['id'].startswith('chapter-skip:') and d['id'] not in resolved]
+        finally:
+            store.db.close()
+
+    def skip_chapter(self, chapter_id, request_id):
+        """Move on to the next chapter; the skipped sections stay on the route as deferred."""
+        with self.host.lock:
+            position = self._guard_mainline()
+            model = self.operation({'op': 'curriculum.view'})
+            chapter = next((c for c in model['chapters'] if c['id'] == chapter_id), None)
+            current = position.get('concept_id') or next(iter(model['route']), None)
+            if not chapter or current not in chapter['concept_ids']:
+                raise OperationError('stale_position', 'Skip the chapter you are studying; refresh the page')
+            end = model['route'].index(chapter['concept_ids'][-1])
+            if end + 1 >= len(model['route']):
+                raise OperationError('no_next_chapter', 'No later chapter is built yet')
+            target = model['route'][end + 1]
+            for cid in chapter['concept_ids'][chapter['concept_ids'].index(current):]:
+                self.operation({'op': 'evidence.defer', 'id': f'chapter-skip:{chapter_id}:{cid}', 'concept_id': cid,
+                                'reason': 'Learner skipped the chapter', 'section_id': chapter_id, 'target_concept_id': target})
+            return self._enter(target, request_id)
+
+    def enter_skipped(self, concept_id, request_id):
+        with self.host.lock:
+            self._guard_mainline()
+            if not any(d['concept_id'] == concept_id for d in self.skipped()):
+                raise OperationError('not_skipped', 'Only a skipped section can be studied out of route order')
+            return self._enter(concept_id, request_id)
+
+    def resolve_skip(self, turn):
+        if not turn.get('record_user'):
+            return
+        for item in self.skipped():
+            if item['concept_id'] == turn['concept_id']:
+                try:
+                    self.operation({'op': 'evidence.resolve', 'id': 'resolved:' + item['id'], 'deferred_id': item['id'],
+                                    'interaction_id': 'stream-user:' + turn['id']})
+                except OperationError:
+                    continue
 
     def _sources(self, refs):
         store = Store(self.host.workspace)
@@ -365,7 +449,7 @@ class Practice(Feature):
 
     def on_complete(self, turn):
         self.operation({'op': 'practice.complete', 'id': turn['id']})
-        if turn['channel'] == 'mainline' and not self.host.closing:
+        if turn['channel'] == 'mainline' and not is_recap(turn) and not self.host.closing:
             self.generate(turn['concept_id'])
 
 

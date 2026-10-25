@@ -15,7 +15,7 @@ Use the course workspace as the only official state. Courses live in the learner
 
 ## Prepare a course
 
-Confirm the learner's goal and the paths to their materials. If these are already clear, proceed. Create the course and register PDFs and Markdown with [course operations](references/course-operations.md); inspect failures and unreadable pages. Use [curriculum operations](references/curriculum.md) to build a source-linked concept route and coverage ledger. Show the proposed route and unresolved source checks. A candidate map can be used for learning with its uncertainty visible; do not claim complete verification from extraction alone.
+Confirm the learner's goal and the paths to their materials. If these are already clear, proceed. Create the course and register PDFs and Markdown with [course operations](references/course-operations.md); inspect failures and unreadable pages. Use [curriculum operations](references/curriculum.md) to build a source-linked concept route and coverage ledger, grouped into chapters and saved one chapter at a time. Show the proposed route and unresolved source checks. A candidate map can be used for learning with its uncertainty visible; do not claim complete verification from extraction alone.
 
 Finish every piece of course work (creating a course, adding files, rebuilding a route, reviewing pages) by opening that course in the app as described in [learning app](references/learning-app.md); do not stop at a route summary. An open app tab picks up the changes by itself. The app owns the interactive lesson, questions, practice, and progress display.
 

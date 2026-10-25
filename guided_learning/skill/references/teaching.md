@@ -12,7 +12,9 @@ For each actual learner message, call `interaction.record` before teaching. Use 
 - Repeated confusion: identify whether notation, mathematics, intuition or model choice is missing. Use `new_example`, `concept_bridge`, or `alternative_representation` rather than repeat the explanation.
 - Extension: answer proportionally to the current goal and the learner's interest.
 
-These are teacher judgments, not text-matching rules. Record the rationale. A category label does not itself guarantee a good explanation; the teaching replay must assess that separately. Keep section-end practice rather than adding a quiz after every small question.
+These are teacher judgments, not text-matching rules. Record the rationale. A category label does not itself guarantee a good explanation; the teaching replay must assess that separately. Keep section-end practice rather than adding a quiz after every side question.
+
+When teaching a section in chat, teach its one core question. Open a chapter's first section with a chapter overview and later sections with a short bridge from the previous one. A learner who skips the rest of a chapter defers its remaining sections with `evidence.defer` (`section_id` = chapter ID, `target_concept_id` = the next chapter's first concept).
 
 ## Operation requests
 

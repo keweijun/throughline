@@ -97,3 +97,74 @@ class CurriculumCLI(unittest.TestCase):
         path.write_text('Revised', encoding='utf-8')
         self.call('source.register', path=str(path))
         self.call('curriculum.save', error='invalid_coverage', **self.model())
+
+
+class ChapterCLI(CurriculumCLI):
+    def chapter(self, concepts, coverage=(), **fields):
+        return self.call('curriculum.chapter.save', concepts=list(concepts), coverage=list(coverage), **fields)
+
+    def test_chapters_are_built_one_at_a_time_and_keep_the_route_in_chapter_order(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        self.assertEqual(self.call('curriculum.view')['route'], [])
+        state, projection = self.model()['concepts']
+        self.chapter([state], [self.model()['coverage'][0]], chapter_id='states', summary='What a state represents')
+        model = self.call('curriculum.view')
+        self.assertEqual(model['route'], ['state'])
+        self.assertEqual(model['chapters'][1]['concept_ids'], [])
+        self.call('position.save', position={'concept_id': 'state'})
+        self.assertEqual(self.call('curriculum.context')['chapter']['id'], 'states')
+        self.chapter([projection], self.model()['coverage'][1:], chapter_id='measure')
+        model = self.call('curriculum.view')
+        self.assertEqual(model['route'], ['state', 'projection'])
+        self.assertEqual(len(model['coverage']), 3)
+        self.assertEqual(model['chapters'][0]['summary'], 'What a state represents')
+        view = self.call('curriculum.chapter.view', chapter_id='measure')
+        self.assertEqual([c['id'] for c in view['concepts']], ['projection'])
+        self.assertEqual(len(view['coverage']), 2)
+        self.assertEqual(self.call('curriculum.context', concept_id='projection')['chapter']['index'], 1)
+
+    def test_prerequisites_must_come_from_earlier_or_built_chapters(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        self.chapter([projection], chapter_id='measure', error='invalid_reference')
+        self.chapter([state], chapter_id='states')
+        self.chapter([projection], chapter_id='measure')
+        self.chapter([{**state, 'prerequisites': ['projection']}], chapter_id='states', error='prerequisite_cycle')
+        self.chapter([], chapter_id='measure', error='invalid_route')
+        self.chapter([state], chapter_id='missing', error='unknown_chapter')
+
+    def test_moving_concepts_or_reordering_chapters_needs_confirmation(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        projection['prerequisites'] = []
+        self.chapter([state, projection], chapter_id='states')
+        self.chapter([projection], chapter_id='measure')
+        self.assertEqual(self.call('curriculum.view')['chapters'][0]['concept_ids'], ['state'])
+        self.call('curriculum.outline', chapters=[{'id': 'measure', 'title': 'Measurement'}, {'id': 'states', 'title': 'States'}], error='confirmation_required')
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}], error='invalid_chapters')
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'Quantum states'}, {'id': 'measure', 'title': 'Measurement'}, {'id': 'later', 'title': 'Later'}])
+        self.assertEqual([c['title'] for c in self.call('curriculum.view')['chapters']], ['Quantum states', 'Measurement', 'Later'])
+
+    def test_existing_flat_routes_are_grouped_by_outline_and_full_saves_keep_chapters(self):
+        self.call('curriculum.save', **self.model())
+        self.call('curriculum.outline', chapters=[{'id': 'one', 'title': 'One'}], error='invalid_chapters')
+        self.call('curriculum.outline', chapters=[{'id': 'one', 'title': 'One', 'concept_ids': ['state']}, {'id': 'two', 'title': 'Two', 'concept_ids': ['projection']}])
+        self.call('curriculum.save', **self.model())
+        self.assertEqual(len(self.call('curriculum.view')['chapters']), 2)
+        model = self.model()
+        model['concepts'].append({'id': 'extra', 'title': 'Extra'})
+        model['route'].append('extra')
+        self.call('curriculum.save', error='invalid_chapters', **model)
+        chapters = self.call('curriculum.view')['chapters']
+        chapters[1]['concept_ids'].append('extra')
+        self.call('curriculum.save', chapters=chapters, **model)
+
+    def test_a_source_unit_shared_by_two_chapters_keeps_both_mappings(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        shared = self.refs[1]
+        state = {**state, 'links': state['links'] + [shared]}
+        self.chapter([state], [{**shared, 'disposition': 'mapped', 'concept_ids': ['state']}], chapter_id='states')
+        self.chapter([projection], [{**shared, 'disposition': 'mapped', 'concept_ids': ['projection']}], chapter_id='measure')
+        entry = next(e for e in self.call('curriculum.view')['coverage'] if e['source_id'] == shared['source_id'])
+        self.assertEqual(entry['concept_ids'], ['state', 'projection'])

@@ -9,6 +9,8 @@
 
   const o = $derived(preview.overview);
   const next = $derived(app.concept(preview.next_concept_id));
+  const chapter = $derived(app.chapterOf(preview.concept.id));
+  const opensChapter = $derived(chapter?.concept_ids[0] === preview.concept.id);
   const sourceTitle = (id: string) => app.state?.sources.find((s) => s.id === id)?.path.split(/[\\/]/).pop() ?? id;
 </script>
 
@@ -26,9 +28,17 @@
     </dl>
   {:else}
     <p class="note">
-      {app.hasLesson(preview.concept.id)
-        ? t("The teacher's unit overview is at the start of the first lesson below.")
-        : t("The first lesson opens with a full unit overview written by the teacher.")}
+      {#if chapter && !opensChapter}
+        {t("Part of the chapter {chapter}. Its overview opens the chapter's first section.", { chapter: chapter.title })}
+      {:else if chapter}
+        {app.hasLesson(preview.concept.id)
+          ? t("The teacher's chapter overview is at the start of the first lesson below.")
+          : t("The first lesson opens with an overview of the whole chapter, written by the teacher.")}
+      {:else}
+        {app.hasLesson(preview.concept.id)
+          ? t("The teacher's unit overview is at the start of the first lesson below.")
+          : t("The first lesson opens with a full unit overview written by the teacher.")}
+      {/if}
     </p>
     <dl>
       <div>

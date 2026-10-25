@@ -81,6 +81,19 @@ class NextSectionRequest(Body):
     request_id: str
 
 
+class EnterSectionRequest(Body):
+    concept_id: str
+    request_id: str
+
+
+class SkipChapterRequest(Body):
+    request_id: str
+
+
+class RecapRequest(Body):
+    id: Optional[str] = None
+
+
 class SettingsRequest(Body):
     model: str = ''
     small_model: str = ''
@@ -243,7 +256,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'practice': current.practice.state(),
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
-                'annotations': current.operation({'op': 'annotations.list'})['annotations']}
+                'annotations': current.operation({'op': 'annotations.list'})['annotations'],
+                'skipped': current.practice.skipped()}
 
     @app.get('/api/events')
     async def events(request: Request):
@@ -340,6 +354,19 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/sections/next')
     def next_section(body: NextSectionRequest):
         return host.practice.next_section(body.concept_id, body.request_id)
+
+    @app.post('/api/sections/enter')
+    def enter_section(body: EnterSectionRequest):
+        return host.practice.enter_skipped(body.concept_id, body.request_id)
+
+    @app.post('/api/chapters/{chapter_id}/skip')
+    def skip_chapter(chapter_id: str, body: SkipChapterRequest):
+        return host.practice.skip_chapter(chapter_id, body.request_id)
+
+    @app.post('/api/chapters/{chapter_id}/recap')
+    def recap(chapter_id: str, body: RecapRequest):
+        result = host.navigation.start_recap(chapter_id, body.id)
+        return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.post('/api/preparation/retry')
     def retry_preparation():

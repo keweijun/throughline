@@ -28,6 +28,8 @@
   const seenKey = $derived(`overview-seen:${app.state?.course.id}:${conceptId}`);
   const explanations = $derived(app.explanationsFor(conceptId));
   const bookmarked = $derived(!!app.bookmark(conceptId));
+  const chapter = $derived(app.chapterOf(conceptId));
+  const skipped = $derived(app.isSkipped(conceptId));
   const goal = $derived(
     position?.goal ||
       concept?.objective ||
@@ -106,16 +108,29 @@
     {#if !isCurrent}
       <div class="previewing" role="note">
         <p>
+          {#if skipped}{t("You skipped this section with its chapter.")}{/if}
           {t("You're previewing this section. Your learning position stays at")}
           <strong>{app.concept(app.currentId)?.title}</strong>.
         </p>
-        <button class="btn btn-small" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
+        <div class="previewing-actions">
+          {#if skipped}
+            <button class="btn btn-small btn-primary" onclick={() => app.studySkipped(conceptId)}>{t("Study this section now")}</button>
+          {/if}
+          <button class="btn btn-small" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
+        </div>
       </div>
     {/if}
 
     <header class="head">
       <div class="eyebrow-row">
-        <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
+        {#if chapter}
+          <p class="eyebrow">
+            <button class="chapter-link" onclick={() => app.viewChapter(chapter.id)}>{chapter.title}</button>
+            · {t('Section {number} of {total}', { number: chapter.concept_ids.indexOf(conceptId) + 1, total: chapter.concept_ids.length })}
+          </p>
+        {:else}
+          <p class="eyebrow">{t('Section {number} of {total}', { number: index + 1, total })}</p>
+        {/if}
         <button
           class="btn btn-quiet btn-small bookmark"
           aria-pressed={bookmarked}
@@ -254,6 +269,25 @@
 
   .bookmark {
     color: var(--pencil);
+  }
+
+  .chapter-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .chapter-link:hover {
+    text-decoration: underline;
+  }
+
+  .previewing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .bookmark[aria-pressed='true'] {

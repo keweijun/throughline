@@ -7,21 +7,44 @@
   import { autogrow } from '../lib/autogrow';
   import type { Annotation } from '../lib/types';
 
-  let scope = $state<'section' | 'all'>('section');
+  let scope = $state<'section' | 'chapter' | 'all'>('section');
   let draft = $state('');
   let editing = $state<string | null>(null);
   let edit = $state('');
   let flash = $state<string | null>(null);
 
   const viewing = $derived(app.viewingId);
+  const chapter = $derived(app.chapterOf(viewing));
   const groups = $derived.by(() => {
     const all = app.state?.annotations ?? [];
     const route = app.state?.curriculum.route ?? [];
-    const ids = scope === 'section' ? [viewing] : route;
+    const ids = scope === 'section' ? [viewing] : scope === 'chapter' ? (chapter?.concept_ids ?? []) : route;
     return ids
-      .map((id) => ({ concept: app.concept(id), items: all.filter((a) => a.concept_id === id) }))
+      .map((id) => ({ concept: app.concept(id), chapter: app.chapterOf(id), items: all.filter((a) => a.concept_id === id) }))
       .filter((g) => g.concept && (g.items.length || scope === 'section'));
   });
+  const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
+
+  /** Your notes as a Markdown file, grouped by chapter and section, for keeping outside the app. */
+  function exportNotes() {
+    const lines = [`# ${app.state?.course.title ?? ''}`];
+    let heading: string | undefined;
+    for (const group of groups) {
+      if (group.chapter && group.chapter.title !== heading) lines.push('', `## ${(heading = group.chapter.title)}`);
+      lines.push('', `${group.chapter ? '###' : '##'} ${group.concept!.title}`);
+      for (const item of group.items) {
+        lines.push('', `- ${label(item)}${item.source?.label ? ` (${item.source.label})` : ''}`);
+        if (item.passage) lines.push(...item.passage.split('\n').map((line) => `  > ${line}`));
+        if (item.note) lines.push(...item.note.split('\n').map((line) => `  ${line}`));
+      }
+    }
+    const name = scope === 'chapter' ? chapter?.title : scope === 'section' ? groups[0]?.concept?.title : app.state?.course.title;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' }));
+    link.download = `${(name ?? 'notes').replace(/[\\/:*?"<>|]+/g, '-')}.md`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
   const total = $derived(app.state?.annotations.length ?? 0);
 
   async function add(event: SubmitEvent) {
@@ -84,10 +107,18 @@
 
   <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
     <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
+    {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
     <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
   </div>
 
-  {#each groups as group (group.concept!.id)}
+  {#if shown}
+    <button class="btn btn-quiet btn-small export" onclick={exportNotes}>{t("Export these notes as Markdown")}</button>
+  {/if}
+
+  {#each groups as group, i (group.concept!.id)}
+    {#if scope === 'all' && group.chapter && group.chapter.id !== groups[i - 1]?.chapter?.id}
+      <h3 class="chapter">{group.chapter.title}</h3>
+    {/if}
     <section class="group">
       <h3>{group.concept!.title}</h3>
       {#if !group.items.length}
@@ -161,6 +192,17 @@
 
   .scope {
     margin-top: 0.5rem;
+  }
+
+  .export {
+    justify-self: start;
+    padding-left: 0;
+  }
+
+  h3.chapter {
+    margin-top: 1.4rem;
+    font-size: var(--step-0);
+    color: var(--ink);
   }
 
   h3 {

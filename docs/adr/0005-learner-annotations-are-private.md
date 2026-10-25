@@ -13,4 +13,4 @@ In Codex, the skill may read annotations only when the learner asks about them d
 ## Scope
 
 - An annotation belongs to one route section, and to a passage in a lesson, a side-question answer or an exercise, a source location (exact revision and unit), or the section as a whole. A lesson, answer or exercise sets the section itself. Only the note text can be edited afterward.
-- No freeform notebook, tags, export or sync to other apps yet. ADR 0001's "no Obsidian synchronization" still holds; export can be reconsidered as a one-way copy if learners ask for it.
+- No freeform notebook, tags or sync to other apps yet. ADR 0001's "no Obsidian synchronization" still holds. The Notes tab can export the shown notes (a section, a chapter or the course) as a one-way Markdown download; nothing is read back.

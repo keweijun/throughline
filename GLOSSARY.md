@@ -28,7 +28,7 @@ _Avoid_: Resolved, ignored question.
 **Mainline restore point**: The unfinished teaching position before a branch, including the current goal, explanation progress, and remaining steps.
 _Avoid_: End of chat, latest message.
 
-**Learning section**: A teaching unit that answers one core question, explaining closely related ideas together; it may span sources and turns and ends with grouped practice.
+**Learning section**: A part of the route that answers one core question, explaining closely related ideas together; it may span sources and turns and ends with grouped practice.
 _Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
 
 **Chapter**: A table-of-contents grouping of consecutive learning sections, built and revised one at a time; it is never taught as one block. A chapter with no sections is not built yet (ADR 0006).

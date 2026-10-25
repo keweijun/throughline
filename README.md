@@ -9,7 +9,7 @@
 
 ![A lesson in Throughline: the course route on the left, the current section with its goal, next step and a streamed lesson with citations](docs/images/lesson-en.png)
 
-Throughline organizes several PDFs and Markdown documents into one source-linked route, then teaches it in your browser: unit overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
+Throughline organizes several PDFs and Markdown documents into one source-linked route, then teaches it in your browser: chapter overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
 
 The teacher makes instructional judgments from your materials. The program validates state and references; it never decides on its own that you have understood something. Everything runs on your computer, with your own Codex as the teacher.
 
@@ -74,7 +74,7 @@ Throughline is where you study; Codex is where courses are built. You move betwe
 ## Study
 
 - **Route and goal.** The left rail is the course route; each section shows its goal and the next thing to do.
-- **Lessons.** The first lesson of a section opens with a unit overview, then teaches. Text streams in and is saved when complete; you can pause or ask for another pass.
+- **Lessons.** The first lesson of a chapter opens with an overview of the chapter; later sections open with a short bridge from the one before, then teach. Text streams in and is saved when complete; you can pause or ask for another pass.
 - **Side questions.** Select a sentence or formula and ask about it. The lesson keeps going unless you pause it. Questions that a later section answers properly are saved for that section.
 - **Sources.** Hover a citation to see the cited text; click it to open the exact page or line in the built-in reader. Unchecked sources stay marked "Pending verification".
 - **Practice.** Exercises follow each lesson. Hints and solutions are always available, but help is recorded, so a helped answer is never counted as solved on your own.

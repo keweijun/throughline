@@ -13,7 +13,7 @@ def execute(workspace, request):
     handler = operations.get(request['op'])
     if handler is None:
         raise OperationError('unknown_operation', request['op'])
-    store = Store(workspace)
+    store = Store(workspace, create=request['op'] == 'course.init')
     try:
         with store.db:
             store.db.execute('BEGIN IMMEDIATE')

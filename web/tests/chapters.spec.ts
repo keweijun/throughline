@@ -1,4 +1,4 @@
-import { test, expect } from './fixture';
+import { test, expect, dragSelect } from './fixture';
 
 test('route groups sections by chapter and the chapter page shows progress and coverage', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
@@ -20,29 +20,48 @@ test('route groups sections by chapter and the chapter page shows progress and c
   expect(errors).toEqual([]);
 });
 
-test('a chapter ends with an optional recap whose questions are asked for separately', async ({ page, course }) => {
+test('the last section links to the chapter page, whose recap is a lesson that never moves the learner', async ({ page, course }) => {
   const { base, errors } = await course('chapters_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('A short lesson');
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('End of chapter States')).toBeVisible();
   await expect(page.getByText('Next chapter: Measurement')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Recap this chapter' }), 'the recap is on the chapter page').toHaveCount(0);
+  await page.getByRole('button', { name: 'End of chapter: recap and quiz →' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await page.getByRole('button', { name: 'Recap this chapter' }).click();
   await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' })).toBeVisible();
-  await expect(page.locator('.lesson-body').last()).toContainText('The chapter in one line');
+  const recap = page.locator('.lesson-body').last();
+  await expect(recap).toContainText('The chapter in one line');
+  await expect(page.getByRole('button', { name: 'Recap again' })).toBeVisible();
 
+  // Passages in the recap can be highlighted like any lesson's.
+  expect((await dragSelect(page, recap.locator('p').first())).trim().length).toBeGreaterThan(5);
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size)).toBe(1);
+
+  await page.locator('#route').getByRole('button', { name: /Superposition/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
+  await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' }), 'the recap is not one of the section lessons').toHaveCount(0);
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
+
+  // An earlier chapter can be recapped from anywhere.
+  await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
+  await page.getByRole('button', { name: 'Recap again' }).click();
+  await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' })).toHaveCount(2);
   await page.locator('#route').getByRole('button', { name: /Chapter 2 · Measurement/ }).click();
   await expect(page.getByRole('button', { name: 'Skip to the next chapter' }), 'no later chapter is built').toHaveCount(0);
 
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.position.concept_id).toBe('outcomes');
-  // The section's own lesson asked for exercises once; the recap asked only for its retrieval questions (ADR 0008).
+  const recaps = state.turns.filter((turn: { id: string }) => turn.id.startsWith('recap:'));
+  expect(recaps.map((turn: { chapter_id: string; concept_id: string }) => [turn.chapter_id, turn.concept_id])).toEqual([['states', 'superposition'], ['states', 'superposition']]);
+  // The section's own lesson asked for exercises once; a recap asks for nothing (the quiz is taken on purpose).
   const jobs = state.practice.jobs.filter((job: { concept_id: string }) => job.concept_id === 'superposition');
-  expect(jobs.map((job: { purpose?: string }) => job.purpose ?? 'exercises').sort()).toEqual(['exercises', 'recap']);
+  expect(jobs.map((job: { purpose?: string }) => job.purpose ?? 'exercises')).toEqual(['exercises']);
   expect(errors).toEqual([]);
 });
 

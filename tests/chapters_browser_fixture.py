@@ -24,7 +24,7 @@ execute(root, {'op': 'curriculum.chapter.save', 'chapter_id': 'measurement', 'co
 
 class Runner:
     def run(self, prompt, cwd, emit, cancel):
-        text = '{"questions": []}' if 'Practice only' in prompt else ('## Chapter recap\n\nThe chapter in one line.' if 'Chapter recap' in prompt else '## Lesson\n\nA short lesson.')
+        text = '{"questions": []}' if 'Practice only' in prompt else ('## Chapter recap\n\nThe chapter in one line: states and their superpositions.' if 'Chapter recap' in prompt else '## Lesson\n\nA short lesson.')
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

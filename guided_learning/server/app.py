@@ -268,6 +268,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         practice = current.practice.state()
         review = current.review.state(practice)
         # Review questions and their requests live on the review page, not among a section's exercises (ADR 0008).
+        # Chapter recaps and quiz questions carry chapter_id; the chapter page lists them, section views leave them out.
         return {**snapshot,
                 'questions': [_public_question(b) for b in current.questions.list()],
                 'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review'],
@@ -403,6 +404,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/chapters/{chapter_id}/recap')
     def recap(chapter_id: str, body: RecapRequest):
         result = host.navigation.start_recap(chapter_id, body.id)
+        return {**result, 'turn': turn_summary(result['turn'])}
+
+    @app.post('/api/chapters/{chapter_id}/quiz')
+    def chapter_quiz(chapter_id: str):
+        result = host.practice.quiz(chapter_id)
         return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.post('/api/preparation/retry')

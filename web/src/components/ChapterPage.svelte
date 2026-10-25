@@ -4,6 +4,8 @@
   import { solved } from '../lib/format';
   import CodexLink from './CodexLink.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
+  import ChapterRecap from './ChapterRecap.svelte';
+  import ChapterQuiz from './ChapterQuiz.svelte';
 
   let { chapterId }: { chapterId: string } = $props();
 
@@ -58,8 +60,6 @@
       .map((id) => app.concept(id))
       .filter((c) => c?.prerequisites?.some((p) => ids.includes(p))),
   );
-
-  const canRecap = $derived(isCurrent && app.currentId === last && app.hasLesson(last ?? null) && !app.runningLesson);
 
   function skip() {
     const warning = dependents.length
@@ -122,20 +122,19 @@
         {/if}
       </section>
 
-      {#if isCurrent}
+      {#if app.chapterStudied(chapterId)}
+        <ChapterRecap {chapter} />
+        <ChapterQuiz {chapter} />
+      {:else}
+        <p class="note">{t("A recap and a quiz on this chapter open once you have studied one of its sections.")}</p>
+      {/if}
+
+      {#if isCurrent && following && app.chapterOf(following.id)?.id !== chapterId}
         <section class="actions" aria-label={t("Chapter actions")}>
-          {#if canRecap}
-            <div>
-              <button class="btn btn-primary" onclick={() => app.recapChapter(chapterId)}>{t("Recap this chapter")}</button>
-              <p class="note">{t("A recap connects the chapter's sections, lists exercises you set aside and ends with a few questions to answer from memory. No new material.")}</p>
-            </div>
-          {/if}
-          {#if following && app.chapterOf(following.id)?.id !== chapterId}
-            <div>
-              <button class="btn" onclick={skip}>{t("Skip to the next chapter")}</button>
-              <p class="note">{t("Skipped sections stay on the route. You can come back and study them at any time.")}</p>
-            </div>
-          {/if}
+          <div>
+            <button class="btn" onclick={skip}>{t("Skip to the next chapter")}</button>
+            <p class="note">{t("Skipped sections stay on the route. You can come back and study them at any time.")}</p>
+          </div>
         </section>
       {/if}
     {/if}

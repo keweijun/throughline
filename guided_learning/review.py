@@ -1,7 +1,7 @@
 """Spaced review schedule (ADR 0008), computed from assessment evidence whenever it is read.
 
 A section becomes reviewable once one of its exercises is assessed `passed`. Its review is due INTERVALS[step] days
-after the last pass. A review (a task with origin `review`, or a `recap` task, which reviews every section it tests)
+after the last pass. A review (a task with origin `review`, or a `chapter_quiz` task, which reviews every section it tests)
 moves the step: an unaided pass to the next interval, an assisted pass keeps it, `needs_work` returns to the first. An
 ordinary exercise passed later restarts the wait at the same step. Sections skipped with their chapter are not scheduled.
 """
@@ -13,7 +13,7 @@ from .store import OperationError
 DAY = 86400
 INTERVALS = (1, 3, 7, 21, 60)
 DAILY_CAP = 5
-REVIEW_ORIGINS = ('review', 'recap')
+REVIEW_ORIGINS = ('review', 'chapter_quiz')
 UNAIDED = ('independent', 'retest_passed')
 
 
@@ -39,7 +39,7 @@ def assessments(store):
         interaction = store.get('interactions', item['assessment_id']) or {}
         task = tasks.get(item.get('exercise_id')) or {}
         origin = task.get('origin')
-        sections = task.get('tests_concept_ids') if origin == 'recap' and task.get('tests_concept_ids') else [item['concept_id']]
+        sections = task.get('tests_concept_ids') if origin == 'chapter_quiz' and task.get('tests_concept_ids') else [item['concept_id']]
         events.append({'sequence': interaction.get('sequence', 0), 'at': item.get('assessed_at') or 0, 'kind': item['kind'],
                        'passed': item['outcome'] == 'passed', 'review': origin in REVIEW_ORIGINS, 'sections': sections})
     return sorted(events, key=lambda e: e['sequence'])

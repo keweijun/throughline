@@ -35,6 +35,11 @@ export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'f
 export type Turn = {
   id: string;
   concept_id: string;
+  /**
+   * Set on a chapter recap: it belongs to the chapter page, and `concept_id` (the chapter's last section) is only the
+   * anchor for section-scoped records.
+   */
+  chapter_id?: string;
   channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build';
   prompt: string;
   status: TurnStatus;
@@ -94,9 +99,17 @@ export type Task = {
   id: string;
   concept_id: string;
   question: string;
-  /** `review` and `recap` are retrieval questions (ADR 0008); a recap question names the sections it tests. */
-  origin: 'source' | 'self_created' | 'review' | 'recap';
+  /**
+   * `review` and `chapter_quiz` are retrieval questions (ADR 0008). A chapter quiz question belongs to its chapter
+   * (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks an earlier exercise
+   * again, the exercise it came from.
+   */
+  origin: 'source' | 'self_created' | 'review' | 'chapter_quiz';
   tests_concept_ids?: string[];
+  chapter_id?: string;
+  quiz_id?: string;
+  from_task_id?: string;
+  created_at?: number;
   source_refs: Ref[];
   status: 'pending' | 'attempted' | 'deferred';
   history: PracticeHistory[];
@@ -110,7 +123,8 @@ export type PracticeJob = {
   concept_id: string;
   action: 'generate' | PracticeAction;
   task_id?: string;
-  purpose?: 'review' | 'recap';
+  purpose?: 'review' | 'chapter_quiz';
+  chapter_id?: string;
   processed?: boolean;
   error?: string;
 };

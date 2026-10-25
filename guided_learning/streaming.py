@@ -26,6 +26,13 @@ def start(store, request):
     identity = {'record_user':request.get('record_user',True), 'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
     if identity['channel'] not in ('mainline','sidequestion','practice','preparation','build'):
         raise OperationError('invalid_channel','Unknown teaching channel')
+    if 'chapter_id' in request:
+        # A turn owned by a chapter (its recap) is shown on the chapter page; concept_id stays the chapter's last
+        # section, the anchor for the section-scoped records every turn has (ADR 0006).
+        chapter = next((c for c in curriculum.view(store,{})['chapters'] if c['id'] == request['chapter_id']), None)
+        if not chapter or chapter['concept_ids'][-1:] != [concept]:
+            raise OperationError('invalid_request','A chapter turn is anchored to the last section of its chapter')
+        identity['chapter_id'] = chapter['id']
     old = store.get('streams', identifier)
     # Omitted language on a retry means the original request, not today's preference.
     identity['language'] = validate_language(request.get('language', old.get('language','en') if old else preferences(store,{})['preferences']['language']))

@@ -78,7 +78,7 @@ Throughline is where you study; Codex is where courses are built. You move betwe
 - **Side questions.** Select a sentence or formula and ask about it. The lesson keeps going unless you pause it. Questions that a later section answers properly are saved for that section.
 - **Sources.** Hover a citation to see the cited text; click it to open the exact page or line in the built-in reader. Unchecked sources stay marked "Pending verification".
 - **Practice.** Exercises follow each lesson. Hints and solutions are always available, but help is recorded, so a helped answer is never counted as solved on your own.
-- **Review.** A section you have solved comes back after 1, 3, 7, 21 and then 60 days with a fresh question to answer from memory, at most five a day; **Review** in the top bar shows what is due. A chapter recap ends with a few such questions spanning the chapter.
+- **Review.** A section you have solved comes back after 1, 3, 7, 21 and then 60 days with a fresh question to answer from memory, at most five a day; **Review** in the top bar shows what is due. Each chapter page also offers an optional chapter quiz that mixes earlier exercises with new questions spanning the chapter.
 
 <table>
   <tr>

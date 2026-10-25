@@ -52,7 +52,48 @@ def date_assessments(store):
             store.put('evidence', item['id'], item)
 
 
-MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments]
+def chapter_owned_recaps(store):
+    """The chapter recap and its questions belong to the chapter and are shown on the chapter page (ADR 0006, 0008).
+
+    Recap turns (ids `recap:`) gain `chapter_id`; recap questions become chapter quiz questions (`origin: "chapter_quiz"`,
+    keeping `tests_concept_ids`) with `chapter_id` and a `quiz_id` naming the request that made them, and recap question
+    requests become chapter quiz requests. Each keeps `concept_id`, the chapter's last section when it was made, as its
+    anchor for section-scoped records. The chapter is the one that now contains that section; a recap turn whose frozen
+    chapter differs, or any record whose section is no longer in a chapter (moved or removed), cannot be placed: it stays
+    anchored to its section, unowned, where it shows as before.
+    """
+    chapters = (store.get('curriculum', 'model') or {}).get('chapters') or []
+
+    def owner(concept_id):
+        return next((c['id'] for c in chapters if concept_id in c.get('concept_ids', [])), None)
+
+    for turn in store.list('streams'):
+        if not turn['id'].startswith('recap:') or turn.get('chapter_id'):
+            continue
+        chapter = owner(turn.get('concept_id'))
+        frozen = (((turn.get('prompt_snapshot') or {}).get('context') or {}).get('chapter') or {}).get('id')
+        if chapter and frozen in (None, chapter):
+            turn['chapter_id'] = chapter
+            store.put('streams', turn['id'], turn)
+    for job in store.list('practice_jobs'):
+        if job.get('purpose') != 'recap':
+            continue
+        job['purpose'] = 'chapter_quiz'
+        chapter = owner(job.get('concept_id'))
+        if chapter:
+            job.update(chapter_id=chapter, quiz_id=job['id'], earlier=[])
+        store.put('practice_jobs', job['id'], job)
+    for task in store.list('practice_tasks'):
+        if task.get('origin') != 'recap':
+            continue
+        task['origin'] = 'chapter_quiz'
+        chapter = owner(task.get('concept_id'))
+        if chapter:
+            task.update(chapter_id=chapter, quiz_id=task['id'].rsplit(':', 1)[0])
+        store.put('practice_tasks', task['id'], task)
+
+
+MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments, chapter_owned_recaps]
 VERSION = len(MIGRATIONS) + 1
 
 

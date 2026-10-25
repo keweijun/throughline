@@ -35,7 +35,7 @@ class Runner:
     def run(self, prompt, cwd, emit, cancel):
         if 'Practice only (spaced review)' in prompt:
             text = json.dumps({'questions': [{'question': 'A state is multiplied by $-1$. Does anything you can measure change? Why?'}]})
-        elif 'Practice only (chapter recap)' in prompt:
+        elif 'Practice only (chapter quiz)' in prompt:
             text = json.dumps({'questions': [{'question': 'Why must the amplitudes of a superposition be normalized together?', 'tests_concept_ids': ['state', 'superposition']},
                                              {'question': 'Write a new superposition with equal probabilities.', 'tests_concept_ids': ['superposition']}]})
         elif 'Question and help history' in prompt:

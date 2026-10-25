@@ -98,10 +98,10 @@ class Schedule(unittest.TestCase):
         self.assess('a', T0 + 3 * DAY, kind='needs_work')
         self.assertEqual(self.section(T0 + 3 * DAY, 'a')['interval_days'], 3, 'a failed ordinary exercise is not a review')
 
-    def test_a_recap_question_reviews_every_section_it_tests(self):
+    def test_a_chapter_quiz_question_reviews_every_section_it_tests(self):
         self.assess('a', T0)
         self.assess('b', T0)
-        self.assess('c', T0 + 2 * DAY, origin='recap', tests=['a', 'b'])
+        self.assess('c', T0 + 2 * DAY, origin='chapter_quiz', tests=['a', 'b'])
         now = T0 + 2 * DAY
         self.assertEqual(self.section(now, 'a')['interval_days'], 3)
         self.assertEqual(self.section(now, 'b')['interval_days'], 3)

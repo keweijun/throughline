@@ -37,14 +37,17 @@ _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number 
 **Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
 _Avoid_: An overview repeated at every section, unit overview (retired: a course without chapters is one chapter).
 
-**Chapter recap**: An optional lesson at the end of a chapter that connects its sections and lists set-aside exercises without new material, followed by two or three retrieval questions spanning the chapter (ADR 0008).
-_Avoid_: Quiz, review test, chapter exam.
+**Chapter recap**: An optional lesson on the chapter page that connects the chapter's sections and lists set-aside exercises without new material. It sets no questions of its own; it offers the chapter quiz (ADR 0006).
+_Avoid_: Review test, chapter exam, a lesson of the chapter's last section.
+
+**Chapter quiz**: An optional set of questions on the chapter page that mixes a few earlier exercises from the chapter's sections, asked again, with two or three new retrieval questions spanning the chapter. Each answer counts as a review of the sections it tests; it never gates the route (ADR 0008).
+_Avoid_: Chapter exam, mastery test, gate, the section's exercises.
 
 **Review**: Returning to a section the learner has passed, after a growing interval (1, 3, 7, 21, then 60 days), to answer one retrieval question about it. Reviews are listed when due, at most five a day, and never gate the route (ADR 0008).
 _Avoid_: Revision of the course plan, reviewing source locations in Codex, a test that must be passed.
 
-**Retrieval question**: A question answered from memory that asks the learner to recall a key idea and apply it to a new situation, without new material or hints. A review asks one; a chapter recap ends with two or three.
-_Avoid_: Flashcard, quiz item, a repeat of an exercise already seen.
+**Retrieval question**: A question answered from memory that asks the learner to recall a key idea and apply it to a new situation, without new material or hints. A review asks one; a chapter quiz adds two or three new ones to the earlier exercises it asks again.
+_Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks earlier exercises again as such, not as new questions).
 
 **Skipped section**: A section deferred when the learner skipped the rest of its chapter; it stays on the route until a lesson there is studied.
 _Avoid_: Excluded, completed, mastered.

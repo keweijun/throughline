@@ -24,10 +24,9 @@
     const later = chapters.slice(chapters.findIndex((c) => c.id === chapter?.id) + 1);
     return endsChapter && !next ? later.find((c) => !c.concept_ids.length) : undefined;
   });
-  const recapped = $derived(app.lessons(conceptId).some((l) => l.id.startsWith('recap:')));
   const activeSupplement = $derived((app.state?.questions ?? []).some((q) => q.choice === 'accept' && !q.returned));
 
-  // Each stays busy until the refreshed state shows the move, so a second click cannot repeat it.
+  // Stays busy until the refreshed state shows the move, so a second click cannot repeat it.
   async function advance() {
     if (busy) return;
     busy = true;
@@ -35,25 +34,12 @@
     busy = false;
     if (moved) window.scrollTo({ top: 0 });
   }
-
-  async function recap(chapterId: string) {
-    if (busy) return;
-    busy = true;
-    await app.recapChapter(chapterId);
-    busy = false;
-  }
 </script>
 
 {#if endsChapter && chapter && app.hasLesson(conceptId)}
-  <section class="chapter-end" aria-label={t("End of chapter")}>
-    <div>
-      <p class="label">{t("End of chapter {chapter}", { chapter: chapter.title })}</p>
-      <p class="note">{t("A recap connects the chapter's sections, lists exercises you set aside and ends with a few questions to answer from memory. No new material.")}</p>
-    </div>
-    <button class="btn" disabled={busy || !!app.runningLesson} onclick={() => recap(chapter.id)}>
-      {recapped ? t("Recap again") : t("Recap this chapter")}
-    </button>
-  </section>
+  <p class="chapter-end">
+    <button class="link" onclick={() => app.viewChapter(chapter.id)}>{t("End of chapter: recap and quiz →")}</button>
+  </p>
 {/if}
 
 {#if next}
@@ -118,15 +104,22 @@
   }
 
   .chapter-end {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
     margin-top: 3rem;
-    padding: 1.1rem 1.35rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--step-0);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    text-decoration: underline;
   }
 
   .chapter-end + .next {

@@ -14,7 +14,7 @@ from . import prompts
 
 log = logging.getLogger(__name__)
 
-RETRIEVAL_ORIGINS = ('review', 'recap')
+RETRIEVAL_ORIGINS = ('review', 'chapter_quiz')
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
 _PDF_LOCK = threading.Lock()
 
@@ -62,6 +62,13 @@ def source_url(ref, fmt=None):
 
 def is_recap(turn):
     return turn['id'].startswith('recap:')
+
+
+def chapter_owned(item):
+    """A chapter recap turn or chapter quiz question: listed on the chapter page, never among a section's lessons or
+    exercises. Its concept_id is the chapter's last section, kept only as the anchor that section-scoped records
+    (stream context, side-question restore points, annotations, practice and evidence) need (ADR 0006)."""
+    return bool(item.get('chapter_id'))
 
 
 def matching_ref(item, ref):
@@ -189,7 +196,7 @@ class Navigation(Feature):
         if is_recap(turn):
             return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
         earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
-                   and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
+                   and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed' and not chapter_owned(t)]
         if earlier:
             text = prompts.LESSON_CONTINUES
         else:
@@ -203,26 +210,45 @@ class Navigation(Feature):
         model = self.operation({'op': 'curriculum.view'})
         titles = {c['id']: c['title'] for c in model['concepts']}
         deferred = [{'section': titles[t['concept_id']], 'question': t['question']}
-                    for t in self.operation({'op': 'practice.list'})['tasks'] if t['status'] == 'deferred' and t['concept_id'] in chapter['concept_ids']]
-        return [titles[cid] for cid in chapter['concept_ids']], deferred
+                    for t in self.operation({'op': 'practice.list'})['tasks']
+                    if t['status'] == 'deferred' and t['concept_id'] in chapter['concept_ids'] and not chapter_owned(t) and t['origin'] not in RETRIEVAL_ORIGINS]
+        studied = set(self.studied(chapter))
+        return ([titles[cid] for cid in chapter['concept_ids']], deferred,
+                [titles[cid] for cid in chapter['concept_ids'] if cid not in studied])
+
+    def chapter(self, chapter_id):
+        chapter = next((c for c in self.operation({'op': 'curriculum.view'})['chapters'] if c['id'] == chapter_id), None)
+        if chapter is None:
+            raise OperationError('unknown_chapter', 'Unknown chapter')
+        if not chapter['concept_ids']:
+            raise OperationError('not_built', 'This chapter is not built yet')
+        return chapter
+
+    def studied(self, chapter):
+        """The chapter's sections with a completed lesson of their own."""
+        done = {t['concept_id'] for t in self.host.brief_turns() if t['channel'] == 'mainline' and t['status'] == 'completed' and not chapter_owned(t)}
+        return [cid for cid in chapter['concept_ids'] if cid in done]
+
+    def studied_chapter(self, chapter_id):
+        """A chapter recap or quiz is offered once any section of the chapter has a completed lesson, wherever the learner is."""
+        chapter = self.chapter(chapter_id)
+        if not self.studied(chapter):
+            raise OperationError('not_studied', 'Study a section of this chapter first')
+        return chapter
 
     def start_recap(self, chapter_id, identifier=None):
-        """A recap is a mainline turn in the chapter's last section; it explains nothing new. Retrieval questions follow it (ADR 0008)."""
+        """A recap is a mainline turn owned by the chapter and shown on its page; it explains nothing new. Starting one
+        never moves the learner's position, and like any lesson it waits while another lesson is being written."""
         with self.host.lock:
-            position = self.operation({'op': 'course.status'})['position'] or {}
-            chapter = self.operation({'op': 'curriculum.context'})['chapter'] if position.get('concept_id') else None
-            if not chapter or chapter['id'] != chapter_id or chapter['concept_ids'][-1] != position['concept_id']:
-                raise OperationError('not_at_chapter_end', 'A chapter recap is offered in the last section of the chapter you are studying')
+            chapter = self.studied_chapter(chapter_id)
             chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
-            return self.host.start_turn({'id': 'recap:' + (identifier or str(uuid.uuid4())).removeprefix('recap:'), 'concept_id': position['concept_id'],
-                                         'channel': 'mainline', 'prompt': prompts.recap_request(chapter['title'], chinese)})
+            return self.host.start_turn({'id': 'recap:' + (identifier or str(uuid.uuid4())).removeprefix('recap:'), 'concept_id': chapter['concept_ids'][-1],
+                                         'chapter_id': chapter['id'], 'channel': 'mainline', 'prompt': prompts.recap_request(chapter['title'], chinese)})
 
     def on_complete(self, turn):
-        if turn['channel'] != 'mainline':
+        if turn['channel'] != 'mainline' or is_recap(turn):
             return
         self.host.practice.resolve_skip(turn)
-        if is_recap(turn):
-            return
         for item in self._due(turn):
             if item['status'] != 'pending':
                 continue
@@ -337,7 +363,7 @@ class Practice(Feature):
                     log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
-    def _launch(self, concept_id, action, task=None, answer=None, purpose=None):
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
@@ -350,6 +376,8 @@ class Practice(Feature):
             job = {'id': identifier, 'concept_id': concept_id, 'action': action}
             if purpose:
                 job['purpose'] = purpose
+            if chapter_id:
+                job['chapter_id'] = chapter_id
             if task:
                 job['task_id'] = task['id']
             if answer is not None:
@@ -361,8 +389,8 @@ class Practice(Feature):
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
 
     def generate(self, concept_id):
-        # Retrieval questions (ADR 0008) are not the section's own exercises.
-        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS]
+        # Retrieval questions (ADR 0008) and a chapter's quiz anchored here are not the section's own exercises.
+        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS and not chapter_owned(t)]
         if existing:
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
@@ -375,6 +403,8 @@ class Practice(Feature):
             raise OperationError('invalid_action', 'Unknown practice action')
         if action == 'defer' and task['origin'] == 'review':
             raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
+        if action == 'defer' and task['origin'] == 'chapter_quiz':
+            raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
         if action == 'defer':
             with self.host.lock:
                 for job in self.state()['jobs']:
@@ -387,7 +417,15 @@ class Practice(Feature):
                 result = self.operation({'op': 'practice.defer', 'id': task['id']})
                 self.host.changed()
                 return result
-        return self._launch(task['concept_id'], action, task, answer if action == 'assess' else None)
+        return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None)
+
+    def _assessed_section(self, task):
+        """The section a task's help and assessment are recorded for: its own, or the first section a chapter quiz question
+        tests, so evidence and retests land on that section (ADR 0008)."""
+        tested = task.get('tests_concept_ids') or []
+        if task['origin'] == 'chapter_quiz' and tested and tested[0] in self.operation({'op': 'curriculum.view'})['route']:
+            return tested[0]
+        return task['concept_id']
 
     def next_section(self, concept_id, request_id):
         with self.host.lock:
@@ -476,30 +514,33 @@ class Practice(Feature):
     def _retrieval_prompt(self, job, context, tasks):
         titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}
         if job['purpose'] == 'review':
-            tested = {job['concept_id']}
-        else:
-            tested = set(context['chapter']['concept_ids'])
-        seen = [t['question'] for t in tasks if ({t['concept_id'], *t.get('tests_concept_ids', [])} & tested)]
-        if job['purpose'] == 'review':
+            seen = [t['question'] for t in tasks if job['concept_id'] in {t['concept_id'], *t.get('tests_concept_ids', [])}]
             return prompts.review_question(context['concept'], seen)
-        sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in context['chapter']['concept_ids']]
-        return prompts.recap_questions(context['chapter'], sections, seen)
+        chapter = next((c for c in self.operation({'op': 'curriculum.view'})['chapters'] if c['id'] == job.get('chapter_id')), None) or context['chapter']
+        tested = set(chapter['concept_ids'])
+        earlier = {t['id']: t for t in tasks if t['id'] in job.get('earlier', [])}
+        again = [{'section': titles.get(earlier[i]['concept_id'], earlier[i]['concept_id']), 'question': earlier[i]['question']}
+                 for i in job.get('earlier', []) if i in earlier]
+        seen = [t['question'] for t in tasks if t['id'] not in earlier and ({t['concept_id'], *t.get('tests_concept_ids', [])} & tested)]
+        sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in chapter['concept_ids']]
+        return prompts.chapter_quiz(chapter, sections, seen, again)
 
-    def recap_questions(self, concept_id):
-        """After a chapter recap, two or three retrieval questions spanning the chapter, unless earlier ones are still open."""
-        open_recap = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] == 'recap'
-                      and not any(h.get('outcome') == 'passed' for h in t['history'])]
-        if open_recap:
-            return {'tasks': open_recap}
-        return self._launch(concept_id, 'generate', purpose='recap')
+    def quiz(self, chapter_id):
+        """A chapter quiz: a few earlier exercises from the chapter asked again plus two or three new questions spanning
+        it (ADR 0008). Offered once any section has a lesson, wherever the learner is, and it never moves the position. A
+        new quiz waits until every question of the chapter's earlier quizzes has been answered."""
+        with self.host.lock:
+            chapter = self.host.navigation.studied_chapter(chapter_id)
+            if any(t.get('chapter_id') == chapter_id and t['origin'] == 'chapter_quiz' and not any(h.get('action') == 'assess' for h in t['history'])
+                   for t in self.state()['tasks']):
+                raise OperationError('quiz_open', 'Answer the questions of the current quiz before taking it again')
+            return self._launch(chapter['concept_ids'][-1], 'generate', purpose='chapter_quiz', chapter_id=chapter_id)
 
     def on_complete(self, turn):
         self.operation({'op': 'practice.complete', 'id': turn['id']})
-        if turn['channel'] == 'mainline' and not self.host.closing:
-            if is_recap(turn):
-                self.recap_questions(turn['concept_id'])
-            else:
-                self.generate(turn['concept_id'])
+        # A chapter recap asks for nothing: the chapter quiz is taken on purpose from the chapter page.
+        if turn['channel'] == 'mainline' and not self.host.closing and not is_recap(turn):
+            self.generate(turn['concept_id'])
 
 
 class Preparation(Feature):

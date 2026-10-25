@@ -82,7 +82,7 @@ class LanguagePreferences(unittest.TestCase):
             self.assertTrue(runner.received.wait(2))
             self.assertEqual(turn['language'],'zh-CN')
             self.assertIn('selected teaching language: Simplified Chinese',runner.prompts[0])
-            self.assertIn('## 单元导览',runner.prompts[0])
+            self.assertIn('## 章节导览',runner.prompts[0])
             self.assertIn('JSON field names/enumerated values unchanged',runner.prompts[0])
             client.put('/api/preferences',json={'language':'en'})
             self.assertEqual(self.op(op='stream.read',id='lesson')['turn']['language'],'zh-CN')

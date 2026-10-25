@@ -54,7 +54,7 @@ Default `verification` is `pending`. Set `verified` only after checking the cont
 
 Changes to the relative order of existing concepts or chapters require the learner's agreement; then pass `confirm_reorder: true`. Adding a node without changing existing relative order is a local revision. Keep stable IDs and defer content instead of deleting concepts.
 
-`curriculum.save` accepts a complete model (`concepts`, `route`, `coverage`, optional `chapters` each with `concept_ids`) in one call. Prefer the chapter operations; use it for small courses or whole-model repairs. Without `chapters` the stored chapters are kept, so a new concept must then be placed through `chapters`, `curriculum.outline` or `curriculum.chapter.save`. With chapters, their `concept_ids` joined in order must equal the route.
+`curriculum.save` accepts a complete model (`concepts`, `route`, `coverage`, optional `chapters` each with `concept_ids`) in one call. Prefer the chapter operations; use it for small courses or whole-model repairs. Without `chapters`, a course with no chapters of its own becomes one chapter titled after the course (id `course`), which follows the route until you outline real chapters; otherwise the stored chapters are kept, so a new concept must then be placed through `chapters`, `curriculum.outline` or `curriculum.chapter.save`. With chapters, their `concept_ids` joined in order must equal the route.
 
 ## Inspect
 

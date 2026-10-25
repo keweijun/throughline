@@ -14,10 +14,18 @@ def source_unit(store, ref):
                 return unit
     raise OperationError('invalid_reference', 'Unknown source revision or unit')
 
+def whole_course_chapter(store, route):
+    """A route saved without chapters is one chapter titled after the course (ADR 0006)."""
+    return {'id': 'course', 'title': (store.get('course', 'metadata') or {}).get('title') or 'Course', 'concept_ids': list(route)}
+
 def save(store, request):
     model = {key: request.get(key, []) for key in ('concepts', 'route', 'coverage')}
     # Omitting chapters keeps the current grouping; new concepts must then be placed through chapters.
     model['chapters'] = request['chapters'] if 'chapters' in request else view(store, request)['chapters']
+    if isinstance(model['route'], list) and model['route'] and (
+            not model['chapters'] or ('chapters' not in request and [c['id'] for c in model['chapters']] == ['course'])):
+        # Without its own chapters, the whole route stays one chapter however the route changes.
+        model['chapters'] = [whole_course_chapter(store, model['route'])]
     return store_model(store, model, request.get('confirm_reorder') is True)
 
 OVERVIEW_TEXT = ('core_problem', 'prior', 'next', 'target_ability')

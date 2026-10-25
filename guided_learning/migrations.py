@@ -31,7 +31,16 @@ def slim_selected_lectures(store):
             store.put('streams', turn['id'], turn)
 
 
-MIGRATIONS = [slim_selected_lectures]
+def group_flat_routes(store):
+    """Courses built before chapters become one chapter, so every course is taught the same way (ADR 0006)."""
+    from .curriculum import whole_course_chapter
+    model = store.get('curriculum', 'model')
+    if isinstance(model, dict) and model.get('route') and not model.get('chapters'):
+        model['chapters'] = [whole_course_chapter(store, model['route'])]
+        store.put('curriculum', 'model', model)
+
+
+MIGRATIONS = [slim_selected_lectures, group_flat_routes]
 VERSION = len(MIGRATIONS) + 1
 
 

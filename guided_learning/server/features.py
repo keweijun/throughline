@@ -191,10 +191,9 @@ class Navigation(Feature):
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed']
         if earlier:
             text = prompts.LESSON_CONTINUES
-        elif chapter:
-            text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language)
         else:
-            text = prompts.first_lesson(language)
+            # Every routed section is in a chapter: flat routes become one chapter (ADR 0006, migration 3).
+            text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language)
         text += '\n' + prompts.SECTION_FOCUS
         due = [i for i in self._due(turn) if i['status'] == 'pending']
         return text + '\n' + prompts.due_explanations(due) if due else text

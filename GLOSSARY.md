@@ -35,7 +35,7 @@ _Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
 _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number of chapters.
 
 **Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
-_Avoid_: Unit overview repeated in every section.
+_Avoid_: An overview repeated at every section, unit overview (retired: a course without chapters is one chapter).
 
 **Chapter recap**: An optional lesson at the end of a chapter that connects its sections and lists set-aside exercises, without new material or exercises.
 _Avoid_: Quiz, review test, chapter exam.
@@ -48,9 +48,6 @@ _Avoid_: Course manager, a second store of progress.
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
-
-**Unit overview**: An introduction to a section in a course without chapters, explaining its core problem, main steps, connections, and target ability.
-_Avoid_: Contents alone, a list of concepts alone.
 
 **Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.
 _Avoid_: A second course with separate progress, a complete chat mirror.

@@ -30,14 +30,10 @@
     <p class="note">
       {#if chapter && !opensChapter}
         {t("Part of the chapter {chapter}. Its overview opens the chapter's first section.", { chapter: chapter.title })}
-      {:else if chapter}
+      {:else}
         {app.hasLesson(preview.concept.id)
           ? t("The teacher's chapter overview is at the start of the first lesson below.")
           : t("The first lesson opens with an overview of the whole chapter, written by the teacher.")}
-      {:else}
-        {app.hasLesson(preview.concept.id)
-          ? t("The teacher's unit overview is at the start of the first lesson below.")
-          : t("The first lesson opens with a full unit overview written by the teacher.")}
       {/if}
     </p>
     <dl>

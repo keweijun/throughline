@@ -637,6 +637,7 @@ summary:focus-visible {
   --settle: 0.22s;
 }
 
+button,
 .btn,
 .segmented label,
 summary,

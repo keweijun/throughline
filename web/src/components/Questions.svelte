@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enterToSend } from '../lib/keys';
+  import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
@@ -126,7 +127,9 @@
     </div>
     <div class="list">
       {#each shown as q (q.id)}
-        <QuestionThread question={q} bind:open={() => isOpen(q), (value) => (opened[q.id] = value)} />
+        <div transition:slide={{ duration: 200 }}>
+          <QuestionThread question={q} bind:open={() => isOpen(q), (value) => (opened[q.id] = value)} />
+        </div>
       {:else}
         <p class="none">{search.trim() ? t("No questions match your search.") : t("No questions from this section yet.")}</p>
       {/each}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t, locale, diagnostic } from './lib/i18n.svelte';
   import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { app } from './lib/store.svelte';
   import TopBar from './components/TopBar.svelte';
   import RouteRail from './components/RouteRail.svelte';
@@ -53,14 +54,14 @@
 <TopBar />
 
 {#if app.error}
-  <div class="banner" role="alert">
+  <div class="banner" role="alert" out:fade={{ duration: 160 }}>
     <p>{diagnostic(app.error)}</p>
     <button class="btn btn-quiet btn-small" onclick={() => (app.error = null)}>{t("Dismiss")}</button>
   </div>
 {/if}
 
 {#if app.notice}
-  <div class="banner notice" role="status">
+  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
     <p>{app.notice}</p>
     <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
   </div>

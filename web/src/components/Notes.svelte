@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enterToSend } from '../lib/keys';
+  import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -94,7 +95,7 @@
       {/if}
       <ul>
         {#each group.items as item (item.id)}
-          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
+          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id} transition:slide={{ duration: 200 }}>
             <p class="kind">
               {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
             </p>

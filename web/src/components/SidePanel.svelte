@@ -126,6 +126,11 @@
     border-bottom-color: var(--accent);
   }
 
+  /* A tab that comes into view fades in rather than replacing the last one in a blink. */
+  .tab:not([hidden]) {
+    animation: enter-fade var(--quick) ease;
+  }
+
   .body {
     flex: 1;
     min-height: 0;

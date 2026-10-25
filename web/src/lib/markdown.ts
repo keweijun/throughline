@@ -97,6 +97,11 @@ export function labelFor(ref: Ref) {
   return page ? t('p. {number}', { number: page[1] }) : line ? t('line {number}', { number: line[1] }) : ref.unit_id;
 }
 
+/** True when the text contains math the renderer would typeset, ignoring code. */
+export function hasMath(text: string) {
+  return [...text.matchAll(MATH)].some((match) => match[2] !== undefined);
+}
+
 export type MarkdownOptions = { language?: Language; text: string; breaks?: boolean; refs?: Ref[]; onSource?: (ref: Ref) => void };
 
 /** Renders sanitized Markdown, patching only changed blocks so streaming keeps selections and scroll. */

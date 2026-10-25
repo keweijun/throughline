@@ -4,7 +4,7 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
-  import { markdown } from '../lib/markdown';
+  import { markdown, hasMath } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
   import { evidenceLabels, helpLabels } from '../lib/format';
   import type { Task } from '../lib/types';
@@ -18,6 +18,13 @@
   let answer = $state('');
   let busy = $state(false);
   let confirmSolution = $state(false);
+  let preview = $state('');
+
+  $effect(() => {
+    const text = answer;
+    const timer = setTimeout(() => (preview = hasMath(text) ? text : ''), 150);
+    return () => clearTimeout(timer);
+  });
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
   const working = $derived(jobs.some((j) => app.turn(j.id)?.status === 'running'));
@@ -113,8 +120,14 @@
     {/if}
     <label class="field">
       <span class="visually-hidden">{t("Exercise answer")}</span>
-      <textarea rows="3" bind:value={answer} use:autogrow={answer} use:enterToSend={() => !busy && answer.trim() && act('assess')} placeholder={t("Write your reasoning and answer")} aria-label={t("Exercise answer")}></textarea>
+      <textarea rows="3" bind:value={answer} use:autogrow={answer} use:enterToSend={() => !busy && answer.trim() && act('assess')} placeholder={t("Write your reasoning and answer. Use $…$ for math.")} aria-label={t("Exercise answer")}></textarea>
     </label>
+    {#if preview && answer}
+      <section class="answer-preview" aria-label={t("Answer preview")}>
+        <p class="answer-label">{t("Preview")}</p>
+        <div class="prose" use:markdown={{ language: locale.language, text: preview, breaks: true }}></div>
+      </section>
+    {/if}
     <div class="actions">
       <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>{t("Check my answer")}</button>
       <span class="help">
@@ -214,6 +227,15 @@
     padding: 0.8rem 1rem;
     background: var(--accent-wash);
     border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+  }
+
+  .answer-preview {
+    margin-top: -0.4rem;
+    padding: 0.6rem 1rem;
+    font-size: var(--step-0);
+    color: var(--ink-soft);
+    border: 1px dashed var(--rule);
     border-radius: var(--radius);
   }
 

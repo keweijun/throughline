@@ -57,3 +57,17 @@ test('failed assessment keeps the submitted answer recoverable even with older f
   await task.getByRole('button', { name: 'Restore submitted answer' }).click();
   await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('First line\nSecond line');
 });
+
+test('an answer with math shows a live preview before it is submitted', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').first();
+  const box = task.getByRole('textbox', { name: 'Exercise answer' });
+  const preview = task.getByRole('region', { name: 'Answer preview' });
+  await box.fill('No math here, it costs $5');
+  await expect(preview).toHaveCount(0);
+  await box.fill('So $x^2 = \\frac{1}{2}$');
+  await expect(preview.locator('.katex')).toHaveCount(1);
+  await expect(preview.locator('[data-exercise]')).toHaveCount(0);
+  await box.fill('');
+  await expect(preview).toHaveCount(0);
+});

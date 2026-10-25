@@ -73,8 +73,8 @@ class Navigation(unittest.TestCase):
         self.host.start_turn({'id':'overview-test','concept_id':'wave','prompt':'Full explanation','channel':'mainline'})
         self.host.wait('overview-test',5)
         self.assertIn('core problem',runner.prompt)
-        self.assertIn('target ability',runner.prompt)
-        self.assertIn('Unit overview',runner.prompt)
+        self.assertIn('its sections in order',runner.prompt)
+        self.assertIn('## Chapter overview',runner.prompt, 'a course without chapters is one chapter')
 
     def test_missing_pdf_renderer_is_explicit_and_original_remains_available(self):
         from pypdf import PdfWriter

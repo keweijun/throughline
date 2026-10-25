@@ -145,6 +145,15 @@ class ChapterCLI(CurriculumCLI):
         self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'Quantum states'}, {'id': 'measure', 'title': 'Measurement'}, {'id': 'later', 'title': 'Later'}])
         self.assertEqual([c['title'] for c in self.call('curriculum.view')['chapters']], ['Quantum states', 'Measurement', 'Later'])
 
+    def test_a_route_saved_without_chapters_is_one_chapter_that_follows_it(self):
+        self.call('curriculum.save', **self.model())
+        self.assertEqual(self.call('curriculum.view')['chapters'], [{'id': 'course', 'title': 'Quantum', 'concept_ids': ['state', 'projection']}])
+        grown = self.model()
+        grown['concepts'].append({'id': 'later', 'title': 'Later'})
+        grown['route'].append('later')
+        self.call('curriculum.save', **grown)
+        self.assertEqual(self.call('curriculum.view')['chapters'][0]['concept_ids'], ['state', 'projection', 'later'])
+
     def test_existing_flat_routes_are_grouped_by_outline_and_full_saves_keep_chapters(self):
         self.call('curriculum.save', **self.model())
         self.call('curriculum.outline', chapters=[{'id': 'one', 'title': 'One'}], error='invalid_chapters')

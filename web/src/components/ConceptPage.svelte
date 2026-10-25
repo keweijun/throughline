@@ -56,7 +56,7 @@
     app.openPanel('questions');
   }
 
-  // The first lesson opens with its own unit overview, so the route summary steps aside once teaching starts.
+  // The first lesson of a chapter opens with its own overview, so the route summary steps aside once teaching starts.
   let hadLesson: boolean | null = null;
   $effect(() => {
     const has = app.hasLesson(conceptId);

@@ -54,6 +54,13 @@ class Migrations(unittest.TestCase):
         turn = execute(self.workspace, {'op': 'stream.read', 'id': 'branch:q'})['turn']
         self.assertEqual(turn['prompt_snapshot']['branch']['selected_lecture'], expected)
 
+    def test_a_course_built_before_chapters_becomes_one_chapter(self):
+        self.raw("DELETE FROM documents WHERE namespace='course' AND key='schema'")
+        self.put('curriculum', 'model', {'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}], 'route': ['a', 'b'], 'coverage': []})
+        model = execute(self.workspace, {'op': 'curriculum.view'})
+        self.assertEqual(model['chapters'], [{'id': 'course', 'title': 'Quantum', 'concept_ids': ['a', 'b']}])
+        self.assertEqual(model['route'], ['a', 'b'])
+
     def test_a_course_from_a_newer_throughline_is_refused_and_listed_with_the_reason(self):
         self.put('course', 'schema', {'version': migrations.VERSION + 1})
         with self.assertRaises(OperationError) as raised:

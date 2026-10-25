@@ -32,13 +32,6 @@ DEFAULT_LESSON_REQUEST = 'Teach this section fully around the current goal: star
 
 LESSON_CONTINUES = 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full overview.'
 
-LESSON_FIRST = '''This is the first formal lesson for this section in the learning interface. Begin the reply with a substantive "## Unit overview", then teach the section directly without asking the learner to confirm.
-Use brief, concrete language to describe the core problem (the question this section answers: the phenomenon, puzzle or task that motivates it), main steps (about three, each naming specific concepts rather than just intuition, formulas, and practice), connections to learned prerequisites and later topics, and target ability (what the learner can explain, prove or calculate afterward).
-Organize the lesson using the supplied route, sources, and actual mainline goal. Keep unverified material explicitly uncertain. Avoid mechanically repeating the contents or inserting preparation status messages. Generate and save the overview and full explanation in the same reply, retaining the necessary derivations, conditions, and examples.'''
-
-
-def first_lesson(language):
-    return LESSON_FIRST.replace('## Unit overview', '## 单元导览') if language == 'zh-CN' else LESSON_FIRST
 
 
 SECTION_FOCUS = '''A section answers one core question; the section's core_question and objective in the route data, when present, state that question and what the learner should be able to do. Teach that question completely, explaining closely related ideas together and bridging missing prerequisites first, but leave material that belongs to other sections of the route to them. Refer back to earlier sections briefly instead of re-introducing them, and leave long hand calculations to practice.'''

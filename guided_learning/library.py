@@ -47,7 +47,7 @@ def is_course(path):
 def fingerprint(path):
     """Changes when course building touches the course: title, position, sources or route. Reads without locking."""
     try:
-        db = sqlite3.connect(f'file:{Path(path) / "course.sqlite3"}?mode=ro', uri=True, timeout=1)
+        db = sqlite3.connect((Path(path) / 'course.sqlite3').resolve().as_uri() + '?mode=ro', uri=True, timeout=1)
         try:
             rows = db.execute("SELECT namespace, key, value FROM documents WHERE namespace IN ('course', 'sources', 'curriculum') ORDER BY namespace, key").fetchall()
         finally:

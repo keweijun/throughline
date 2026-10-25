@@ -131,7 +131,8 @@ class Branches(unittest.TestCase):
                 branch=ask({'id':'q','question':'Old passage?','selection':'saved','selected_turn_id':'a','main_turn_id':'b'})['branch']
                 app.wait('branch:q',3)
                 self.assertEqual(branch['selected_turn_id'],'a')
-                self.assertEqual(branch['selected_lecture']['prompt_snapshot']['context']['concept']['id'],'a')
+                self.assertEqual(branch['selected_lecture']['concept_id'],'a')
+                self.assertNotIn('prompt_snapshot',branch['selected_lecture'])
                 self.assertEqual(branch['restore_point']['concept_id'],'b')
                 turn=app.operation({'op':'stream.read','id':'branch:q'})['turn']
                 self.assertIn('old source text',app.build_prompt(turn))

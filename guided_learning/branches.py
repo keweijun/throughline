@@ -1,6 +1,7 @@
 """Durable side lanes: teacher decisions never mutate the course checkpoint."""
 import time
 from .store import OperationError
+from .migrations import lecture_excerpt
 from .teaching import require_text, create_deferred
 
 
@@ -32,7 +33,7 @@ def begin(store, request):
     if not isinstance(anchor,dict): raise OperationError('invalid_request','anchor must be an object')
     branch={'id':identifier,'question':question,'selection':request.get('selection',''), 'anchor':anchor,
             'restore_point':position,'main_turn_id':current_id,
-            'selected_turn_id':selected_id,'selected_lecture':selected, 'turn_id':'branch:'+identifier,
+            'selected_turn_id':selected_id,'selected_lecture':lecture_excerpt(selected) if selected else None, 'turn_id':'branch:'+identifier,
             'status':'unanswered','decision':None,'choice':None,'created_at':time.time(),'replies':[]}
     store.put('web_branches',identifier,branch)
     return {'branch':branch}

@@ -1,4 +1,5 @@
 from importlib import import_module
+from . import migrations
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
@@ -17,8 +18,13 @@ def execute(workspace, request):
     try:
         with store.db:
             store.db.execute('BEGIN IMMEDIATE')
-            if request['op'] != 'course.init' and store.get('course', 'metadata') is None:
-                raise OperationError('course_not_initialized', 'Run course.init first')
+            if store.get('course', 'metadata') is None:
+                if request['op'] != 'course.init':
+                    raise OperationError('course_not_initialized', 'Run course.init first')
+                result = handler(store, request)
+                migrations.mark_current(store)
+                return result
+            migrations.upgrade(store)
             if request['op'] in ('position.save', 'mainline.enter'):
                 request_id = request.get('request_id')
                 if not isinstance(request_id, str) or not request_id.strip():

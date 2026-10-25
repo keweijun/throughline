@@ -62,7 +62,10 @@ def start(store, request):
         selected=branch.get('selected_lecture')
         if selected:
             for ref in selected.get('source_refs',[]):
-                if ref not in source_refs: source_refs.append(ref)
+                if ref not in source_refs:
+                    source_refs.append(ref)
+                    # The passage may come from an earlier section, so give the teacher its sources too.
+                    context['sources'].append({**ref, **curriculum.source_unit(store,ref), 'stale':curriculum.is_stale(store,ref)})
     turn = {**identity, 'source_refs':source_refs, 'prompt_snapshot':snapshot, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
             'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
     store.put('streams', identifier, turn)

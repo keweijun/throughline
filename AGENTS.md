@@ -11,6 +11,7 @@ Read `GLOSSARY.md` and the relevant ADRs in `docs/adr/` before changing behavior
 - Python tests: `.venv/bin/python -m unittest discover -s tests`. Browser tests: `cd web && npx playwright test`.
 - UI changes: run `npm run check` and `npm run build` in `web/`, and commit the rebuilt `guided_learning/web_dist`.
 - The Codex skill lives in `guided_learning/skill/` and ships with the package; `guided-learning setup` installs it. Operation names and semantics in its references are a stable contract.
+- A change that reshapes stored course data needs a migration in `guided_learning/migrations.py` and a test that starts from the old format (ADR 0007); learners have real courses.
 - Never commit course materials or learning records; they belong in the course library or ignored `work/`.
 
 ## Issues

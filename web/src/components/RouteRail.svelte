@@ -67,8 +67,8 @@
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
     <span class="node" aria-hidden="true"></span>
     <button
-      class:viewing={id === app.viewingId && !app.viewingChapter}
-      aria-current={id === app.viewingId && !app.viewingChapter ? 'page' : undefined}
+      class:viewing={id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
+      aria-current={id === app.viewingId && !app.viewingChapter && !app.reviewOpen ? 'page' : undefined}
       onclick={() => app.view(id)}
     >
       <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
@@ -104,8 +104,8 @@
             ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
             <button
               class="chapter-name"
-              class:viewing={app.viewingChapter === chapter.id}
-              aria-current={app.viewingChapter === chapter.id ? 'page' : undefined}
+              class:viewing={app.viewingChapter === chapter.id && !app.reviewOpen}
+              aria-current={app.viewingChapter === chapter.id && !app.reviewOpen ? 'page' : undefined}
               onclick={() => app.viewChapter(chapter.id)}
             >
               <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>

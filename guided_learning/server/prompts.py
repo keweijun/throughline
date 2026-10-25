@@ -55,7 +55,8 @@ def recap_request(title, chinese):
 
 def chapter_recap(chapter, sections, deferred, language):
     heading = '## 本章回顾' if language == 'zh-CN' else '## Chapter recap'
-    return (f'The learner asked for a recap of the chapter "{chapter["title"]}". Begin with "{heading}". Do not teach new material and do not set exercises. '
+    return (f'The learner asked for a recap of the chapter "{chapter["title"]}". Begin with "{heading}". Do not teach new material and do not set exercises in the lesson: '
+            'two or three retrieval questions spanning the chapter are set separately after it, so do not announce or answer any. '
             'Retrace the chain of reasoning through the chapter\'s sections in order, state the key results with the conditions under which they hold, '
             'show how the sections depend on each other, and point out the confusions most worth checking. Base it on the route and sources; '
             'the learner may not have studied every section closely. If deferred exercises are listed, mention briefly that they wait in their sections. '
@@ -109,6 +110,30 @@ def practice_generate(sources):
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
             'Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. '
             'Use source_id/revision/unit_id in source_refs. Original exercise materials: ' + json.dumps(sources, ensure_ascii=False))
+
+
+RETRIEVAL = ('Each question asks the learner to recall a key idea from memory and apply it to a new situation. '
+             'Teach nothing new and use no material beyond what the sections cover. Give no hints, steps, answers or reminders of the result in the question. '
+             'Do not repeat or lightly reword any exercise the learner has already seen (listed below as data); vary the situation, values or representation. '
+             'Each should take a few minutes to answer in writing.')
+
+
+def review_question(section, seen):
+    """One spaced-review question for a section the learner studied earlier (ADR 0008)."""
+    data = {k: section[k] for k in ('id', 'title', 'core_question', 'objective', 'goal') if section.get(k)}
+    return ('Practice only (spaced review): return JSON {"questions":[{"question":"Question only, without answers or hints"}]} with exactly one question. '
+            f'The learner studied the section "{section["title"]}" earlier and is now reviewing it after a gap. ' + RETRIEVAL
+            + ' Section (data): ' + json.dumps(data, ensure_ascii=False)
+            + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
+
+
+def recap_questions(chapter, sections, seen):
+    """Retrieval questions that close a chapter recap; each names the sections it tests (ADR 0008)."""
+    return ('Practice only (chapter recap): return JSON {"questions":[{"question":"Question only, without answers or hints","tests_concept_ids":["section id"]}]} '
+            f'with two or three questions that together span the chapter "{chapter["title"]}". Prefer questions that connect two or more sections; '
+            'tests_concept_ids lists the ids of the sections each question tests, taken from the sections below. ' + RETRIEVAL
+            + ' Sections (data): ' + json.dumps(sections, ensure_ascii=False)
+            + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
 
 
 PRACTICE_ACTIONS = {

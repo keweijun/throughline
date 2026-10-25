@@ -48,7 +48,7 @@
   <section class="chapter-end" aria-label={t("End of chapter")}>
     <div>
       <p class="label">{t("End of chapter {chapter}", { chapter: chapter.title })}</p>
-      <p class="note">{t("A recap connects the chapter's sections and lists exercises you set aside. No new material, no new exercises.")}</p>
+      <p class="note">{t("A recap connects the chapter's sections, lists exercises you set aside and ends with a few questions to answer from memory. No new material.")}</p>
     </div>
     <button class="btn" disabled={busy || !!app.runningLesson} onclick={() => recap(chapter.id)}>
       {recapped ? t("Recap again") : t("Recap this chapter")}

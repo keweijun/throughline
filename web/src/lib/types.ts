@@ -80,7 +80,7 @@ export type Question = {
   returned?: boolean;
 };
 
-export type EvidenceKind = 'independent' | 'hinted' | 'needs_work';
+export type EvidenceKind = 'independent' | 'retest_passed' | 'hinted' | 'needs_work';
 
 export type PracticeHistory = {
   action: PracticeAction;
@@ -94,7 +94,9 @@ export type Task = {
   id: string;
   concept_id: string;
   question: string;
-  origin: 'source' | 'self_created';
+  /** `review` and `recap` are retrieval questions (ADR 0008); a recap question names the sections it tests. */
+  origin: 'source' | 'self_created' | 'review' | 'recap';
+  tests_concept_ids?: string[];
   source_refs: Ref[];
   status: 'pending' | 'attempted' | 'deferred';
   history: PracticeHistory[];
@@ -108,6 +110,7 @@ export type PracticeJob = {
   concept_id: string;
   action: 'generate' | PracticeAction;
   task_id?: string;
+  purpose?: 'review' | 'recap';
   processed?: boolean;
   error?: string;
 };
@@ -171,6 +174,32 @@ export type State = {
   settings: Settings;
   annotations: Annotation[];
   skipped: Skipped[];
+  review: ReviewState;
+};
+
+/** A section's place in the spaced review schedule; `task_id` is its review question once started. */
+export type ReviewSection = {
+  concept_id: string;
+  step: number;
+  interval_days: number;
+  due_at: number;
+  last_review_at: number | null;
+  task_id: string | null;
+};
+
+/** Due sections (oldest first, at most `cap` a day counting `done_today`), with the review questions and their requests. */
+export type ReviewState = {
+  due: ReviewSection[];
+  waiting: number;
+  upcoming: number;
+  next_due_at: number | null;
+  reviewable: number;
+  done_today: number;
+  cap: number;
+  now: number;
+  sections: ReviewSection[];
+  tasks: Task[];
+  jobs: PracticeJob[];
 };
 
 export type AnnotationSource = Ref & { label?: string; page?: number };

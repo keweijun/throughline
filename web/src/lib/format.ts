@@ -25,6 +25,7 @@ export const helpLabels: Record<PracticeAction, MessageKey> = {
 
 const evidenceLabels: Record<EvidenceKind, MessageKey> = {
   independent: 'Solved independently',
+  retest_passed: 'Remembered on your own',
   hinted: 'Solved with help',
   needs_work: 'Needs another try',
 };

@@ -9,6 +9,11 @@
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
 
+  // Review is always there while studying; before anything is reviewable its page explains when that happens (ADR 0008).
+  // The count is what is due today.
+  const review = $derived(app.state?.review);
+  const reviewDue = $derived(review?.due.length ?? 0);
+
   // Each side-panel tab has its own toggle, mirroring the tabs inside the panel.
   const showing = (tab: PanelTab) => studying && app.panelOpen && app.panelTab === tab;
   function toggle(tab: PanelTab) {
@@ -53,6 +58,20 @@
       <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
       <span class="wide-only">{t("Courses")}</span>
     </button>
+    {#if studying && review}
+      <button
+        id="open-review"
+        class="btn btn-quiet"
+        class:idle={!reviewDue}
+        aria-pressed={app.reviewOpen}
+        aria-label={t("Review")}
+        title={reviewDue ? t("Sections due for review today") : t("Nothing due for review today")}
+        onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
+      >
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Review")}</span>{#if reviewDue}<span class="count">{reviewDue}</span>{/if}
+      </button>
+    {/if}
     {#if studying}
       <button id="toggle-questions" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
         {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
@@ -201,6 +220,11 @@
   /* A title cut to a letter or two says nothing; the section heading below names where you are. */
   @media (max-width: 30rem) {
     .course {
+      display: none;
+    }
+
+    /* Phones have room for Review only when something is due. */
+    .idle {
       display: none;
     }
   }

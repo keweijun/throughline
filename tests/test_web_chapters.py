@@ -54,14 +54,15 @@ class Chapters(unittest.TestCase):
         self.assertNotIn('## Chapter overview', prompt)
         self.assertIn('connecting it to the previous section', prompt)
 
-    def test_recap_is_offered_at_the_end_of_a_chapter_and_adds_no_exercises(self):
+    def test_recap_is_offered_at_the_end_of_a_chapter_and_asks_for_retrieval_questions_separately(self):
         self.post('/api/chapters/one/recap', {}, status=409)
         self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-1'})
         self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-2'}, status=409)
         turn = self.post('/api/chapters/one/recap', {})['turn']
         self.host.wait(turn['id'], 5)
         self.assertTrue(any('## Chapter recap' in p for p in self.runner.prompts))
-        self.assertEqual(self.client.get('/api/state').json()['practice']['jobs'], [])
+        jobs = self.client.get('/api/state').json()['practice']['jobs']
+        self.assertEqual([(j['concept_id'], j['action'], j.get('purpose')) for j in jobs], [('b', 'generate', 'recap')])
 
     def test_skipping_a_chapter_defers_its_sections_until_the_learner_returns(self):
         self.post('/api/chapters/two/skip', {'request_id': 'skip-0'}, status=409)

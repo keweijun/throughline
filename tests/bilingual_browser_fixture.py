@@ -12,7 +12,7 @@ execute(root,{'op':'curriculum.save','concepts':[{'id':'wave','title':'Wave supe
 execute(root,{'op':'position.save','request_id':'setup','position':{'concept_id':'wave','goal':'Understand amplitudes through wave superposition','progress':'We have seen how a crest and a trough cancel.','next_step':'Explain interference through superposition of two paths.'}})
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
-  chinese='Use the selected teaching language: Simplified Chinese' in prompt
+  chinese='selected teaching language: Simplified Chinese' in prompt
   text='## 单元导览\n\n中文讲解：先合成概率幅。' if chinese else '## Unit overview\n\nEnglish lesson: combine amplitudes first.'
   emit({'kind':'delta','text':text})
   if cancel.wait(2): return

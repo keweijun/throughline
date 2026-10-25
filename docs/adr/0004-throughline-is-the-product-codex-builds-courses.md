@@ -16,11 +16,13 @@ Codex has two roles, split so the learner moves between the two tools in one ste
 - **Starting the app.** `guided-learning setup` adds a launcher (Start menu or desktop, `~/Applications`, or a `.desktop` entry) that starts the host if needed and opens the browser. Nothing starts at login.
 - **One host** serves the library and owns one open course at a time; switching closes the previous `Host` and releases its lease.
 
-Teaching in Codex's chat still works through the skill and shares the same course state, but it is a fallback: the README and the library send learners to the app.
+## Teaching in Codex's chat is deprecated
+
+Earlier versions let the skill teach a course in a Codex chat as a fallback, sharing the course state. In practice the two drifted: chat used `sidequestion.*` and `interaction.record` while the app grew `branch.*`, `practice.*` and chapter skips, so state written in one place was invisible or misread in the other, and keeping both in step doubled the cost of every teaching feature. The skill now only builds and changes courses, answers questions about them from `course.status` and `session.resume` (which reports the app's open questions too), and opens the app; asked to teach, it opens the app. The chat-teaching operations keep their names and semantics for existing scripts and are documented as deprecated in `docs/chat-teaching-operations.md`; new teaching features go into the app only.
 
 ## Distribution
 
-Throughline is a Python package that bundles the skill (`guided_learning/skill/`); `guided-learning setup` installs it to `~/.agents/skills/guided-learning`, so the skill always matches the code it calls. The learner installs by pasting one prompt into Codex. The command, package and skill keep the names `guided-learning` and `codex-guided-learning`.
+Throughline is a Python package that bundles the skill (`guided_learning/skill/`); `guided-learning setup` installs it to `~/.agents/skills/throughline` (replacing the pre-0.5 `guided-learning` folder), so the skill always matches the code it calls. The learner installs by pasting one prompt into Codex. The command and package keep the names `guided-learning` and `codex-guided-learning`; the skill is `throughline`.
 
 ## Considered and not chosen
 

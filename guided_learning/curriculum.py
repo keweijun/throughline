@@ -20,6 +20,24 @@ def save(store, request):
     model['chapters'] = request['chapters'] if 'chapters' in request else view(store, request)['chapters']
     return store_model(store, model, request.get('confirm_reorder') is True)
 
+OVERVIEW_TEXT = ('core_problem', 'prior', 'next', 'target_ability')
+
+
+def validate_framing(concept):
+    """The section's core question, objective and overview are optional, but the app renders them as text."""
+    for field in ('core_question', 'objective'):
+        if field in concept and not isinstance(concept[field], str):
+            raise OperationError('invalid_request', field + ' must be a string')
+    overview = concept.get('overview')
+    if overview is None:
+        return
+    if not isinstance(overview, dict):
+        raise OperationError('invalid_request', 'overview must be an object')
+    if any(field in overview and not isinstance(overview[field], str) for field in OVERVIEW_TEXT):
+        raise OperationError('invalid_request', 'overview ' + '/'.join(OVERVIEW_TEXT) + ' must be strings')
+    if 'steps' in overview and (not isinstance(overview['steps'], list) or any(not isinstance(s, str) for s in overview['steps'])):
+        raise OperationError('invalid_request', 'overview steps must be an array of strings')
+
 def store_model(store, model, confirm_reorder):
     if any(not isinstance(model[k], list) for k in model):
         raise OperationError('invalid_request', 'concepts, route, coverage and chapters must be arrays')
@@ -34,6 +52,7 @@ def store_model(store, model, confirm_reorder):
                 raise OperationError('invalid_request', field + ' must be an array')
         if any(not isinstance(cid, str) for cid in concept.get('prerequisites', [])):
             raise OperationError('invalid_reference', 'Prerequisite IDs must be strings')
+        validate_framing(concept)
         concepts[concept['id']] = concept
         for field in ('links', 'notations', 'exercises'):
             for ref in concept.get(field, []):

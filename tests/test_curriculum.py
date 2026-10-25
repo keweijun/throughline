@@ -168,3 +168,15 @@ class ChapterCLI(CurriculumCLI):
         self.chapter([projection], [{**shared, 'disposition': 'mapped', 'concept_ids': ['projection']}], chapter_id='measure')
         entry = next(e for e in self.call('curriculum.view')['coverage'] if e['source_id'] == shared['source_id'])
         self.assertEqual(entry['concept_ids'], ['state', 'projection'])
+
+    def test_sections_keep_their_core_question_objective_and_overview(self):
+        model = self.model()
+        framing = {'core_question': 'What is a state?', 'objective': 'Write a normalized state',
+                   'overview': {'core_problem': 'States are vectors', 'steps': ['Kets', 'Normalization']}}
+        model['concepts'][0].update(framing)
+        self.call('curriculum.save', **model)
+        self.assertEqual({k: self.call('curriculum.view')['concepts'][0][k] for k in framing}, framing)
+        for bad in ({'core_question': 3}, {'overview': 'text'}, {'overview': {'steps': 'Kets'}}, {'overview': {'next': ['x']}}):
+            model = self.model()
+            model['concepts'][0].update(bad)
+            self.call('curriculum.save', error='invalid_request', **model)

@@ -75,6 +75,8 @@ class AppStore {
   viewing = $state<string | null>(null);
   /** Chapter whose page replaces the section in the reading column. */
   viewingChapter = $state<string | null>(null);
+  /** The review page replaces the reading column (ADR 0008). */
+  reviewOpen = $state(false);
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -316,6 +318,7 @@ class AppStore {
 
   view(conceptId: string) {
     this.viewingChapter = null;
+    this.reviewOpen = false;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
     window.scrollTo({ top: 0 });
@@ -474,6 +477,7 @@ class AppStore {
 
   viewChapter(chapterId: string) {
     this.viewingChapter = chapterId;
+    this.reviewOpen = false;
     this.routeOpen = false;
     window.scrollTo({ top: 0 });
   }
@@ -482,8 +486,24 @@ class AppStore {
   async #move(action: () => Promise<unknown>) {
     if (await this.act(action)) {
       this.viewing = this.viewingChapter = null;
+      this.reviewOpen = false;
       window.scrollTo({ top: 0 });
     }
+  }
+
+  showReview() {
+    this.reviewOpen = true;
+    this.libraryOpen = false;
+    this.routeOpen = false;
+    window.scrollTo({ top: 0 });
+  }
+
+  startReview(conceptId: string) {
+    return this.act(() => api.post('/api/review/start', { concept_id: conceptId }));
+  }
+
+  postponeReview(conceptId: string) {
+    return this.act(() => api.post('/api/review/postpone', { concept_id: conceptId }));
   }
 
   recapChapter(chapterId: string) {

@@ -74,6 +74,7 @@ turn_summary = summarize
 class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
         from .features import Navigation, Practice, Preparation, Questions
+        from .review import Review
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
@@ -88,6 +89,7 @@ class Host:
         self.questions = Questions(self)
         self.practice = Practice(self)
         self.preparation = Preparation(self)
+        self.review = Review(self)
         # Order matters: prompt additions are appended in this order.
         self.features = (self.navigation, self.questions, self.practice, self.preparation)
         self.questions.recover()

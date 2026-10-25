@@ -61,6 +61,31 @@ class Migrations(unittest.TestCase):
         self.assertEqual(model['chapters'], [{'id': 'course', 'title': 'Quantum', 'concept_ids': ['a', 'b']}])
         self.assertEqual(model['route'], ['a', 'b'])
 
+    def test_assessments_made_before_the_review_schedule_are_dated_by_their_practice_turn(self):
+        import json
+        from guided_learning.store import Store
+        self.put('course', 'schema', {'version': 3})
+        practice = {'id': 'practice-evidence:practice-1', 'concept_id': 'a', 'kind': 'independent', 'outcome': 'passed', 'assessment_id': 'practice-feedback:practice-1'}
+        chat = {'id': 'assessment-7a', 'concept_id': 'a', 'kind': 'independent', 'outcome': 'passed', 'assessment_id': 'teacher-feedback-7a'}
+        hint = {'id': 'practice-feedback-help:practice-1', 'concept_id': 'a', 'kind': 'hint', 'interaction_id': 'practice-feedback:practice-1'}
+        for item in (practice, chat, hint):
+            self.put('evidence', item['id'], item)
+        self.put('streams', 'practice-1', {'id': 'practice-1', 'channel': 'practice', 'started_at': 1700000000.5})
+
+        execute(self.workspace, {'op': 'course.status'})
+
+        self.assertEqual(self.stored_version(), migrations.VERSION)
+        stored = {json.loads(v)['id']: json.loads(v) for (v,) in self.raw("SELECT value FROM documents WHERE namespace='evidence'")}
+        self.assertEqual(stored[practice['id']], {**practice, 'assessed_at': 1700000000.5})
+        self.assertEqual(stored[chat['id']], chat, 'an assessment with no practice turn stays undated')
+        self.assertEqual(stored[hint['id']], hint, 'only assessments are dated')
+        store = Store(self.workspace)
+        try:
+            migrations.date_assessments(store)  # idempotent on an already migrated course
+            self.assertEqual(store.get('evidence', practice['id'])['assessed_at'], 1700000000.5)
+        finally:
+            store.db.close()
+
     def test_a_course_from_a_newer_throughline_is_refused_and_listed_with_the_reason(self):
         self.put('course', 'schema', {'version': migrations.VERSION + 1})
         with self.assertRaises(OperationError) as raised:

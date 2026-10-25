@@ -42,7 +42,7 @@
   const status = $derived.by(() => {
     if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
     if (lastAssessment?.kind) {
-      const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' ? 'good' : 'accent';
+      const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' || lastAssessment.kind === 'retest_passed' ? 'good' : 'accent';
       return { label: evidenceLabel(lastAssessment.kind), tone };
     }
     return null;
@@ -63,11 +63,18 @@
   }
 </script>
 
-<article class="exercise" id="exercise-{task.id}" class:solved aria-label={number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? t("Review question") : number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
-      {number ? t('Exercise {number}', { number }) : t("Exercise")}
-      <span class="origin">· {task.origin === 'source' ? t("from the course materials") : t("written by the teacher")}</span>
+      {#if task.origin === 'review'}
+        {t("Review question")}
+      {:else if task.origin === 'recap'}
+        {number ? t('Recap question {number}', { number }) : t("Recap question")}
+        <span class="origin">· {t("tests {sections}", { sections: (task.tests_concept_ids ?? []).map((id) => app.concept(id)?.title ?? id).join(', ') })}</span>
+      {:else}
+        {number ? t('Exercise {number}', { number }) : t("Exercise")}
+        <span class="origin">· {task.origin === 'source' ? t("from the course materials") : t("written by the teacher")}</span>
+      {/if}
       {#if showSection}<span class="origin">· {app.concept(task.concept_id)?.title ?? task.concept_id}</span>{/if}
     </span>
     {#if noted.length}
@@ -151,7 +158,7 @@
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>{t("Full solution")}</button>
-        {#if task.status !== 'deferred'}
+        {#if task.status !== 'deferred' && task.origin !== 'review'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}
       </span>

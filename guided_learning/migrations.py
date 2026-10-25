@@ -40,7 +40,19 @@ def group_flat_routes(store):
         store.put('curriculum', 'model', model)
 
 
-MIGRATIONS = [slim_selected_lectures, group_flat_routes]
+def date_assessments(store):
+    """The review schedule reads when each assessment was made (ADR 0008). An assessment made in the app is dated by the
+    practice turn that produced it; one recorded elsewhere has no such turn and stays undated, which reads as long ago."""
+    for item in store.list('evidence'):
+        if 'assessment_id' not in item or 'assessed_at' in item or not item['id'].startswith('practice-evidence:'):
+            continue
+        turn = store.get('streams', item['id'].removeprefix('practice-evidence:'))
+        if turn and isinstance(turn.get('started_at'), (int, float)):
+            item['assessed_at'] = turn['started_at']
+            store.put('evidence', item['id'], item)
+
+
+MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments]
 VERSION = len(MIGRATIONS) + 1
 
 

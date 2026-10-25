@@ -20,7 +20,7 @@ test('route groups sections by chapter and the chapter page shows progress and c
   expect(errors).toEqual([]);
 });
 
-test('a chapter ends with an optional recap that adds no exercises', async ({ page, course }) => {
+test('a chapter ends with an optional recap whose questions are asked for separately', async ({ page, course }) => {
   const { base, errors } = await course('chapters_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('A short lesson');
@@ -40,8 +40,9 @@ test('a chapter ends with an optional recap that adds no exercises', async ({ pa
 
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.position.concept_id).toBe('outcomes');
-  // The section's own lesson asked for exercises once; the recap did not ask again.
-  expect(state.practice.jobs.filter((job: { concept_id: string }) => job.concept_id === 'superposition')).toHaveLength(1);
+  // The section's own lesson asked for exercises once; the recap asked only for its retrieval questions (ADR 0008).
+  const jobs = state.practice.jobs.filter((job: { concept_id: string }) => job.concept_id === 'superposition');
+  expect(jobs.map((job: { purpose?: string }) => job.purpose ?? 'exercises').sort()).toEqual(['exercises', 'recap']);
   expect(errors).toEqual([]);
 });
 

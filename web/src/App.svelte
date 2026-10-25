@@ -8,6 +8,7 @@
   import RouteRail from './components/RouteRail.svelte';
   import ConceptPage from './components/ConceptPage.svelte';
   import ChapterPage from './components/ChapterPage.svelte';
+  import ReviewPage from './components/ReviewPage.svelte';
   import SidePanel from './components/SidePanel.svelte';
   import SelectionAsk from './components/SelectionAsk.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
@@ -77,7 +78,9 @@
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
     <RouteRail />
     <main id="main">
-      {#if app.viewingChapter}
+      {#if app.reviewOpen}
+        <ReviewPage />
+      {:else if app.viewingChapter}
         {#key app.viewingChapter}
           <ChapterPage chapterId={app.viewingChapter} />
         {/key}

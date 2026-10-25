@@ -1,4 +1,5 @@
 """Evidence records preserve provenance; judgments are supplied by the teacher."""
+import time
 from .store import OperationError
 
 
@@ -91,6 +92,11 @@ def assess(store, request):
         if item['kind'] == 'independent':
             item['kind'] = 'retest_passed'
     existing = store.get('evidence', item['id'])
+    # When the assessment was made, for the review schedule (ADR 0008); a replay keeps the original time.
+    if existing is None:
+        item['assessed_at'] = time.time()
+    elif 'assessed_at' in existing:
+        item['assessed_at'] = existing['assessed_at']
     if existing is None or 'answer_source_refs' in existing:
         item['answer_source_refs'] = answer.get('source_refs', [])
         item['assessment_source_refs'] = assessment.get('source_refs', [])

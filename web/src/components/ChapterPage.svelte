@@ -131,7 +131,7 @@
           {#if canRecap}
             <div>
               <button class="btn btn-primary" onclick={() => app.recapChapter(chapterId)}>{t("Recap this chapter")}</button>
-              <p class="note">{t("A recap connects the chapter's sections and lists exercises you set aside. No new material, no new exercises.")}</p>
+              <p class="note">{t("A recap connects the chapter's sections, lists exercises you set aside and ends with a few questions to answer from memory. No new material.")}</p>
             </div>
           {/if}
           {#if following && app.chapterOf(following.id)?.id !== chapterId}

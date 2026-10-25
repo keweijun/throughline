@@ -10,14 +10,22 @@
   let busy = $state(false);
 
   const practice = $derived(app.state?.practice ?? { tasks: [], jobs: [] });
-  const tasks = $derived(practice.tasks.filter((t) => t.concept_id === conceptId));
+  const all = $derived(practice.tasks.filter((t) => t.concept_id === conceptId));
+  const tasks = $derived(all.filter((t) => t.origin !== 'recap'));
+  // Retrieval questions that close a chapter recap (ADR 0008), kept apart from the section's own exercises.
+  const recap = $derived(all.filter((t) => t.origin === 'recap'));
+  const recapGenerating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.purpose === 'recap' && app.isRunning(j.id)));
+  const recapFailed = $derived.by(() => {
+    const last = practice.jobs.filter((j) => j.concept_id === conceptId && j.purpose === 'recap').at(-1);
+    return !recap.length && last?.error ? last : undefined;
+  });
   const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !solved(t)) : []);
-  const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && app.isRunning(j.id)));
+  const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && app.isRunning(j.id)));
 
-  const failed = $derived(practice.jobs.filter((j) => j.concept_id === conceptId && j.action === 'generate' && j.error).at(-1));
+  const failed = $derived(practice.jobs.filter((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && j.error).at(-1));
   const interrupted = $derived(
     practice.jobs.some((j) => {
-      if (j.concept_id !== conceptId || j.action !== 'generate' || j.processed) return false;
+      if (j.concept_id !== conceptId || j.action !== 'generate' || j.purpose || j.processed) return false;
       const turn = app.turn(j.id);
       return turn && turn.status !== 'running' && turn.status !== 'completed';
     }),
@@ -31,7 +39,7 @@
   }
 </script>
 
-{#if tasks.length || earlier.length || generating || (isCurrent && hasLesson)}
+{#if all.length || earlier.length || generating || recapGenerating || (isCurrent && hasLesson)}
   <section class="practice" id="practice" aria-labelledby="practice-title">
     <header>
       <h2 id="practice-title">{t("Practice")}</h2>
@@ -52,6 +60,21 @@
     {#each tasks as task, i (task.id)}
       <Exercise {task} number={i + 1} />
     {/each}
+
+    {#if recap.length || recapGenerating || recapFailed}
+      <section class="recap" aria-labelledby="recap-questions-title">
+        <h3 id="recap-questions-title">{t("Chapter recap questions")}</h3>
+        <p class="note">{t("Answer from memory. Each one also counts as a review of the sections it tests.")}</p>
+        {#if recapGenerating}
+          <p class="status"><span class="chip"><span class="live-dot"></span>{t("Preparing recap questions")}</span></p>
+        {:else if recapFailed}
+          <p class="problem">{t("The recap questions could not be prepared:")} {diagnostic(recapFailed.error ?? "")}</p>
+        {/if}
+        {#each recap as task, i (task.id)}
+          <Exercise {task} number={i + 1} />
+        {/each}
+      </section>
+    {/if}
 
     {#if earlier.length}
       <details class="earlier">
@@ -88,6 +111,24 @@
   }
 
   .earlier-tasks { display: grid; gap: 1rem; margin-top: 1rem; }
+
+  .recap {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  h3 {
+    font-family: var(--serif);
+    font-size: var(--step-2);
+    font-weight: 600;
+  }
+
+  .recap .note {
+    margin-top: -0.6rem;
+    color: var(--pencil);
+    font-size: var(--step-0);
+  }
 
   summary {
     cursor: pointer;

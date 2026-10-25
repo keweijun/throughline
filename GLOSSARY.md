@@ -37,8 +37,14 @@ _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number 
 **Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
 _Avoid_: An overview repeated at every section, unit overview (retired: a course without chapters is one chapter).
 
-**Chapter recap**: An optional lesson at the end of a chapter that connects its sections and lists set-aside exercises, without new material or exercises.
+**Chapter recap**: An optional lesson at the end of a chapter that connects its sections and lists set-aside exercises without new material, followed by two or three retrieval questions spanning the chapter (ADR 0008).
 _Avoid_: Quiz, review test, chapter exam.
+
+**Review**: Returning to a section the learner has passed, after a growing interval (1, 3, 7, 21, then 60 days), to answer one retrieval question about it. Reviews are listed when due, at most five a day, and never gate the route (ADR 0008).
+_Avoid_: Revision of the course plan, reviewing source locations in Codex, a test that must be passed.
+
+**Retrieval question**: A question answered from memory that asks the learner to recall a key idea and apply it to a new situation, without new material or hints. A review asks one; a chapter recap ends with two or three.
+_Avoid_: Flashcard, quiz item, a repeat of an exercise already seen.
 
 **Skipped section**: A section deferred when the learner skipped the rest of its chapter; it stays on the route until a lesson there is studied.
 _Avoid_: Excluded, completed, mastered.

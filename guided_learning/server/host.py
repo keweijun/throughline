@@ -75,6 +75,7 @@ class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
         from .features import Navigation, Practice, Preparation, Questions
         from .builds import ChapterBuilds
+        from .review import Review
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
@@ -90,6 +91,7 @@ class Host:
         self.practice = Practice(self)
         self.preparation = Preparation(self)
         self.builds = ChapterBuilds(self)
+        self.review = Review(self)
         # Order matters: prompt additions are appended in this order.
         self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds)
         self.questions.recover()

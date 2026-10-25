@@ -18,7 +18,7 @@ Codex builds a course chapter by chapter: `curriculum.outline` saves the ordered
 ## Teaching
 
 - The first lesson of a chapter's first section opens with a chapter overview. Later sections open with a short bridge from the previous section instead of a unit overview.
-- At the end of a chapter the learner may ask for a recap: a mainline lesson in the chapter's last section that connects its sections and lists set-aside exercises. It teaches nothing new and adds no exercises.
+- At the end of a chapter the learner may ask for a recap: a mainline lesson in the chapter's last section that connects its sections and lists set-aside exercises. It teaches nothing new, and ends with two or three retrieval questions spanning the chapter's sections (ADR 0008).
 - The learner may skip the rest of a chapter. Its remaining sections are deferred with `evidence.defer` (`section_id` is the chapter) and stay on the route, marked as skipped; the learner can go back and study one, and its next lesson resolves the deferral. No mastery gate is added.
 - Practice is unchanged: grouped at the end of each section.
 

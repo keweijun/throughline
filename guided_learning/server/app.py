@@ -93,6 +93,10 @@ class SkipChapterRequest(Body):
     request_id: str
 
 
+class ReviewRequest(Body):
+    concept_id: str
+
+
 class RecapRequest(Body):
     id: Optional[str] = None
 
@@ -261,9 +265,14 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def state():
         current = courses.require()
         snapshot = current.snapshot()
+        practice = current.practice.state()
+        review = current.review.state(practice)
+        # Review questions and their requests live on the review page, not among a section's exercises (ADR 0008).
         return {**snapshot,
                 'questions': [_public_question(b) for b in current.questions.list()],
-                'practice': current.practice.state(),
+                'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review'],
+                             'jobs': [j for j in practice['jobs'] if j.get('purpose') != 'review']},
+                'review': review,
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
@@ -361,6 +370,19 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def practice_action(task_id: str, action: str, body: PracticeRequest):
         result = host.practice.act(task_id, action, body.answer)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
+
+    @app.get('/api/review')
+    def review_schedule():
+        return host.review.state()
+
+    @app.post('/api/review/start')
+    def start_review(body: ReviewRequest):
+        result = host.review.start(body.concept_id)
+        return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
+
+    @app.post('/api/review/postpone')
+    def postpone_review(body: ReviewRequest):
+        return host.review.postpone(body.concept_id)
 
     @app.post('/api/sections/next')
     def next_section(body: NextSectionRequest):

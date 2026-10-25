@@ -14,6 +14,7 @@ from . import prompts
 
 log = logging.getLogger(__name__)
 
+RETRIEVAL_ORIGINS = ('review', 'recap')
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
 _PDF_LOCK = threading.Lock()
 
@@ -206,7 +207,7 @@ class Navigation(Feature):
         return [titles[cid] for cid in chapter['concept_ids']], deferred
 
     def start_recap(self, chapter_id, identifier=None):
-        """A recap is a mainline turn in the chapter's last section; it explains nothing new and adds no exercises."""
+        """A recap is a mainline turn in the chapter's last section; it explains nothing new. Retrieval questions follow it (ADR 0008)."""
         with self.host.lock:
             position = self.operation({'op': 'course.status'})['position'] or {}
             chapter = self.operation({'op': 'curriculum.context'})['chapter'] if position.get('concept_id') else None
@@ -336,17 +337,19 @@ class Practice(Feature):
                     log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
-    def _launch(self, concept_id, action, task=None, answer=None):
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
             for job in jobs:
                 if job['id'] not in running:
                     continue
-                if (job.get('task_id') == task['id']) if task else (job['concept_id'] == concept_id and job['action'] == 'generate'):
+                if (job.get('task_id') == task['id']) if task else (job['concept_id'] == concept_id and job['action'] == 'generate' and job.get('purpose') == purpose):
                     raise OperationError('practice_busy', 'Wait for the current practice request to finish')
             identifier = 'practice-' + str(uuid.uuid4())
             job = {'id': identifier, 'concept_id': concept_id, 'action': action}
+            if purpose:
+                job['purpose'] = purpose
             if task:
                 job['task_id'] = task['id']
             if answer is not None:
@@ -358,7 +361,8 @@ class Practice(Feature):
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
 
     def generate(self, concept_id):
-        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id]
+        # Retrieval questions (ADR 0008) are not the section's own exercises.
+        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS]
         if existing:
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
@@ -369,6 +373,8 @@ class Practice(Feature):
             raise OperationError('unknown_exercise', 'Unknown exercise')
         if action not in self.ACTIONS:
             raise OperationError('invalid_action', 'Unknown practice action')
+        if action == 'defer' and task['origin'] == 'review':
+            raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
         if action == 'defer':
             with self.host.lock:
                 for job in self.state()['jobs']:
@@ -459,16 +465,41 @@ class Practice(Feature):
         job = next((j for j in state['jobs'] if j['id'] == turn['id']), None)
         if not job:
             return ''
+        if job.get('purpose'):
+            return self._retrieval_prompt(job, context, state['tasks'])
         if job['action'] == 'generate':
             # Exercise refs need not be included in the lesson links.
             return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
         return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'))
 
+    def _retrieval_prompt(self, job, context, tasks):
+        titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}
+        if job['purpose'] == 'review':
+            tested = {job['concept_id']}
+        else:
+            tested = set(context['chapter']['concept_ids'])
+        seen = [t['question'] for t in tasks if ({t['concept_id'], *t.get('tests_concept_ids', [])} & tested)]
+        if job['purpose'] == 'review':
+            return prompts.review_question(context['concept'], seen)
+        sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in context['chapter']['concept_ids']]
+        return prompts.recap_questions(context['chapter'], sections, seen)
+
+    def recap_questions(self, concept_id):
+        """After a chapter recap, two or three retrieval questions spanning the chapter, unless earlier ones are still open."""
+        open_recap = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] == 'recap'
+                      and not any(h.get('outcome') == 'passed' for h in t['history'])]
+        if open_recap:
+            return {'tasks': open_recap}
+        return self._launch(concept_id, 'generate', purpose='recap')
+
     def on_complete(self, turn):
         self.operation({'op': 'practice.complete', 'id': turn['id']})
-        if turn['channel'] == 'mainline' and not is_recap(turn) and not self.host.closing:
-            self.generate(turn['concept_id'])
+        if turn['channel'] == 'mainline' and not self.host.closing:
+            if is_recap(turn):
+                self.recap_questions(turn['concept_id'])
+            else:
+                self.generate(turn['concept_id'])
 
 
 class Preparation(Feature):

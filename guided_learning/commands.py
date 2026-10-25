@@ -262,13 +262,29 @@ def _call(port, method, path, body=None, timeout=2):
 
 
 def running():
-    """The host started by `open`, if it still answers."""
+    """The host started by `open`, if it still answers on its recorded port."""
     try:
         record = json.loads(host_record().read_text(encoding='utf-8'))
-        _call(record['port'], 'GET', '/api/library')
-        return record
+        try:
+            health = _call(record['port'], 'GET', '/api/health')
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            _call(record['port'], 'GET', '/api/library')  # a host from before /api/health existed
+            return record
+        return record if health.get('pid') == record.get('pid') else None
     except (OSError, ValueError, KeyError, urllib.error.URLError):
         return None
+
+
+def _error_text(exc):
+    """What the host said went wrong with a request, or that it did not answer."""
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            return json.loads(exc.read() or b'{}').get('error') or str(exc)
+        except ValueError:
+            return str(exc)
+    return f'The learning host did not answer ({getattr(exc, "reason", exc)}).'
 
 
 def _spawn(port):
@@ -305,8 +321,8 @@ def open_course(args):
     if args.course:
         try:
             _call(record['port'], 'POST', '/api/library/open', {'name': args.course}, timeout=30)
-        except urllib.error.HTTPError as exc:
-            print(json.loads(exc.read() or b'{}').get('error', str(exc)), file=sys.stderr)
+        except (urllib.error.URLError, OSError) as exc:
+            print(_error_text(exc), file=sys.stderr)
             return 1
     url = f"http://127.0.0.1:{record['port']}/"
     print(f'Throughline is open at {url}')
@@ -323,7 +339,14 @@ def stop(args):
     if not record:
         print('No learning host is running.')
         return 0
-    _call(record['port'], 'POST', '/api/shutdown', {})
+    try:
+        _call(record['port'], 'POST', '/api/shutdown', {})
+    except urllib.error.HTTPError as exc:
+        print(_error_text(exc), file=sys.stderr)
+        return 1
+    except (urllib.error.URLError, OSError):
+        print('No learning host is running.')  # it stopped between the check and the request
+        return 0
     print('The learning host is stopping.')
     return 0
 

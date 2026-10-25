@@ -14,7 +14,7 @@ course.sqlite3 + sources/<id>/<revision>   the course workspace (ADR 0001)
 
 ## Domain operations
 
-`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice`, `preparation`, `preferences` and `annotations`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through the `guided-learning` command (`--course <name>` resolves inside the course library, `--workspace` takes any folder); their names and semantics are a stable contract documented in `guided_learning/skill/references/`, which `guided-learning setup` copies to `~/.agents/skills/guided-learning`. The host calls the same operations and keeps no state of its own besides worker threads.
+`guided_learning/api.py` dispatches `op` requests to `core`, `sources`, `curriculum`, `teaching`, `evidence`, `background`, `streaming`, `branches`, `practice`, `preparation`, `preferences` and `annotations`. Each call is one `BEGIN IMMEDIATE` transaction on the course database. The Codex skill uses these through the `guided-learning` command (`--course <name>` resolves inside the course library, `--workspace` takes any folder); their names and semantics are a stable contract. The ones Codex uses to build courses are documented in `guided_learning/skill/references/`, which `guided-learning setup` copies to `~/.agents/skills/throughline`; the deprecated chat-teaching operations are in `docs/chat-teaching-operations.md`; the rest (`stream.*`, `branch.*`, `practice.*`, `preparation.*`) are internal to the host. The host calls the same operations and keeps no state of its own besides worker threads.
 
 ## Host (`guided_learning/server/`)
 

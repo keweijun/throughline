@@ -58,6 +58,22 @@ test('failed assessment keeps the submitted answer recoverable even with older f
   await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('First line\nSecond line');
 });
 
+test('copying rendered teacher output gives the TeX source of its formulas', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const feedback = page.locator('.feedback').first();
+  await expect(feedback.locator('.katex')).toHaveCount(1);
+  const tex = await feedback.locator('[data-tex]').first().getAttribute('data-tex');
+  const copied = await feedback.evaluate((node) => {
+    const selection = document.getSelection()!;
+    selection.selectAllChildren(node);
+    const event = new ClipboardEvent('copy', { clipboardData: new DataTransfer(), bubbles: true, cancelable: true });
+    node.dispatchEvent(event);
+    return event.clipboardData!.getData('text/plain');
+  });
+  expect(copied).toContain(`$${tex}$`);
+  expect(copied).not.toContain('​');
+});
+
 test('an answer with math shows a live preview before it is submitted', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const task = page.locator('#practice article').first();

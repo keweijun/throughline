@@ -7,6 +7,7 @@ import 'katex/dist/katex.min.css';
 import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
+import { copyFormulasAsTex } from './lib/selection';
 
 try {
   const theme = localStorage.getItem('theme');
@@ -15,4 +16,5 @@ try {
   // Storage can be unavailable in private windows; the system theme still applies.
 }
 
-mount(App, { target: document.getElementById('app')! });
+document.addEventListener('copy', copyFormulasAsTex);
+mount(App,{ target: document.getElementById('app')! });

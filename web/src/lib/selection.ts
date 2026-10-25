@@ -15,3 +15,14 @@ export function selectionMarkdown(selection: Selection, area: HTMLElement): stri
   for (const block of fragment.querySelectorAll('p,div,li,blockquote,tr,h1,h2,h3,h4')) block.append(document.createTextNode('\n'));
   return (fragment.textContent ?? '').trim();
 }
+
+/** Copy rendered formulas as their TeX source, so they paste straight into an answer or Codex. */
+export function copyFormulasAsTex(event: ClipboardEvent) {
+  const selection = document.getSelection();
+  if (!event.clipboardData || !selection?.rangeCount || selection.isCollapsed) return;
+  if (event.target instanceof Element && event.target.closest('textarea, input')) return;
+  const range = selection.getRangeAt(0);
+  if (![...document.querySelectorAll('[data-tex]')].some((node) => range.intersectsNode(node))) return;
+  event.clipboardData.setData('text/plain', selectionMarkdown(selection, document.body));
+  event.preventDefault();
+}

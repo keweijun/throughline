@@ -70,9 +70,17 @@ def part_statuses(task):
     if last and count==1: return ['correct' if last.get('outcome')=='passed' else 'not_yet']
     return ['not_attempted']*count
 
+MAX_PART_LABEL = 40
+
+def _part(p):
+    """A part is the text of what it asks, or {label?, text} with a short label such as "(a)"."""
+    if isinstance(p,str): return bool(p.strip())
+    return (isinstance(p,dict) and not set(p)-{'label','text'} and isinstance(p.get('text'),str) and bool(p['text'].strip())
+            and ('label' not in p or isinstance(p['label'],str) and 0<len(p['label'].strip())<=MAX_PART_LABEL))
+
 def _check_parts(q):
-    if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or any(not isinstance(p,str) or not p.strip() for p in q['parts'])):
-        raise FormatError('parts must list each part as nonempty text')
+    if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or not all(_part(p) for p in q['parts'])):
+        raise FormatError(f'parts must list each part as nonempty text or {{label, text}} with a label of at most {MAX_PART_LABEL} characters')
 
 def job(store, request):
     value = request.get('job')

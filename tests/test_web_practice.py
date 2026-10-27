@@ -24,7 +24,7 @@ class PracticeFlow(unittest.TestCase):
             runner=Runner();app=Host(path,runner=runner)
             app.wait(app.practice.generate('light')['turn']['id'],5)
             prompt=next(p for p in runner.prompts if 'Practice only' in p)
-            self.assertIn('numbered list',prompt)
+            self.assertIn('starts with its label',prompt)
             self.assertIn('own line',prompt)
             self.assertEqual(app.practice.state()['tasks'][0]['question'],'Two parts:\n1. First\n2. Second')
             app.close()
@@ -247,6 +247,15 @@ class PartsFlow(unittest.TestCase):
         last=state['tasks'][0]['history'][-1]
         self.assertEqual((last['parts'],last['outcome'],last['kind']),(['correct']*3,'passed','hinted'),'feedback correcting part 3 was help')
         self.assertFalse(execute(self.path,{'op':'evidence.view','concept_id':'a'})['independently_verified'])
+
+    def test_parts_may_carry_short_labels(self):
+        for parts in ([{'label':'(a)'}],[{'label':5,'text':'State it.'}],[{'label':'x'*41,'text':'State it.'}],[{'text':'State it.','extra':1}]):
+            with self.subTest(parts=parts):
+                state=self.run_job(lambda:self.app.practice.generate('a'),json.dumps({'questions':[{'question':'Q.','origin':'self_created','source_refs':[],'parts':parts}]}))
+                self.assertIn('error',[j for j in state['jobs'] if j['action']=='generate'][-1])
+        labelled=[{'label':'(a)','text':'State it.'},'Apply it.',{'text':'Check it.'}]
+        self.assertEqual(self.generate(labelled)['parts'],labelled)
+        self.assertIn('"label"',next(p for p in self.runner.prompts if 'Practice only' in p))
 
     def test_correct_parts_one_at_a_time_stay_independent(self):
         task=self.generate(['State it.','Apply it.','Check it.'])

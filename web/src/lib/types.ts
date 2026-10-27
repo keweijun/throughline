@@ -129,8 +129,8 @@ export type Task = {
   id: string;
   concept_id: string;
   question: string;
-  /** What each exercise part asks, in order; a task without parts is a single part (ADR 0011). */
-  parts?: string[];
+  /** What each exercise part asks, in order, optionally with a short label such as "(a)"; a task without parts is a single part (ADR 0011). */
+  parts?: (string | { label?: string; text: string })[];
   /**
    * `review` and `chapter_quiz` are retrieval questions (ADR 0008). A chapter quiz question belongs to its chapter
    * (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks an earlier exercise

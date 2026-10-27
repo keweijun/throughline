@@ -138,9 +138,10 @@ def question_protocol(language):
     return QUESTION_PROTOCOL.replace('150 English words', '250 Chinese characters') if language == 'zh-CN' else QUESTION_PROTOCOL
 
 
-PARTS = ('When a question has several parts, write each part on its own line as a Markdown numbered list (1., 2., ...) after any shared setup. '
-         'Also list the parts in "parts", in order, one short entry per part restating what it asks; a question without subquestions has one part.')
-PART_FIELD = '"parts":["What each part asks"]'
+PARTS = ('When a question has several parts, write each part on its own line as a Markdown list item that starts with its label, after any shared setup. '
+         'Also list the parts in "parts", in order, one entry per part: label is a short label such as "(a)", as the question numbers the part, '
+         'and text briefly restates what it asks; a question without subquestions has one part.')
+PART_FIELD = '"parts":[{"label":"(a)","text":"What each part asks"}]'
 
 
 def practice_generate(sources):

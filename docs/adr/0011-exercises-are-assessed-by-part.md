@@ -8,7 +8,7 @@ An assessment gave one outcome, `passed` or `needs_work`, for the whole exercise
 
 ## Parts
 
-An exercise lists its **exercise parts** (an exercise without subquestions has one). Each part's question is on its own line. An assessment gives each part the learner addressed one status: `correct`, `partly_correct` or `not_yet`; parts not addressed stay `not_attempted` and keep any earlier status. The exercise is solved once every part is `correct`; the interface shows progress as parts correct out of parts. Part statuses accumulate across submissions, so a learner can answer one part at a time.
+An exercise lists its **exercise parts** (an exercise without subquestions has one). Each part's question is on its own line, and a part may carry a short label such as "(a)", which the interface shows instead of "Part 1". An assessment gives each part the learner addressed one status: `correct`, `partly_correct` or `not_yet`; parts not addressed stay `not_attempted` and keep any earlier status. The exercise is solved once every part is `correct`; the interface shows progress as parts correct out of parts. Part statuses accumulate across submissions, so a learner can answer one part at a time.
 
 Assistance stays per exercise: a solved exercise is `independent` only if no hint, key steps or solution was used on it, otherwise `hinted`, as before. `evidence.assess` keeps `outcome` (`passed` exactly when the exercise becomes solved, else `needs_work`) and adds the part statuses, so existing evidence, the review schedule and the chapter quiz (ADR 0008), which read `outcome`, stay valid. Review and quiz questions have parts like any exercise.
 

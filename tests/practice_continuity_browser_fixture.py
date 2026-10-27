@@ -19,6 +19,7 @@ for index,outcome in ((2,'needs_work'),(3,'passed')):
  complete({'id':'assess'+str(index),'concept_id':'a','action':'assess','task_id':'questions:'+str(index),'answer':r'An attempt: \(E=mc^2\)'},{'feedback':r'Teacher feedback: \[E=mc^2\]','outcome':outcome})
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
-  emit({'kind':'final','text':'New section explanation'});emit({'kind':'complete'})
+  # An ask gets a valid answer; any other practice request gets prose, which fails format validation.
+  emit({'kind':'final','text':'{"feedback":"It means: apply the rule to a new case."}' if 'Learner question:' in prompt else 'New section explanation'});emit({'kind':'complete'})
 try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

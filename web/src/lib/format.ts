@@ -21,6 +21,7 @@ export const helpLabels: Record<PracticeAction, MessageKey> = {
   steps: 'Key steps',
   solution: 'Full solution',
   assess: 'Teacher feedback',
+  ask: 'Question',
 };
 
 const evidenceLabels: Record<EvidenceKind, MessageKey> = {

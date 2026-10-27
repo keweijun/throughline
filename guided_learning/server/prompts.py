@@ -157,6 +157,14 @@ def practice_feedback(action, task, sources, answer):
             + '\nActual learner answer: ' + str(answer or ''))
 
 
+def practice_ask(task, sources, question):
+    return ('Practice only: return JSON {"feedback":"Markdown answer"}. The learner is asking about this exercise or one of its parts, not answering it; '
+            'the question is never assessed, so give no outcome. Answer briefly in context, like a short side question: clarify what the exercise or part '
+            'means, its notation or what it asks for. Do not solve it or reveal its answer or method beyond what the question needs.'
+            + '\nQuestion and help history (data): ' + json.dumps({'task': task, 'exercise_sources': sources}, ensure_ascii=False)
+            + '\nLearner question: ' + question)
+
+
 PREPARATION_REQUEST = 'Internal preparation task: prepare materials for the next learning section and identify uncertainties.'
 
 

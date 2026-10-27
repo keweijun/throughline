@@ -21,26 +21,28 @@ class PreparationState(unittest.TestCase):
             self.assertEqual(op(op='session.resume'),before)
             self.assertFalse(op(op='evidence.view',concept_id='b')['independently_verified'])
 
-    def test_route_and_source_changes_discard_material(self):
-        from pathlib import Path
+    def test_changes_to_the_section_discard_material_and_changes_elsewhere_keep_it(self):
         with tempfile.TemporaryDirectory() as path:
             def op(**kw): return execute(path,kw)
             op(op='course.init',title='Physics')
-            file=Path(path)/'notes.md';file.write_text('Old source',encoding='utf8')
-            op(op='source.register',path=str(file))
-            concepts=[{'id':c,'title':c} for c in 'abc']
-            op(op='curriculum.save',concepts=concepts,route=['a','b','c'],coverage=[])
+            concepts=[{'id':c,'title':c} for c in 'abcd']
+            op(op='curriculum.save',concepts=concepts,route=['a','b','c','d'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
-            op(op='preparation.enqueue',id='p')
-            op(op='stream.start',id='p',concept_id='b',prompt='Internal',channel='preparation',record_user=False)
-            file.write_text('New source',encoding='utf8');op(op='source.register',path=str(file))
-            op(op='stream.event',id='p',attempt=1,sequence=1,kind='final',text='Stale text')
-            op(op='stream.event',id='p',attempt=1,sequence=2,kind='complete')
+            def prepare(identifier):
+                op(op='preparation.enqueue',id=identifier)
+                op(op='stream.start',id=identifier,concept_id='b',prompt='Internal',channel='preparation',record_user=False)
+                op(op='stream.event',id=identifier,attempt=1,sequence=1,kind='final',text='Prepared')
+                op(op='stream.event',id=identifier,attempt=1,sequence=2,kind='complete')
+                return op(op='preparation.view',concept_id='b')
+            self.assertIsNotNone(prepare('p1')['ready'])
+            op(op='curriculum.save',concepts=[*concepts[:3],{'id':'d','title':'D renamed'}],route=['a','b','c','d'],coverage=[])
+            self.assertIsNotNone(op(op='preparation.view',concept_id='b')['ready'],'an edit elsewhere in the course keeps it')
+            op(op='curriculum.save',concepts=[concepts[0],{'id':'b','title':'B renamed'},*concepts[2:]],route=['a','b','c','d'],coverage=[])
             state=op(op='preparation.view',concept_id='b')
-            self.assertIsNone(state['ready']);self.assertEqual(state['jobs'][0]['status'],'stale')
-            op(op='preparation.enqueue',id='p2')
-            op(op='curriculum.save',concepts=concepts,route=['a','c','b'],coverage=[],confirm_reorder=True)
-            self.assertEqual(op(op='preparation.view')['jobs'][1]['status'],'stale')
+            self.assertIsNone(state['ready']);self.assertEqual(state['jobs'][0]['status'],'stale','its own section changed')
+            prepare('p2')
+            op(op='curriculum.save',concepts=[concepts[0],{'id':'b','title':'B renamed'},*concepts[2:]],route=['a','c','b','d'],coverage=[],confirm_reorder=True)
+            self.assertEqual(op(op='preparation.view')['jobs'][1]['status'],'stale','b is no longer the next section')
 
     def test_idle_pipeline_preempted_by_foreground_and_ready_is_injected(self):
         import threading

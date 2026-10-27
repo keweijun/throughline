@@ -50,48 +50,54 @@ class TurnFailures(unittest.TestCase):
         self.path = self.temp.name
         course(self.path, ('a',))  # no next section, so preparation stays out of the way
 
-    def failing_first_delta(self, host):
-        real = host.operation
+    def failing_first_stream_write(self):
+        """The first write of streamed events fails, as when the database stays locked."""
+        from guided_learning.server import host as host_module
+        real = host_module.execute
         failed = []
 
-        def operation(request):
-            if request.get('op') == 'stream.event' and request.get('kind') == 'delta' and not failed:
+        def execute(workspace, request):
+            if request.get('op') == 'stream.events' and not failed:
                 failed.append(request)
                 raise OperationError('busy', 'Synthetic write failure')
-            return real(request)
-        return mock.patch.object(host, 'operation', side_effect=operation)
+            return real(workspace, request)
+        return mock.patch.object(host_module, 'execute', side_effect=execute)
 
     def test_a_failed_event_write_marks_the_turn_failed_and_frees_the_mainline(self):
         class Runner:
             def run(self, prompt, cwd, emit, cancel):
                 emit({'kind': 'delta', 'text': 'partial'})
+                emit({'kind': 'final', 'text': 'Final'})
+                emit({'kind': 'complete'})
         host = Host(self.path, runner=Runner())
         try:
-            with self.failing_first_delta(host):
+            with self.failing_first_stream_write():
                 turn = host.start_lesson({'id': 'one'})['turn']
                 finished = host.wait(turn['id'], 3)
             self.assertEqual(finished['status'], 'failed')
             self.assertIn('Synthetic write failure', finished['error'])
+            self.assertEqual(finished['text'], 'partial', 'the events that failed to store are stored with the failure')
             host._runner = Lesson()
             self.assertEqual(host.wait(host.start_lesson({'id': 'two'})['turn']['id'], 3)['status'], 'completed')
         finally:
             host.close()
 
-    def test_later_events_still_apply_after_one_failed_write(self):
+    def test_streamed_text_whose_write_failed_is_written_later(self):
         class Runner:
             def run(self, prompt, cwd, emit, cancel):
-                try:
-                    emit({'kind': 'delta', 'text': 'lost'})
-                except OperationError:
-                    pass
-                emit({'kind': 'delta', 'text': 'kept'})
+                emit({'kind': 'delta', 'text': 'kept '})
+                time.sleep(0.2)  # the timed write fails meanwhile
+                emit({'kind': 'delta', 'text': 'too'})
                 emit({'kind': 'final', 'text': 'Final'})
                 emit({'kind': 'complete'})
         host = Host(self.path, runner=Runner())
+        host.persist_interval = 0.05
         try:
-            with self.failing_first_delta(host):
+            with self.failing_first_stream_write() as write:
                 turn = host.start_lesson({'id': 'one'})['turn']
                 self.assertEqual(host.wait(turn['id'], 3)['status'], 'completed')
+            batches = [c.args[1]['events'] for c in write.call_args_list if c.args[1]['op'] == 'stream.events']
+            self.assertEqual([b[0].get('text') for b in batches[:2]], ['kept ', 'kept '], 'the failed write is retried')
         finally:
             host.close()
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from ..api import execute
 from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
-from ..store import OperationError
+from ..store import OperationError, hold
 from . import prompts
 from .state import public_turn
 
@@ -86,8 +86,16 @@ class Host:
         self.lock = threading.RLock()
         self.closing = False
         self.workers = {}
+        # Streamed events are published at once but stored a few times a second (`persist_interval`); every operation
+        # through the host stores them first, so what it reads includes every published delta.
+        self.persist_interval = 0.25
+        self._streams = threading.RLock()
+        self._pending = {}  # (turn id, attempt) -> events not yet stored
+        self._live = {}  # (turn id, attempt) -> channel, while this host streams the attempt
+        self._timer = None
         self.operation({'op': 'course.status'})
         self._lease = _acquire_lease(self.workspace)
+        self._held = hold(self.workspace)
         self.operation({'op': 'stream.recover'})
         self.navigation = Navigation(self)
         self.questions = Questions(self)
@@ -114,7 +122,38 @@ class Host:
         return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
 
     def operation(self, request):
+        if self._pending:
+            try:
+                self._persist()
+            except Exception:
+                log.exception('Could not store streamed text before %s', request.get('op'))
         return execute(self.workspace, request)
+
+    def _persist(self, key=None):
+        """Store buffered stream events, of one attempt or all; returns the last write's result. Events that cannot be
+        stored stay buffered for the next try."""
+        result = None
+        with self._streams:
+            for key in [key] if key else list(self._pending):
+                events = self._pending.pop(key, None)
+                if not events:
+                    continue
+                try:
+                    result = execute(self.workspace, {'op': 'stream.events', 'id': key[0], 'attempt': key[1], 'events': events})
+                except Exception:
+                    self._pending[key] = events
+                    raise
+                if result.get('ignored'):
+                    self._live.pop(key, None)  # stopped elsewhere; later events of this attempt are dropped
+        return result
+
+    def _tick(self):
+        with self._streams:
+            self._timer = None
+            try:
+                self._persist()
+            except Exception:
+                log.exception('Could not store streamed text')
 
     def changed(self, scope='state'):
         self.events.publish({'type': 'changed', 'scope': scope})
@@ -144,8 +183,20 @@ class Host:
                 'turns': [t for t in self.operation({'op': 'stream.summaries'})['turns'] if t['channel'] != PREPARED_STEP]}
 
     def publish_turn(self, turn):
-        if turn['channel'] != PREPARED_STEP:
+        if turn['channel'] == PREPARED_STEP:
+            return
+        with self._streams:
             self.events.publish({'type': 'turn', 'turn': public_turn(turn_summary(turn))})
+            key = (turn['id'], turn['attempt'])
+            if self._live.get(key) == PREPARED_STEP:
+                # Revealed while streaming: send what was written after this copy, and stream from here.
+                self._live[key] = turn['channel']
+                for event in self._pending.get(key, []):
+                    if event['kind'] == 'delta' and event['sequence'] > turn['sequence']:
+                        self._publish_delta(key, event)
+
+    def _publish_delta(self, key, event):
+        self.events.publish({'type': 'delta', 'id': key[0], 'attempt': key[1], 'sequence': event['sequence'], 'text': event.get('text', '')})
 
     def completed(self, turn):
         """Run every feature's completion hook for a turn stored as completed."""
@@ -219,20 +270,39 @@ class Host:
         cancel = threading.Event()
         identifier, attempt = turn['id'], turn['attempt']
         key = (identifier, attempt)
+        with self._streams:
+            self._live[key] = turn['channel']
         self.publish_turn(turn)
 
         def emit(event):
-            sequence = emit.sequence + 1
-            result = self.operation({'op': 'stream.event', 'id': identifier, 'attempt': attempt, 'sequence': sequence, **event})
-            # Count an event only once it is stored, so one failed write cannot leave a gap for every later event.
-            emit.sequence = sequence
-            if result.get('ignored'):
+            if event['kind'] == 'delta' and cancel.is_set():
+                return  # paused: the stored turn ignores it
+            with self._streams:
+                if key not in self._live:
+                    return
+                emit.sequence += 1
+                self._pending.setdefault(key, []).append({**event, 'sequence': emit.sequence})
+                if event['kind'] == 'delta':
+                    # A prepared step's text is published once Continue reveals it, and streams from there.
+                    if self._live[key] != PREPARED_STEP:
+                        self._publish_delta(key, self._pending[key][-1])
+                    if self._timer is None:
+                        self._timer = threading.Timer(self.persist_interval, self._tick)
+                        self._timer.daemon = True
+                        self._timer.start()
+                    return
+                try:
+                    result = self._persist(key)
+                except Exception:
+                    # Earlier events stay buffered; this one is not counted, so the attempt can still be marked failed.
+                    self._pending[key].pop()
+                    emit.sequence -= 1
+                    raise
+                if event['kind'] in ('complete', 'failed'):
+                    self._live.pop(key, None)
+            if result is None or result.get('ignored'):
                 return
-            if event['kind'] == 'delta':
-                # A prepared step's text is published once Continue reveals it, and streams from there.
-                if result['turn']['channel'] != PREPARED_STEP:
-                    self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, 'text': event.get('text', '')})
-            elif event['kind'] in ('complete', 'failed'):
+            if event['kind'] in ('complete', 'failed'):
                 self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
                     self.completed(result['turn'])
@@ -240,12 +310,25 @@ class Host:
         emit.sequence = 0
 
         def fail(message):
-            """Mark this attempt failed from whatever sequence is stored, whatever happened to earlier events."""
-            current = self.operation({'op': 'stream.read', 'id': identifier})['turn']
-            if current['attempt'] != attempt or current['status'] != 'running':
-                return
-            emit.sequence = current['sequence']
-            emit({'kind': 'failed', 'error': message})
+            """Mark this attempt failed after whatever is stored, whatever happened to earlier events."""
+            with self._streams:
+                try:
+                    self._persist(key)
+                except Exception:
+                    log.exception('Could not store the rest of turn %s attempt %s', identifier, attempt)
+                    self._pending.pop(key, None)
+                current = execute(self.workspace, {'op': 'stream.read', 'id': identifier})['turn']
+                if current['attempt'] != attempt or current['status'] != 'running':
+                    self._live.pop(key, None)
+                    return
+                self._live.setdefault(key, current['channel'])
+                emit.sequence = current['sequence']
+            try:
+                emit({'kind': 'failed', 'error': message})
+            except Exception:
+                with self._streams:
+                    self._pending.pop(key, None)
+                raise
 
         def work():
             try:
@@ -261,6 +344,8 @@ class Host:
                 except Exception:
                     log.exception('Could not mark turn %s attempt %s failed', identifier, attempt)
             finally:
+                with self._streams:
+                    self._live.pop(key, None)
                 if self.workers.get(key, (None,))[0] is threading.current_thread():
                     self.workers.pop(key, None)
                 self._wake_background()
@@ -328,4 +413,9 @@ class Host:
             thread.join(max(0, deadline - time.monotonic()))
         self.preparation.join(2)
         self.builds.join(2)
+        try:
+            self._persist()
+        except Exception:
+            log.exception('Could not store streamed text while closing')
+        self._held.close()
         self._lease.close()

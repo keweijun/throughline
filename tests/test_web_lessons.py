@@ -57,6 +57,7 @@ class Runner:
                 pass
             if cancel.is_set():
                 return
+            emit({'kind': 'delta', 'text': 'Then more. '})
         if number and self.delay:
             cancel.wait(self.delay)
         if number and int(number[1]) in self.by_step:
@@ -477,12 +478,17 @@ class PreparedSteps(LessonHost):
         prepared = self.begin()
         self.until(lambda: self.read(prepared)['text'], 'the prepared step streams')
         self.assertEqual(self.state()['turns'][-1]['id'], 'one')
+        events = []
+        publish = self.host.events.publish
+        self.host.events.publish = lambda event: (events.append(event), publish(event))
         result = self.proceed('two')
         self.assertEqual((result['turn']['id'], result['turn']['status'], result['turn']['text']), (prepared, 'running', 'Written so far. '))
         self.assertEqual(self.state()['turns'][-1]['status'], 'running')
         self.assertEqual(self.proceed('three', 409)['code'], 'active_turn', 'one lesson step is written at a time')
         gate.set()
         self.finish('two')
+        shown = [(e['type'], e.get('sequence', e.get('turn', {}).get('sequence'))) for e in events if e.get('id', e.get('turn', {}).get('id')) == prepared]
+        self.assertEqual(shown[:2], [('turn', 1), ('delta', 2)], 'the revealed step streams on from the text it showed')
         self.assertTrue(self.lesson()['steps'][1]['replied'])
         self.assertIn('stream:' + prepared, self.interactions(), 'the step completes as a lesson')
         settle(self.host)

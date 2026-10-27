@@ -112,6 +112,27 @@ class CourseLibrary(unittest.TestCase):
                 execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
                 self.assertTrue(wait_for('state'), events)
 
+    def test_the_watcher_reads_only_courses_whose_files_changed(self):
+        from guided_learning import library
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            course(Path(root) / 'beta', 'Beta')
+            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
+                             library_root=root, watch_interval=0.02)
+            read = []
+            real = library.fingerprint
+            with TestClient(app, base_url='http://127.0.0.1:8765'), \
+                    mock.patch.object(library, 'fingerprint', side_effect=lambda p: read.append(Path(p).name) or real(p)):
+                time.sleep(0.3)
+                self.assertEqual(read, [], 'idle courses are not read')
+                execute(Path(root) / 'beta', {'op': 'preferences.save', 'language': 'zh-CN'})
+                for _ in range(100):
+                    if read:
+                        break
+                    time.sleep(0.02)
+                time.sleep(0.1)
+                self.assertEqual(set(read), {'beta'})
+
     def test_host_switches_between_library_courses(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
             course(Path(root) / 'alpha', 'Alpha')

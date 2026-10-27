@@ -115,7 +115,17 @@ test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ p
   await expect(task.locator('.submitted-answer')).toContainText('Second line');
 });
 
-test('an unsent answer survives looking at another section', async ({ page, course }) => {
+test('each part of a multi-part exercise shows on its own line', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const question = page.locator('#practice article').nth(1).locator('.question');
+  await expect(question.locator('li')).toHaveText(['State the rule.', /^Apply it to/]);
+  await expect(question.locator('li .katex')).toHaveCount(1);
+  // A single newline in the question is a line break.
+  await expect(question.locator('p br')).toHaveCount(1);
+  await expect(question.locator('p')).toContainText('Use the rule from the lesson.');
+});
+
+test('an unsent answer survives looking at another section',async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const box = page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' });
   await box.fill('Half-written reasoning');

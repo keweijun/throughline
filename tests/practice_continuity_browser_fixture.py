@@ -14,7 +14,7 @@ def complete(job,result):
  execute(root,{'op':'stream.event','id':job['id'],'attempt':1,'sequence':1,'kind':'final','text':json.dumps(result)})
  execute(root,{'op':'stream.event','id':job['id'],'attempt':1,'sequence':2,'kind':'complete'})
  execute(root,{'op':'practice.complete','id':job['id']})
-complete({'id':'questions','concept_id':'a','action':'generate'},{'questions':[{'question':q,'origin':'self_created','source_refs':[]} for q in ('First exercise','Second exercise','Needs work exercise','Passed exercise')]})
+complete({'id':'questions','concept_id':'a','action':'generate'},{'questions':[{'question':q,'origin':'self_created','source_refs':[]} for q in ('First exercise','Second exercise, in two parts:\nUse the rule from the lesson.\n1. State the rule.\n2. Apply it to $x=2$.','Needs work exercise','Passed exercise')]})
 for index,outcome in ((2,'needs_work'),(3,'passed')):
  complete({'id':'assess'+str(index),'concept_id':'a','action':'assess','task_id':'questions:'+str(index),'answer':r'An attempt: \(E=mc^2\)'},{'feedback':r'Teacher feedback: \[E=mc^2\]','outcome':outcome})
 class Runner:

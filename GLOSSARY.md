@@ -20,7 +20,7 @@ _Avoid_: Off-topic, irrelevant question.
 _Avoid_: Always brief, always detailed, depth determined by question length.
 
 **Learner profile**: What the learner reported when the course was built: goal, desired depth, prior knowledge of each prerequisite and focus. It shapes the route and lesson depth.
-_Avoid_: Mastery, assessment, learning evidence.
+_Avoid_: Mastery, assessment, learning evidence, preferences learned during teaching (course memory).
 
 **Pending explanation**: Content answered sufficiently for current use whose full explanation is explicitly scheduled for a later concept.
 _Avoid_: Resolved, ignored question.
@@ -30,6 +30,18 @@ _Avoid_: End of chat, latest message.
 
 **Learning section**: A part of the route that answers one core question, explaining closely related ideas together; it may span sources and turns and ends with grouped practice.
 _Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
+
+**Lesson step**: One turn of a section's lesson, teaching one part of its core question and ending with a check question; the teacher may add a bridge step or reorder steps within the section (ADR 0009).
+_Avoid_: Unit overview step list, a whole lesson, a slide.
+
+**Check question**: A multiple-choice question ending a lesson step, with explanations for every option, used to catch a gap before the next step; it is never assessed and is not learning evidence.
+_Avoid_: Exercise, quiz, diagnostic test.
+
+**Exercise part**: One subquestion of an exercise, assessed on its own; an exercise is solved when all its parts are correct (ADR 0011).
+_Avoid_: Step (a lesson step), a separate exercise.
+
+**Skipped exercise**: An exercise the learner closed as too easy, too tedious or not relevant; it records no outcome and is never reminded.
+_Avoid_: Deferred item ("do later" returns at review), failed, skipped section.
 
 **Chapter**: A table-of-contents grouping of consecutive learning sections, built and revised one at a time; it is never taught as one block. A chapter with no sections is not built yet (ADR 0006).
 _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number of chapters.
@@ -78,3 +90,12 @@ _Avoid_: Uncertainty notes in preparation material, progress note.
 
 **Bookmark**: A learner annotation marking a section or a source location to come back to.
 _Avoid_: Deferred item, mainline restore point.
+
+**Course memory**: What the teacher keeps about one course while teaching it: confirmed learner preferences, taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
+_Avoid_: Learner profile (reported when the course was built), learner annotation, evidence, mastery, chat history.
+
+**Taught term**: A term or notation recorded in course memory with the section, lesson step or side question that defined it; the teacher may use it without defining it again.
+_Avoid_: Glossary of the materials, coverage ledger.
+
+**Difficulty**: An idea the learner has repeatedly got wrong, recorded in course memory until a later check question or exercise on it is answered correctly.
+_Avoid_: Needs-work assessment (one result), misconception label, weakness score.

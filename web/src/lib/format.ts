@@ -1,5 +1,5 @@
 import { t, type MessageKey } from './i18n.svelte';
-import type { EvidenceKind, PracticeAction, Question, Task, TurnStatus } from './types';
+import type { EvidenceKind, PartStatus, PracticeAction, Question, Task, TurnStatus } from './types';
 
 type Tone = 'good' | 'caution' | 'danger' | 'accent' | 'plain';
 
@@ -46,7 +46,24 @@ const questionCategories: Record<string, MessageKey> = {
 export const questionCategory = (category: string) =>
   Object.hasOwn(questionCategories, category) ? t(questionCategories[category]) : category;
 
-export const solved = (task: Task) => task.history.filter((h) => h.action === 'assess').at(-1)?.outcome === 'passed';
+/** Each part's status after the latest assessment; an assessment from before parts gave its one part's status (ADR 0011). */
+export const partStatuses = (task: Task): PartStatus[] => {
+  const count = task.parts?.length || 1;
+  const last = task.history.filter((h) => h.action === 'assess').at(-1);
+  if (last?.parts?.length === count) return last.parts;
+  if (last && count === 1) return [last.outcome === 'passed' ? 'correct' : 'not_yet'];
+  return Array(count).fill('not_attempted');
+};
+
+/** An exercise is solved when every part is correct. */
+export const solved = (task: Task) => partStatuses(task).every((s) => s === 'correct');
+
+export const partLabels: Record<PartStatus, { label: MessageKey; tone: Tone }> = {
+  correct: { label: 'Correct', tone: 'good' },
+  partly_correct: { label: 'Partly correct', tone: 'accent' },
+  not_yet: { label: 'Not yet', tone: 'caution' },
+  not_attempted: { label: 'Not attempted', tone: 'plain' },
+};
 
 /** Every turn that answers a side question: the answer, a foundation supplement and follow-up replies. */
 export const questionTurnIds = (question: Question) =>

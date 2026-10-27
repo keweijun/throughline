@@ -46,6 +46,13 @@ class EarlierExercises(unittest.TestCase):
         self.task('a-open', 'a')
         self.assertEqual(practice.quiz_earlier(self.store, CHAPTER), [])
 
+    def test_quiz_questions_keep_the_parts_of_earlier_exercises_and_take_new_ones(self):
+        self.task('a-hinted', 'a', 'hinted', parts=['Recall.', 'Apply.'])
+        self.task('b-hinted', 'b', 'hinted')
+        value = {'id': 'q', 'concept_id': 'd', 'chapter_id': 'one', 'earlier': ['a-hinted', 'b-hinted']}
+        practice.quiz_tasks(self.store, value, [{'question': '1. X\n2. Y', 'tests_concept_ids': ['a'], 'parts': ['X', 'Y']}])
+        self.assertEqual([self.store.get('practice_tasks', f'q:{i}').get('parts') for i in range(3)], [['Recall.', 'Apply.'], None, ['X', 'Y']])
+
 
 if __name__ == '__main__':
     unittest.main()

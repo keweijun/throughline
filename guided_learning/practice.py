@@ -20,6 +20,23 @@ QUIZ_EARLIER=3
 class FormatError(ValueError):
     """The teacher's reply is not the JSON the practice prompt asked for; a model problem, not a course error."""
 
+def part_count(task):
+    """A task without a parts list, such as one from before parts, is a single part."""
+    return len(task.get('parts') or [None])
+
+def part_statuses(task):
+    """Each part's status after the latest assessment (ADR 0011): an answer changes only the parts it addresses, so the
+    rest stay not_attempted or keep an earlier status. An old assessment without parts gave its one part's status."""
+    count=part_count(task)
+    last=next((h for h in reversed(task.get('history',[])) if h.get('action')=='assess'),None)
+    if last and len(last.get('parts') or [])==count: return list(last['parts'])
+    if last and count==1: return ['correct' if last.get('outcome')=='passed' else 'not_yet']
+    return ['not_attempted']*count
+
+def _check_parts(q):
+    if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or any(not isinstance(p,str) or not p.strip() for p in q['parts'])):
+        raise FormatError('parts must list each part as nonempty text')
+
 def job(store, request):
     value = request.get('job')
     if not isinstance(value,dict):
@@ -74,6 +91,7 @@ def _parse(store, value, text):
                 sections=chapter['concept_ids']
             for q in questions:
                 if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
+                _check_parts(q)
                 if sections is not None:
                     tested=q.get('tests_concept_ids')
                     if not isinstance(tested,list) or not tested or any(c not in sections for c in tested): raise FormatError('tests_concept_ids must list sections of this chapter')
@@ -84,6 +102,7 @@ def _parse(store, value, text):
             allowed=context['concept'].get('exercises',[])+context['concept'].get('links',[])
             for q in questions:
                 if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
+                _check_parts(q)
                 if q.get('origin') not in ('source','self_created'): raise FormatError('Missing question origin')
                 refs=q.get('source_refs',[])
                 if not isinstance(refs,list) or (q['origin']=='source' and not refs): raise FormatError('Missing exercise source')
@@ -93,7 +112,16 @@ def _parse(store, value, text):
                     if not any(all(ref.get(k)==a.get(k) for k in ('source_id','revision','unit_id')) for a in allowed): raise FormatError('Unrelated question source')
         else:
             if not isinstance(result.get('feedback'),str) or not result['feedback'].strip(): raise FormatError('feedback must be nonempty text')
-            if value['action']=='assess' and result.get('outcome') not in ('passed','needs_work'): raise FormatError('Assessment must explicitly give outcome')
+            if value['action']=='assess':
+                task=store.get('practice_tasks',value['task_id'])
+                count=part_count(task) if task else 1
+                parts=result.get('parts')
+                # A reply giving only an outcome still assesses a single-part exercise.
+                if parts is None and count==1 and result.get('outcome') in ('passed','needs_work'):
+                    parts=['correct' if result['outcome']=='passed' else 'not_yet']
+                if not isinstance(parts,list) or len(parts)!=count or any(p not in evidence.PART_STATUSES for p in parts):
+                    raise FormatError(f'Assessment must give the status of each of the {count} parts')
+                result['parts']=parts
         return result
     except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as exc:
         raise FormatError(str(exc)) from exc
@@ -117,6 +145,7 @@ def complete(store, request):
         for index,q in enumerate(result['questions']):
             task={'id':value['id']+':'+str(index),'concept_id':value['concept_id'],'question':q['question'],'origin':value.get('purpose') or q['origin'],
                   'source_refs':[] if value.get('purpose') else q.get('source_refs',[]),'status':'pending','history':[]}
+            if 'parts' in q: task['parts']=q['parts']
             store.put('practice_tasks',task['id'],task)
     else:
         task=store.get('practice_tasks',value['task_id'])
@@ -130,15 +159,18 @@ def complete(store, request):
         if value['action']=='ask':
             task['history'].append({'action':'ask','question':value['question'],'feedback':feedback})
         elif value['action']=='assess':
-            request={**base,'answer_id':'practice-answer:'+value['id'],'assessment_id':iid,'outcome':result['outcome']}
+            parts=[old if new=='not_attempted' else new for old,new in zip(part_statuses(task),result['parts'])]
+            outcome='passed' if all(p=='correct' for p in parts) else 'needs_work'
+            request={**base,'answer_id':'practice-answer:'+value['id'],'assessment_id':iid,'outcome':outcome,'parts':parts}
             retest=task.get('origin')=='review' or (task.get('origin')=='chapter_quiz' and task.get('tests_concept_ids')==[cid])
             prior=retest_target(store,task,cid) if retest else None
             if prior: request['retest_of']=prior
             item=evidence.assess(store,request)['evidence']
-            # Corrective feedback may reveal a method/answer; subsequent retries are assisted.
-            evidence.record(store,{**base,'id':'practice-feedback-help:'+value['id'],'interaction_id':iid,'kind':'hint','level':'assessment_feedback'})
+            # Feedback correcting a part may reveal a method/answer, so later answers are assisted; confirming a correct part is no help.
+            if any(p in ('partly_correct','not_yet') for p in result['parts']):
+                evidence.record(store,{**base,'id':'practice-feedback-help:'+value['id'],'interaction_id':iid,'kind':'hint','level':'assessment_feedback'})
             task['status']='attempted'
-            task['history'].append({'action':'assess','feedback':feedback,'outcome':result['outcome'],'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer']})
+            task['history'].append({'action':'assess','feedback':feedback,'outcome':outcome,'parts':parts,'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer']})
         else:
             evidence.record(store,{**base,'interaction_id':iid,'kind':'demonstrated' if value['action']=='solution' else 'hint','level':value['action']})
             task['history'].append({'action':value['action'],'feedback':feedback})
@@ -194,8 +226,9 @@ def quiz_tasks(store, value, questions):
         original=store.get('practice_tasks',task_id)
         if original:
             items.append({'question':original['question'],'source_refs':original.get('source_refs',[]),'from_task_id':task_id,
-                          'tests_concept_ids':[original['concept_id']]})
-    items+=[{'question':q['question'],'source_refs':[],'tests_concept_ids':list(dict.fromkeys(q['tests_concept_ids']))} for q in questions]
+                          'tests_concept_ids':[original['concept_id']],**({'parts':original['parts']} if 'parts' in original else {})})
+    items+=[{'question':q['question'],'source_refs':[],'tests_concept_ids':list(dict.fromkeys(q['tests_concept_ids'])),
+             **({'parts':q['parts']} if 'parts' in q else {})} for q in questions]
     for index,item in enumerate(items):
         identifier=value['id']+':'+str(index)
         store.put('practice_tasks',identifier,{'id':identifier,**common,**item})

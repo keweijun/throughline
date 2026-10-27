@@ -184,5 +184,31 @@ class ReviewFlow(unittest.TestCase):
                          'once every question is answered the quiz can be taken again')
 
 
+    def test_review_questions_have_parts(self):
+        reply = self.runner.run
+        def run(prompt, cwd, emit, cancel):
+            if 'Practice only (spaced review)' in prompt:
+                self.runner.prompts.append(prompt)
+                emit({'kind': 'final', 'text': json.dumps({'questions': [{'question': '1. Recall.\n2. Apply.', 'parts': ['Recall.', 'Apply.']}]})})
+                return emit({'kind': 'complete'})
+            if 'Question and help history' in prompt and '"parts": ["Recall.", "Apply."]' in prompt:
+                self.runner.prompts.append(prompt)
+                emit({'kind': 'final', 'text': json.dumps({'feedback': 'Part 1 right.', 'parts': [self.runner.part, 'not_attempted']})})
+                return emit({'kind': 'complete'})
+            return reply(prompt, cwd, emit, cancel)
+        self.runner.run = run
+        self.runner.part = 'correct'
+        self.study('a')
+        self.host.review.clock = lambda: time.time() + 2 * DAY
+        self.post('/api/review/start', {'concept_id': 'a'})
+        self.settle()
+        [task] = self.state()['review']['tasks']
+        self.assertIn('"parts"', next(p for p in self.runner.prompts if 'Practice only (spaced review)' in p))
+        self.assertEqual(task['parts'], ['Recall.', 'Apply.'])
+        self.answer(task['id'])
+        [task] = self.state()['review']['tasks']
+        self.assertEqual((task['history'][-1]['parts'], task['history'][-1]['outcome']), (['correct', 'not_attempted'], 'needs_work'))
+        self.assertEqual(self.client.get('/api/review').json()['sections'][0]['interval_days'], 1, 'the schedule reads outcome')
+
 if __name__ == '__main__':
     unittest.main()

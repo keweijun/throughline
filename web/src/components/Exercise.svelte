@@ -4,7 +4,7 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
-  import { markdown, hasMath } from '../lib/markdown';
+  import { markdown, hasMath, labelFor } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
   import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
   import type { SkipReason, Task } from '../lib/types';
@@ -189,7 +189,7 @@
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}
-        <button class="citation" onclick={() => app.openSource(ref)}>{t("View source")}</button>
+        <button class="citation" onclick={() => app.openSource(ref)}>{t('View source {location}', { location: labelFor(ref) })}</button>
       {/each}
     </p>
   {/if}

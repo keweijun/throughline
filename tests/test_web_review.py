@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from guided_learning.api import execute
-from support import host_client
+from support import host_client, settle
 
 DAY = 86400
 
@@ -59,14 +59,7 @@ class ReviewFlow(unittest.TestCase):
         return self.client.get('/api/state').json()
 
     def settle(self):
-        """Wait until every model turn, including ones started by completion hooks, has finished."""
-        for _ in range(20):
-            running = [t for t in self.host.brief_turns() if t['status'] == 'running']
-            if not running:
-                return
-            for turn in running:
-                self.host.wait(turn['id'], 5)
-        self.fail('turns kept running')
+        settle(self.host)
 
     def answer(self, task_id, outcome='passed'):
         self.runner.outcome = outcome

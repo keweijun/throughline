@@ -4,7 +4,7 @@ import unittest
 
 from guided_learning.api import execute
 from guided_learning.server import Host
-from support import host_client
+from support import host_client, settle
 
 LESSON = ('A plane wave is $e^{ikx}$.\n<course-memory>{"entries":[{"kind":"taught_term","text":"plane wave"},'
           '{"kind":"preference","text":"One step at a time"}],"cleared":[]}</course-memory>')
@@ -37,9 +37,6 @@ def course(path):
     execute(path, {'op': 'mainline.enter', 'concept_id': 'state', 'goal': 'states', 'next_step': 'read', 'request_id': 'p'})
 
 
-def settle(app):
-    for turn in app.brief_turns():
-        app.wait(turn['id'], 5)
 
 
 class MemoryFlow(unittest.TestCase):

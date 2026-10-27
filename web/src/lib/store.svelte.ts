@@ -5,7 +5,7 @@ import { locate } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
 import type { Annotation, AnnotationSource, Chapter, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
-export type PanelTab = 'questions' | 'source' | 'notes';
+export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -412,6 +412,19 @@ class AppStore {
 
   removeAnnotation(id: string) {
     return this.act(() => api.delete(`/api/annotations/${encodeURIComponent(id)}`));
+  }
+
+  editMemory(id: string, text: string) {
+    return this.act(() => api.put(`/api/memory/${encodeURIComponent(id)}`, { text }));
+  }
+
+  confirmMemory(id: string) {
+    return this.act(() => api.post(`/api/memory/${encodeURIComponent(id)}/confirm`));
+  }
+
+  /** Deleting is final, and dismissing a suggested preference is a delete: the same evidence does not bring it back. */
+  removeMemory(id: string) {
+    return this.act(() => api.delete(`/api/memory/${encodeURIComponent(id)}`));
   }
 
   toggleBookmark(conceptId: string, source?: AnnotationSource | null) {

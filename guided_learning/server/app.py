@@ -67,6 +67,10 @@ class NoteRequest(Body):
     note: str
 
 
+class MemoryRequest(Body):
+    text: str
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -277,6 +281,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
+                'memory': current.operation({'op': 'memory.view'})['entries'],
                 'skipped': current.practice.skipped(),
                 'builds': current.builds.state()}
 
@@ -359,6 +364,24 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.delete('/api/annotations/{identifier}')
     def remove_annotation(identifier: str):
         result = host.operation({'op': 'annotations.delete', 'id': identifier})
+        host.changed()
+        return result
+
+    @app.put('/api/memory/{identifier}')
+    def edit_memory(identifier: str, body: MemoryRequest):
+        result = host.operation({'op': 'memory.save', 'id': identifier, 'text': body.text})
+        host.changed()
+        return result
+
+    @app.post('/api/memory/{identifier}/confirm')
+    def confirm_memory(identifier: str):
+        result = host.operation({'op': 'memory.confirm', 'id': identifier})
+        host.changed()
+        return result
+
+    @app.delete('/api/memory/{identifier}')
+    def remove_memory(identifier: str):
+        result = host.operation({'op': 'memory.delete', 'id': identifier})
         host.changed()
         return result
 

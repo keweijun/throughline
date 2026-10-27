@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 from ..store import OperationError
+from .. import memory
 from . import prompts
 
 log = logging.getLogger(__name__)
@@ -331,7 +332,7 @@ class Questions(Feature):
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):
             return
-        match = DECISION.search(turn['final_text'])
+        match = DECISION.search(memory.strip(turn['final_text']))
         if not match:
             return  # the question stays unanswered when the decision is missing
         try:
@@ -541,6 +542,51 @@ class Practice(Feature):
         # A chapter recap asks for nothing: the chapter quiz is taken on purpose from the chapter page.
         if turn['channel'] == 'mainline' and not self.host.closing and not is_recap(turn):
             self.generate(turn['concept_id'])
+
+
+class Memory(Feature):
+    """Course memory (ADR 0010). Every teaching prompt carries it through the snapshot; a lesson, side-question answer or
+    practice help ends with a memory note, which the host records once the turn completes."""
+
+    def _job(self, turn):
+        if turn['channel'] != 'practice':
+            return None
+        return next((j for j in self.operation({'op': 'practice.list'})['jobs'] if j['id'] == turn['id']), None)
+
+    def prompt(self, turn, context):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            return prompts.memory_note(json_reply=False)
+        job = self._job(turn)
+        if job and job['action'] != 'generate':
+            return prompts.memory_note(json_reply=True)
+        return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
+
+    def on_complete(self, turn):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            match = memory.NOTE.search(turn['final_text'] or '')
+            own = ['stream-user:' + turn['id'], 'stream:' + turn['id']]
+            try:
+                note = json.loads(match.group(1)) if match else None
+            except ValueError:
+                note = None
+        else:
+            job = self._job(turn)
+            if not job or job['action'] == 'generate' or job.get('error'):
+                return
+            own = ['practice-answer:' + job['id'], 'practice-feedback:' + job['id']]
+            raw = (turn['final_text'] or '').strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]
+            try:
+                note = json.loads(raw).get('memory')
+            except (ValueError, AttributeError):
+                note = None
+        if not isinstance(note, dict):
+            return
+        try:
+            self.operation({'op': 'memory.note', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'interaction_ids': own, 'note': note})
+        except OperationError:
+            log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
 
 
 class Preparation(Feature):

@@ -6,6 +6,7 @@
   import { lessonStatus } from '../lib/format';
   import type { Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
+  import CheckQuestion from './CheckQuestion.svelte';
 
   let { turn }: { turn: Turn } = $props();
 
@@ -22,6 +23,11 @@
     !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),
   );
   let continuing = $state(false);
+  // A check stays answerable until the next step starts; continuing without answering leaves it unanswered.
+  const entry = $derived(step ? step.lesson.steps[step.number - 1] : null);
+  const check = $derived(
+    entry?.check && turn.status === 'completed' && (entry.answer || !planned.some((s) => s.turn_id)) ? entry.check : null,
+  );
 
   async function next() {
     if (!step || continuing) return;
@@ -145,6 +151,10 @@
     ></div>
   {:else if turn.status === 'running'}
     <p class="waiting">{t("The teacher is reading the goal and sources. Text appears here as it is written.")}</p>
+  {/if}
+
+  {#if check && step && entry}
+    <CheckQuestion lessonId={step.lesson.id} turnId={turn.id} {check} answer={entry.answer} more={planned.length > 0} />
   {/if}
 
   {#if continues}

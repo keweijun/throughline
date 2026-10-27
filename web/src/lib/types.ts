@@ -57,7 +57,15 @@ export type Turn = {
 };
 
 /** One step of a stepped lesson (ADR 0009); `turn_id` is set once the step is taught, `replied` once its plan block is read. */
-export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean };
+/** A step's check question (ADR 0009): never assessed and never evidence. `correct` indexes `options`. */
+export type CheckQuestion = { idea: string; question: string; options: { text: string; explanation: string }[]; correct: number };
+
+/** The learner's choice on a check question: an option's index or "unsure". */
+export type CheckChoice = number | 'unsure';
+
+export type CheckAnswer = { choice: CheckChoice; unsure: boolean; correct: boolean; interaction_id: string; answered_at: number };
+
+export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean; check?: CheckQuestion; answer?: CheckAnswer };
 
 /** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. */
 export type SteppedLesson = { id: string; concept_id: string; request: string; created_at: number; steps: LessonStep[] };

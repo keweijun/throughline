@@ -8,7 +8,7 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -113,6 +113,10 @@ class RecapRequest(Body):
 
 class StepRequest(Body):
     id: Optional[str] = None
+
+
+class CheckAnswer(Body):
+    choice: Any = None  # an option index or "unsure"; lesson.answer validates it
 
 
 class SettingsRequest(Body):
@@ -325,6 +329,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def continue_lesson(lesson_id: str, body: StepRequest):
         result = host.navigation.continue_lesson(lesson_id, body.model_dump())
         return {**result, 'turn': turn_summary(result['turn'])}
+
+    @app.post('/api/lessons/{lesson_id}/steps/{turn_id}/check')
+    def answer_check(lesson_id: str, turn_id: str, body: CheckAnswer):
+        return host.navigation.answer_check(lesson_id, turn_id, body.choice)
 
     @app.put('/api/preferences')
     def preferences(body: PreferencesRequest):

@@ -49,3 +49,43 @@ test('a lesson saved before steps still displays as one reply', async ({ page, c
   await expect(lesson.locator('.step-position')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('each step ends with a check question: instant feedback, a repair after a miss, and continuing without answering', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const first = page.getByRole('region', { name: 'Step 1 of 4' });
+  const check = first.getByRole('group', { name: 'Check question' });
+  await expect(check).toContainText('What does a path carry?');
+  await check.getByRole('button', { name: 'A probability' }).click();
+  const feedback = check.getByRole('status');
+  await expect(feedback).toContainText('Not quite.');
+  await expect(feedback).toContainText('Probabilities come only after the amplitudes are added.');
+  await expect(feedback).toContainText('Each path contributes an amplitude, not a probability.');
+  await expect(feedback).toContainText('The next step starts by going over this.');
+  await expect(check.getByRole('button', { name: 'A complex amplitude' })).toBeDisabled();
+  await expect(page.locator('section.lesson'), 'feedback needs no model turn').toHaveCount(1);
+
+  await first.getByRole('group', { name: 'Next step' }).getByRole('button', { name: 'Continue' }).click();
+  const second = page.getByRole('region', { name: 'Step 2 of 4' });
+  await second.getByRole('button', { name: 'Pause' }).click();
+  await second.getByRole('button', { name: 'Regenerate step' }).click();
+  const revised = page.getByRole('region', { name: 'Step 2 of 3' });
+  await expect(revised, 'the step after a miss opens with a repair').toContainText('First, a quick fix');
+  await expect(page.getByRole('region', { name: 'Step 1 of 3' }).getByRole('group', { name: 'Check question' }), 'an answered check stays with its step').toContainText('Not quite.');
+
+  // Continue without answering: the check closes unanswered.
+  await expect(revised.getByRole('group', { name: 'Check question' })).toBeVisible();
+  await revised.getByRole('group', { name: 'Next step' }).getByRole('button', { name: 'Continue' }).click();
+  const third = page.getByRole('region', { name: 'Step 3 of 3' });
+  await expect(third).toContainText('then square');
+  await expect(third, 'no repair without a missed check').not.toContainText('quick fix');
+  await expect(revised.getByRole('group', { name: 'Check question' })).toHaveCount(0);
+
+  const last = third.getByRole('group', { name: 'Check question' });
+  await last.getByRole('button', { name: 'The amplitudes' }).click();
+  await expect(last.getByRole('status')).toContainText('Correct.');
+  await expect(last.getByRole('status')).not.toContainText('next step');
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Step 3 of 3' }).getByRole('group', { name: 'Check question' }).getByRole('status')).toContainText('Correct.');
+  expect(errors).toEqual([]);
+});

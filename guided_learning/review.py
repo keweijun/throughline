@@ -2,7 +2,9 @@
 
 A section becomes reviewable once one of its exercises is assessed `passed`. Its review is due INTERVALS[step] days
 after the last pass. A review (a task with origin `review`, or a `chapter_quiz` task, which reviews every section it tests)
-moves the step: an unaided pass to the next interval, an assisted pass keeps it, `needs_work` returns to the first. An
+moves the step: an unaided pass to the next interval, an assisted pass keeps it, `needs_work` returns to the first.
+An assessment of a review answered part by part that marks no part partly_correct or not_yet is neither: the review
+stays open until it is passed or a part is missed. An
 ordinary exercise passed later restarts the wait at the same step. Sections skipped with their chapter are not scheduled.
 """
 import time
@@ -15,6 +17,12 @@ INTERVALS = (1, 3, 7, 21, 60)
 DAILY_CAP = 5
 REVIEW_ORIGINS = ('review', 'chapter_quiz')
 UNAIDED = ('independent', 'retest_passed')
+MISSES = ('partly_correct', 'not_yet')
+
+
+def settled(outcome, parts):
+    """Whether an assessment passes or misses, rather than only finding some parts correct and the rest unanswered."""
+    return outcome == 'passed' or parts is None or any(p in MISSES for p in parts)
 
 
 def _now(request):
@@ -41,7 +49,8 @@ def assessments(store):
         origin = task.get('origin')
         sections = task.get('tests_concept_ids') if origin == 'chapter_quiz' and task.get('tests_concept_ids') else [item['concept_id']]
         events.append({'sequence': interaction.get('sequence', 0), 'at': item.get('assessed_at') or 0, 'kind': item['kind'],
-                       'passed': item['outcome'] == 'passed', 'review': origin in REVIEW_ORIGINS, 'sections': sections})
+                       'passed': item['outcome'] == 'passed', 'settled': settled(item['outcome'], item.get('parts')),
+                       'review': origin in REVIEW_ORIGINS, 'sections': sections})
     return sorted(events, key=lambda e: e['sequence'])
 
 
@@ -55,7 +64,7 @@ def section_states(events):
                 if event['passed']:
                     states[cid] = {'step': 0, 'anchor': event['at'], 'last_review': None}
                 continue
-            if event['review']:
+            if event['review'] and event['settled']:
                 if not event['passed']:
                     state['step'] = 0
                 elif event['kind'] in UNAIDED:
@@ -75,7 +84,7 @@ def skipped(store):
 def open_reviews(store):
     """Review questions generated but not yet answered, by section."""
     return {t['concept_id']: t['id'] for t in store.list('practice_tasks')
-            if t.get('origin') == 'review' and t.get('status') != 'deferred' and not any(h.get('action') == 'assess' for h in t.get('history', []))}
+            if t.get('origin') == 'review' and t.get('status') != 'deferred' and not any(h.get('action') == 'assess' and settled(h.get('outcome'), h.get('parts')) for h in t.get('history', []))}
 
 
 def schedule(store, request):

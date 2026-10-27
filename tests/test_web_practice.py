@@ -159,3 +159,47 @@ class PracticeFlow(unittest.TestCase):
             with self.assertRaises(OperationError) as result:
                 app.start_turn({'concept_id':'a','prompt':'Explain','channel':'mainline'})
             self.assertEqual(result.exception.code,'host_closing')
+
+
+class AskFlow(unittest.TestCase):
+    def test_asking_about_a_solved_exercise_records_no_assessment(self):
+        from guided_learning.store import OperationError
+        class Runner:
+            reply='';prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt);emit({'kind':'final','text':self.reply});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            def run(start,text):
+                runner.reply=text;t=app.wait(start()['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
+                return app.practice.state()
+            tid=run(lambda:app.practice.generate('a'),'{"questions":[{"question":"1. State it.\\n2. Apply it.","origin":"self_created","source_refs":[]}]}')['tasks'][0]['id']
+            run(lambda:app.practice.act(tid,'assess','Both parts.'),'{"feedback":"Correct.","outcome":"passed"}')
+            evidence=execute(path,{'op':'evidence.view','concept_id':'a'})['history']
+            state=run(lambda:app.practice.act(tid,'ask',question='What does part 2 mean by apply?'),'{"feedback":"Use the rule on a new case."}')
+            self.assertIn('What does part 2 mean by apply?',runner.prompts[-1])
+            self.assertIn('never assessed',runner.prompts[-1])
+            task=state['tasks'][0]
+            self.assertEqual(task['status'],'attempted')
+            self.assertEqual(task['history'][-1],{'action':'ask','question':'What does part 2 mean by apply?','feedback':'Use the rule on a new case.'})
+            self.assertEqual([h['outcome'] for h in task['history'] if h['action']=='assess'],['passed'])
+            self.assertEqual(execute(path,{'op':'evidence.view','concept_id':'a'})['history'],evidence)
+            self.assertIn('What does part 2 mean by apply?',[i['text'] for i in app.snapshot()['session']['recent_interactions']])
+            # A reply that gives an outcome anyway is still only an answer.
+            state=run(lambda:app.practice.act(tid,'ask',question='Is my answer right?'),'{"feedback":"Use Check my answer for that.","outcome":"needs_work"}')
+            self.assertEqual(set(state['tasks'][0]['history'][-1]),{'action','question','feedback'})
+            self.assertEqual(execute(path,{'op':'evidence.view','concept_id':'a'})['history'],evidence)
+            with self.assertRaises(OperationError) as caught: app.practice.act(tid,'ask',question='  ')
+            self.assertEqual(caught.exception.code,'empty_question')
+            app.close()
+
+    def test_an_ask_job_needs_a_question(self):
+        from guided_learning.store import OperationError
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            with self.assertRaises(OperationError) as caught:
+                execute(path,{'op':'practice.job','job':{'id':'j','concept_id':'a','action':'ask','task_id':'t'}})
+            self.assertEqual(caught.exception.code,'invalid_request')

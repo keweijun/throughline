@@ -137,3 +137,21 @@ test('an unsent answer survives looking at another section',async ({ page, cours
   await page.reload();
   await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
 });
+
+test('asking about a solved exercise shows the answer and keeps it solved', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').nth(3);
+  await expect(task).toContainText('Solved independently');
+  await task.getByRole('textbox', { name: 'Exercise answer' }).fill('A draft answer');
+  await task.getByRole('button', { name: 'Ask about this' }).click();
+  await task.getByRole('textbox', { name: 'Question about this exercise' }).fill('What does it mean?');
+  await task.getByRole('button', { name: 'Ask', exact: true }).click();
+  const asked = task.locator('.history details').last();
+  await expect(asked.locator('.your-answer')).toContainText('What does it mean?');
+  await expect(asked.locator('.teacher-feedback')).toContainText("Teacher's answer");
+  await expect(asked.locator('.teacher-feedback')).toContainText('apply the rule to a new case');
+  await expect(task.locator('header .chip')).toHaveText('Solved independently');
+  await expect(task).not.toContainText('solved with help');
+  await expect(task.getByRole('textbox', { name: 'Question about this exercise' })).toHaveCount(0);
+  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('A draft answer');
+});

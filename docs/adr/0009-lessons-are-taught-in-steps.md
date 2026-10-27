@@ -9,7 +9,7 @@ We teach a section's lesson as a short sequence of **lesson steps**:
 - A correct answer leads to the next step. A wrong or "not sure" answer shows that option's explanation and the correct answer with its own, and the next step opens with a short fix aimed at that misconception before going on. Repairs never cost an extra turn.
 - The learner may continue without answering. The check is then left unanswered and nothing is repaired.
 - The teacher may adapt the plan freely while teaching: add a bridge step, reorder or merge the remaining steps. It may only use material that belongs to the section or its taught prerequisites; content of later sections stays with them (ADR 0006). The interface shows the step position and any added step.
-- Grouped practice still ends the section. Check questions are not exercises.
+- Grouped practice still ends the section. Check questions are not exercises. Lessons teach the method on their own examples and leave the section's original exercises (homework, problem sets) unsolved for practice: in a trial, a lesson that worked the homework as examples left practice nothing original to set.
 
 ## Check questions are not evidence
 

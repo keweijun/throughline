@@ -10,6 +10,9 @@ from .preferences import view as preferences, validate_language
 from .memory import for_prompt as course_memory
 
 
+BACKGROUND = ('preparation', 'build', 'consolidation')  # channels whose turns are not teaching interactions
+
+
 def read(store, request):
     turn = store.get('streams', require_text(request, 'id'))
     if turn is None:
@@ -25,7 +28,7 @@ def start(store, request):
     if not isinstance(request.get('record_user', True), bool):
         raise OperationError('invalid_request','record_user must be boolean')
     identity = {'record_user':request.get('record_user',True), 'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
-    if identity['channel'] not in ('mainline','sidequestion','practice','preparation','build'):
+    if identity['channel'] not in ('mainline','sidequestion','practice','preparation','build','consolidation'):
         raise OperationError('invalid_channel','Unknown teaching channel')
     if 'chapter_id' in request:
         # A turn owned by a chapter (its recap) is shown on the chapter page; concept_id stays the chapter's last
@@ -59,7 +62,7 @@ def start(store, request):
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile
     memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
-    if memory and identity['channel'] != 'build': snapshot['course_memory'] = memory
+    if memory and identity['channel'] not in ('build','consolidation'): snapshot['course_memory'] = memory
     branch=next((b for b in store.list('web_branches') if identifier in [b['turn_id'],b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]),None)
     if branch:
         snapshot['branch']=branch
@@ -107,7 +110,7 @@ def event(store, request):
             raise OperationError('missing_final','No authoritative final answer')
         begin = time.perf_counter()
         # Background work is not a teaching interaction.
-        if turn['channel'] not in ('preparation', 'build'):
+        if turn['channel'] not in BACKGROUND:
             record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'

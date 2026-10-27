@@ -106,8 +106,9 @@ class Host:
         return self._runner or self.settings.runner()
 
     def runner_for(self, turn):
-        # Preparation is background work, so it runs on the small model when one is chosen; a chapter build needs the teacher.
-        return self._runner or self.settings.runner(small=turn['channel'] == 'preparation')
+        # Preparation and memory consolidation are background work, so they run on the small model when one is chosen; a
+        # chapter build needs the teacher.
+        return self._runner or self.settings.runner(small=turn['channel'] in ('preparation', 'consolidation'))
 
     def operation(self, request):
         return execute(self.workspace, request)
@@ -153,6 +154,8 @@ class Host:
             raise OperationError('missing_snapshot', 'This older turn has no source snapshot; start a new lesson')
         if turn['channel'] == 'build':
             return self.builds.build_prompt(turn)  # not a teaching turn: none of the teaching additions apply
+        if turn['channel'] == 'consolidation':
+            return self.memory.consolidation_prompt(turn)
         prompt = prompts.base(turn)
         context = turn['prompt_snapshot']['context']
         for feature in self.features:

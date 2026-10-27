@@ -7,6 +7,7 @@ from .preferences import view as course_preferences
 from .teaching import require_text, validate_concept
 
 KINDS = ('preference', 'taught_term', 'difficulty')
+LIVE = ('active', 'suggested', 'confirmed', 'cleared')  # the rest are deleted, merged or pruned
 MAX_TEXT = 300
 NOTE = re.compile(r'<course-memory>\s*(\{.*?\})\s*</course-memory>', re.S)
 
@@ -36,7 +37,7 @@ def _entries(store):
 
 
 def view(store, request):
-    return {'entries': [e for e in _entries(store) if e['status'] != 'deleted']}
+    return {'entries': [e for e in _entries(store) if e['status'] in LIVE]}
 
 
 def for_prompt(store):
@@ -70,7 +71,7 @@ def _create(store, identifier, kind, text, concept_id, interaction_ids):
 
 def _live(store, request):
     entry = store.get('memory', require_text(request, 'id'))
-    if not entry or entry['status'] == 'deleted':
+    if not entry or entry['status'] not in LIVE:
         raise OperationError('unknown_memory_entry', request['id'])
     return entry
 
@@ -166,5 +167,74 @@ def suggest_from_skips(store, reason, concept_id):
                                                  'skip_reason': reason, 'created_at': now, 'updated_at': now})
 
 
-OPERATIONS = {'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,
+def _refuse(message):
+    raise OperationError('invalid_consolidation', message)
+
+
+def consolidate(store, request):
+    """Applies a section-end consolidation once per turn: `merge` folds duplicate entries into one, which keeps its text and
+    gains their interactions; `prune` retires cleared or stale entries with a reason. It never adds or rewords an entry,
+    touches a deleted one or retires a confirmed preference, which only the learner can delete. Refused whole."""
+    turn_id = require_text(request, 'turn_id')
+    concept_id = require_text(request, 'concept_id')
+    validate_concept(store, concept_id)
+    if store.get('memory_consolidations', turn_id):
+        return {'changed': [], 'replayed': True}
+    reply = request.get('reply')
+    if not isinstance(reply, dict) or set(reply) - {'merge', 'prune'}:
+        _refuse('A consolidation is an object with only merge and prune lists')
+    merges, prunes = reply.get('merge', []), reply.get('prune', [])
+    if not isinstance(merges, list) or not isinstance(prunes, list):
+        _refuse('merge and prune must be lists')
+    changed = []
+
+    def live(identifier):
+        entry = store.get('memory', identifier) if isinstance(identifier, str) else None
+        if not entry or entry['status'] not in LIVE:
+            _refuse(f'{identifier} is not a live memory entry')
+        if identifier in changed:
+            _refuse(f'{identifier} is changed twice')
+        changed.append(identifier)
+        return entry
+
+    merged = []
+    for item in merges:
+        if not isinstance(item, dict) or set(item) != {'into', 'entries'} or not isinstance(item['entries'], list) or not item['entries']:
+            _refuse('Each merge is {into, entries} with at least one entry to fold in')
+        into = live(item['into'])
+        others = [live(i) for i in item['entries']]
+        # Same status too, so a suggested preference never merges into, or out of, a confirmed one.
+        if any((e['kind'], e['status']) != (into['kind'], into['status']) for e in others):
+            _refuse('Only entries of the same kind and status merge')
+        merged.append((into, others))
+    pruned = []
+    for item in prunes:
+        if not isinstance(item, dict) or not isinstance(item.get('reason'), str) or not item['reason'].strip():
+            _refuse('Each prune is {id, reason}')
+        entry = live(item.get('id'))
+        if entry['kind'] == 'preference' and entry['status'] == 'confirmed':
+            _refuse('A confirmed preference is removed only by the learner')
+        pruned.append((entry, ' '.join(item['reason'].split())[:MAX_TEXT]))
+    now = time.time()
+    for into, others in merged:
+        ids = list(dict.fromkeys(into['interaction_ids'] + [i for e in others for i in e['interaction_ids']]))
+        skips = list(dict.fromkeys(into.get('skip_ids', []) + [i for e in others for i in e.get('skip_ids', [])]))
+        store.put('memory', into['id'], {**into, 'interaction_ids': ids, **({'skip_ids': skips} if skips else {}), 'consolidated_by': turn_id, 'updated_at': now})
+        for entry in others:
+            store.put('memory', entry['id'], {**entry, 'status': 'merged', 'merged_into': into['id'], 'consolidated_by': turn_id, 'updated_at': now})
+    for entry, reason in pruned:
+        store.put('memory', entry['id'], {**entry, 'status': 'pruned', 'pruned_reason': reason, 'consolidated_by': turn_id, 'updated_at': now})
+    store.put('memory_consolidations', turn_id, {
+        'turn_id': turn_id, 'concept_id': concept_id, 'created_at': now,
+        'merge': [{'into': into['id'], 'entries': [e['id'] for e in others]} for into, others in merged],
+        'prune': [{'id': entry['id'], 'reason': reason} for entry, reason in pruned]})
+    return {'changed': changed}
+
+
+def consolidations(store, request):
+    return {'consolidations': sorted(store.list('memory_consolidations'), key=lambda c: c['created_at'])}
+
+
+OPERATIONS = {'memory.consolidate': consolidate, 'memory.consolidations': consolidations,
+              'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,
               'memory.prompt': lambda store, request: {'memory': for_prompt(store)}}

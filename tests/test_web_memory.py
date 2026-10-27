@@ -110,5 +110,102 @@ class MemoryFlow(unittest.TestCase):
                 self.assertEqual([e['text'] for e in client.get('/api/state').json()['memory']], ['Give the tedious integrals'])
 
 
+class Consolidating:
+    """Answers a consolidation turn with `reply` and records which turns ran on the small model."""
+
+    def __init__(self, reply):
+        self.reply, self.calls = reply, []
+
+    def runner(self, small=False):
+        settings = self
+
+        class Run:
+            def run(self, prompt, cwd, emit, cancel):
+                settings.calls.append((small, prompt))
+                if 'Consolidate the course memory' not in prompt:
+                    text = 'Prepared.'
+                elif isinstance(settings.reply, Exception):
+                    raise settings.reply
+                else:
+                    text = settings.reply if isinstance(settings.reply, str) else json.dumps(settings.reply)
+                emit({'kind': 'final', 'text': text})
+                emit({'kind': 'complete'})
+        return Run()
+
+
+def remembered(path):
+    execute(path, {'op': 'course.init', 'title': 'Quantum'})
+    execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'spin', 'title': 'Spin'}],
+                   'route': ['state', 'spin'], 'coverage': []})
+    execute(path, {'op': 'mainline.enter', 'concept_id': 'state', 'goal': 'states', 'next_step': 'read', 'request_id': 'p'})
+    execute(path, {'op': 'interaction.record', 'id': 'i1', 'role': 'user', 'text': 'q', 'concept_id': 'state'})
+    def note(turn, entries, cleared=()):
+        return execute(path, {'op': 'memory.note', 'turn_id': turn, 'concept_id': 'state', 'interaction_ids': ['i1'] if turn == 't1' else [],
+                              'note': {'entries': entries, 'cleared': list(cleared)}})['recorded']
+    [term, difficulty, preference, gone] = note('t1', [{'kind': 'taught_term', 'text': 'plane wave'}, {'kind': 'difficulty', 'text': 'Box normalization'},
+                                                       {'kind': 'preference', 'text': 'One step at a time'}, {'kind': 'taught_term', 'text': 'DELETED-TERM'}])
+    [plural] = note('t2', [{'kind': 'taught_term', 'text': 'plane waves'}], cleared=[difficulty['id']])
+    execute(path, {'op': 'memory.confirm', 'id': preference['id']})
+    execute(path, {'op': 'memory.delete', 'id': gone['id']})
+    return {'term': term['id'], 'plural': plural['id'], 'difficulty': difficulty['id'], 'preference': preference['id'], 'deleted': gone['id']}
+
+
+class SectionEndConsolidation(unittest.TestCase):
+    def run_consolidation(self, path, reply):
+        settings = Consolidating(reply)
+        app = Host(path, settings=settings)
+        try:
+            app.practice.next_section('state', 'r1')
+            settle(app)
+            return app, settings
+        finally:
+            app.close()
+
+    def test_entering_the_next_section_consolidates_the_previous_one_on_the_small_model(self):
+        with tempfile.TemporaryDirectory() as path:
+            ids = remembered(path)
+            app, settings = self.run_consolidation(path, {'merge': [{'into': ids['term'], 'entries': [ids['plural']]}],
+                                                          'prune': [{'id': ids['difficulty'], 'reason': 'Cleared in practice'}]})
+            turn = app.operation({'op': 'stream.read', 'id': 'consolidation-state'})['turn']
+            self.assertEqual((turn['channel'], turn['concept_id'], turn['status']), ('consolidation', 'state', 'completed'))
+            [(small, prompt)] = [c for c in settings.calls if 'Consolidate the course memory' in c[1]]
+            self.assertTrue(small)
+            self.assertIn(ids['plural'], prompt)
+            self.assertNotIn('DELETED-TERM', prompt)
+            entries = {e['id']: e for e in app.operation({'op': 'memory.view'})['entries']}
+            self.assertEqual(set(entries), {ids['term'], ids['preference']})
+            self.assertEqual(entries[ids['preference']]['status'], 'confirmed')
+            self.assertEqual(app.operation({'op': 'memory.consolidations'})['consolidations'][0]['turn_id'], 'consolidation-state')
+            self.assertEqual(app.operation({'op': 'course.status'})['position']['concept_id'], 'spin')
+            # Background work, not a teaching interaction.
+            self.assertNotIn('stream:consolidation-state', [i['id'] for i in app.operation({'op': 'session.resume', 'recent_limit': 20})['recent_interactions']])
+
+            # One consolidation per section.
+            app = Host(path, settings=settings)
+            try:
+                self.assertFalse(app.memory.consolidate('state')['created'])
+                settle(app)
+            finally:
+                app.close()
+            self.assertEqual(len([c for c in settings.calls if 'Consolidate the course memory' in c[1]]), 1)
+
+    def test_a_refused_or_failed_consolidation_leaves_memory_unchanged(self):
+        for reply in ('not json', RuntimeError('model down'),
+                      {'merge': [], 'entries': [{'kind': 'preference', 'text': 'Be brief'}]},
+                      'DELETED', 'CONFIRMED'):
+            with self.subTest(reply=reply), tempfile.TemporaryDirectory() as path:
+                ids = remembered(path)
+                if reply == 'DELETED':
+                    reply = {'merge': [{'into': ids['term'], 'entries': [ids['deleted']]}]}
+                elif reply == 'CONFIRMED':
+                    reply = {'prune': [{'id': ids['difficulty'], 'reason': 'Cleared'}, {'id': ids['preference'], 'reason': 'stale'}]}
+                before = execute(path, {'op': 'memory.view'})['entries']
+                app, _ = self.run_consolidation(path, reply)
+                status = app.operation({'op': 'stream.read', 'id': 'consolidation-state'})['turn']['status']
+                self.assertEqual(status, 'failed' if isinstance(reply, Exception) else 'completed')
+                self.assertEqual(app.operation({'op': 'memory.view'})['entries'], before)
+                self.assertEqual(app.operation({'op': 'memory.consolidations'})['consolidations'], [])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -34,6 +34,9 @@ _Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
 **Lesson step**: One turn of a section's lesson, teaching one part of its core question; it may end with a check question. The teacher decides how many steps a section needs and whether a step ends with a check, and may add a bridge step or reorder steps within the section (ADR 0009).
 _Avoid_: Unit overview step list, a whole lesson, a slide.
 
+**Prepared step**: The next lesson step, written while the learner reads the current one and hidden until Continue reveals it; it is not taught, shown or cited before then, and is written again when a check answer calls for a repair (ADR 0009).
+_Avoid_: Preparation (of the next section), prefetch, draft step.
+
 **Check question**: A multiple-choice question that may end a lesson step, with explanations for every option, used to catch a gap before the next step; it is never assessed and is not learning evidence.
 _Avoid_: Exercise, quiz, diagnostic test.
 

@@ -4,6 +4,7 @@ recorded as an interaction, never as evidence. Lessons saved before this module 
 import random
 import time
 from .memory import from_check
+from .streaming import PREPARED_STEP, reveal
 from .store import OperationError
 from .teaching import record_interaction, require_text, validate_concept
 
@@ -99,11 +100,13 @@ def begin(store, request):
 
 def step(store, request):
     """Assign the next planned step to a turn. The previous step must be complete; a step whose turn never started
-    (the host stopped in between) is free again."""
+    (the host stopped in between) is free again. The lesson's prepared step (lesson.prepare) is revealed as the mainline
+    turn it was written as; any other assignment drops it. An optional `request_id` makes the request idempotent."""
     lesson = _read(store, require_text(request, 'id'))
     turn_id = require_text(request, 'turn_id')
+    request_id = request.get('request_id')
     for index, item in enumerate(lesson['steps']):
-        if item.get('turn_id') == turn_id:
+        if item.get('turn_id') == turn_id or (request_id and item.get('request_id') == request_id):
             return {'lesson': lesson, 'number': index + 1, 'created': False}
     for item in lesson['steps']:
         if item.get('turn_id') and not _started(store, item):
@@ -113,9 +116,38 @@ def step(store, request):
         raise OperationError('step_unfinished', 'Finish the current step first')
     if len(taught) == len(lesson['steps']):
         raise OperationError('lesson_finished', 'This lesson has no steps left')
-    lesson['steps'][len(taught)]['turn_id'] = turn_id
+    turn = store.get('streams', turn_id)
+    if lesson.pop('prepared', None) == turn_id:
+        reveal(store, turn)
+    elif turn and turn['channel'] == PREPARED_STEP:
+        raise OperationError('not_prepared', 'This turn is not the prepared step of the lesson')
+    entry = lesson['steps'][len(taught)]
+    entry['turn_id'] = turn_id
+    if isinstance(request_id, str) and request_id:
+        entry['request_id'] = request_id
     store.put('lessons', lesson['id'], lesson)
     return {'lesson': lesson, 'number': len(taught) + 1, 'created': True}
+
+
+def prepare(store, request):
+    """Record the lesson's prepared step: a turn writing its next step ahead, on the prepared_step channel, whose prompt
+    snapshot names the lesson and step number; `turn_id` null drops it. A lesson has at most one; the host stops the
+    one replaced."""
+    lesson = _read(store, require_text(request, 'id'))
+    turn_id = request.get('turn_id')
+    previous = lesson.get('prepared')
+    if turn_id is None:
+        lesson.pop('prepared', None)
+    else:
+        turn = store.get('streams', require_text(request, 'turn_id'))
+        ahead = (turn or {}).get('prompt_snapshot', {}).get('lesson_step') or {}
+        if not turn or turn['channel'] != PREPARED_STEP or ahead.get('lesson_id') != lesson['id']:
+            raise OperationError('not_prepared', 'Prepare a step with a prepared_step turn of this lesson')
+        if ahead.get('number') != sum(1 for item in lesson['steps'] if item.get('turn_id')) + 1:
+            raise OperationError('not_prepared', 'A prepared step is the next step of the lesson')
+        lesson['prepared'] = turn_id
+    store.put('lessons', lesson['id'], lesson)
+    return {'lesson': lesson, 'previous': previous}
 
 
 def reply(store, request):
@@ -199,4 +231,4 @@ def list_lessons(store, request):
     return {'lessons': lessons}
 
 
-OPERATIONS = {'lesson.begin': begin, 'lesson.step': step, 'lesson.reply': reply, 'lesson.answer': answer, 'lesson.read': read, 'lesson.list': list_lessons}
+OPERATIONS = {'lesson.begin': begin, 'lesson.step': step, 'lesson.prepare': prepare, 'lesson.reply': reply, 'lesson.answer': answer, 'lesson.read': read, 'lesson.list': list_lessons}

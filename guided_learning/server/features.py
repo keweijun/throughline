@@ -13,7 +13,7 @@ from .. import lessons
 from .. import practice
 from ..store import OperationError
 from .. import memory
-from ..streaming import BACKGROUND
+from ..streaming import BACKGROUND, PREPARED_STEP
 from . import prompts
 
 log = logging.getLogger(__name__)
@@ -232,13 +232,13 @@ class Navigation(Feature):
         return [i for i in self.operation({'op': 'deferred.list'})['deferred_explanations'] if i['id'] in due]
 
     def prompt(self, turn, context):
-        if turn['channel'] != 'mainline':
+        if turn['channel'] not in ('mainline', PREPARED_STEP):
             return ''
         language = turn.get('language', 'en')
         chapter = context.get('chapter')
         if is_recap(turn):
             return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
-        lesson, number = self.step_of(turn['id'])
+        lesson, number, repair = self._step(turn)
         earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed' and not chapter_owned(t)]
         if earlier and not lesson:
@@ -250,14 +250,22 @@ class Navigation(Feature):
             text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language) + '\n'
         if lesson:
             previous = [{'step': i + 1, 'title': s['title'], 'text': self._step_text(s['turn_id'])} for i, s in enumerate(lesson['steps'][:number - 1])]
-            text += prompts.lesson_step(lesson['steps'], number, previous, lesson.get('request'), lessons.MAX_STEPS,
-                                        missed_check(lesson['steps'][number - 2]) if number > 1 else None) + '\n'
+            text += prompts.lesson_step(lesson['steps'], number, previous, lesson.get('request'), lessons.MAX_STEPS, repair) + '\n'
         text += prompts.SECTION_FOCUS
         due = [i for i in self._due(turn) if i['status'] == 'pending']
         return text + '\n' + prompts.due_explanations(due) if due else text
 
     def _step_text(self, turn_id):
         return STEP_BLOCK.sub('', self.operation({'op': 'stream.read', 'id': turn_id})['turn']['final_text'] or '')
+
+    def _step(self, turn):
+        """The lesson, step number and check repair a step's prompt teaches: a prepared step keeps those its snapshot
+        recorded, so Continue reveals exactly what it assumed."""
+        ahead = (turn.get('prompt_snapshot') or {}).get('lesson_step')
+        if ahead:
+            return self.operation({'op': 'lesson.read', 'id': ahead['lesson_id']})['lesson'], ahead['number'], ahead['missed_check']
+        lesson, number = self.step_of(turn['id'])
+        return lesson, number, missed_check(lesson['steps'][number - 2]) if lesson and number > 1 else None
 
     def step_of(self, turn_id):
         """The stepped lesson a turn teaches a step of, and the step's number; (None, None) for a single-reply lesson."""
@@ -305,16 +313,81 @@ class Navigation(Feature):
             position = self.operation({'op': 'course.status'})['position'] or {}
             if position.get('concept_id') != lesson['concept_id']:
                 raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
+            done = next((s for s in lesson['steps'] if s.get('request_id') == identifier), None)
+            if done:
+                return {'turn': self.operation({'op': 'stream.read', 'id': done['turn_id']})['turn'], 'created': False}
             self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
-            return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
+            prepared = self._prepared(lesson)
+            if not prepared:
+                self.discard_prepared()
+                return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
+            self.operation({'op': 'lesson.step', 'id': lesson_id, 'turn_id': prepared['id'], 'request_id': identifier})
+            turn = self.operation({'op': 'stream.read', 'id': prepared['id']})['turn']
+            self.host.publish_turn(turn)
+            if turn['status'] == 'completed':
+                self.host.completed(turn)
+            self.host.changed()
+            return {'turn': turn, 'created': True, 'prepared': True}
 
     def answer_check(self, lesson_id, turn_id, choice):
-        """A check answer shows its explanation at once: it is recorded, with no model turn (ADR 0009)."""
+        """A check answer shows its explanation at once: it is recorded, with no model turn (ADR 0009). A miss means the
+        next step opens with a repair, so the step prepared without one is written again."""
         with self.host.lock:
             result = self.operation({'op': 'lesson.answer', 'id': lesson_id, 'turn_id': turn_id, 'choice': choice})
+            if result['changed'] and not result['answer']['correct']:
+                self.prepare(result['lesson'])
         if result['changed']:
             self.host.changed()
         return {'answer': result['answer'], 'changed': result['changed']}
+
+    def prepare(self, lesson):
+        """Start writing the lesson's next step while the learner reads the current one, replacing any prepared step. It
+        is hidden until Continue; nothing is prepared after the last step, outside the current section, or while another
+        lesson is being written."""
+        with self.host.lock:
+            self.discard_prepared()
+            lesson = self.operation({'op': 'lesson.read', 'id': lesson['id']})['lesson']
+            taught = [s for s in lesson['steps'] if s.get('turn_id')]
+            turns = {t['id']: t for t in self.host.brief_turns()}
+            position = self.operation({'op': 'course.status'})['position'] or {}
+            if (self.host.closing or not taught or len(taught) == len(lesson['steps']) or position.get('concept_id') != lesson['concept_id']
+                    or turns.get(taught[-1]['turn_id'], {}).get('status') != 'completed'
+                    or any(t['channel'] == 'mainline' and t['status'] == 'running' for t in turns.values())):
+                return None
+            identifier = 'step:' + str(uuid.uuid4())
+            self.host.start_turn({'id': identifier, 'concept_id': lesson['concept_id'], 'channel': PREPARED_STEP, 'record_user': False,
+                                  'prompt': prompts.STEP_CONTINUE_REQUEST,
+                                  'lesson_step': {'lesson_id': lesson['id'], 'number': len(taught) + 1, 'missed_check': missed_check(taught[-1])}})
+            self.operation({'op': 'lesson.prepare', 'id': lesson['id'], 'turn_id': identifier})
+            return identifier
+
+    def _prepared(self, lesson):
+        """The lesson's prepared step, still running or complete, when its prompt still applies: the next step, with the
+        repair the last check now calls for, in the current language."""
+        if not lesson.get('prepared'):
+            return None
+        turn = self.operation({'op': 'stream.read', 'id': lesson['prepared']})['turn']
+        ahead = turn['prompt_snapshot'].get('lesson_step') or {}
+        taught = [s for s in lesson['steps'] if s.get('turn_id')]
+        language = self.operation({'op': 'preferences.view'})['preferences']['language']
+        if (turn['channel'] == PREPARED_STEP and turn['status'] in ('running', 'completed') and taught and ahead.get('number') == len(taught) + 1
+                and ahead.get('missed_check') == missed_check(taught[-1]) and turn.get('language', 'en') == language):
+            return turn
+        return None
+
+    def discard_prepared(self):
+        """Drop every prepared step, stopping any still being written."""
+        with self.host.lock:
+            for lesson in self.operation({'op': 'lesson.list'})['lessons']:
+                if lesson.get('prepared'):
+                    self.operation({'op': 'lesson.prepare', 'id': lesson['id'], 'turn_id': None})
+            for turn in self.host.brief_turns():
+                if turn['channel'] == PREPARED_STEP and turn['status'] == 'running':
+                    self.host.pause_turn(turn['id'])
+
+    def before_start(self, request):
+        if request.get('channel', 'mainline') == 'mainline':
+            self.discard_prepared()  # another lesson, or a step regenerated, goes first
 
     def _existing(self, identifier):
         """A retried request whose turn already started."""
@@ -402,6 +475,7 @@ class Navigation(Feature):
         if lesson:
             self._record_step(lesson, turn)
             if self.steps_remain(turn):
+                self.prepare(lesson)
                 return  # pending explanations are given within the lesson, by its last step at the latest
         for item in self._due(turn):
             if item['status'] != 'pending':
@@ -625,6 +699,7 @@ class Practice(Feature):
 
     def _enter(self, concept_id, request_id):
         left = (self.operation({'op': 'course.status'})['position'] or {}).get('concept_id')
+        self.host.navigation.discard_prepared()
         for turn in self.host.brief_turns():
             if turn['channel'] == 'mainline' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
@@ -757,7 +832,7 @@ class Memory(Feature):
         return self.practice_job(turn['id'])
 
     def prompt(self, turn, context):
-        if turn['channel'] in ('mainline', 'sidequestion'):
+        if turn['channel'] in ('mainline', PREPARED_STEP, 'sidequestion'):
             return prompts.memory_note(json_reply=False)
         job = self._job(turn)
         if job and job['action'] != 'generate':

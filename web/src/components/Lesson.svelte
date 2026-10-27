@@ -30,7 +30,7 @@
   );
 
   async function next() {
-    if (!step || continuing) return;
+    if (!step || continuing || !continues || app.runningLesson) return;
     continuing = true;
     await app.continueLesson(step.lesson.id);
     continuing = false;
@@ -154,7 +154,7 @@
   {/if}
 
   {#if check && step && entry}
-    <CheckQuestion lessonId={step.lesson.id} turnId={turn.id} {check} answer={entry.answer} more={planned.length > 0} />
+    <CheckQuestion lessonId={step.lesson.id} turnId={turn.id} {check} answer={entry.answer} more={planned.length > 0} oncorrect={next} />
   {/if}
 
   {#if continues}

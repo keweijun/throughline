@@ -11,7 +11,8 @@
     check,
     answer,
     more,
-  }: { lessonId: string; turnId: string; check: CheckQuestion; answer?: CheckAnswer; more: boolean } = $props();
+    oncorrect,
+  }: { lessonId: string; turnId: string; check: CheckQuestion; answer?: CheckAnswer; more: boolean; oncorrect?: () => void } = $props();
 
   // Shown at once, before the host has recorded the choice.
   let picked = $state<CheckChoice | null>(null);
@@ -23,6 +24,8 @@
     if (choice !== null) return;
     picked = value;
     if (!(await app.answerCheck(lessonId, turnId, value))) picked = null;
+    // A right answer moves straight on; a miss waits so its explanation can be read before the repair.
+    else if (value === check.correct && more) oncorrect?.();
   }
 
   const md = (text: string) => ({ language: locale.language, text });

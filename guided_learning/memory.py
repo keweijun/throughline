@@ -3,6 +3,7 @@ Entries are facts citing the interactions behind them; they are never evidence a
 import re
 import time
 from .store import OperationError
+from .preferences import view as course_preferences
 from .teaching import require_text, validate_concept
 
 KINDS = ('preference', 'taught_term', 'difficulty')
@@ -135,6 +136,34 @@ def note(store, request):
             store.put('memory', identifier, {**entry, 'status': 'cleared', 'cleared_by': own, 'updated_at': time.time()})
     store.put('memory_notes', turn_id, {'turn_id': turn_id, 'recorded': [e['id'] for e in recorded]})
     return {'recorded': recorded, 'skipped': skipped}
+
+
+# The preference a repeated skip reason suggests, in each teaching language (ADR 0011).
+SKIP_PREFERENCES = {'en': {'too_easy': 'Harder exercises, without routine ones', 'too_tedious': 'Fewer long calculations',
+                           'not_relevant': 'Only exercises relevant to my goals'},
+                    'zh-CN': {'too_easy': '练习难一些，少出常规题', 'too_tedious': '少一些冗长的计算',
+                              'not_relevant': '只出与我的学习目标相关的练习'}}
+
+
+def suggest_from_skips(store, reason, concept_id):
+    """Once two exercises are skipped with the same reason, suggests the matching preference citing those skips
+    (`skip_ids`, task IDs: a skip has no interaction). A preference already suggested, confirmed or deleted for that
+    reason or with the same text is not suggested again; a live one cites the new skip."""
+    skips = [t['id'] for t in sorted(store.list('practice_tasks'), key=lambda t: t.get('skipped_at', 0))
+             if t.get('status') == 'skipped' and t.get('skip_reason') == reason]
+    text = SKIP_PREFERENCES[course_preferences(store, {})['preferences']['language']][reason]
+    for entry in _entries(store):
+        if entry['kind'] == 'preference' and (entry.get('skip_reason') == reason or entry['text'].casefold() == text.casefold()):
+            cited = list(dict.fromkeys(entry.get('skip_ids', []) + skips))
+            if entry['status'] != 'deleted' and cited != entry.get('skip_ids'):
+                store.put('memory', entry['id'], {**entry, 'skip_ids': cited, 'updated_at': time.time()})
+            return None
+    if len(skips) < 2:
+        return None
+    now = time.time()
+    return store.put('memory', 'skip:' + reason, {'id': 'skip:' + reason, 'kind': 'preference', 'text': text, 'status': 'suggested',
+                                                 'concept_id': concept_id, 'interaction_ids': [], 'skip_ids': skips,
+                                                 'skip_reason': reason, 'created_at': now, 'updated_at': now})
 
 
 OPERATIONS = {'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,

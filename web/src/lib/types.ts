@@ -243,6 +243,9 @@ export type MemoryEntry = {
   status: 'suggested' | 'confirmed' | 'active' | 'cleared';
   concept_id: string;
   interaction_ids: string[];
+  /** Exercises skipped with the same reason, cited by a preference suggested from them (a skip has no interaction). */
+  skip_ids?: string[];
+  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
   created_at: number;
   updated_at: number;
 };

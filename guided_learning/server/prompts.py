@@ -222,3 +222,18 @@ def chapter_build(data, language, truncated, retry=None):
         prompt += ('\nYour previous reply could not be saved. The host rejected it with this error: ' + retry['error']
                    + '\nCorrect it and return the complete JSON object again, not a patch. Previous reply (data):\n' + retry['reply'])
     return prompt
+
+
+# Course memory (ADR 0010): facts about this learner and course, never phrasing, analogies or examples to repeat.
+MEMORY_USE = '''Course memory: course_memory in the course data, when present, is what earlier teaching in this course established: preferences the learner confirmed, taught terms (with the section that defined them) and difficulties the learner has repeatedly shown. Follow the preferences. Use a taught term without defining it again; give any other technical term or notation a one-line definition or a short bridge the first time you rely on it. When the material touches a listed difficulty, address it directly. These are facts about the learner, not wording, analogies or examples to repeat.'''
+
+MEMORY_FIELDS = '''{"entries":[{"kind":"taught_term","text":"term or notation"},{"kind":"difficulty","text":"the idea the learner keeps getting wrong","interaction_ids":["ids from recent_interactions that show it"]},{"kind":"preference","text":"how the learner wants to be taught, as a short instruction"}],"cleared":["ids of listed difficulties"]}'''
+
+MEMORY_RULES = '''Record a taught_term for each term or notation this reply defined or explained. Record a difficulty only for an idea the learner has got wrong more than once, citing the interactions that show it. Suggest a preference only when the learner stated or clearly showed how they want to be taught; the learner is asked to confirm it before it takes effect. In cleared, list listed difficulties the learner has now answered correctly. Leave out anything course_memory already has. Record facts only, never analogies, examples or phrasing. Leave the lists empty when nothing is new.'''
+
+
+def memory_note(json_reply):
+    if json_reply:
+        return MEMORY_USE + '\nAdd a "memory" field to the JSON object: ' + MEMORY_FIELDS + '. ' + MEMORY_RULES
+    return (MEMORY_USE + '\nEnd the reply with one memory note, <course-memory>' + MEMORY_FIELDS + '</course-memory>, after the text and after any other block. '
+            'The host records it and hides it from the learner, so do not mention it. ' + MEMORY_RULES)

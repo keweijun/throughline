@@ -211,8 +211,33 @@
     if (rendered.get(number) === entry) markPage(number);
   }
 
+  // A jump to a page owns the position until its scroll ends: intermediate positions are not the current page, and pages
+  // that change size while drawing can stop a smooth scroll short, so the landing is checked and corrected.
+  let jumping: number | null = null;
+  let settle: ReturnType<typeof setTimeout> | undefined;
+
+  function land() {
+    clearTimeout(settle);
+    const n = jumping;
+    jumping = null;
+    const element = n === null ? undefined : elements.get(n);
+    if (element && scroller && Math.abs(scroller.scrollTop - (element.offsetTop - 12)) > 2) {
+      scroller.scrollTo({ top: element.offsetTop - 12, behavior: 'instant' });
+    }
+    if (n !== null) {
+      current = n;
+      pageInput = String(n);
+    }
+  }
+
   function onScroll() {
     if (!scroller) return;
+    if (jumping !== null) {
+      // Some browsers have no scrollend event; settle once scrolling pauses.
+      clearTimeout(settle);
+      settle = setTimeout(land, 150);
+      return;
+    }
     const middle = scroller.getBoundingClientRect().top + scroller.clientHeight / 3;
     for (const [number, element] of elements) {
       const box = element.getBoundingClientRect();
@@ -233,9 +258,13 @@
     const n = Math.min(Math.max(1, number), doc.numPages);
     const element = elements.get(n);
     if (!element || !scroller) return;
-    scroller.scrollTo({ top: element.offsetTop - 12, behavior });
     current = n;
     pageInput = String(n);
+    if (Math.abs(scroller.scrollTop - (element.offsetTop - 12)) <= 2) return;
+    jumping = n;
+    scroller.scrollTo({ top: element.offsetTop - 12, behavior });
+    clearTimeout(settle);
+    settle = setTimeout(land, behavior === 'smooth' ? 1000 : 150);
   }
 
   function setZoom(value: number) {
@@ -275,7 +304,7 @@
 
   <!-- Focusable so the pages can be scrolled with the keyboard. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="pages" bind:this={scroller} onscroll={onScroll} data-source-label={label} tabindex="0" role="region" aria-label={label}>
+  <div class="pages" bind:this={scroller} onscroll={onScroll} onscrollend={() => jumping !== null && land()} data-source-label={label} tabindex="0" role="region" aria-label={label}>
 
     {#if failed}
       <p class="problem">{t("This PDF could not be displayed here. Open the original instead.")}</p>

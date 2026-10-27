@@ -4,6 +4,7 @@
   import { fade } from 'svelte/transition';
   import { app } from './lib/store.svelte';
   import { panelCoversLesson } from './lib/media';
+  import { scrollStageByKey } from './lib/stage';
   import TopBar from './components/TopBar.svelte';
   import RouteRail from './components/RouteRail.svelte';
   import ConceptPage from './components/ConceptPage.svelte';
@@ -39,6 +40,7 @@
 
       return;
     }
+    if (scrollStageByKey(event)) return;
     const target = event.target as HTMLElement;
     if (app.libraryOpen || event.metaKey || event.ctrlKey || event.altKey || target.closest('input, textarea, select, [contenteditable], dialog')) return;
     if (event.key === '/') {
@@ -71,7 +73,10 @@
   </div>
 {/if}
 
-<div class="layout" class:with-panel={app.panelOpen} style:--panel="{app.panelWidth}px">
+<!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
+<div class="workspace" style:--panel="{app.panelWidth}px">
+<div id="stage" class="stage">
+<div class="layout" class:with-panel={app.panelOpen}>
   {#if app.libraryOpen}
     <Library />
   {:else if app.state}
@@ -90,12 +95,16 @@
         {/key}
       {/if}
     </main>
-    <SidePanel />
   {:else if !app.error}
     <main id="main" class="loading" aria-busy="true">
       <p>{t("Opening your course…")}</p>
     </main>
   {/if}
+</div>
+</div>
+{#if app.state && !app.libraryOpen}
+  <SidePanel />
+{/if}
 </div>
 
 <SelectionAsk />
@@ -106,9 +115,6 @@
 <style>
   .banner {
     animation: enter-drop var(--settle) var(--ease-out);
-    position: sticky;
-    top: var(--topbar);
-    z-index: 25;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -125,6 +131,19 @@
     color: var(--ink-soft);
   }
 
+  .workspace {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .stage {
+    flex: 1;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .layout {
     display: grid;
     grid-template-columns: var(--rail) minmax(0, 1fr);
@@ -135,7 +154,6 @@
 
   .layout.with-panel {
     max-width: none;
-    grid-template-columns: var(--rail) minmax(0, 1fr) var(--panel);
   }
 
   main {
@@ -151,12 +169,6 @@
 
   .scrim {
     display: none;
-  }
-
-  @media (max-width: 79.99rem) {
-    .layout.with-panel {
-      grid-template-columns: var(--rail) minmax(0, 1fr);
-    }
   }
 
   @media (max-width: 56rem) {

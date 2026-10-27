@@ -62,7 +62,7 @@ test('highlight text in the PDF reader and bookmark the page', async ({ page, co
   await page.getByRole('button', { name: 'Bookmark page' }).click();
   await expect(page.getByRole('button', { name: 'Bookmarked' })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Notes' }).click();
+  await page.locator('#toggle-notes').click();
   await expect(page.locator('.notes-panel .item.highlight')).toContainText('lecture-2.pdf, p. 2');
   await expect(page.locator('.notes-panel .item.bookmark')).toContainText('lecture-2.pdf, p. 2');
   expect(errors).toEqual([]);

@@ -5,32 +5,24 @@
   import SourceViewer from './SourceViewer.svelte';
   import Notes from './Notes.svelte';
 
-  // Each tab keeps its own scroll position when you switch between them.
+  // The top bar's toggles are the panel's only navigation; each view keeps its own scroll position between visits.
   const scroll: Record<string, number> = {};
   let body: HTMLElement | undefined = $state();
   let panel: HTMLElement | undefined = $state();
-  const tabs: { id: PanelTab; label: () => string }[] = [
-    { id: 'questions', label: () => t('Questions') },
-    { id: 'source', label: () => t('Source') },
-    { id: 'notes', label: () => t('Notes') },
-  ];
+  const labels: Record<PanelTab, () => string> = {
+    questions: () => t('Questions'),
+    source: () => t('Source'),
+    notes: () => t('Notes'),
+  };
 
-  function select(tab: PanelTab) {
-    if (body) scroll[app.panelTab] = body.scrollTop;
-    app.panelTab = tab;
+  let shown = app.panelTab;
+  $effect.pre(() => {
+    const tab = app.panelTab;
+    if (tab === shown) return;
+    if (body) scroll[shown] = body.scrollTop;
+    shown = tab;
     requestAnimationFrame(() => body && (body.scrollTop = scroll[tab] ?? 0));
-  }
-
-  // Tabs follow the WAI-ARIA pattern: one tab stop, arrow keys (and Home/End) move between tabs.
-  function tabKey(event: KeyboardEvent) {
-    const index = tabs.findIndex((tab) => tab.id === app.panelTab);
-    const next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    const tab = tabs[(next + tabs.length) % tabs.length].id;
-    select(tab);
-    document.getElementById(`panel-tab-${tab}`)?.focus();
-  }
+  });
 
   // Opening the panel moves focus into it, unless something there already took it (such as the question box);
   // closing it returns focus to the top-bar toggle when focus was inside, so keyboard users are not dropped on the page.
@@ -42,7 +34,7 @@
     const tab = app.panelTab;
     if (open) {
       requestAnimationFrame(() => {
-        if (!panel?.contains(document.activeElement)) document.getElementById(`panel-tab-${tab}`)?.focus();
+        if (!panel?.contains(document.activeElement)) panel?.focus();
       });
     } else if (panel?.contains(document.activeElement)) {
       requestAnimationFrame(() => document.getElementById(`toggle-${tab}`)?.focus());
@@ -75,7 +67,7 @@
   }
 </script>
 
-<aside id="auxiliary" class="panel" aria-label={t("Questions and sources")} hidden={!app.panelOpen} bind:this={panel}>
+<aside id="auxiliary" class="panel" aria-label={labels[app.panelTab]()} hidden={!app.panelOpen} tabindex="-1" bind:this={panel}>
   <!-- A focusable window splitter is interactive per WAI-ARIA, which this lint rule does not model. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div
@@ -89,39 +81,30 @@
     onpointerdown={startResize}
     onkeydown={resizeByKey}
   ></div>
-  <div class="bar">
-    <div class="tabs" role="tablist" aria-label={t("Questions and sources")} tabindex="-1" onkeydown={tabKey}>
-      {#each tabs as tab (tab.id)}
-        <button
-          role="tab"
-          id="panel-tab-{tab.id}"
-          aria-selected={app.panelTab === tab.id}
-          aria-controls="panel-{tab.id}"
-          tabindex={app.panelTab === tab.id ? 0 : -1}
-          onclick={() => select(tab.id)}
-        >{tab.label()}</button>
-      {/each}
-    </div>
-    <button id="close-aux" class="btn btn-quiet btn-small" onclick={() => (app.panelOpen = false)} aria-label={t("Close panel")}>{t("Close")}</button>
-  </div>
+  <button id="close-aux" class="btn btn-quiet close" onclick={() => (app.panelOpen = false)} aria-label={t("Close panel")} title={t("Close panel")}>
+    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+  </button>
   <div class="body" class:fill={app.panelTab === 'source'} bind:this={body}>
-    <div class="tab" role="tabpanel" id="panel-questions" aria-labelledby="panel-tab-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
-    <div class="tab" role="tabpanel" id="panel-source" aria-labelledby="panel-tab-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
-    <div class="tab" role="tabpanel" id="panel-notes" aria-labelledby="panel-tab-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
-
+    <div class="view" id="panel-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
+    <div class="view" id="panel-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
+    <div class="view" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
   </div>
 </aside>
 
 <style>
   .panel {
     animation: enter-slide var(--settle) var(--ease-out);
-    position: sticky;
-    top: var(--topbar);
+    position: relative;
     display: flex;
+    flex: none;
     flex-direction: column;
-    height: calc(100vh - var(--topbar));
+    width: var(--panel);
     border-left: 1px solid var(--rule);
     background: var(--sheet);
+  }
+
+  .panel:focus {
+    outline: none;
   }
 
   .handle {
@@ -145,38 +128,18 @@
     user-select: none;
   }
 
-  .bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.6rem 0.75rem 0 1rem;
-    border-bottom: 1px solid var(--rule);
-  }
-
-  .tabs {
-    display: flex;
-    gap: 1rem;
-  }
-
-  [role='tab'] {
-    padding: 0.5rem 0.1rem 0.6rem;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    font-size: var(--step-0);
-    font-weight: 500;
+  /* The close button floats in the corner, level with the heading each view opens with. */
+  .close {
+    position: absolute;
+    top: 0.7rem;
+    right: 0.6rem;
+    z-index: 1;
+    padding-inline: 0.45rem;
     color: var(--pencil);
-    cursor: pointer;
   }
 
-  [role='tab'][aria-selected='true'] {
-    color: var(--ink);
-    border-bottom-color: var(--accent);
-  }
-
-  /* A tab that comes into view fades in rather than replacing the last one in a blink. */
-  .tab:not([hidden]) {
+  /* A view that comes into view fades in rather than replacing the last one in a blink. */
+  .view:not([hidden]) {
     animation: enter-fade var(--quick) ease;
   }
 
@@ -184,7 +147,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1.25rem 1.1rem 3rem;
+    padding: 1.1rem 1.1rem 3rem;
   }
 
   /* The reader scrolls inside itself, so the source tab fills the panel instead. */
@@ -195,7 +158,7 @@
     padding-bottom: 1rem;
   }
 
-  .body.fill > .tab:not([hidden]) {
+  .body.fill > .view:not([hidden]) {
     display: flex;
     flex-direction: column;
     flex: 1;

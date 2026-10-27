@@ -2,6 +2,7 @@
   import { t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { scrollStage } from '../lib/stage';
   import { solved } from '../lib/format';
   import Preparation from './Preparation.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
@@ -32,7 +33,7 @@
     busy = true;
     const moved = await app.act(() => api.post('/api/sections/next', { concept_id: conceptId, request_id: newId() }));
     busy = false;
-    if (moved) window.scrollTo({ top: 0 });
+    if (moved) scrollStage(0);
   }
 </script>
 

@@ -47,7 +47,7 @@ test('ask about a selected passage, then return to that passage', async ({ page,
   await expect(thread).toContainText('What does this sentence mean?');
   await expect(thread.locator('.answer')).toContainText('complete lesson paragraph');
 
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.locator('#stage').evaluate((stage) => stage.scrollTo({ top: 0, behavior: 'instant' }));
   await expect(paragraph).not.toBeInViewport();
   // The passage repeats in many paragraphs; returning picks the one the learner was reading.
   await thread.getByRole('button', { name: 'Back to the passage' }).click();

@@ -318,13 +318,16 @@ def defer(store, request):
 
 SKIP_REASONS=('too_easy','too_tedious','not_relevant')
 
+def require_skippable(task):
+    if task.get('origin') not in ('source','self_created'):
+        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+
 def skip(store, request):
     """Close a section exercise for good, with an optional reason (ADR 0011). It records no outcome, evidence or deferral;
     answering it later reopens it like any attempt."""
     task=store.get('practice_tasks',request.get('id'))
     if not task: raise OperationError('unknown_exercise','Unknown exercise')
-    if task.get('origin') not in ('source','self_created'):
-        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+    require_skippable(task)
     reason=request.get('reason')
     if reason is not None and reason not in SKIP_REASONS:
         raise OperationError('invalid_request','reason must be one of '+', '.join(SKIP_REASONS))

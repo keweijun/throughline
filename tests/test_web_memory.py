@@ -53,6 +53,10 @@ class MemoryFlow(unittest.TestCase):
                 app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'})
                 settle(app)
                 self.assertIn('<course-memory>', runner.prompts[0])
+                for rule in ('Use a taught term without defining it again', 'Derive or justify an example',
+                             'Mention source verification or extraction quality only when'):
+                    self.assertIn(rule, runner.prompts[0])
+                self.assertNotIn('State uncertainty about formulas', runner.prompts[0])
                 entries = {e['kind']: e for e in app.operation({'op': 'memory.view'})['entries']}
                 self.assertEqual(entries['taught_term']['interaction_ids'], ['stream-user:one', 'stream:one'])
                 self.assertEqual(entries['preference']['status'], 'suggested')

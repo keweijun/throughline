@@ -140,7 +140,8 @@ def note(store, request):
     return {'recorded': recorded, 'skipped': skipped}
 
 
-# The preference a repeated skip reason suggests, in each teaching language (ADR 0011).
+# The preference a repeated skip reason suggests, in each teaching language (ADR 0011). Its keys are the skip reasons
+# (practice.SKIP_REASONS); web/src/lib/types.ts mirrors them as SkipReason.
 SKIP_PREFERENCES = {'en': {'too_easy': 'Harder exercises, without routine ones', 'too_tedious': 'Fewer long calculations',
                            'not_relevant': 'Only exercises relevant to my goals'},
                     'zh-CN': {'too_easy': '练习难一些，少出常规题', 'too_tedious': '少一些冗长的计算',

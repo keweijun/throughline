@@ -41,6 +41,9 @@ export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'f
 /** A turn's channel, as `CHANNELS` in guided_learning/streaming.py: the learner's own requests, then background work. */
 export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build' | 'consolidation';
 
+/** Why an exercise was skipped, as practice.SKIP_REASONS (ADR 0011). */
+export type SkipReason = 'too_easy' | 'too_tedious' | 'not_relevant';
+
 export type Turn = {
   id: string;
   concept_id: string;
@@ -149,7 +152,7 @@ export type Task = {
   created_at?: number;
   source_refs: Ref[];
   status: 'pending' | 'attempted' | 'deferred' | 'skipped';
-  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
+  skip_reason?: SkipReason;
   history: PracticeHistory[];
 };
 
@@ -282,7 +285,7 @@ export type MemoryEntry = {
   interaction_ids: string[];
   /** Exercises skipped with the same reason, cited by a preference suggested from them (a skip has no interaction). */
   skip_ids?: string[];
-  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
+  skip_reason?: SkipReason;
   created_at: number;
   updated_at: number;
 };

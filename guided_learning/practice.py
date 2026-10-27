@@ -316,7 +316,7 @@ def defer(store, request):
     store.put('practice_tasks',task['id'],task)
     return {'task':task}
 
-SKIP_REASONS=('too_easy','too_tedious','not_relevant')
+SKIP_REASONS=tuple(memory.SKIP_PREFERENCES['en'])  # each reason has the preference it suggests (ADR 0011)
 
 def require_skippable(task):
     if task.get('origin') not in ('source','self_created'):

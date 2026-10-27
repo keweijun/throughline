@@ -1,4 +1,5 @@
 import { RENDERED } from './markdown';
+import { stageOffset } from './stage';
 
 /** Marks passages using the CSS Custom Highlight API (no DOM changes): ones the learner asked about, and their own highlights. */
 
@@ -58,7 +59,7 @@ export function locate(root: HTMLElement, needle: string, nearY?: number, option
   let distance = Infinity;
   for (; start >= 0; start = flat.indexOf(target, start + 1)) {
     const range = toRange(start);
-    const gap = Math.abs(range.getBoundingClientRect().top + window.scrollY - nearY);
+    const gap = Math.abs(stageOffset(range.getBoundingClientRect().top) - nearY);
     if (gap < distance) [best, distance] = [range, gap];
   }
   return best;

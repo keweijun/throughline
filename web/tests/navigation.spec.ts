@@ -33,10 +33,12 @@ test('lesson streams, renders math safely, survives reload and opens sources', a
   await page.locator('#close-aux').click();
   await page.mouse.wheel(0, 1500);
   await page.waitForTimeout(200);
-  const before = await page.evaluate(() => window.scrollY);
+  const scrolled = () => page.locator('#stage').evaluate((stage) => stage.scrollTop);
+  const before = await scrolled();
+  expect(before).toBeGreaterThan(0);
   await page.evaluate(() => fetch('/api/preparation/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
   await page.waitForTimeout(600);
-  expect(Math.abs((await page.evaluate(() => window.scrollY)) - before)).toBeLessThan(3);
+  expect(Math.abs((await scrolled()) - before)).toBeLessThan(3);
   expect(errors).toEqual([]);
 });
 

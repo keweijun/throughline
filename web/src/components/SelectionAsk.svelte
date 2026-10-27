@@ -3,6 +3,7 @@
   import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { stageScroll } from '../lib/stage';
   import { autogrow } from '../lib/autogrow';
   import type { AnnotationSource } from '../lib/types';
 
@@ -47,7 +48,7 @@
   function ask() {
     if (!pending) return;
     const { text, turnId, source, questionId } = pending;
-    app.quote = { text, turnId, source, questionId, scrollY: window.scrollY };
+    app.quote = { text, turnId, source, questionId, scrollY: stageScroll() };
     visible = false;
     window.getSelection()?.removeAllRanges();
     app.openPanel('questions');

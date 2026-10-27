@@ -5,6 +5,7 @@
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { stageScroll } from '../lib/stage';
   import { autogrow } from '../lib/autogrow';
   import { questionTurnIds } from '../lib/format';
 
@@ -73,7 +74,7 @@
         selection: quote ? (quote.source ? `${quote.text}\n(${quote.source})` : quote.text) : '',
         selected_turn_id: quote?.turnId ?? null,
         main_turn_id: currentLesson?.id ?? null,
-        anchor: { scroll_y: quote?.scrollY ?? window.scrollY, concept_id: app.viewingId },
+        anchor: { scroll_y: quote?.scrollY ?? stageScroll(), concept_id: app.viewingId },
         pause,
       }),
     );

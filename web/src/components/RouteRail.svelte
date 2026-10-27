@@ -156,8 +156,8 @@
     --node: 0.8rem;
     --gutter: 1.75rem;
     position: sticky;
-    top: var(--topbar);
-    max-height: calc(100vh - var(--topbar));
+    top: 0;
+    max-height: calc(100dvh - var(--topbar));
     overflow-y: auto;
     padding: 2.5rem 0.75rem 2rem clamp(0.75rem, 2vw, 1.5rem);
   }

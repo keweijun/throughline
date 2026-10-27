@@ -132,7 +132,7 @@
   .lesson {
     animation: enter-rise var(--settle) var(--ease-out);
     position: relative;
-    scroll-margin-top: calc(var(--topbar) + 1rem);
+    scroll-margin-top: 1rem;
   }
 
   .notes {

@@ -82,10 +82,16 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
   background: var(--ground);
-  /* Entering panels slide in from beyond the edge; clip (unlike hidden) keeps sticky positioning working. */
-  overflow-x: clip;
+  /* Entering panels slide in from beyond the edge. */
+  overflow: clip;
+}
+
+/* The window never scrolls: the top bar stays put and the reading column and side panel each scroll on their own. */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
 }
 
 button,

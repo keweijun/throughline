@@ -28,7 +28,7 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   await expect(page.locator('#branch-selection')).toContainText('interference term');
   await expect(page.locator('#branch-panel')).toContainText('From lecture-2.pdf, p. 2');
 
-  await page.getByRole('tab', { name: 'Source' }).click();
+  await page.locator('#toggle-source').click();
   await page.getByRole('button', { name: 'Next page' }).click();
   await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('3');
   await page.getByRole('button', { name: 'Back to cited page' }).click();
@@ -61,21 +61,39 @@ test('another citation into the same PDF moves the open reader and keeps its zoo
   expect(errors).toEqual([]);
 });
 
-test('the side panel tabs follow the keyboard and focus returns to the toggle on close', async ({ page, course }) => {
+test('the top bar is the only navigation for the side panel and focus returns to the toggle on close', async ({ page, course }) => {
   await course('demo_course_fixture');
-  await page.getByRole('button', { name: 'Questions', exact: true }).click();
-  const questions = page.getByRole('tab', { name: 'Questions' });
-  await expect(questions).toBeFocused();
-  await expect(questions).toHaveAttribute('aria-controls', 'panel-questions');
-  await expect(page.getByRole('tabpanel', { name: 'Questions' })).toBeVisible();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Source' })).toBeFocused();
-  await expect(page.getByRole('tab', { name: 'Source' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tab', { name: 'Questions' })).toHaveAttribute('tabindex', '-1');
-  await page.keyboard.press('End');
-  await expect(page.getByRole('tab', { name: 'Notes' })).toBeFocused();
-  await page.getByRole('button', { name: 'Close panel' }).click();
+  await page.locator('#toggle-questions').click();
+  const panel = page.getByRole('complementary', { name: 'Questions' });
+  await expect(panel).toBeFocused();
+  await expect(page.locator('#auxiliary [role="tab"]')).toHaveCount(0);
+  await page.locator('#toggle-notes').click();
+  await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
+  await expect(page.locator('#toggle-notes')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#toggle-questions')).toHaveAttribute('aria-pressed', 'false');
+  await page.getByRole('button', { name: 'Close panel' }).focus();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#toggle-notes')).toBeFocused();
+});
+
+test('the reading column scrolls beside the open panel, not past it', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.locator('.lesson-body p').first()).toBeVisible();
+  await page.locator('#toggle-notes').click();
+  // Once the panel has slid in, the stage (and so its scrollbar) ends exactly where the panel begins.
+  await expect
+    .poll(async () => {
+      const stage = (await page.locator('#stage').boundingBox())!;
+      const panel = (await page.locator('#auxiliary').boundingBox())!;
+      return Math.abs(stage.x + stage.width - panel.x);
+    })
+    .toBeLessThan(2);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+
+  await page.locator('main').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('PageDown');
+  await expect.poll(() => page.locator('#stage').evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 });
 
 test('a Markdown citation opens the whole note at the cited line', async ({ page, course }) => {

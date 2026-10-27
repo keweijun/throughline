@@ -2,6 +2,7 @@ import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
+import { scrollStage, stageHeight, stageOffset } from './stage';
 import type { Annotation, AnnotationSource, Chapter, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
@@ -348,7 +349,7 @@ class AppStore {
     this.reviewOpen = false;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
-    window.scrollTo({ top: 0 });
+    scrollStage(0);
   }
 
   /**
@@ -362,10 +363,10 @@ class AppStore {
       const body = lesson?.querySelector<HTMLElement>('.lesson-body');
       const range = body && passage ? locate(body, passage, options.near) : null;
       let top: number | null = null;
-      if (range) top = range.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
+      if (range) top = stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3;
       else if (options.fallback !== undefined) top = options.fallback;
-      else if (lesson) top = lesson.getBoundingClientRect().top + window.scrollY - 80;
-      if (top !== null) window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+      else if (lesson) top = stageOffset(lesson.getBoundingClientRect().top) - 24;
+      if (top !== null) scrollStage(Math.max(0, top));
     });
   }
 
@@ -380,7 +381,7 @@ class AppStore {
     if (this.currentId) this.view(this.currentId);
     const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
     return this.#scrollToLesson(turnId, question.selection, {
-      near: sameSection ? question.anchor.scroll_y! + window.innerHeight / 2 : undefined,
+      near: sameSection ? question.anchor.scroll_y! + stageHeight() / 2 : undefined,
       fallback: sameSection ? question.anchor.scroll_y! : undefined,
     });
   }
@@ -520,7 +521,7 @@ class AppStore {
     this.viewingChapter = chapterId;
     this.reviewOpen = false;
     this.routeOpen = false;
-    window.scrollTo({ top: 0 });
+    scrollStage(0);
   }
 
   /** Moving the position always lands on the new section. */
@@ -528,7 +529,7 @@ class AppStore {
     if (await this.act(action)) {
       this.viewing = this.viewingChapter = null;
       this.reviewOpen = false;
-      window.scrollTo({ top: 0 });
+      scrollStage(0);
     }
   }
 
@@ -536,7 +537,7 @@ class AppStore {
     this.reviewOpen = true;
     this.libraryOpen = false;
     this.routeOpen = false;
-    window.scrollTo({ top: 0 });
+    scrollStage(0);
   }
 
   startReview(conceptId: string) {

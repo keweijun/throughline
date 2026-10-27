@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import katex from 'katex';
 import { marked } from 'marked';
 import type { Ref } from './types';
+import { scrollStage, stageScroll } from './stage';
 
 const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$)/g;
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
@@ -122,7 +123,7 @@ export function render(node: HTMLElement, { text, breaks = false, refs = [], onS
   if (node.dataset.key === key) return;
   const fragment = parse(text.replace(DECISION, ''), breaks);
   linkCitations(fragment, refs, onSource);
-  const scrollY = window.scrollY;
+  const scrollY = stageScroll();
   const incoming = [...fragment.childNodes];
   incoming.forEach((child, index) => {
     const old = node.childNodes[index];
@@ -131,7 +132,7 @@ export function render(node: HTMLElement, { text, breaks = false, refs = [], onS
   });
   while (node.childNodes.length > incoming.length) node.lastChild!.remove();
   node.dataset.key = key;
-  if (window.scrollY !== scrollY) window.scrollTo(window.scrollX, scrollY);
+  if (stageScroll() !== scrollY) scrollStage(scrollY);
   node.dispatchEvent(new CustomEvent(RENDERED));
 }
 

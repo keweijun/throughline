@@ -12,6 +12,7 @@ from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError, hold
 from . import prompts
+from .state import public_turn
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ def _acquire_lease(workspace):
 
 
 turn_summary = summarize
+# What a finished background turn changes besides itself: the interface reloads only that part of the state.
+FINISHED = {'preparation': 'preparation', 'consolidation': 'memory'}
 
 
 class Host:
@@ -183,7 +186,7 @@ class Host:
         if turn['channel'] == PREPARED_STEP:
             return
         with self._streams:
-            self.events.publish({'type': 'turn', 'turn': turn_summary(turn)})
+            self.events.publish({'type': 'turn', 'turn': public_turn(turn_summary(turn))})
             key = (turn['id'], turn['attempt'])
             if self._live.get(key) == PREPARED_STEP:
                 # Revealed while streaming: send what was written after this copy, and stream from here.
@@ -303,7 +306,7 @@ class Host:
                 self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
                     self.completed(result['turn'])
-                self.changed()
+                self.changed(FINISHED.get(result['turn']['channel'], 'state'))
         emit.sequence = 0
 
         def fail(message):

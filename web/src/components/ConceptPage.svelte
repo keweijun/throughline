@@ -81,13 +81,14 @@
   });
 
   // The preview follows the course plan and its sources, so fetch it again when Codex changes them. Only the newest
-  // reply counts, and none after this page has gone.
+  // reply counts, and none after this page has gone. The section is read through the version too: the prop reads the
+  // store, so reading it directly would fetch again after every state reload.
   const planVersion = $derived(
-    JSON.stringify([app.state?.curriculum, app.state?.sources, app.state?.preferences.language]),
+    JSON.stringify([conceptId, app.state?.curriculum.version, app.state?.sources, app.state?.preferences.language]),
   );
   $effect(() => {
     void planVersion;
-    const id = conceptId;
+    const id = untrack(() => conceptId);
     if (!id) return;
     let current = true;
     untrack(async () => {

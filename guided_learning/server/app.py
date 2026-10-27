@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .. import library
 from ..store import OperationError
+from . import state as public_state
 from .host import EventBus, Host, turn_summary
 from .settings import TeacherSettings
 
@@ -223,11 +224,6 @@ class ActiveHost:
         return getattr(self._courses.require(), name)
 
 
-def _public_question(branch):
-    selected = branch.get('selected_lecture')
-    return {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
-
-
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5):
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval)
     if workspace:
@@ -293,25 +289,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return JSONResponse({'error': f'Internal error ({exc.__class__.__name__}); see the host log', 'code': 'internal_error'}, 500)
 
     @app.get('/api/state')
-    def state():
-        current = courses.require()
-        snapshot = current.snapshot()
-        practice = current.practice.state()
-        review = current.review.state(practice)
-        # Review questions and their requests live on the review page, not among a section's exercises (ADR 0008).
-        # Chapter recaps and quiz questions carry chapter_id; the chapter page lists them, section views leave them out.
-        return {**snapshot,
-                'questions': [_public_question(b) for b in current.questions.list()],
-                'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review'],
-                             'jobs': [j for j in practice['jobs'] if j.get('purpose') != 'review']},
-                'review': review,
-                'preparation': current.preparation.state(),
-                'settings': current.settings.public(),
-                'lessons': current.operation({'op': 'lesson.list'})['lessons'],
-                'annotations': current.operation({'op': 'annotations.list'})['annotations'],
-                'memory': current.operation({'op': 'memory.view'})['entries'],
-                'skipped': current.practice.skipped(),
-                'builds': current.builds.state()}
+    def state(only: Optional[str] = None):
+        """The whole state, or with `only` the comma-separated parts a `changed` event names (`public_state.ALONE`)."""
+        parts = only.split(',') if only else None
+        if parts and not set(parts) <= set(public_state.ALONE):
+            return JSONResponse({'error': 'only: parts that load alone are ' + ', '.join(public_state.ALONE)}, 400)
+        # Plain JSON throughout, so skip FastAPI's encoder, which walks every value.
+        return JSONResponse(public_state.build(courses.require(), parts))
 
     @app.get('/api/events')
     async def events(request: Request):

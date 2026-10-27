@@ -259,9 +259,11 @@ class PartsFlow(unittest.TestCase):
     def test_part_statuses_must_match_the_parts(self):
         task=self.generate(['State it.','Apply it.','Check it.'])
         state=self.assess(task['id'],'All.',['correct','correct'])
-        self.assertIn('error',state['jobs'][-1])
+        assessed=lambda state:[j for j in state['jobs'] if j['action']=='assess']
+        self.assertTrue(all('error' in j for j in assessed(state)))
         state=self.run_job(lambda:self.app.practice.act(task['id'],'assess','All.'),json.dumps({'feedback':'Good.','outcome':'passed'}))
-        self.assertIn('error',state['jobs'][-1],'a multi-part exercise needs part statuses')
+        self.assertEqual(len(assessed(state)),2)
+        self.assertTrue(all('error' in j for j in assessed(state)),'a multi-part exercise needs part statuses')
         self.assertEqual(state['tasks'][0]['history'],[])
 
     def test_a_task_without_parts_is_one_part(self):

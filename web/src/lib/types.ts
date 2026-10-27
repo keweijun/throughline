@@ -93,10 +93,16 @@ export type Question = {
 
 export type EvidenceKind = 'independent' | 'retest_passed' | 'hinted' | 'needs_work';
 
+/** The status of an exercise part after an assessment (ADR 0011). */
+export type PartStatus = 'correct' | 'partly_correct' | 'not_yet' | 'not_attempted';
+
 export type PracticeHistory = {
   action: PracticeAction;
   feedback: string;
+  /** `passed` exactly when every part is correct. */
   outcome?: 'passed' | 'needs_work';
+  /** Each part's status after this assessment; an assessment from before parts has none. */
+  parts?: PartStatus[];
   kind?: EvidenceKind;
   answer?: string;
   /** Names of images of the learner's work attached to the answer, served from /api/practice/images/{name}. */
@@ -109,6 +115,8 @@ export type Task = {
   id: string;
   concept_id: string;
   question: string;
+  /** What each exercise part asks, in order; a task without parts is a single part (ADR 0011). */
+  parts?: string[];
   /**
    * `review` and `chapter_quiz` are retrieval questions (ADR 0008). A chapter quiz question belongs to its chapter
    * (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks an earlier exercise

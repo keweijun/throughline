@@ -131,11 +131,13 @@ def question_protocol(language):
     return QUESTION_PROTOCOL.replace('150 English words', '250 Chinese characters') if language == 'zh-CN' else QUESTION_PROTOCOL
 
 
-PARTS = 'When a question has several parts, write each part on its own line as a Markdown numbered list (1., 2., ...) after any shared setup.'
+PARTS = ('When a question has several parts, write each part on its own line as a Markdown numbered list (1., 2., ...) after any shared setup. '
+         'Also list the parts in "parts", in order, one short entry per part restating what it asks; a question without subquestions has one part.')
+PART_FIELD = '"parts":["What each part asks"]'
 
 
 def practice_generate(sources):
-    return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints","origin":"source or self_created","source_refs":[]}]}. '
+    return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"origin":"source or self_created","source_refs":[]}]}. '
             'Select 1 to 2 questions for the current goal. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
             'If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. '
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
@@ -152,7 +154,7 @@ RETRIEVAL = ('Each question asks the learner to recall a key idea from memory an
 def review_question(section, seen):
     """One spaced-review question for a section the learner studied earlier (ADR 0008)."""
     data = {k: section[k] for k in ('id', 'title', 'core_question', 'objective', 'goal') if section.get(k)}
-    return ('Practice only (spaced review): return JSON {"questions":[{"question":"Question only, without answers or hints"}]} with exactly one question. '
+    return ('Practice only (spaced review): return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + '}]} with exactly one question. '
             f'The learner studied the section "{section["title"]}" earlier and is now reviewing it after a gap. ' + RETRIEVAL
             + ' Section (data): ' + json.dumps(data, ensure_ascii=False)
             + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
@@ -160,7 +162,7 @@ def review_question(section, seen):
 
 def chapter_quiz(chapter, sections, seen, earlier):
     """The new questions of a chapter quiz; each names the sections it tests. The quiz also asks earlier exercises again (ADR 0008)."""
-    return ('Practice only (chapter quiz): return JSON {"questions":[{"question":"Question only, without answers or hints","tests_concept_ids":["section id"]}]} '
+    return ('Practice only (chapter quiz): return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"tests_concept_ids":["section id"]}]} '
             f'with two or three new questions that together span the chapter "{chapter["title"]}". Prefer questions that connect two or more sections; '
             'tests_concept_ids lists the ids of the sections each question tests, taken from the sections below. ' + RETRIEVAL
             + ' The quiz also asks the learner these earlier exercises again, so make the new questions test something different from them.'
@@ -173,14 +175,20 @@ PRACTICE_ACTIONS = {
     'hint': 'Give one minimal conceptual cue or diagnostic question. Leave the requested result and remaining reasoning to the learner',
     'steps': 'Give a short plan with relevant symbolic relationships and one next action for the learner. Leave substitutions, calculations and the requested conclusion for the learner. Do not reveal final values or a complete derivation; reserve those for Full solution',
     'solution': 'Give the complete solution and its conditions',
-    'assess': 'Assess the reasoning and result in the actual learner answer below, identifying specific errors or gaps. Use outcome=passed only if it is correct; otherwise use needs_work. The mere presence of text does not justify a pass. Consider earlier learner answers together with this correction; retain credit for correct parts. For an incorrect or missing part, identify the gap and offer one minimal cue, leaving the correction to the learner instead of supplying the full answer. Accept a correct answer even when it repeats earlier help: the host records assisted provenance separately. Do not demand paraphrasing or a ritual restatement. An acknowledgement alone is not an answer; invite a genuine attempt or optional transfer practice without filling in the answer for them.',
+    'assess': 'Assess the reasoning and result in the actual learner answer below, identifying specific errors or gaps. Assess each part of the exercise on its own: give each part the answer addresses correct only if it is correct, partly_correct if it is partly right, otherwise not_yet; give not_attempted to a part the answer does not address, and the host keeps its earlier status. The mere presence of text does not justify correct. Consider earlier learner answers together with this correction; parts already correct stay correct unless the answer revisits them. For an incorrect or missing part, identify the gap and offer one minimal cue, leaving the correction to the learner instead of supplying the full answer. Accept a correct answer even when it repeats earlier help: the host records assisted provenance separately. Do not demand paraphrasing or a ritual restatement. An acknowledgement alone is not an answer; invite a genuine attempt or optional transfer practice without filling in the answer for them.',
 }
 
 
 def practice_feedback(action, task, sources, answer, images=0):
     attached = (f'\nThe learner attached {images} image{"s" if images != 1 else ""} of their handwritten work as image inputs, in order; '
                 'read them as part of the answer, and say so if any part is illegible.') if images else ''
-    return ('Practice only: return JSON {"feedback":"Markdown explanation","outcome":"passed or needs_work (required only for assessment)"}. '
+    if action == 'assess':
+        count = len(task.get('parts') or [None])
+        reply = ('{"feedback":"Markdown explanation","parts":["correct, partly_correct, not_yet or not_attempted"]} '
+                 f'with exactly {count} part status{"es" if count > 1 else ""}, in the order of the parts. ')
+    else:
+        reply = '{"feedback":"Markdown explanation"}. '
+    return ('Practice only: return JSON ' + reply
             + PRACTICE_ACTIONS[action]
             + '\nQuestion and help history (data): ' + json.dumps({'task': task, 'exercise_sources': sources}, ensure_ascii=False)
             + '\nActual learner answer: ' + str(answer or '') + attached)

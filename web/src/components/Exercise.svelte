@@ -6,7 +6,7 @@
   import { autogrow } from '../lib/autogrow';
   import { markdown, hasMath } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
-  import { evidenceLabel, helpLabels, solved as isSolved } from '../lib/format';
+  import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
   import type { Task } from '../lib/types';
   import AnswerImages from './AnswerImages.svelte';
 
@@ -78,6 +78,9 @@
   const submittedQuestion = $derived(latestJob?.action === 'ask' && (!latestJob.processed || latestJob.error) ? latestJob.question : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
+  // Parts are assessed one by one and accumulate across answers (ADR 0011).
+  const parts = $derived(partStatuses(task));
+  const partsCorrect = (statuses: string[]) => ({ correct: statuses.filter((s) => s === 'correct').length, total: statuses.length });
   const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
   // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
@@ -87,6 +90,7 @@
   const status = $derived.by(() => {
     if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
     if (task.status === 'skipped') return { label: task.skip_reason ? t('Skipped · {reason}', { reason: t(skipReasons[task.skip_reason]) }) : t('Skipped'), tone: 'plain' };
+    if (lastAssessment && parts.length > 1 && !solved) return { label: t('{correct}/{total} parts correct', partsCorrect(parts)), tone: 'caution' };
     if (lastAssessment?.kind) {
       const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' || lastAssessment.kind === 'retest_passed' ? 'good' : 'accent';
       return { label: evidenceLabel(lastAssessment.kind), tone };
@@ -164,12 +168,23 @@
     </p>
   {/if}
 
+  {#if lastAssessment && parts.length > 1}
+    <ol class="parts" aria-label={t("Parts")}>
+      {#each parts as status, i}
+        <li>
+          <span class="part-name">{t('Part {number}', { number: i + 1 })}</span>
+          <span class="chip chip-{partLabels[status].tone}">{t(partLabels[status].label)}</span>
+        </li>
+      {/each}
+    </ol>
+  {/if}
+
   {#if task.history.length}
     <div class="history">
       {#each task.history as entry, i}
         <details open={i === task.history.length - 1}>
           <summary>
-            {t(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}
+            {t(helpLabels[entry.action])}{#if entry.parts && entry.parts.length > 1 && entry.outcome !== 'passed'}<span class="kind"> · {t('{correct}/{total} parts correct', partsCorrect(entry.parts))}</span>{:else if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}
           </summary>
           {#if entry.question}
             <section class="your-answer" aria-label={t("Your question")}>
@@ -363,6 +378,26 @@
   .refs .citation {
     margin-left: 0;
     font-size: var(--step--1);
+  }
+
+  .parts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin: -0.2rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--step--1);
+  }
+
+  .parts li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .part-name {
+    color: var(--pencil);
   }
 
   .history {

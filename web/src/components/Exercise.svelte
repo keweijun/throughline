@@ -187,6 +187,7 @@
   .exercise {
     animation: enter-rise var(--settle) var(--ease-out) backwards;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.85rem;
     padding: 1.25rem 1.35rem;
     border: 1px solid var(--rule);
@@ -266,6 +267,12 @@
     color: var(--ink-soft);
     border: 1px dashed var(--rule);
     border-radius: var(--radius);
+  }
+
+  /* A long inline formula cannot wrap, so learner text scrolls within its block. */
+  .answer-preview .prose,
+  .your-answer .prose {
+    overflow-x: auto;
   }
 
   .answer-label {

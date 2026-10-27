@@ -88,6 +88,19 @@ test('an answer with math shows a live preview before it is submitted', async ({
   await expect(preview).toHaveCount(0);
 });
 
+test('a long formula scrolls inside the preview instead of widening the page', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').first();
+  const width = await task.evaluate((node) => node.getBoundingClientRect().width);
+  const long = Array.from({ length: 60 }, (_, i) => `\\frac{x_{${i}}}{y_{${i}}}`).join('');
+  for (const answer of [`Inline $${long}$`, `Display $$${long}$$`]) {
+    await task.getByRole('textbox', { name: 'Exercise answer' }).fill(answer);
+    await expect(task.getByRole('region', { name: 'Answer preview' }).locator('.katex')).toHaveCount(1);
+    expect(await task.evaluate((node) => node.getBoundingClientRect().width)).toBeCloseTo(width, 0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
 test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const task = page.locator('#practice article').nth(2);

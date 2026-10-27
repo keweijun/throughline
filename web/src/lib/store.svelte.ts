@@ -3,13 +3,19 @@ import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
-import type { Annotation, AnnotationSource, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
 const DEFAULT_PANEL = 400;
+
+/** Parts of the state the host loads alone (`state.ALONE`), and the change scopes that need only that part. */
+type StatePart = 'preparation' | 'settings' | 'builds' | 'memory';
+const ALONE: Partial<Record<ChangeScope, StatePart>> = { preparation: 'preparation', settings: 'settings', builds: 'builds', memory: 'memory' };
+/** Channels of work the host does on its own, as BACKGROUND in guided_learning/streaming.py. */
+const BACKGROUND: Channel[] = ['preparation', 'build', 'consolidation'];
 
 /** Each course owns its language; the last one used also labels the library before a course opens. */
 function rememberLanguage(language?: Language): Language | null {
@@ -108,7 +114,8 @@ class AppStore {
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
   #noticeTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
-  #again = false;
+  /** What the next load fetches: the whole state, some parts of it, or nothing (null). */
+  #queued: Set<StatePart> | 'all' | null = null;
   /** Deltas that arrive while a state snapshot is in flight; replayed onto the snapshot so no text is lost. */
   #inflight: DeltaEvent[] | null = null;
   /** Annotation changes shown before the host confirms them; reapplied to any snapshot loaded meanwhile. */
@@ -212,8 +219,20 @@ class AppStore {
     return this.turn(turnId)?.status === 'running';
   }
 
-  /** Loads the course state; sync() is the entry point, so two loads never race. */
-  async #load() {
+  /** Loads the course state, or only `parts` of it; sync() is the entry point, so two loads never race. */
+  async #load(parts: StatePart[] | null): Promise<void> {
+    if (parts && this.state) {
+      try {
+        const partial = await api.get<Partial<State>>(`/api/state?only=${parts.join(',')}`);
+        if (this.state) Object.assign(this.state, partial);
+        if (partial.settings) this.settings = partial.settings;
+      } catch (e) {
+        // A course closed meanwhile needs the whole state, which also reports why.
+        if (e instanceof ApiError && e.code === 'no_course') return this.#load(null);
+        this.error = (e as Error).message;
+      }
+      return;
+    }
     this.#inflight = [];
     try {
       const state = await api.get<State>('/api/state');
@@ -262,29 +281,38 @@ class AppStore {
     if (opened) location.reload();
   }
 
-  refresh() {
+  /** Reloads the state shortly, so a burst of changes costs one load; a load that starts meanwhile covers them. */
+  refresh(parts: StatePart[] | 'all' = 'all') {
+    this.#queue(parts);
     if (this.#refreshTimer) return;
     this.#refreshTimer = setTimeout(() => {
       this.#refreshTimer = null;
-      void this.sync();
+      if (this.#queued) void this.#drain();
     }, 120);
   }
 
   /**
-   * Reloads the state, one load at a time. A request made while a load runs queues one more load, and the returned
-   * promise settles once the state reflects everything requested so far.
+   * Reloads the state (or `parts` of it), one load at a time. A request made while a load runs joins the one load
+   * queued after it, and the returned promise settles once the state reflects everything requested so far.
    */
-  sync(): Promise<void> {
-    if (this.#refreshing) {
-      this.#again = true;
-      return this.#refreshing;
-    }
+  sync(parts: StatePart[] | 'all' = 'all'): Promise<void> {
+    this.#queue(parts);
+    return this.#drain();
+  }
+
+  #queue(parts: StatePart[] | 'all') {
+    this.#queued = parts === 'all' || this.#queued === 'all' ? 'all' : new Set([...(this.#queued ?? []), ...parts]);
+  }
+
+  #drain(): Promise<void> {
+    if (this.#refreshing) return this.#refreshing;
     this.#refreshing = (async () => {
       try {
-        do {
-          this.#again = false;
-          await this.#load();
-        } while (this.#again);
+        while (this.#queued) {
+          const parts = this.#queued;
+          this.#queued = null;
+          await this.#load(parts === 'all' ? null : [...parts]);
+        }
       } catch (e) {
         this.error = (e as Error).message;
       } finally {
@@ -328,9 +356,11 @@ class AppStore {
       const index = turns.findIndex((t) => t.id === event.turn.id);
       if (index >= 0) turns[index] = event.turn;
       else turns.push(event.turn);
-      if (event.turn.status !== 'running') this.refresh();
+      // A finished background turn is followed by a change event naming what else it changed.
+      if (event.turn.status !== 'running' && !BACKGROUND.includes(event.turn.channel)) this.refresh();
     } else {
-      this.refresh();
+      const part = ALONE[event.scope];
+      this.refresh(part ? [part] : 'all');
     }
   }
 

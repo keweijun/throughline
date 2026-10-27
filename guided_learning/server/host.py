@@ -12,6 +12,7 @@ from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
+from .state import public_turn
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ def _acquire_lease(workspace):
 
 
 turn_summary = summarize
+# What a finished background turn changes besides itself: the interface reloads only that part of the state.
+FINISHED = {'preparation': 'preparation', 'consolidation': 'memory'}
 
 
 class Host:
@@ -142,7 +145,7 @@ class Host:
 
     def publish_turn(self, turn):
         if turn['channel'] != PREPARED_STEP:
-            self.events.publish({'type': 'turn', 'turn': turn_summary(turn)})
+            self.events.publish({'type': 'turn', 'turn': public_turn(turn_summary(turn))})
 
     def completed(self, turn):
         """Run every feature's completion hook for a turn stored as completed."""
@@ -233,7 +236,7 @@ class Host:
                 self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
                     self.completed(result['turn'])
-                self.changed()
+                self.changed(FINISHED.get(result['turn']['channel'], 'state'))
         emit.sequence = 0
 
         def fail(message):

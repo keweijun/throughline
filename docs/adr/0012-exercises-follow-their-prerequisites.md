@@ -2,7 +2,9 @@
 
 Course exercises, especially homework, are mapped to route sections with the concepts they require. In one course 23 of 95 mappings placed an exercise before at least one of its required concepts, some by more than twenty sections. The lesson then had to teach whatever the exercise needed, which is how atomic units and a perturbation setup appeared in a lesson on operators.
 
-An exercise part is mapped to the latest section among the concepts it requires, never earlier. A homework question whose parts need different concepts is split: each part goes to its own section, and keeps a reference to the original question and to where its other parts are taught. Curriculum validation rejects a mapping that comes before a required concept.
+An exercise part is mapped to the latest section among the concepts it requires, never earlier. A homework question whose parts need different concepts is split: each part goes to its own section, and keeps a reference to the original question and to where its other parts are taught. Curriculum validation rejects a mapping that comes before a required concept, and one that requires a concept not on the route, since its place cannot be judged.
+
+When chapters are built one at a time, a part that needs a chapter not built yet waits: the mapped part lists it in `other_parts` without a `concept_id`. The app's chapter builds receive such parts as `waiting_parts`, with their source text (their unit is already mapped, so it is not among the unmapped units), and map each one in the chapter that completes what it needs.
 
 Deadlines do not override this. A learner who needs a homework part sooner can study the sections it needs, or ask for it as a side question.
 

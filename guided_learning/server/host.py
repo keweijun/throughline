@@ -164,7 +164,7 @@ class Host:
                 prompt += '\n' + addition
         return prompt
 
-    def _ensure_single_mainline(self, identifier, message):
+    def ensure_single_mainline(self, identifier, message):
         for other in self.brief_turns():
             if other['id'] != identifier and other['channel'] == 'mainline' and other['status'] == 'running':
                 raise OperationError('active_turn', message)
@@ -175,7 +175,7 @@ class Host:
                 raise OperationError('host_closing', 'Learning server is closing')
             request = {**request, 'id': request.get('id') or str(uuid.uuid4())}
             if request.get('channel', 'mainline') == 'mainline':
-                self._ensure_single_mainline(request['id'], 'Pause the current lesson before starting another')
+                self.ensure_single_mainline(request['id'], 'Pause the current lesson before starting another')
             for feature in self.features:
                 feature.before_start(request)
             result = self.operation({**request, 'op': 'stream.start'})
@@ -271,7 +271,7 @@ class Host:
                 raise OperationError('host_closing', 'Learning server is closing')
             previous = self.operation({'op': 'stream.read', 'id': identifier})['turn']
             if previous['channel'] == 'mainline':
-                self._ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
+                self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))
             if worker and worker[0].is_alive():
                 raise OperationError('stopping', 'The model is still stopping; try again in a moment')

@@ -284,7 +284,7 @@ class Navigation(Feature):
             taught = any(t['channel'] == 'mainline' and t['concept_id'] == concept_id and not chapter_owned(t) for t in self.host.brief_turns())
             if taught:
                 return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt or prompts.DEFAULT_LESSON_REQUEST})
-            self.host._ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+            self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
             preview = self.preview(concept_id)
             plan = [s.strip()[:lessons.MAX_TITLE] for s in preview['overview']['steps'] if isinstance(s, str) and s.strip()][:lessons.MAX_STEPS]
             prompt = prompt or prompts.STEP_LESSON_REQUEST
@@ -303,7 +303,7 @@ class Navigation(Feature):
             position = self.operation({'op': 'course.status'})['position'] or {}
             if position.get('concept_id') != lesson['concept_id']:
                 raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
-            self.host._ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+            self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
             return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
 
     def answer_check(self, lesson_id, turn_id, choice):

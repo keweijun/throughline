@@ -93,6 +93,8 @@ export type PracticeHistory = {
   outcome?: 'passed' | 'needs_work';
   kind?: EvidenceKind;
   answer?: string;
+  /** An ask: the learner's question, answered and never assessed (ADR 0011). */
+  question?: string;
 };
 
 export type Task = {
@@ -115,10 +117,11 @@ export type Task = {
   history: PracticeHistory[];
 };
 
-export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess';
+export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess' | 'ask';
 
 export type PracticeJob = {
   answer?: string;
+  question?: string;
   id: string;
   concept_id: string;
   action: 'generate' | PracticeAction;

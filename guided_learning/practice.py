@@ -8,7 +8,8 @@ from .store import OperationError
 def listing(store, request):
     return {'tasks':store.list('practice_tasks'),'jobs':store.list('practice_jobs')}
 
-ACTIONS=('generate','hint','steps','solution','assess')
+ACTIONS=('generate','hint','steps','solution','assess','ask')
+# An ask answers the learner's question about an exercise; it is never assessed and records no evidence (ADR 0011).
 # A generate job may ask for retrieval questions instead of a section's exercises (ADR 0008): one question for a spaced
 # review of the section, or a chapter quiz: two or three new questions spanning the chapter, asked together with a few
 # earlier exercises from its sections.
@@ -31,6 +32,8 @@ def job(store, request):
         teaching.require_text(value,'task_id')
     if value['action']=='assess':
         teaching.require_text(value,'answer')
+    if value['action']=='ask':
+        teaching.require_text(value,'question')
     if 'purpose' in value and (value['action']!='generate' or value['purpose'] not in PURPOSES):
         raise OperationError('invalid_request','purpose must be review or chapter_quiz, on a generate job')
     teaching.validate_concept(store,value['concept_id'])
@@ -48,6 +51,8 @@ def job(store, request):
         raise OperationError('unknown_exercise','Unknown exercise')
     if value['action']=='assess':
         teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['answer']})
+    if value['action']=='ask':
+        teaching.record_interaction(store,{'id':'practice-question:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['question']})
     store.put('practice_jobs',value['id'],value)
     return {'job':value}
 
@@ -122,7 +127,9 @@ def complete(store, request):
         cid=value['concept_id']
         teaching.record_interaction(store,{'id':iid,'role':'assistant','text':feedback,'concept_id':cid,'source_refs':task['source_refs']})
         base={'id':'practice-evidence:'+value['id'],'concept_id':cid,'session_id':'practice:'+task['id'],'exercise_id':task['id']}
-        if value['action']=='assess':
+        if value['action']=='ask':
+            task['history'].append({'action':'ask','question':value['question'],'feedback':feedback})
+        elif value['action']=='assess':
             request={**base,'answer_id':'practice-answer:'+value['id'],'assessment_id':iid,'outcome':result['outcome']}
             retest=task.get('origin')=='review' or (task.get('origin')=='chapter_quiz' and task.get('tests_concept_ids')==[cid])
             prior=retest_target(store,task,cid) if retest else None

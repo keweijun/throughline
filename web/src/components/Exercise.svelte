@@ -19,6 +19,10 @@
   const draftKey = $derived(`exercise:${task.id}`);
   const answer = $derived(app.drafts.get(draftKey));
   const setAnswer = (value: string) => app.drafts.set(draftKey, value);
+  // A question about the exercise has its own draft: asking is never assessed (ADR 0011).
+  const askKey = $derived(`exercise-ask:${task.id}`);
+  const question = $derived(app.drafts.get(askKey));
+  let asking = $state(false);
   let busy = $state(false);
   let confirmSolution = $state(false);
   let preview = $state('');
@@ -35,9 +39,10 @@
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
   const submittedAnswer = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob.answer : undefined);
+  const submittedQuestion = $derived(latestJob?.action === 'ask' && (!latestJob.processed || latestJob.error) ? latestJob.question : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
-  const helped = $derived(task.history.some((h) => h.action !== 'assess'));
+  const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
   const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
 
   const status = $derived.by(() => {
@@ -61,6 +66,18 @@
     busy = false;
     // Keep anything typed while the answer was being sent.
     if (result && action === 'assess' && app.drafts.get(key) === submitted) app.drafts.set(key, '');
+  }
+
+  async function ask() {
+    if (busy || !question.trim()) return;
+    busy = true;
+    const submitted = question;
+    const key = askKey;
+    const result = await app.act(() => api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/ask`, { question: submitted }));
+    busy = false;
+    if (!result) return;
+    asking = false;
+    if (app.drafts.get(key) === submitted) app.drafts.set(key, '');
   }
 </script>
 
@@ -90,7 +107,7 @@
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}
@@ -106,14 +123,20 @@
           <summary>
             {t(helpLabels[entry.action])}{#if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}
           </summary>
+          {#if entry.question}
+            <section class="your-answer" aria-label={t("Your question")}>
+              <p class="answer-label">{t("Your question")}</p>
+              <div class="prose" use:markdown={{ language: locale.language, text: entry.question, breaks: true }}></div>
+            </section>
+          {/if}
           {#if entry.answer}
             <section class="your-answer" aria-label={t("Your answer")}>
               <p class="answer-label">{t("Your answer")}</p>
               <div class="prose" use:markdown={{ language: locale.language, text: entry.answer, breaks: true }}></div>
             </section>
           {/if}
-          <section class="teacher-feedback" aria-label={t("Teacher feedback")}>
-            <p class="answer-label">{t("Teacher feedback")}</p>
+          <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
+            <p class="answer-label">{entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}</p>
             <div class="prose feedback" data-exercise={task.id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
           </section>
         </details>
@@ -127,6 +150,16 @@
       <div class="prose" use:markdown={{ language: locale.language, text: submittedAnswer, breaks: true }}></div>
       {#if failedJob}
         <button class="btn btn-small" onclick={() => setAnswer(submittedAnswer ?? '')}>{t("Restore submitted answer")}</button>
+      {/if}
+    </section>
+  {/if}
+
+  {#if submittedQuestion}
+    <section class="your-answer submitted-answer" aria-label={t("Your question")}>
+      <p class="answer-label">{t("Your question")}</p>
+      <div class="prose" use:markdown={{ language: locale.language, text: submittedQuestion, breaks: true }}></div>
+      {#if failedJob}
+        <button class="btn btn-small" onclick={() => { app.drafts.set(askKey, submittedQuestion ?? ''); asking = true; }}>{t("Restore question")}</button>
       {/if}
     </section>
   {/if}
@@ -163,6 +196,7 @@
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>{t("Full solution")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
         {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}
@@ -178,6 +212,23 @@
       </div>
     {:else if helped && !solved}
       <p class="note">{t("You've had help on this one, so a correct answer will count as solved with help.")}</p>
+    {/if}
+    {#if asking}
+      <div class="ask" role="group" aria-label={t("Ask about this")}>
+        <textarea
+          rows="2"
+          bind:value={() => question, (v: string) => app.drafts.set(askKey, v)}
+          use:autogrow={question}
+          use:modEnterToSend={ask}
+          placeholder={t("What does this exercise or one of its parts mean?")}
+          aria-label={t("Question about this exercise")}
+        ></textarea>
+        <div>
+          <button class="btn btn-primary btn-small" disabled={busy || !question.trim()} onclick={ask}>{t("Ask")}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => (asking = false)}>{t("Cancel")}</button>
+          <span class="keys">{t("{keys} to ask", { keys: sendKeys })} · {t("Asking is never graded.")}</span>
+        </div>
+      </div>
     {/if}
   {/if}
 </article>
@@ -322,6 +373,18 @@
 
   .confirm div {
     display: flex;
+    gap: 0.4rem;
+  }
+
+  .ask {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .ask div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 0.4rem;
   }
 

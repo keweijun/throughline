@@ -2,7 +2,7 @@
   import { enterToSend } from '../lib/keys';
   import { panelCoversLesson } from '../lib/media';
   import { slide } from 'svelte/transition';
-  import { highlights } from '../lib/highlight';
+  import { highlights, annotationPassage } from '../lib/highlight';
   import { locale, t } from '../lib/i18n.svelte';
 
   import { api, newId } from '../lib/api';
@@ -92,7 +92,7 @@
   // The learner's own highlights and notes on this thread's answers.
   const threadTurns = $derived(new Set(questionTurnIds(question)));
   const mine = $derived((app.state?.annotations ?? []).filter((a) => a.turn_id && threadTurns.has(a.turn_id)));
-  const passages = (turnId: string) => mine.filter((a) => a.turn_id === turnId).map((a) => a.passage);
+  const passages = (turnId: string) => mine.filter((a) => a.turn_id === turnId).map(annotationPassage);
   const noted = $derived(mine.filter((a) => a.note));
 
   // A long list stays scannable: each thread shows a one-line summary until it is opened.

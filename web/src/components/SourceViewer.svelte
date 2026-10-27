@@ -2,6 +2,7 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
+  import { annotationPassage } from '../lib/highlight';
   import PdfReader from './PdfReader.svelte';
   import MarkdownReader from './MarkdownReader.svelte';
   import CodexLink from './CodexLink.svelte';
@@ -86,12 +87,12 @@
           {page}
           {label}
           bind:current={shown}
-          highlights={mine.map((a) => ({ page: Number(a.source!.unit_id.replace('page-', '')), passage: a.passage }))}
+          highlights={mine.map((a) => ({ page: Number(a.source!.unit_id.replace('page-', '')), passage: annotationPassage(a) }))}
         />
       {/key}
     {:else if s.document}
       {#key `${s.source_id}/${s.revision}/${s.unit_id}`}
-        <MarkdownReader lines={s.document} target={s.unit_id} {label} highlights={mine.map((a) => a.passage)} />
+        <MarkdownReader lines={s.document} target={s.unit_id} {label} highlights={mine.map(annotationPassage)} />
       {/key}
     {:else}
       <pre>{s.text || t("No text was extracted at this location.")}</pre>

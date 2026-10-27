@@ -5,7 +5,7 @@
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
   import { markdown, hasMath, labelFor } from '../lib/markdown';
-  import { highlights } from '../lib/highlight';
+  import { highlights, annotationPassage } from '../lib/highlight';
   import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
   import type { SkipReason, Task } from '../lib/types';
   import AnswerImages from './AnswerImages.svelte';
@@ -13,7 +13,7 @@
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
 
   const mine = $derived((app.state?.annotations ?? []).filter((a) => a.task_id === task.id));
-  const passages = $derived(mine.map((a) => a.passage));
+  const passages = $derived(mine.map(annotationPassage));
   const noted = $derived(mine.filter((a) => a.note));
 
   // The answer is kept as a draft, so it survives moving to another section and back.

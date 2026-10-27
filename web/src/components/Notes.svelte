@@ -88,9 +88,10 @@
   }
 
   function label(item: Annotation) {
-    if (item.kind === 'note') return t("Note");
+    if (item.kind === 'note') return t("Section note");
     if (item.kind === 'bookmark') return t("Bookmark");
-    return t("Highlight");
+    // A highlight the learner wrote on reads as a note on that passage.
+    return item.note ? t("Note") : t("Highlight");
   }
 
   $effect(() => {

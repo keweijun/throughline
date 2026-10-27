@@ -1,7 +1,7 @@
 import { tick } from 'svelte';
 import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
-import { locate } from './highlight';
+import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
 import type { Annotation, AnnotationSource, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
@@ -20,6 +20,11 @@ function rememberLanguage(language?: Language): Language | null {
   } catch {
     return null;
   }
+}
+
+function drop(annotations: Annotation[], id: string) {
+  const index = annotations.findIndex((a) => a.id === id);
+  if (index >= 0) annotations.splice(index, 1);
 }
 
 function storedWidth() {
@@ -106,6 +111,8 @@ class AppStore {
   #again = false;
   /** Deltas that arrive while a state snapshot is in flight; replayed onto the snapshot so no text is lost. */
   #inflight: DeltaEvent[] | null = null;
+  /** Annotation changes shown before the host confirms them; reapplied to any snapshot loaded meanwhile. */
+  #pending = new Map<string, (annotations: Annotation[]) => void>();
 
   get currentId(): string | null {
     const s = this.state;
@@ -213,6 +220,7 @@ class AppStore {
       const missed = this.#inflight;
       this.state = state;
       for (const delta of missed) this.#delta(delta);
+      for (const change of this.#pending.values()) change(this.state.annotations);
       this.settings = this.state.settings;
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
@@ -370,14 +378,20 @@ class AppStore {
 
   /**
    * Once the reading column has re-rendered, scrolls to a passage in a lesson, else to `fallback` (a page offset),
-   * else to the lesson itself. `near` picks between repeated occurrences of the passage.
+   * else to the lesson itself. `occurrence`, or else `near`, picks between repeats of the passage.
    */
-  async #scrollToLesson(turnId: string | null | undefined, passage: string | null | undefined, options: { near?: number; fallback?: number } = {}) {
+  async #scrollToLesson(
+    turnId: string | null | undefined,
+    passage: string | null | undefined,
+    options: { near?: number; fallback?: number; occurrence?: number } = {},
+  ) {
     await tick();
     requestAnimationFrame(() => {
       const lesson = turnId ? document.getElementById(`turn-${turnId}`) : null;
       const body = lesson?.querySelector<HTMLElement>('.lesson-body');
-      const range = body && passage ? locate(body, passage, options.near) : null;
+      const range = !body || !passage ? null
+        : options.occurrence !== undefined ? (occurrences(body, passage)[options.occurrence] ?? locate(body, passage))
+        : locate(body, passage, options.near);
       let top: number | null = null;
       if (range) top = stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3;
       else if (options.fallback !== undefined) top = options.fallback;
@@ -418,16 +432,66 @@ class AppStore {
     );
   }
 
-  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'note' | 'turn_id' | 'task_id' | 'source'>>) {
-    return this.act(() => api.post<{ annotation: Annotation }>('/api/annotations', annotation));
+  /**
+   * Shows an annotation change at once instead of after a full state reload, which grows with the course. The change
+   * stays applied until the host answers; a failure takes it back and reports the error. The host's change event
+   * reloads the state afterwards as usual.
+   */
+  async #annotation<T>(change: (annotations: Annotation[]) => void, request: () => Promise<T>, settle?: (result: T) => void): Promise<T | undefined> {
+    const key = newId();
+    this.error = null;
+    this.#pending.set(key, change);
+    if (this.state) change(this.state.annotations);
+    try {
+      const result = await request();
+      this.#pending.delete(key);
+      settle?.(result);
+      return result;
+    } catch (e) {
+      this.#pending.delete(key);
+      this.error = e instanceof Error ? e.message : String(e);
+      await this.sync();
+      return undefined;
+    }
+  }
+
+  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'occurrence' | 'note' | 'turn_id' | 'task_id' | 'source'>>) {
+    const now = Date.now() / 1000;
+    // Choosing the ID here keeps the shown annotation the same item once the host has saved it.
+    const draft: Annotation = {
+      turn_id: null, task_id: null, source: null, passage: '', note: '', created_at: now, updated_at: now,
+      ...annotation, id: newId(),
+    };
+    return this.#annotation(
+      (list) => {
+        if (!list.some((a) => a.id === draft.id)) list.push({ ...draft });
+      },
+      () => api.post<{ annotation: Annotation }>('/api/annotations', { ...annotation, id: draft.id }),
+      ({ annotation: saved }) => {
+        const list = this.state?.annotations;
+        const index = list?.findIndex((a) => a.id === saved.id) ?? -1;
+        if (index >= 0) list![index] = saved;
+        else list?.push(saved);
+      },
+    );
   }
 
   editNote(id: string, note: string) {
-    return this.act(() => api.put(`/api/annotations/${encodeURIComponent(id)}`, { note }));
+    const text = note.trim();
+    return this.#annotation(
+      (list) => {
+        const item = list.find((a) => a.id === id);
+        if (item) item.note = text;
+      },
+      () => api.put(`/api/annotations/${encodeURIComponent(id)}`, { note }),
+    );
   }
 
   removeAnnotation(id: string) {
-    return this.act(() => api.delete(`/api/annotations/${encodeURIComponent(id)}`));
+    return this.#annotation(
+      (list) => drop(list, id),
+      () => api.delete(`/api/annotations/${encodeURIComponent(id)}`),
+    );
   }
 
   editMemory(id: string, text: string) {
@@ -479,7 +543,7 @@ class AppStore {
       requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
       return;
     }
-    if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage);
+    if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0 });
   }
 
   /** A section's own exercises; chapter quiz questions anchored to it are listed on the chapter page. */

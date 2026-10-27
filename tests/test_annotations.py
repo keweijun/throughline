@@ -91,6 +91,19 @@ class Annotations(unittest.TestCase):
                 self.assertEqual(client.delete(f'/api/annotations/{identifier}').status_code, 200)
                 self.assertEqual(client.delete(f'/api/annotations/{identifier}').status_code, 404)
                 self.assertEqual(client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'state', 'note': 'x', 'extra': 1}).status_code, 400)
+                # The interface may choose the ID, but never one already in use.
+                chosen = '0b6a8e8e-6d2c-4a37-9a58-2f3d8c1e5b10'
+                note = {'id': chosen, 'kind': 'note', 'concept_id': 'state', 'note': 'first'}
+                self.assertEqual(client.post('/api/annotations', json=note).json()['annotation']['id'], chosen)
+                self.assertEqual(client.post('/api/annotations', json={**note, 'note': 'second'}).status_code, 409)
+                self.assertEqual(client.post('/api/annotations', json={**note, 'id': 'not-a-uuid'}).status_code, 400)
+                notes = [a for a in client.get('/api/state').json()['annotations'] if a['id'] == chosen]
+                self.assertEqual([a['note'] for a in notes], ['first'])
+                # A repeated passage records which repeat was marked; only a passage has one.
+                repeat = {'kind': 'highlight', 'concept_id': 'state', 'turn_id': 'one', 'passage': 'about states', 'occurrence': 2}
+                self.assertEqual(client.post('/api/annotations', json=repeat).json()['annotation']['occurrence'], 2)
+                self.assertEqual(client.post('/api/annotations', json={**repeat, 'occurrence': -1}).status_code, 409)
+                self.assertEqual(client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'state', 'note': 'x', 'occurrence': 1}).status_code, 409)
 
 
 if __name__ == '__main__':

@@ -57,9 +57,12 @@ class QuestionRequest(Body):
 
 
 class AnnotationRequest(Body):
+    # The interface may choose the ID, so it can show the annotation before the host answers.
+    id: Optional[uuid.UUID] = None
     kind: Literal['highlight', 'note', 'bookmark']
     concept_id: Optional[str] = None
     passage: Optional[str] = None
+    occurrence: Optional[int] = None
     note: Optional[str] = None
     turn_id: Optional[str] = None
     task_id: Optional[str] = None
@@ -378,7 +381,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/annotations')
     def annotate(body: AnnotationRequest):
-        result = host.operation({'op': 'annotations.save', 'id': str(uuid.uuid4()), **body.model_dump(exclude_none=True)})
+        identifier = str(body.id or uuid.uuid4())
+        # annotations.save with a known ID edits that note, which creating must never do.
+        if any(a['id'] == identifier for a in host.operation({'op': 'annotations.list'})['annotations']):
+            raise OperationError('annotation_exists', identifier)
+        result = host.operation({'op': 'annotations.save', **body.model_dump(exclude_none=True), 'id': identifier})
         host.changed()
         return result
 

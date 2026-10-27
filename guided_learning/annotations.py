@@ -78,9 +78,13 @@ def save(store, request):
         raise OperationError('invalid_request', 'A note needs text')
     if kind == 'bookmark' and passage:
         raise OperationError('invalid_request', 'A bookmark has no passage; highlight it instead')
+    # A passage can repeat in its text; this says which repeat was marked. Records without it mean the first.
+    occurrence = request.get('occurrence', 0)
+    if not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 0 or (occurrence and not passage):
+        raise OperationError('invalid_request', 'occurrence must be a non-negative integer, for a passage')
     now = time.time()
     annotation = {'id': identifier, 'kind': kind, 'concept_id': concept_id, 'turn_id': turn_id, 'task_id': task_id, 'source': source,
-                  'passage': passage, 'note': note, 'created_at': now, 'updated_at': now}
+                  'passage': passage, 'occurrence': occurrence, 'note': note, 'created_at': now, 'updated_at': now}
     return {'annotation': store.put('annotations', identifier, annotation)}
 
 

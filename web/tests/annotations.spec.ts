@@ -122,3 +122,79 @@ test('highlight and note an exercise', async ({ page, course }) => {
   await expect(page.locator('.notes-panel .item.highlight')).toContainText('Watch the sign');
   expect(errors).toEqual([]);
 });
+
+test('a highlight running into a formula is still painted', async ({ page, course }) => {
+  const { errors } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  const excerpt = await page.locator('.lesson-body').first().evaluate((body) => {
+    const start = [...body.querySelectorAll('p')].find((p) => p.textContent?.includes('squared magnitude'))!;
+    const range = document.createRange();
+    range.setStart(start.firstChild!, 0);
+    range.setEndAfter(body.querySelector('[data-tex]')!);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return window.getSelection()!.toString();
+  });
+  expect(excerpt).toContain('squared magnitude');
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('highlights show before the host answers, preview on hover and can be noted or removed in place', async ({ page, course }) => {
+  const { errors } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
+  const painted = () => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0);
+
+  // The highlight is painted at once, not after the save and a full state reload.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/annotations', async (route) => (await held, route.continue()));
+  await dragSelect(page, paragraph);
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(painted, { timeout: 1000 }).toBe(1);
+  const saved = page.waitForResponse('**/api/annotations');
+  release();
+  await saved;
+  await page.unroute('**/api/annotations');
+
+  // Clicking the highlight offers a note; the note then previews on hover over its margin marker.
+  // The fixture repeats its paragraphs; the highlight is painted on the repeat that was selected, not the first.
+  const spot = () => page.evaluate(() => {
+    const rect = ([...CSS.highlights.get('mine')!][0] as Range).getClientRects()[0];
+    return { x: rect.left + 10, y: rect.top + rect.height / 2 };
+  });
+  let { x, y } = await spot();
+  const box = (await paragraph.boundingBox())!;
+  expect(y).toBeGreaterThan(box.y);
+  expect(y).toBeLessThan(box.y + box.height);
+  await page.mouse.click(x, y);
+  const toolbar = page.getByRole('toolbar', { name: 'Your highlight' });
+  await toolbar.getByRole('button', { name: 'Add note' }).click();
+  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Compare with the slit width');
+  await page.getByRole('button', { name: 'Save note' }).click();
+  const marker = page.getByRole('button', { name: 'Open your note on this passage' });
+  await marker.hover();
+  await expect(page.getByRole('tooltip').filter({ hasText: 'Compare with the slit width' })).toBeVisible();
+
+  // In Notes, a highlight carrying a note is called a note.
+  await page.locator('#toggle-notes').click();
+  await expect(page.locator('.notes-panel .item.highlight .kind')).toHaveText('Note');
+  await page.locator('#toggle-notes').click();
+
+  // Removing it from the page asks first, since the note goes with it.
+  page.once('dialog', (dialog) => dialog.accept());
+  ({ x, y } = await spot());
+  await page.mouse.click(x, y);
+  await toolbar.getByRole('button', { name: 'Remove highlight' }).click();
+  await expect.poll(painted).toBe(0);
+  await expect(marker).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.lesson-body').first()).toBeVisible();
+  expect(await painted()).toBe(0);
+  expect(errors).toEqual([]);
+});

@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { mark, clear } from '../lib/highlight';
+  import { mark, clear, type Passage } from '../lib/highlight';
 
   let {
     lines,
     target,
     label,
     highlights = [],
-  }: { lines: { id: string; text: string }[]; target: string; label: string; highlights?: string[] } = $props();
+  }: { lines: { id: string; text: string }[]; target: string; label: string; highlights?: Passage[] } = $props();
 
   let container: HTMLElement | undefined = $state();
 

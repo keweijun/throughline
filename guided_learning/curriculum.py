@@ -46,7 +46,66 @@ def validate_framing(concept):
     if 'steps' in overview and (not isinstance(overview['steps'], list) or any(not isinstance(s, str) for s in overview['steps'])):
         raise OperationError('invalid_request', 'overview steps must be an array of strings')
 
-def store_model(store, model, confirm_reorder):
+def validate_exercise(exercise):
+    """Placement fields of an exercise part (ADR 0012); all optional, for courses mapped before them."""
+    required = exercise.get('required_concepts', [])
+    if not isinstance(required, list) or any(not isinstance(cid, str) for cid in required):
+        raise OperationError('invalid_request', 'Exercise required_concepts must be an array of concept IDs')
+    if 'part_of' in exercise and not isinstance(exercise['part_of'], str):
+        raise OperationError('invalid_request', 'Exercise part_of must be a string')
+    others = exercise.get('other_parts', [])
+    if not isinstance(others, list) or any(not isinstance(p, dict) or not isinstance(p.get('question'), str)
+                                           or not isinstance(p.get('concept_id', ''), str) for p in others):
+        raise OperationError('invalid_request', 'Exercise other_parts must be objects with a question and optional concept_id')
+
+def placement_violations(model):
+    """Exercises mapped before a concept they require, or requiring one the route does not have."""
+    position = {cid: i for i, cid in enumerate(model['route'])}
+    concepts = {c['id']: c for c in model['concepts']}
+    violations = []
+    for cid in model['route']:
+        for exercise in concepts[cid].get('exercises', []):
+            required = exercise.get('required_concepts', [])
+            if not isinstance(required, list):
+                continue
+            later = [r for r in required if r in position and position[r] > position[cid]]
+            unknown = [r for r in required if r not in position]
+            if later or unknown:
+                chapter = chapter_of(model, cid)
+                violations.append({'concept_id': cid, 'chapter_id': chapter and chapter['id'], 'question': exercise.get('question', ''),
+                                   **{k: exercise.get(k) for k in ('source_id', 'revision', 'unit_id')},
+                                   'later_concepts': later, 'unknown_concepts': unknown,
+                                   'move_to': max(later, key=position.get) if later else None})
+    return violations
+
+def placement_key(violation):
+    return tuple(str(violation[k]) for k in ('concept_id', 'question', 'source_id', 'revision', 'unit_id', 'later_concepts', 'unknown_concepts'))
+
+def describe(violation):
+    where = f'Exercise "{violation["question"]}" ({violation["source_id"]} / {violation["unit_id"]}) in section "{violation["concept_id"]}"'
+    problems = [f'requires "{cid}", which comes later in the route' for cid in violation['later_concepts']]
+    problems += [f'requires "{cid}", which is not in the route' for cid in violation['unknown_concepts']]
+    advice = f'map it to "{violation["move_to"]}" or later' if violation['move_to'] else 'map it in the chapter that teaches what it needs'
+    return where + ' ' + ' and '.join(problems) + '; ' + advice
+
+def check_placement(model, previous, written):
+    """Reject violations in the concepts a save sends, and any it creates elsewhere (a reorder or a moved concept);
+    violations stored earlier in concepts the save does not send stay, and `curriculum.check` reports them."""
+    existing = {placement_key(v) for v in placement_violations(previous)}
+    rejected = [v for v in placement_violations(model) if v['concept_id'] in written or placement_key(v) not in existing]
+    if rejected:
+        raise OperationError('exercise_placement', '; '.join(describe(v) for v in rejected)
+                             + '. Map each exercise part to the latest section it requires (split homework by part).')
+
+def check(store, request):
+    """Read-only report of exercise placement in the stored course (ADR 0012)."""
+    model = view(store, request)
+    exercises = [e for c in model['concepts'] for e in c.get('exercises', [])]
+    return {'violations': placement_violations(model), 'exercises': len(exercises),
+            'without_required_concepts': sum(1 for e in exercises if not e.get('required_concepts'))}
+
+def store_model(store, model, confirm_reorder, written=None):
+    """Validate and store the merged model; `written` lists the concepts the request sent (None: all of them)."""
     if any(not isinstance(model[k], list) for k in model):
         raise OperationError('invalid_request', 'concepts, route, coverage and chapters must be arrays')
     concepts = {}
@@ -65,6 +124,8 @@ def store_model(store, model, confirm_reorder):
         for field in ('links', 'notations', 'exercises'):
             for ref in concept.get(field, []):
                 source_unit(store, ref)
+        for exercise in concept.get('exercises', []):
+            validate_exercise(exercise)
     for concept in concepts.values():
         if any(p not in concepts for p in concept.get('prerequisites', [])):
             raise OperationError('invalid_reference', 'Unknown prerequisite')
@@ -124,6 +185,7 @@ def store_model(store, model, confirm_reorder):
     previous_ids = set(previous['route'])
     if not previous_ids.issubset(concepts):
         raise OperationError('invalid_route', 'Preserve stable concept IDs; defer content instead of deleting it')
+    check_placement(model, previous, set(concepts) if written is None else written)
     previous_chapters = [c['id'] for c in previous['chapters']]
     reordered = [cid for cid in route if cid in previous_ids] != previous['route']
     reordered = reordered or [c['id'] for c in chapters if c['id'] in previous_chapters] != [c for c in previous_chapters if c in {c['id'] for c in chapters}]
@@ -158,7 +220,7 @@ def outline(store, request):
     if any(cid not in placed for cid in previous['route']):
         raise OperationError('invalid_chapters', 'Every existing concept needs a chapter; assign them with concept_ids')
     route = [cid for c in chapters for cid in c['concept_ids']] if all(isinstance(c['concept_ids'], list) for c in chapters) else []
-    return store_model(store, {**previous, 'route': route, 'chapters': chapters}, request.get('confirm_reorder') is True)
+    return store_model(store, {**previous, 'route': route, 'chapters': chapters}, request.get('confirm_reorder') is True, set())
 
 def chapter_save(store, request):
     """Replace one chapter's concepts, in teaching order, and upsert the coverage entries it sends."""
@@ -184,7 +246,7 @@ def chapter_save(store, request):
         merged[key] = merge_entry(merged.get(key), entry, set(ids))
     model = {'concepts': [c for c in previous['concepts'] if c['id'] not in ids] + concepts,
              'route': [cid for c in chapters for cid in c['concept_ids']], 'coverage': list(merged.values()), 'chapters': chapters}
-    return store_model(store, model, request.get('confirm_reorder') is True)
+    return store_model(store, model, request.get('confirm_reorder') is True, set(ids))
 
 def entry_key(entry):
     return tuple(entry.get(k) for k in ('source_id', 'revision', 'unit_id'))
@@ -252,4 +314,5 @@ def context(store, request):
     return {'concept': concept, 'chapter': chapter_of(model, concept_id), 'position': position, 'prerequisites': [concepts[c] for c in concept.get('prerequisites', [])], 'next_concept_id': model['route'][index + 1] if index + 1 < len(model['route']) else None, 'sources': [{**ref, **source_unit(store, ref), 'stale': is_stale(store, ref)} for ref in concept.get('links', [])]}
 
 OPERATIONS = {'curriculum.save': save, 'curriculum.view': view, 'curriculum.coverage': coverage, 'curriculum.context': context,
-              'curriculum.outline': outline, 'curriculum.chapter.save': chapter_save, 'curriculum.chapter.view': chapter_view}
+              'curriculum.outline': outline, 'curriculum.chapter.save': chapter_save, 'curriculum.chapter.view': chapter_view,
+              'curriculum.check': check}

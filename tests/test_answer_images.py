@@ -84,7 +84,7 @@ class AnswerImages(unittest.TestCase):
                 tid = host.practice.state()['tasks'][0]['id']
                 name = host.practice.save_image(PNG[:64])
                 runner.reply = '{"feedback":"Check the constant.","outcome":"needs_work"}'
-                host.wait(host.practice.act(tid, 'assess', 'See my working', [name])['turn']['id'], 5)
+                host.wait(host.practice.act(tid, 'assess', 'See my working', images=[name])['turn']['id'], 5)
             interactions = execute(path, {'op': 'session.resume'})['recent_interactions']
             answer = next(i for i in interactions if i['id'].startswith('practice-answer:'))
             self.assertEqual((answer['text'], answer['images']), ('See my working', [name]))

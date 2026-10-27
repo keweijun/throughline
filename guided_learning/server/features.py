@@ -355,7 +355,7 @@ class Questions(Feature):
 
 
 class Practice(Feature):
-    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'defer')
+    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer')
 
     def state(self):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
@@ -380,7 +380,7 @@ class Practice(Feature):
         job = next((j for j in self.operation({'op': 'practice.list'})['jobs'] if j['id'] == turn['id']), None)
         return [str(practice.image_path(self.host.workspace, name)) for name in (job or {}).get('images', [])]
 
-    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, images=None):
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, question=None, images=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
@@ -403,6 +403,10 @@ class Practice(Feature):
                 job['answer'] = answer or ''
                 if images:
                     job['images'] = list(images)
+            if action == 'ask':
+                if not isinstance(question, str) or not question.strip():
+                    raise OperationError('empty_question', 'Enter your question first')
+                job['question'] = question
             self.operation({'op': 'practice.job', 'job': job})
             return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'practice',
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
@@ -414,7 +418,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None, images=None):
+    def act(self, task_id, action, answer=None, question=None, images=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -438,7 +442,8 @@ class Practice(Feature):
                 return result
         if action != 'assess':
             answer = images = None
-        return self._launch(self._assessed_section(task), action, task, answer, images=images)
+        return self._launch(self._assessed_section(task), action, task, answer,
+                            question=question if action == 'ask' else None, images=images)
 
     def _assessed_section(self, task):
         """The section a task's help and assessment are recorded for: its own, or the first section a chapter quiz question
@@ -530,6 +535,8 @@ class Practice(Feature):
             # Exercise refs need not be included in the lesson links.
             return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
+        if job['action'] == 'ask':
+            return prompts.practice_ask(task, self._sources(task['source_refs']), job['question'])
         return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'), len(job.get('images', [])))
 
     def _retrieval_prompt(self, job, context, tasks):

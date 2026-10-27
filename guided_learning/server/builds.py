@@ -136,7 +136,30 @@ class ChapterBuilds(Feature):
             data['learner_profile'] = snapshot['learner_profile']
         previous = next((c for c in reversed(chapters[:index]) if c['concept_ids']), None)
         data['source_units'], truncated = self._units(status['sources'], set(previous['concept_ids']) if previous else set())
+        waiting = self._waiting_parts(model)
+        if waiting:
+            data['waiting_parts'] = waiting
         return data, truncated
+
+    def _waiting_parts(self, model):
+        """Homework parts a built chapter left for later (ADR 0012): their unit is already mapped, so source_units omits it."""
+        mapped = {(e.get('question'), e.get('source_id'), e.get('unit_id')) for c in model['concepts'] for e in c.get('exercises', [])}
+        waiting = []
+        for cid in model['route']:
+            concept = next(c for c in model['concepts'] if c['id'] == cid)
+            for exercise in concept.get('exercises', []):
+                for part in exercise.get('other_parts', []):
+                    if part.get('concept_id') or (part['question'], exercise['source_id'], exercise['unit_id']) in mapped:
+                        continue
+                    ref = {k: exercise[k] for k in ('source_id', 'revision', 'unit_id')}
+                    try:
+                        text = self.operation({'op': 'source.units', 'refs': [ref]})['sources'][0]['unit'].get('text', '')
+                    except OperationError:
+                        continue
+                    waiting.append({'question': part['question'], **({'part_of': exercise['part_of']} if exercise.get('part_of') else {}),
+                                    **ref, 'text': text,
+                                    'mapped_part': {'question': exercise.get('question', ''), 'concept_id': cid}})
+        return waiting
 
     def _units(self, sources, previous_ids):
         """Unmapped units first, then set-aside ones as context, within the limit, starting after the previous chapter's material."""

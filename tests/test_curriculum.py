@@ -24,7 +24,7 @@ class CurriculumCLI(unittest.TestCase):
     def model(self):
         return {'concepts': [
             {'id': 'state', 'title': 'State', 'prerequisites': [], 'links': [{**self.refs[0], 'detail': 'Definition'}]},
-            {'id': 'projection', 'title': 'Projection', 'prerequisites': ['state'], 'links': [{**self.refs[0], 'unit_id': 'line-2', 'detail': 'Formula'}, {**self.refs[1], 'detail': 'Application'}], 'notations': [{'symbol': 'c', 'meaning': 'Projection coefficient', **self.refs[1]}], 'exercises': [{'question': '7(a)', **self.refs[1]}]}
+            {'id': 'projection', 'title': 'Projection', 'prerequisites': ['state'], 'links': [{**self.refs[0], 'unit_id': 'line-2', 'detail': 'Formula'}, {**self.refs[1], 'detail': 'Application'}], 'notations': [{'symbol': 'c', 'meaning': 'Projection coefficient', **self.refs[1]}], 'exercises': [{'question': '7(a)', **self.refs[1], 'required_concepts': ['projection']}]}
         ], 'route': ['state', 'projection'], 'coverage': [
             {**self.refs[0], 'disposition': 'mapped', 'concept_ids': ['state']},
             {**self.refs[0], 'unit_id': 'line-2', 'disposition': 'mapped', 'concept_ids': ['projection']},
@@ -243,6 +243,20 @@ class ExercisePlacement(CurriculumCLI):
                   chapters=[{'id': 'measure', 'title': 'Measurement'}, {'id': 'states', 'title': 'States'}])
         self.assertEqual(self.call('curriculum.view')['route'], ['state', 'projection'])
 
+    def test_every_exercise_a_save_sends_says_what_it_requires(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        for exercise in ({'question': '8', **self.refs[1]}, self.exercise('8')):
+            state, _ = self.placed([exercise])
+            self.assertIn('required_concepts', self.chapter([state], chapter_id='states', error='invalid_request')['error']['message'])
+        state, projection = self.placed([{'question': '8', **self.refs[1]}])
+        self.chapter([self.placed()[0]], chapter_id='states')
+        self.chapter([projection], chapter_id='measure')
+        self.plant({**self.call('curriculum.view'), 'concepts': [state, projection]})
+        # An exercise stored before the rule keeps working until its chapter is saved again.
+        self.chapter([{**projection, 'title': 'Projections'}], chapter_id='measure')
+        self.assertEqual(self.call('curriculum.context', concept_id='state')['concept']['exercises'][0]['question'], '8')
+        self.chapter([state], chapter_id='states', error='invalid_request')
+
     def test_check_reports_existing_violations_which_only_block_the_saves_that_write_them(self):
         self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
         state, projection = self.placed([self.exercise('7(b)', 'state', 'projection'), {'question': '8', **self.refs[1]}])
@@ -261,6 +275,7 @@ class ExercisePlacement(CurriculumCLI):
         self.assertEqual(self.call('curriculum.context', concept_id='state')['concept']['exercises'][0]['question'], '7(b)')
         self.chapter([{**projection, 'title': 'Projections'}], chapter_id='measure')
         self.assertEqual(len(self.call('curriculum.check')['violations']), 1)
+        state, _ = self.placed([self.exercise('7(b)', 'state', 'projection'), self.exercise('8', 'state')])
         self.chapter([state], chapter_id='states', error='exercise_placement')
         self.call('curriculum.save', error='exercise_placement', **{**self.call('curriculum.view'), 'concepts': [state, projection]})
         state, projection = self.placed([], [self.exercise('7(b)', 'state', 'projection')])

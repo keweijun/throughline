@@ -119,7 +119,7 @@ class PracticeFlow(unittest.TestCase):
             file=Path(path)/'exercise.md';file.write_text('Compute photon energy. Answer: E=hf.',encoding='utf-8')
             source=execute(path,{'op':'source.register','path':str(file)})['source']
             ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
-            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'Photons','exercises':[{**ref,'question':'1(a)'}]}],'route':['a'],'coverage':[]})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'Photons','exercises':[{**ref,'question':'1(a)','required_concepts':['a']}]}],'route':['a'],'coverage':[]})
             runner=Runner();app=Host(path,runner=runner)
             turn=app.practice.generate('a')['turn'];app.wait(turn['id'],5)
             state=app.practice.state()
@@ -294,7 +294,7 @@ class ExerciseOrigin(unittest.TestCase):
             file=Path(path)/'homework.md';file.write_text('7. (a) Normalize. (b) Measure.',encoding='utf-8')
             source=execute(path,{'op':'source.register','path':str(file)})['source']
             ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
-            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'States','exercises':[{**ref,**e} for e in exercises]}],'route':['a'],'coverage':[]})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'States','exercises':[{**ref,'required_concepts':['a'],**e} for e in exercises]}],'route':['a'],'coverage':[]})
             runner=Runner();app=Host(path,runner=runner)
             app.wait(app.practice.generate('a')['turn']['id'],5)
             state=app.practice.state()

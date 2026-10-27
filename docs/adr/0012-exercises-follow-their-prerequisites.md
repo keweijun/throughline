@@ -6,4 +6,4 @@ An exercise part is mapped to the latest section among the concepts it requires,
 
 Deadlines do not override this. A learner who needs a homework part sooner can study the sections it needs, or ask for it as a side question.
 
-Validation applies to what a save writes: the concepts it sends, and any violation it creates elsewhere by reordering or moving concepts. Courses mapped before this rule may hold violations; they keep opening and teaching, a read-only check (`curriculum.check`) lists them, and Codex fixes them one chapter at a time, since a chapter save does not fail on another chapter's earlier violations.
+Every exercise a save sends must list its `required_concepts`; without them the rule cannot be checked, and an optional field let exercises bypass it. Validation applies to what a save writes: the concepts it sends, and any violation it creates elsewhere by reordering or moving concepts. Courses mapped before this rule may hold violations; they keep opening and teaching, a read-only check (`curriculum.check`) lists them, and Codex fixes them one chapter at a time, since a chapter save does not fail on another chapter's earlier violations.

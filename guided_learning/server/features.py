@@ -69,6 +69,19 @@ def is_recap(turn):
     return turn['id'].startswith('recap:')
 
 
+def missed_check(step):
+    """A step's check question answered wrongly or with "not sure", as the next step's prompt repairs it; else None."""
+    check, answer = step.get('check'), step.get('answer')
+    if not check or not answer or answer['correct']:
+        return None
+    right = check['options'][check['correct']]
+    missed = {'idea': check['idea'], 'question': check['question'], 'correct_answer': right['text'], 'why': right['explanation']}
+    if answer['unsure']:
+        return {**missed, 'chosen': "I'm not sure"}
+    chosen = check['options'][answer['choice']]
+    return {**missed, 'chosen': chosen['text'], 'what_the_choice_suggests': chosen['explanation']}
+
+
 def chapter_owned(item):
     """A chapter recap turn or chapter quiz question: listed on the chapter page, never among a section's lessons or
     exercises. Its concept_id is the chapter's last section, kept only as the anchor that section-scoped records
@@ -224,7 +237,8 @@ class Navigation(Feature):
             text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language) + '\n'
         if lesson:
             previous = [{'step': i + 1, 'title': s['title'], 'text': self._step_text(s['turn_id'])} for i, s in enumerate(lesson['steps'][:number - 1])]
-            text += prompts.lesson_step(lesson['steps'], number, previous, lesson.get('request'), lessons.MAX_STEPS) + '\n'
+            text += prompts.lesson_step(lesson['steps'], number, previous, lesson.get('request'), lessons.MAX_STEPS,
+                                        missed_check(lesson['steps'][number - 2]) if number > 1 else None) + '\n'
         text += prompts.SECTION_FOCUS
         due = [i for i in self._due(turn) if i['status'] == 'pending']
         return text + '\n' + prompts.due_explanations(due) if due else text
@@ -279,6 +293,14 @@ class Navigation(Feature):
             self.host._ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
             return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
 
+    def answer_check(self, lesson_id, turn_id, choice):
+        """A check answer shows its explanation at once: it is recorded, with no model turn (ADR 0009)."""
+        with self.host.lock:
+            result = self.operation({'op': 'lesson.answer', 'id': lesson_id, 'turn_id': turn_id, 'choice': choice})
+        if result['changed']:
+            self.host.changed()
+        return {'answer': result['answer'], 'changed': result['changed']}
+
     def _existing(self, identifier):
         """A retried request whose turn already started."""
         try:
@@ -294,21 +316,24 @@ class Navigation(Feature):
         return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt})
 
     def _record_step(self, lesson, turn):
-        """Read the plan block a completed step ends with. A missing or invalid block keeps the plan as it was."""
+        """Read the plan block a completed step ends with. A missing or invalid block keeps the plan as it was; an invalid
+        check question is dropped and an invalid plan kept, each without losing the other."""
         request = {'op': 'lesson.reply', 'id': lesson['id'], 'turn_id': turn['id']}
         match = STEP_REPLY.search(turn['final_text'] or '')
         try:
             reply = json.loads(match.group(1)) if match else None
         except ValueError:
             reply = None
-        if isinstance(reply, dict):
+        fields = {k: reply[k] for k in ('title', 'remaining', 'check') if k in reply} if isinstance(reply, dict) else {}
+        while True:
             try:
-                return self.operation({**request, **{k: reply[k] for k in ('title', 'remaining') if k in reply}})
+                return self.operation({**request, **fields})
             except OperationError as exc:
-                if exc.code != 'invalid_plan':
+                dropped = {'invalid_plan': ('title', 'remaining'), 'invalid_check': ('check',)}.get(exc.code)
+                if not any(k in fields for k in dropped or ()):
                     raise
-                log.info('Step %s returned an invalid plan: %s', turn['id'], exc)
-        return self.operation(request)
+                log.info('Step %s returned an invalid reply: %s', turn['id'], exc)
+                fields = {k: v for k, v in fields.items() if k not in dropped}
 
     def recover(self):
         """Read the plans of steps completed just before a crash, without a model call."""

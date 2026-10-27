@@ -3,7 +3,7 @@ import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
-import type { Annotation, AnnotationSource, Chapter, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -605,6 +605,13 @@ class AppStore {
   /** Continue: teach the next planned step of a stepped lesson. */
   continueLesson(lessonId: string) {
     return this.act(() => api.post(`/api/lessons/${encodeURIComponent(lessonId)}/steps`, { id: newId() }));
+  }
+
+  /** Answers a step's check question; its explanation is already in the lesson, so no model turn follows. */
+  answerCheck(lessonId: string, turnId: string, choice: CheckChoice) {
+    return this.act(() =>
+      api.post(`/api/lessons/${encodeURIComponent(lessonId)}/steps/${encodeURIComponent(turnId)}/check`, { choice }),
+    );
   }
 
   async setLanguage(language: Language) {

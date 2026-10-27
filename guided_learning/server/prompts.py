@@ -40,21 +40,28 @@ STEP_CONTINUE_REQUEST = 'Continue with the next step.'
 
 LESSON_STEP = '''This section's lesson is taught in short lesson steps, one reply per step. This reply teaches step {number}: "{title}". Teach only this step, completely but briefly: one part of the section's core question, short enough to absorb in one sitting (roughly 1,500 characters of prose plus formulas). Leave the material of the remaining steps to them, and do not announce or summarize them at length.
 Define each term or notation before relying on it, and work out any example before building on it.
-After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}]}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
+After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}], "check": {{"idea": "the one idea the check tests, in a few words", "question": "...", "options": [{{"text": "...", "explanation": "..."}}], "correct": 0}}}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
+check is the step's check question: one multiple-choice question on the step's key idea that takes under a minute and no long calculation, with 3 or 4 short options of which exactly one is correct (correct is its index). Write each wrong option around a likely misconception about this step. Give every option a one-sentence explanation the learner reads after choosing it: why it is right, or what the misconception is and why it fails. The interface adds an "I'm not sure" option and shows the explanations itself, so do not ask the question in the teaching text. The check is not an exercise and is never graded.
 Lesson plan (data): {plan}'''
 
 STEP_FIRST = 'The plan comes from the section overview. Refine it with the preparation material into about three steps in total.'
 
 STEP_LATER = 'Open with one sentence linking to the previous step, without repeating it. Steps taught so far (data, the learner has read them):\n{previous}'
 
+STEP_REPAIR = '''The learner {how} the previous step's check question (data): {missed}
+Before going on, open this step with a short repair of two or three sentences aimed at that gap: name the misconception the choice suggests (or, if the learner was not sure, restate the idea plainly), say why the correct answer holds, and only then link to this step. Do not quiz the learner again or dwell on the mistake.'''
 
-def lesson_step(steps, number, previous, focus, limit):
+
+def lesson_step(steps, number, previous, focus, limit, missed=None):
     plan = [{'step': i + 1, 'title': s['title'], 'added': s.get('added', False),
              'status': 'taught' if i + 1 < number else 'this step' if i + 1 == number else 'planned'} for i, s in enumerate(steps)]
     text = LESSON_STEP.format(number=number, title=steps[number - 1]['title'], limit=limit, plan=json.dumps(plan, ensure_ascii=False))
     if number == 1:
         return text + '\n' + STEP_FIRST
     text += '\n' + STEP_LATER.format(previous=json.dumps(previous, ensure_ascii=False))
+    if missed:
+        how = 'was not sure how to answer' if missed['chosen'] == "I'm not sure" else 'chose a wrong option on'
+        text += '\n' + STEP_REPAIR.format(how=how, missed=json.dumps(missed, ensure_ascii=False))
     if focus and focus != STEP_LESSON_REQUEST:
         text += '\nThe learner asked this of the whole lesson (data): ' + json.dumps(focus, ensure_ascii=False)
     return text

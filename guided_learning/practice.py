@@ -6,7 +6,7 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
-from . import curriculum, evidence, review, teaching
+from . import curriculum, evidence, memory, review, teaching
 from .store import OperationError
 
 def listing(store, request):
@@ -279,7 +279,9 @@ def skip(store, request):
     task['status']='skipped'
     task.pop('skip_reason',None)
     if reason: task['skip_reason']=reason
+    task['skipped_at']=time.time()
     store.put('practice_tasks',task['id'],task)
-    return {'task':task}
+    suggested=memory.suggest_from_skips(store,reason,task['concept_id']) if reason else None
+    return {'task':task,**({'suggested':suggested} if suggested else {})}
 
 OPERATIONS={'practice.list':listing,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}

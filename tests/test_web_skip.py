@@ -1,4 +1,5 @@
 """Skipping a section exercise (ADR 0011): it is closed, records nothing, and no quiz or reminder brings it back."""
+import json
 import tempfile
 import time
 import unittest
@@ -9,7 +10,9 @@ from support import host_client
 from test_web_review import DAY, Runner
 
 
-class SkipFlow(unittest.TestCase):
+class SkipCourse(unittest.TestCase):
+    runner_class = Runner
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -18,7 +21,7 @@ class SkipFlow(unittest.TestCase):
         execute(root, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
         execute(root, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'What a state represents'}, {'id': 'b', 'title': 'Superposition'}]})
         self.root = root
-        self.runner = Runner()
+        self.runner = self.runner_class()
         self.client, self.host = host_client(root, runner=self.runner)
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
@@ -48,6 +51,8 @@ class SkipFlow(unittest.TestCase):
     def records(self):
         return (execute(self.root, {'op': 'evidence.unresolved'})['deferred'], execute(self.root, {'op': 'evidence.view', 'concept_id': 'a'}))
 
+
+class SkipFlow(SkipCourse):
     def test_skip_with_a_reason_closes_the_exercise_and_records_no_evidence(self):
         task = self.exercise()
         before = self.records()
@@ -91,6 +96,79 @@ class SkipFlow(unittest.TestCase):
         quiz = next(t for t in self.host.practice.state()['tasks'] if t['origin'] == 'chapter_quiz')
         self.post(f'/api/practice/tasks/{quiz["id"]}/skip', {}, status=409)
         self.assertEqual(self.task(quiz['id'])['status'], 'pending')
+
+
+class TwoExercises(Runner):
+    def run(self, prompt, cwd, emit, cancel):
+        if 'Practice only' in prompt and 'Practice only (' not in prompt and 'Question and help history' not in prompt:
+            text = json.dumps({'questions': [{'question': q, 'origin': 'self_created', 'source_refs': []} for q in ('Normalize (1, 1).', 'Normalize (1, i).', 'Normalize (2, 1).')]})
+            emit({'kind': 'final', 'text': text})
+            emit({'kind': 'complete'})
+            return
+        super().run(prompt, cwd, emit, cancel)
+
+
+class SkipReasonsSuggestPreferences(SkipCourse):
+    """Two skips with the same reason suggest a matching preference in course memory (ADR 0010, 0011)."""
+    runner_class = TwoExercises
+
+    def exercises(self):
+        self.post('/api/lessons', {})
+        self.settle()
+        return [t['id'] for t in self.host.practice.state()['tasks'] if t['concept_id'] == 'a']
+
+    def skip(self, task_id, reason):
+        return self.post(f'/api/practice/tasks/{task_id}/skip', {'reason': reason})
+
+    def memory(self):
+        return self.client.get('/api/state').json()['memory']
+
+    def test_a_second_skip_with_the_same_reason_suggests_a_preference_citing_both(self):
+        one, two, three = self.exercises()
+        self.skip(one, 'too_tedious')
+        self.assertEqual(self.memory(), [])
+        self.skip(two, 'too_tedious')
+        [entry] = self.memory()
+        self.assertEqual((entry['kind'], entry['status'], entry['text']), ('preference', 'suggested', 'Fewer long calculations'))
+        self.assertEqual((entry['skip_ids'], entry['interaction_ids'], entry['concept_id']), ([one, two], [], 'a'))
+        # A third skip cites itself on the same suggestion; skipping again does not duplicate a citation.
+        self.skip(three, 'too_tedious')
+        self.skip(three, 'too_tedious')
+        [entry] = self.memory()
+        self.assertEqual(entry['skip_ids'], [one, two, three])
+        self.assertNotIn('preferences', execute(self.root, {'op': 'memory.prompt'})['memory'], 'a suggestion waits for the learner')
+
+    def test_different_reasons_suggest_nothing(self):
+        one, two, three = self.exercises()
+        self.skip(one, 'too_easy')
+        self.skip(two, 'too_tedious')
+        self.post(f'/api/practice/tasks/{three}/skip', {})
+        self.skip(one, 'not_relevant')
+        self.assertEqual(self.memory(), [])
+
+    def test_a_dismissed_suggestion_is_not_suggested_again(self):
+        one, two, three = self.exercises()
+        self.skip(one, 'too_easy')
+        self.skip(two, 'too_easy')
+        [entry] = self.memory()
+        self.assertEqual(self.client.delete(f'/api/memory/{entry["id"]}').status_code, 200)
+        self.skip(three, 'too_easy')
+        self.assertEqual(self.memory(), [])
+
+    def test_a_matching_preference_already_in_memory_is_not_suggested_again(self):
+        one, two, three = self.exercises()
+        execute(self.root, {'op': 'memory.save', 'id': 'mine', 'kind': 'preference', 'text': 'fewer long calculations', 'concept_id': 'a'})
+        execute(self.root, {'op': 'memory.confirm', 'id': 'mine'})
+        self.skip(one, 'too_tedious')
+        self.skip(two, 'too_tedious')
+        self.assertEqual([(e['id'], e['status']) for e in self.memory()], [('mine', 'confirmed')])
+
+    def test_the_suggestion_is_worded_in_the_course_language(self):
+        execute(self.root, {'op': 'preferences.save', 'language': 'zh-CN'})
+        one, two, _ = self.exercises()
+        self.skip(one, 'not_relevant')
+        self.skip(two, 'not_relevant')
+        self.assertEqual(self.memory()[0]['text'], '只出与我的学习目标相关的练习')
 
 
 if __name__ == '__main__':

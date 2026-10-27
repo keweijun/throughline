@@ -17,7 +17,7 @@ Entries are facts about the learner and the course, each citing the interactions
 ## Writing and reading
 
 - At the end of each turn the teacher appends a structured memory note, as it already does with the side-question `<teaching-decision>` block. The host validates it and records it as operations. At the end of a section the small model merges duplicates and prunes cleared or stale entries.
-- A preference is saved only after the learner confirms it ("Remember: one step at a time?"). Taught terms and difficulties are saved directly.
+- A preference is saved only after the learner confirms it ("Remember: one step at a time?"). Taught terms and difficulties are saved directly. A preference suggested from repeated skip reasons (ADR 0011) cites the skipped exercises, since a skip has no interaction.
 - The learner can see every entry and edit or delete it. Deleting is final: the teacher does not re-add an entry just because the same evidence still exists.
 - Every lesson, side question, practice and preparation prompt includes the current memory. The teacher uses only taught terms without defining them; any other term gets a one-line definition or a bridge.
 

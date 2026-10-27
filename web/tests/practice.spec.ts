@@ -56,6 +56,24 @@ test('a skipped exercise is closed and does not follow the learner', async ({ pa
   await expect(page.getByText('Still open from earlier sections')).toContainText('(1)');
 });
 
+test('skipping two exercises for the same reason suggests a preference to confirm', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const exercises = page.locator('#practice article');
+  const banner = page.getByRole('status').filter({ hasText: 'Remember: Fewer long calculations?' });
+  for (const index of [0, 1]) {
+    await exercises.nth(index).getByRole('button', { name: 'Skip', exact: true }).click();
+    await exercises.nth(index).getByRole('button', { name: 'Too tedious' }).click();
+    await expect(exercises.nth(index)).toContainText('Skipped · Too tedious');
+    if (index === 0) await expect(banner).toHaveCount(0);
+  }
+  await expect(banner).toBeVisible();
+  await expect(page.locator('#toggle-memory .count')).toHaveText('1');
+  await banner.getByRole('button', { name: 'Remember', exact: true }).click();
+  await expect(banner).toBeHidden();
+  await page.locator('#toggle-memory').click();
+  await expect(page.locator('.memory-panel #memory-preference')).toContainText('Fewer long calculations');
+});
+
 test('a full solution asks for confirmation first', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const first = page.locator('#practice article').first();

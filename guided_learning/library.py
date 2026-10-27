@@ -57,6 +57,18 @@ def fingerprint(path):
     return hashlib.sha256(repr(rows).encode()).hexdigest()
 
 
+def stamp(path):
+    """The course database files' sizes and modification times: every commit changes the database or its log."""
+    def stat(file):
+        try:
+            info = file.stat()
+        except OSError:
+            return None
+        return (info.st_mtime_ns, info.st_size) if info.st_size else None  # an empty log holds nothing
+    database = Path(path) / 'course.sqlite3'
+    return stat(database), stat(database.with_name('course.sqlite3-wal'))
+
+
 def summary(path):
     """What the library shows for one course; reads through operations, never edits."""
     path = Path(path).resolve()

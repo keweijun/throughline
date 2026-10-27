@@ -19,7 +19,7 @@ test('streamed text stays whole when the state reloads mid-stream', async ({ pag
       const text = await lesson.locator('.lesson-body').innerText();
       seen = [...text.matchAll(/Streaming paragraph (\d+)/g)].map((m) => Number(m[1]));
       return seen.length;
-    })
+    }, { intervals: [100] }) // the lesson takes under two seconds; the default backoff can miss it running
     .toBeGreaterThanOrEqual(6);
   expect(seen).toEqual(seen.map((_, i) => i));
   await expect(lesson.getByRole('button', { name: 'Pause' })).toBeVisible();

@@ -110,15 +110,15 @@ def reveal(store, turn):
     return turn
 
 
-def event(store, request):
-    turn = read(store, request)['turn']
+def _apply(store, turn, request):
+    """Apply one event to a turn in memory; False when it is stale (another attempt, a stopped turn, or already applied)."""
     if request.get('attempt') != turn['attempt'] or turn['status'] != 'running':
-        return {'turn':turn, 'ignored':True}
+        return False
     sequence = request.get('sequence')
     if not isinstance(sequence,int) or sequence <= 0:
         raise OperationError('invalid_event', 'Positive sequence required')
     if sequence <= turn['sequence']:
-        return {'turn':turn, 'ignored':True}
+        return False
     if sequence != turn['sequence'] + 1:
         raise OperationError('event_gap', 'Events must be applied in order')
     kind = request.get('kind')
@@ -146,10 +146,30 @@ def event(store, request):
     else:
         raise OperationError('invalid_event', str(kind))
     turn['sequence'] = sequence
+    return True
+
+
+def event(store, request):
+    turn = read(store, request)['turn']
+    if not _apply(store, turn, request):
+        return {'turn':turn, 'ignored':True}
     store.put('streams',turn['id'],turn)
     return {'turn':turn}
 
-OPERATIONS = {'stream.start':start, 'stream.read':read, 'stream.event':event,
+
+def events(store, request):
+    """Several events of one attempt, in order, written once: the host stores streamed text a few times a second."""
+    turn = read(store, request)['turn']
+    batch = request.get('events')
+    if not isinstance(batch, list) or not all(isinstance(e, dict) for e in batch):
+        raise OperationError('invalid_request', 'events must be an array of event objects')
+    applied = [_apply(store, turn, {**e, 'attempt': request.get('attempt')}) for e in batch]
+    if not any(applied):
+        return {'turn':turn, 'ignored':True}
+    store.put('streams',turn['id'],turn)
+    return {'turn':turn}
+
+OPERATIONS = {'stream.start':start, 'stream.read':read, 'stream.event':event, 'stream.events':events,
               'stream.list':lambda s,r:{'turns':sorted(s.list('streams'),key=lambda t:t['started_at'])}}
 
 

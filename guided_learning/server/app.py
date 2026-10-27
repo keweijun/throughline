@@ -146,13 +146,20 @@ class Courses:
         self.host = None
         self.watch_interval = watch_interval
         self.stopping = threading.Event()
+        self._stamps = {}  # path -> (file stamp, fingerprint) from the last poll
 
     def _fingerprints(self):
         paths = [p for p in self.root.iterdir() if p.is_dir() and library.is_course(p)] if self.root and self.root.is_dir() else []
         host = self.host
         if host and host.workspace not in paths:
             paths.append(host.workspace)
-        return {path: library.fingerprint(path) for path in paths}
+        stamps = {}
+        for path in paths:
+            stamp = library.stamp(path)  # taken before reading, so a write during the read shows at the next poll
+            known = self._stamps.get(path)
+            stamps[path] = known if known and known[0] == stamp else (stamp, library.fingerprint(path))
+        self._stamps = stamps
+        return {path: fingerprint for path, (_, fingerprint) in stamps.items()}
 
     def watch(self, seen):
         """Tell open tabs when Codex changes a course or the library from outside the app."""

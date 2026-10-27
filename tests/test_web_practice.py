@@ -10,6 +10,24 @@ def practice_call(app,endpoint,body):
     return app.practice.act(body['id'],body['action'],body.get('answer'))
 
 class PracticeFlow(unittest.TestCase):
+    def test_generation_asks_for_each_part_on_its_own_line(self):
+        class Runner:
+            prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt)
+                emit({'kind':'final','text':'{"questions":[{"question":"Two parts:\\n1. First\\n2. Second","origin":"self_created","source_refs":[]}]}'})
+                emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'light','title':'Light'}],'route':['light'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            app.wait(app.practice.generate('light')['turn']['id'],5)
+            prompt=next(p for p in runner.prompts if 'Practice only' in p)
+            self.assertIn('numbered list',prompt)
+            self.assertIn('own line',prompt)
+            self.assertEqual(app.practice.state()['tasks'][0]['question'],'Two parts:\n1. First\n2. Second')
+            app.close()
+
     def test_questions_survive_restart_without_solution_or_mastery(self):
         class Runner:
             def run(self,prompt,cwd,emit,cancel):

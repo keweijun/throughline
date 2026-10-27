@@ -104,9 +104,12 @@ def question_protocol(language):
     return QUESTION_PROTOCOL.replace('150 English words', '250 Chinese characters') if language == 'zh-CN' else QUESTION_PROTOCOL
 
 
+PARTS = 'When a question has several parts, write each part on its own line as a Markdown numbered list (1., 2., ...) after any shared setup.'
+
+
 def practice_generate(sources):
     return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints","origin":"source or self_created","source_refs":[]}]}. '
-            'Select 1 to 2 questions for the current goal. Prefer the original exercises below and cite their sources accurately. '
+            'Select 1 to 2 questions for the current goal. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
             'If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. '
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
             'Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. '
@@ -116,7 +119,7 @@ def practice_generate(sources):
 RETRIEVAL = ('Each question asks the learner to recall a key idea from memory and apply it to a new situation. '
              'Teach nothing new and use no material beyond what the sections cover. Give no hints, steps, answers or reminders of the result in the question. '
              'Do not repeat or lightly reword any exercise the learner has already seen (listed below as data); vary the situation, values or representation. '
-             'Each should take a few minutes to answer in writing.')
+             'Each should take a few minutes to answer in writing. ' + PARTS)
 
 
 def review_question(section, seen):

@@ -707,7 +707,8 @@ class Practice(Feature):
         again = [{'section': titles.get(earlier[i]['concept_id'], earlier[i]['concept_id']), 'question': earlier[i]['question']}
                  for i in job.get('earlier', []) if i in earlier]
         seen = [t['question'] for t in tasks if t['id'] not in earlier and ({t['concept_id'], *t.get('tests_concept_ids', [])} & tested)]
-        sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in chapter['concept_ids']]
+        # New questions test only sections the learner has studied (and not skipped), however much of the chapter remains.
+        sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in self.operation({'op': 'practice.quiz_sections', 'chapter_id': chapter['id']})['sections']]
         return prompts.chapter_quiz(chapter, sections, seen, again)
 
     def quiz(self, chapter_id):

@@ -141,13 +141,13 @@ def _parse(store, value, text):
             if value['purpose']=='chapter_quiz':
                 chapter=quiz_chapter(store,value)
                 if not chapter: raise FormatError('The chapter of this quiz is no longer in the course')
-                sections=chapter['concept_ids']
+                sections=quiz_sections(store,chapter)
             for q in questions:
                 if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
                 _check_parts(q)
                 if sections is not None:
                     tested=q.get('tests_concept_ids')
-                    if not isinstance(tested,list) or not tested or any(c not in sections for c in tested): raise FormatError('tests_concept_ids must list sections of this chapter')
+                    if not isinstance(tested,list) or not tested or any(c not in sections for c in tested): raise FormatError('tests_concept_ids must list studied sections of this chapter')
         elif value['action']=='generate':
             questions=result.get('questions')
             if not isinstance(questions,list) or not 1<=len(questions)<=4: raise FormatError('Expected one to four questions')
@@ -249,6 +249,11 @@ def quiz_chapter(store, value):
     if not isinstance(chapter_id,str): return None
     return next((c for c in curriculum.view(store,{})['chapters'] if c['id']==chapter_id and c['concept_ids']),None)
 
+def quiz_sections(store, chapter):
+    """The chapter's sections a quiz may test: studied ones not skipped with the chapter."""
+    allowed=studied_sections(store)-review.skipped(store)
+    return [c for c in chapter['concept_ids'] if c in allowed]
+
 def studied_sections(store):
     """Sections with a completed lesson of their own; a chapter recap is not one."""
     return {t['concept_id'] for t in store.list('streams') if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
@@ -270,7 +275,7 @@ def quiz_earlier(store, chapter):
     from studied sections not skipped with the chapter; never review or quiz questions. Among equals, ones asked in
     fewer earlier quizzes come first, so retaking the quiz varies it."""
     sections=chapter['concept_ids']
-    allowed=(studied_sections(store)-review.skipped(store))&set(sections)
+    allowed=set(quiz_sections(store,chapter))
     tasks=store.list('practice_tasks')
     asked=Counter(t['from_task_id'] for t in tasks if t.get('from_task_id'))
     candidates=[t for t in tasks if t.get('origin') in ('source','self_created') and not t.get('chapter_id')
@@ -339,4 +344,9 @@ def skip(store, request):
     suggested=memory.suggest_from_skips(store,reason,task['concept_id']) if reason else None
     return {'task':task,**({'suggested':suggested} if suggested else {})}
 
-OPERATIONS={'practice.list':listing,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}
+def sections_for_quiz(store, request):
+    chapter=quiz_chapter(store,{'chapter_id':request.get('chapter_id')})
+    if not chapter: raise OperationError('unknown_chapter','Unknown chapter')
+    return {'sections':quiz_sections(store,chapter)}
+
+OPERATIONS={'practice.list':listing,'practice.quiz_sections':sections_for_quiz,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}

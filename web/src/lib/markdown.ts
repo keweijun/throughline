@@ -7,7 +7,8 @@ import { scrollStage, stageScroll } from './stage';
 
 const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$)/g;
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
-const DECISION = /<teaching-decision>[\s\S]*$/;
+// Structured blocks a teacher reply ends with; the host reads them and the learner never sees them.
+const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
 // The teacher's course memory note (ADR 0010), wherever it is and while it is still streaming.
 const MEMORY = /\s*<course-memory>[\s\S]*?(<\/course-memory>|$)/g;
 

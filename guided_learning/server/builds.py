@@ -10,12 +10,12 @@ import uuid
 from pathlib import Path
 
 from ..store import OperationError
+from ..streaming import LEARNER_CHANNELS
 from . import prompts
 from .features import Feature
 
 log = logging.getLogger(__name__)
 
-LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')
 SOURCE_LIMIT = 60_000  # characters of source text in one build prompt
 UNIT_OVERHEAD = 60  # what one unit's JSON framing costs, counted against the limit
 

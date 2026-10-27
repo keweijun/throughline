@@ -13,6 +13,7 @@ from .. import lessons
 from .. import practice
 from ..store import OperationError
 from .. import memory
+from ..streaming import BACKGROUND
 from . import prompts
 
 log = logging.getLogger(__name__)
@@ -821,7 +822,7 @@ class Preparation(Feature):
 
     def before_start(self, request):
         # A chapter build runs alongside preparation; only the learner's own requests go first.
-        if request.get('channel', 'mainline') in ('preparation', 'build', 'consolidation'):
+        if request.get('channel', 'mainline') in BACKGROUND:
             return
         for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':

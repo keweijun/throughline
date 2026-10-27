@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
-from ..streaming import summarize
+from ..streaming import SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
@@ -108,7 +108,7 @@ class Host:
     def runner_for(self, turn):
         # Preparation and memory consolidation are background work, so they run on the small model when one is chosen; a
         # chapter build needs the teacher.
-        return self._runner or self.settings.runner(small=turn['channel'] in ('preparation', 'consolidation'))
+        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
 
     def operation(self, request):
         return execute(self.workspace, request)

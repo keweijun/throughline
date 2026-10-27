@@ -38,6 +38,9 @@ export type Position = {
 
 export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'failed';
 
+/** A turn's channel, as `CHANNELS` in guided_learning/streaming.py: the learner's own requests, then background work. */
+export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build' | 'consolidation';
+
 export type Turn = {
   id: string;
   concept_id: string;
@@ -46,7 +49,7 @@ export type Turn = {
    * anchor for section-scoped records.
    */
   chapter_id?: string;
-  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build' | 'consolidation';
+  channel: Channel;
   prompt: string;
   status: TurnStatus;
   attempt: number;

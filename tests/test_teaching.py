@@ -25,6 +25,13 @@ class TeachingCLI(unittest.TestCase):
         self.assertEqual(len(session['recent_interactions']), 1)
         self.assertEqual(session['recent_interactions'][0]['id'], 'a1')
         self.assertIsNone(session['position'])
+
+    def test_an_interaction_may_name_its_kind(self):
+        recorded = self.call('interaction.record', id='c1', role='user', text='Answer: A', concept_id='state', kind='check_answer')['interaction']
+        self.assertEqual(recorded['kind'], 'check_answer')
+        self.assertNotIn('kind', self.call('interaction.record', id='u2', role='user', text='Plain', concept_id='state')['interaction'])
+        self.call('interaction.record', error='id_conflict', id='c1', role='user', text='Answer: A', concept_id='state')
+        self.call('interaction.record', error='invalid_request', id='c2', role='user', text='Answer: A', concept_id='state', kind='quiz')
     def test_short_sidequestion_restores_mainline_and_long_answer_waits_across_restart(self):
         position = self.call('mainline.enter', concept_id='state', goal='Understand states', next_step='Normalize psi')['position']
         self.call('interaction.record', id='q1', role='user', text='What is psi?', concept_id='state')

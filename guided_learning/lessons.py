@@ -168,7 +168,7 @@ def answer(store, request):
     if any(_started(store, item) for item in lesson['steps'][index + 1:]):
         raise OperationError('check_closed', 'The next step has started')
     chosen = "I'm not sure" if choice == UNSURE else check['options'][choice]['text']
-    interaction = record_interaction(store, {'id': 'check-answer:' + turn_id, 'role': 'user', 'concept_id': lesson['concept_id'],
+    interaction = record_interaction(store, {'id': 'check-answer:' + turn_id, 'role': 'user', 'kind': 'check_answer', 'concept_id': lesson['concept_id'],
                                              'text': f"Check question: {check['question']}\nAnswer: {chosen}", 'source_refs': []})['interaction']
     entry['answer'] = {'choice': choice, 'unsure': choice == UNSURE, 'correct': choice == check['correct'],
                        'interaction_id': interaction['id'], 'answered_at': time.time()}

@@ -12,6 +12,9 @@ def validate_concept(store, concept_id):
     if concept_id not in curriculum.view(store, {})['route']:
         raise OperationError('unknown_concept', str(concept_id))
 
+# Optional kinds an interaction may name, for records the host makes itself (a check answer, ADR 0009).
+INTERACTION_KINDS = ('check_answer',)
+
 def record_interaction(store, request):
     identifier = require_text(request, 'id')
     text = require_text(request, 'text')
@@ -20,9 +23,13 @@ def record_interaction(store, request):
         raise OperationError('invalid_request', 'role must be user or assistant')
     concept_id = request.get('concept_id')
     value = {'id': identifier, 'role': role, 'text': text, 'concept_id': concept_id}
+    if 'kind' in request:
+        if request['kind'] not in INTERACTION_KINDS:
+            raise OperationError('invalid_request', 'kind must be one of: ' + ', '.join(INTERACTION_KINDS))
+        value['kind'] = request['kind']
     previous = store.get('interactions', identifier)
     if previous:
-        if any(previous[k] != v for k, v in value.items()):
+        if any(previous.get(k) != v for k, v in value.items()) or previous.get('kind') != value.get('kind'):
             raise OperationError('id_conflict', identifier)
         if 'source_refs' in request and request['source_refs'] != previous.get('supplied_source_refs', previous.get('source_refs', [])):
             raise OperationError('id_conflict', identifier)

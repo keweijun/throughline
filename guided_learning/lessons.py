@@ -72,7 +72,8 @@ def _started(store, step):
 
 
 def begin(store, request):
-    """A new stepped lesson for a section with its initial plan (titles, in order)."""
+    """A new stepped lesson for a section with its initial plan (titles, in order) and an optional `outline`: the steps to
+    fall back on when the first step's reply plans none."""
     identifier = require_text(request, 'id')
     concept = require_text(request, 'concept_id')
     validate_concept(store, concept)
@@ -87,8 +88,12 @@ def begin(store, request):
     focus = request.get('request', '')
     if not isinstance(focus, str):
         raise OperationError('invalid_request', 'request must be a string')
+    outline = request.get('outline') or []
+    if not isinstance(outline, list) or len(outline) > MAX_STEPS:
+        raise OperationError('invalid_plan', f'A lesson outline has at most {MAX_STEPS} steps')
     lesson = {'id': identifier, 'concept_id': concept, 'request': focus.strip(), 'created_at': time.time(),
-              'steps': [{'title': _title(t), 'added': False} for t in titles]}
+              'steps': [{'title': _title(t), 'added': False} for t in titles],
+              **({'outline': [_title(t) for t in outline]} if outline else {})}
     return {'lesson': store.put('lessons', identifier, lesson), 'created': True}
 
 
@@ -140,6 +145,10 @@ def reply(store, request):
             if text in {r['title'] for r in revised}:
                 raise OperationError('invalid_plan', 'Remaining steps repeat a title')
             revised.append({'title': text, 'added': item.get('added', False) or text in added})
+    if revised is None and index == 0 and lesson.get('outline') and len(lesson['steps']) == 1:
+        # The teacher plans in its first reply; one that plans nothing keeps to the section overview's steps after this one.
+        revised = [{'title': t, 'added': False} for t in lesson['outline'][1:]]
+        title = title or lesson['outline'][0]
     if title:
         entry['title'] = title
     if revised is not None:

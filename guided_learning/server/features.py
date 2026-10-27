@@ -286,10 +286,12 @@ class Navigation(Feature):
                 return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt or prompts.DEFAULT_LESSON_REQUEST})
             self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
             preview = self.preview(concept_id)
-            plan = [s.strip()[:lessons.MAX_TITLE] for s in preview['overview']['steps'] if isinstance(s, str) and s.strip()][:lessons.MAX_STEPS]
             prompt = prompt or prompts.STEP_LESSON_REQUEST
+            # The teacher plans the steps in its first reply; the section overview reaches it as course data, and its steps
+            # are only the fallback when that reply plans none.
+            outline = [s.strip()[:lessons.MAX_TITLE] for s in preview['overview']['steps'] if isinstance(s, str) and s.strip()][:lessons.MAX_STEPS]
             self.operation({'op': 'lesson.begin', 'id': identifier, 'concept_id': concept_id, 'request': prompt,
-                            'steps': plan or [preview['concept']['title'][:lessons.MAX_TITLE]]})
+                            'steps': [preview['concept']['title'][:lessons.MAX_TITLE]], 'outline': outline})
             return self._start_step(identifier, identifier, concept_id, prompt)
 
     def continue_lesson(self, lesson_id, body):

@@ -92,7 +92,9 @@ class SteppedLessons(unittest.TestCase):
         self.finish('one')
         prompt = self.runner.prompts[0]
         self.assertIn('step 1', prompt)
-        self.assertIn('"Amplitudes"', prompt, 'the initial plan comes from the section overview')
+        self.assertIn('"Amplitudes"', prompt, 'the section overview reaches the teacher as course data')
+        self.assertIn('Plan the lesson yourself', prompt, 'the teacher plans the steps, not the overview')
+        self.assertIn('the previous step', prompt)
         self.assertIn('<lesson-step>', prompt)
         self.assertIn('## Chapter overview', prompt, 'step 1 still opens the chapter')
         lesson = self.lesson()
@@ -135,7 +137,7 @@ class SteppedLessons(unittest.TestCase):
         self.finish('one')
         turn = self.host.operation({'op': 'stream.read', 'id': 'one'})['turn']
         self.assertEqual(turn['attempt'], 2, 'a step regenerates as a new attempt of the same turn')
-        self.assertEqual([s['title'] for s in self.lesson()['steps']], ['Amplitudes', 'Probability'])
+        self.assertEqual([s['title'] for s in self.lesson()['steps']], ['Wave', 'Probability'], 'an untitled first step keeps the section title')
         self.post('/api/lessons/one/steps', {'id': 'two'})
         self.assertFalse(self.post('/api/lessons/one/steps', {'id': 'two'})['created'])
         self.finish('two')
@@ -236,7 +238,7 @@ class CheckQuestions(SteppedLessons):
         self.finish('one')
         steps = self.lesson()['steps']
         self.assertNotIn('check', steps[0])
-        self.assertEqual([s['title'] for s in steps], ['Amplitudes', 'Only next'], 'the valid plan still applies')
+        self.assertEqual([s['title'] for s in steps], ['Wave', 'Only next'], 'the valid plan still applies')
 
     def test_a_wrong_choice_shows_feedback_without_a_model_turn_and_the_next_step_opens_with_a_repair(self):
         check = self.step_with_check()['check']

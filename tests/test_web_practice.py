@@ -260,6 +260,7 @@ class PartsFlow(unittest.TestCase):
     def test_correct_parts_one_at_a_time_stay_independent(self):
         task=self.generate(['State it.','Apply it.','Check it.'])
         self.assess(task['id'],'Part 1.',['correct','not_attempted','not_attempted'])
+        self.assertIn('Give no hint or cue for a part the answer does not address',self.runner.prompts[-1])
         state=self.assess(task['id'],'Parts 2 and 3.',['not_attempted','correct','correct'])
         last=state['tasks'][0]['history'][-1]
         self.assertEqual((last['outcome'],last['kind']),('passed','independent'))

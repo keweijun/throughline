@@ -8,7 +8,7 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -24,6 +24,9 @@ from .settings import TeacherSettings
 log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
 MAX_BODY = 1024 * 1024
+# An answer image is uploaded as its own raw body, so a phone photo fits; JSON bodies keep the small limit.
+IMAGE_UPLOAD = '/api/practice/images'
+MAX_IMAGE = 25 * 1024 * 1024
 
 
 class Body(BaseModel):
@@ -67,6 +70,10 @@ class NoteRequest(Body):
     note: str
 
 
+class MemoryRequest(Body):
+    text: str
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -77,6 +84,9 @@ class GenerateRequest(Body):
 
 class PracticeRequest(Body):
     answer: Optional[str] = None
+    images: Optional[list[str]] = None
+    question: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class NextSectionRequest(Body):
@@ -99,6 +109,14 @@ class ReviewRequest(Body):
 
 class RecapRequest(Body):
     id: Optional[str] = None
+
+
+class StepRequest(Body):
+    id: Optional[str] = None
+
+
+class CheckAnswer(Body):
+    choice: Any = None  # an option index or "unsure"; lesson.answer validates it
 
 
 class SettingsRequest(Body):
@@ -224,12 +242,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.middleware('http')
     async def guard(request: Request, call_next):
         has_body = request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
+        image = request.method == 'POST' and request.url.path == IMAGE_UPLOAD
         if has_body:
             try:
                 size = int(request.headers.get('content-length', '0'))
             except ValueError:
                 size = -1
-            if request.headers.get('transfer-encoding') or size < 0 or size > MAX_BODY:
+            if request.headers.get('transfer-encoding') or size < 0 or size > (MAX_IMAGE if image else MAX_BODY):
                 return JSONResponse({'error': 'Request body must have a bounded Content-Length'}, 413)
         origin = request.headers.get('origin')
         if request.headers.get('host') not in allowed or (origin is not None and origin not in origins):
@@ -238,8 +257,9 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         site = request.headers.get('sec-fetch-site')
         if request.url.path.startswith('/api/') and site is not None and site not in ('same-origin', 'none'):
             return JSONResponse({'error': 'Invalid local origin'}, 403)
-        if has_body and size and request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
-            return JSONResponse({'error': 'JSON required'}, 415)
+        content_type = request.headers.get('content-type', '').split(';')[0].strip()
+        if has_body and size and not (content_type.startswith('image/') if image else content_type == 'application/json'):
+            return JSONResponse({'error': 'An image is required' if image else 'JSON required'}, 415)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -247,7 +267,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.exception_handler(OperationError)
     async def operation_error(request, exc):
-        return JSONResponse({'error': str(exc), 'code': exc.code}, 404 if exc.code.startswith('unknown_') else 409)
+        status = 415 if exc.code == 'unsupported_image' else 404 if exc.code.startswith('unknown_') else 409
+        return JSONResponse({'error': str(exc), 'code': exc.code}, status)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
@@ -276,7 +297,9 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'review': review,
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
+                'lessons': current.operation({'op': 'lesson.list'})['lessons'],
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
+                'memory': current.operation({'op': 'memory.view'})['entries'],
                 'skipped': current.practice.skipped(),
                 'builds': current.builds.state()}
 
@@ -301,6 +324,15 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/lessons')
     def start_lesson(body: LessonRequest):
         return host.start_lesson(body.model_dump())
+
+    @app.post('/api/lessons/{lesson_id}/steps')
+    def continue_lesson(lesson_id: str, body: StepRequest):
+        result = host.navigation.continue_lesson(lesson_id, body.model_dump())
+        return {**result, 'turn': turn_summary(result['turn'])}
+
+    @app.post('/api/lessons/{lesson_id}/steps/{turn_id}/check')
+    def answer_check(lesson_id: str, turn_id: str, body: CheckAnswer):
+        return host.navigation.answer_check(lesson_id, turn_id, body.choice)
 
     @app.put('/api/preferences')
     def preferences(body: PreferencesRequest):
@@ -362,14 +394,42 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         host.changed()
         return result
 
+    @app.put('/api/memory/{identifier}')
+    def edit_memory(identifier: str, body: MemoryRequest):
+        result = host.operation({'op': 'memory.save', 'id': identifier, 'text': body.text})
+        host.changed()
+        return result
+
+    @app.post('/api/memory/{identifier}/confirm')
+    def confirm_memory(identifier: str):
+        result = host.operation({'op': 'memory.confirm', 'id': identifier})
+        host.changed()
+        return result
+
+    @app.delete('/api/memory/{identifier}')
+    def remove_memory(identifier: str):
+        result = host.operation({'op': 'memory.delete', 'id': identifier})
+        host.changed()
+        return result
+
     @app.post('/api/practice/generate')
     def generate(body: GenerateRequest):
         result = host.practice.generate(body.concept_id)
         return {'tasks': result['tasks']} if 'tasks' in result else {**result, 'turn': turn_summary(result['turn'])}
 
+    @app.post(IMAGE_UPLOAD)
+    async def upload_image(request: Request):
+        data = await request.body()
+        return {'image': await asyncio.to_thread(host.practice.save_image, data)}
+
+    @app.get(IMAGE_UPLOAD + '/{name}')
+    def answer_image(name: str):
+        path, media_type = host.practice.image_file(name)
+        return FileResponse(path, media_type=media_type)
+
     @app.post('/api/practice/tasks/{task_id}/{action}')
     def practice_action(task_id: str, action: str, body: PracticeRequest):
-        result = host.practice.act(task_id, action, body.answer)
+        result = host.practice.act(task_id, action, body.answer, body.question, body.reason, body.images)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
     @app.get('/api/review')

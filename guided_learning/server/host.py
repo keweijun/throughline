@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
-from ..streaming import summarize
+from ..streaming import SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
@@ -73,7 +73,7 @@ turn_summary = summarize
 
 class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
-        from .features import Navigation, Practice, Preparation, Questions
+        from .features import Memory, Navigation, Practice, Preparation, Questions
         from .builds import ChapterBuilds
         from .review import Review
         self.workspace = Path(workspace).resolve()
@@ -92,9 +92,12 @@ class Host:
         self.preparation = Preparation(self)
         self.builds = ChapterBuilds(self)
         self.review = Review(self)
-        # Order matters: prompt additions are appended in this order.
-        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds)
+        self.memory = Memory(self)
+        # Order matters: prompt additions are appended, and completions handled, in this order; memory goes last, after
+        # practice has recorded the interactions a note cites.
+        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.memory)
         self.questions.recover()
+        self.navigation.recover()
         self.preparation.start()
         self.builds.start()
 
@@ -103,8 +106,9 @@ class Host:
         return self._runner or self.settings.runner()
 
     def runner_for(self, turn):
-        # Preparation is background work, so it runs on the small model when one is chosen; a chapter build needs the teacher.
-        return self._runner or self.settings.runner(small=turn['channel'] == 'preparation')
+        # Preparation and memory consolidation are background work, so they run on the small model when one is chosen; a
+        # chapter build needs the teacher.
+        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
 
     def operation(self, request):
         return execute(self.workspace, request)
@@ -150,6 +154,8 @@ class Host:
             raise OperationError('missing_snapshot', 'This older turn has no source snapshot; start a new lesson')
         if turn['channel'] == 'build':
             return self.builds.build_prompt(turn)  # not a teaching turn: none of the teaching additions apply
+        if turn['channel'] == 'consolidation':
+            return self.memory.consolidation_prompt(turn)
         prompt = prompts.base(turn)
         context = turn['prompt_snapshot']['context']
         for feature in self.features:
@@ -158,7 +164,7 @@ class Host:
                 prompt += '\n' + addition
         return prompt
 
-    def _ensure_single_mainline(self, identifier, message):
+    def ensure_single_mainline(self, identifier, message):
         for other in self.brief_turns():
             if other['id'] != identifier and other['channel'] == 'mainline' and other['status'] == 'running':
                 raise OperationError('active_turn', message)
@@ -169,7 +175,7 @@ class Host:
                 raise OperationError('host_closing', 'Learning server is closing')
             request = {**request, 'id': request.get('id') or str(uuid.uuid4())}
             if request.get('channel', 'mainline') == 'mainline':
-                self._ensure_single_mainline(request['id'], 'Pause the current lesson before starting another')
+                self.ensure_single_mainline(request['id'], 'Pause the current lesson before starting another')
             for feature in self.features:
                 feature.before_start(request)
             result = self.operation({**request, 'op': 'stream.start'})
@@ -191,8 +197,7 @@ class Host:
                                 'goal': prompts.section_goal(first, chinese),
                                 'next_step': '阅读讲解，然后尝试练习' if chinese else 'Read the lesson, then try the exercises'})
                 position = self.operation({'op': 'course.status'})['position']
-            prompt = (body.get('prompt') or '').strip() or prompts.DEFAULT_LESSON_REQUEST
-            return self.start_turn({'id': body.get('id'), 'concept_id': position['concept_id'], 'prompt': prompt, 'channel': 'mainline'})
+            return self.navigation.start_lesson(position['concept_id'], body)
 
     def _launch(self, turn):
         cancel = threading.Event()
@@ -230,7 +235,10 @@ class Host:
 
         def work():
             try:
-                self.runner_for(turn).run(self.build_prompt(turn), self.workspace, emit, cancel)
+                prompt = self.build_prompt(turn)
+                images = [path for feature in self.features for path in feature.images(turn)]
+                # Only a turn with images passes them, so runners without an `images` parameter keep working (ADR 0002).
+                self.runner_for(turn).run(prompt, self.workspace, emit, cancel, **({'images': images} if images else {}))
                 fail('Model ended without a completed reply')
             except Exception as exc:
                 log.info('Turn %s attempt %s failed', identifier, attempt, exc_info=True)
@@ -263,7 +271,7 @@ class Host:
                 raise OperationError('host_closing', 'Learning server is closing')
             previous = self.operation({'op': 'stream.read', 'id': identifier})['turn']
             if previous['channel'] == 'mainline':
-                self._ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
+                self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))
             if worker and worker[0].is_alive():
                 raise OperationError('stopping', 'The model is still stopping; try again in a moment')

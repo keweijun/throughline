@@ -16,6 +16,7 @@
   import CitationPeek from './components/CitationPeek.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
   import Library from './components/Library.svelte';
+  import RememberPrompt from './components/RememberPrompt.svelte';
 
   onMount(() => {
     void app.sync();
@@ -26,6 +27,8 @@
     document.documentElement.lang = locale.language;
     document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Throughline')}` : t('Throughline');
   });
+
+  const suggestion = $derived(app.libraryOpen ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'));
 
   function step(offset: number) {
     const route = app.state?.curriculum.route ?? [];
@@ -70,6 +73,13 @@
   <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
     <p>{app.notice}</p>
     <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
+  </div>
+{/if}
+
+<!-- A preference the teacher suggested takes effect only once the learner confirms it (ADR 0010). -->
+{#if suggestion && !(app.panelOpen && app.panelTab === 'memory')}
+  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
+    <RememberPrompt entry={suggestion} />
   </div>
 {/if}
 

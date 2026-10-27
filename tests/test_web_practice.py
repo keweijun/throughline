@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from guided_learning.api import execute
@@ -10,6 +11,24 @@ def practice_call(app,endpoint,body):
     return app.practice.act(body['id'],body['action'],body.get('answer'))
 
 class PracticeFlow(unittest.TestCase):
+    def test_generation_asks_for_each_part_on_its_own_line(self):
+        class Runner:
+            prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt)
+                emit({'kind':'final','text':'{"questions":[{"question":"Two parts:\\n1. First\\n2. Second","origin":"self_created","source_refs":[]}]}'})
+                emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'light','title':'Light'}],'route':['light'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            app.wait(app.practice.generate('light')['turn']['id'],5)
+            prompt=next(p for p in runner.prompts if 'Practice only' in p)
+            self.assertIn('starts with its label',prompt)
+            self.assertIn('own line',prompt)
+            self.assertEqual(app.practice.state()['tasks'][0]['question'],'Two parts:\n1. First\n2. Second')
+            app.close()
+
     def test_questions_survive_restart_without_solution_or_mastery(self):
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
@@ -100,7 +119,7 @@ class PracticeFlow(unittest.TestCase):
             file=Path(path)/'exercise.md';file.write_text('Compute photon energy. Answer: E=hf.',encoding='utf-8')
             source=execute(path,{'op':'source.register','path':str(file)})['source']
             ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
-            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'Photons','exercises':[{**ref,'question':'1(a)'}]}],'route':['a'],'coverage':[]})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'Photons','exercises':[{**ref,'question':'1(a)','required_concepts':['a']}]}],'route':['a'],'coverage':[]})
             runner=Runner();app=Host(path,runner=runner)
             turn=app.practice.generate('a')['turn'];app.wait(turn['id'],5)
             state=app.practice.state()
@@ -141,3 +160,173 @@ class PracticeFlow(unittest.TestCase):
             with self.assertRaises(OperationError) as result:
                 app.start_turn({'concept_id':'a','prompt':'Explain','channel':'mainline'})
             self.assertEqual(result.exception.code,'host_closing')
+
+
+class AskFlow(unittest.TestCase):
+    def test_asking_about_a_solved_exercise_records_no_assessment(self):
+        from guided_learning.store import OperationError
+        class Runner:
+            reply='';prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt);emit({'kind':'final','text':self.reply});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            def run(start,text):
+                runner.reply=text;t=app.wait(start()['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
+                return app.practice.state()
+            tid=run(lambda:app.practice.generate('a'),'{"questions":[{"question":"1. State it.\\n2. Apply it.","origin":"self_created","source_refs":[]}]}')['tasks'][0]['id']
+            run(lambda:app.practice.act(tid,'assess','Both parts.'),'{"feedback":"Correct.","outcome":"passed"}')
+            evidence=execute(path,{'op':'evidence.view','concept_id':'a'})['history']
+            state=run(lambda:app.practice.act(tid,'ask',question='What does part 2 mean by apply?'),'{"feedback":"Use the rule on a new case."}')
+            self.assertIn('What does part 2 mean by apply?',runner.prompts[-1])
+            self.assertIn('never assessed',runner.prompts[-1])
+            task=state['tasks'][0]
+            self.assertEqual(task['status'],'attempted')
+            self.assertEqual(task['history'][-1],{'action':'ask','question':'What does part 2 mean by apply?','feedback':'Use the rule on a new case.'})
+            self.assertEqual([h['outcome'] for h in task['history'] if h['action']=='assess'],['passed'])
+            self.assertEqual(execute(path,{'op':'evidence.view','concept_id':'a'})['history'],evidence)
+            self.assertIn('What does part 2 mean by apply?',[i['text'] for i in app.snapshot()['session']['recent_interactions']])
+            # A reply that gives an outcome anyway is still only an answer.
+            state=run(lambda:app.practice.act(tid,'ask',question='Is my answer right?'),'{"feedback":"Use Check my answer for that.","outcome":"needs_work"}')
+            self.assertEqual(set(state['tasks'][0]['history'][-1]),{'action','question','feedback'})
+            self.assertEqual(execute(path,{'op':'evidence.view','concept_id':'a'})['history'],evidence)
+            with self.assertRaises(OperationError) as caught: app.practice.act(tid,'ask',question='  ')
+            self.assertEqual(caught.exception.code,'empty_question')
+            app.close()
+
+    def test_an_ask_job_needs_a_question(self):
+        from guided_learning.store import OperationError
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            with self.assertRaises(OperationError) as caught:
+                execute(path,{'op':'practice.job','job':{'id':'j','concept_id':'a','action':'ask','task_id':'t'}})
+            self.assertEqual(caught.exception.code,'invalid_request')
+
+
+class PartsFlow(unittest.TestCase):
+    """Exercises are assessed part by part (ADR 0011)."""
+    def setUp(self):
+        class Runner:
+            reply='';prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt);emit({'kind':'final','text':self.reply});emit({'kind':'complete'})
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);path=self.path=self.tmp.name
+        execute(path,{'op':'course.init','title':'Physics'})
+        execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+        self.runner=Runner();self.app=Host(path,runner=self.runner);self.addCleanup(self.app.close)
+
+    def run_job(self,start,text):
+        self.runner.reply=text;t=self.app.wait(start()['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
+        return self.app.practice.state()
+
+    def generate(self,parts):
+        question={'question':'Setup.\n1. State it.\n2. Apply it.\n3. Check it.','origin':'self_created','source_refs':[],'parts':parts}
+        return self.run_job(lambda:self.app.practice.generate('a'),json.dumps({'questions':[question]}))['tasks'][0]
+
+    def assess(self,tid,answer,parts,feedback='Checked.'):
+        return self.run_job(lambda:self.app.practice.act(tid,'assess',answer),json.dumps({'feedback':feedback,'parts':parts}))
+
+    def test_a_multi_part_exercise_answered_part_by_part(self):
+        task=self.generate(['State it.','Apply it.','Check it.'])
+        self.assertEqual(task['parts'],['State it.','Apply it.','Check it.'])
+        self.assertIn('"parts"',next(p for p in self.runner.prompts if 'Practice only' in p))
+        state=self.assess(task['id'],'Part 1: the rule.',['correct','not_attempted','not_attempted'])
+        prompt=self.runner.prompts[-1]
+        self.assertIn('partly_correct',prompt);self.assertIn('not_attempted',prompt)
+        last=state['tasks'][0]['history'][-1]
+        self.assertEqual((last['parts'],last['outcome'],last['kind']),(['correct','not_attempted','not_attempted'],'needs_work','needs_work'))
+        self.assertEqual(execute(self.path,{'op':'evidence.view','concept_id':'a'})['latest_assessment']['parts'],['correct','not_attempted','not_attempted'])
+        state=self.assess(task['id'],'Part 2 and 3.',['not_attempted','correct','partly_correct'])
+        self.assertIn('"parts": ["correct", "not_attempted", "not_attempted"]',self.runner.prompts[-1],'the teacher sees the statuses so far')
+        last=state['tasks'][0]['history'][-1]
+        self.assertEqual((last['parts'],last['outcome']),(['correct','correct','partly_correct'],'needs_work'),'only the addressed parts change')
+        state=self.assess(task['id'],'Part 3 fixed.',['not_attempted','not_attempted','correct'])
+        last=state['tasks'][0]['history'][-1]
+        self.assertEqual((last['parts'],last['outcome'],last['kind']),(['correct']*3,'passed','hinted'),'feedback correcting part 3 was help')
+        self.assertFalse(execute(self.path,{'op':'evidence.view','concept_id':'a'})['independently_verified'])
+
+    def test_parts_may_carry_short_labels(self):
+        for parts in ([{'label':'(a)'}],[{'label':5,'text':'State it.'}],[{'label':'x'*41,'text':'State it.'}],[{'text':'State it.','extra':1}]):
+            with self.subTest(parts=parts):
+                state=self.run_job(lambda:self.app.practice.generate('a'),json.dumps({'questions':[{'question':'Q.','origin':'self_created','source_refs':[],'parts':parts}]}))
+                self.assertIn('error',[j for j in state['jobs'] if j['action']=='generate'][-1])
+        labelled=[{'label':'(a)','text':'State it.'},'Apply it.',{'text':'Check it.'}]
+        self.assertEqual(self.generate(labelled)['parts'],labelled)
+        self.assertIn('"label"',next(p for p in self.runner.prompts if 'Practice only' in p))
+
+    def test_correct_parts_one_at_a_time_stay_independent(self):
+        task=self.generate(['State it.','Apply it.','Check it.'])
+        self.assess(task['id'],'Part 1.',['correct','not_attempted','not_attempted'])
+        state=self.assess(task['id'],'Parts 2 and 3.',['not_attempted','correct','correct'])
+        last=state['tasks'][0]['history'][-1]
+        self.assertEqual((last['outcome'],last['kind']),('passed','independent'))
+        self.assertTrue(execute(self.path,{'op':'evidence.view','concept_id':'a'})['independently_verified'])
+
+    def test_part_statuses_must_match_the_parts(self):
+        task=self.generate(['State it.','Apply it.','Check it.'])
+        state=self.assess(task['id'],'All.',['correct','correct'])
+        assessed=lambda state:[j for j in state['jobs'] if j['action']=='assess']
+        self.assertTrue(all('error' in j for j in assessed(state)))
+        state=self.run_job(lambda:self.app.practice.act(task['id'],'assess','All.'),json.dumps({'feedback':'Good.','outcome':'passed'}))
+        self.assertEqual(len(assessed(state)),2)
+        self.assertTrue(all('error' in j for j in assessed(state)),'a multi-part exercise needs part statuses')
+        self.assertEqual(state['tasks'][0]['history'],[])
+
+    def test_a_task_without_parts_is_one_part(self):
+        tid=self.run_job(lambda:self.app.practice.generate('a'),'{"questions":[{"question":"2+2?","origin":"self_created","source_refs":[]}]}')['tasks'][0]['id']
+        state=self.run_job(lambda:self.app.practice.act(tid,'assess','5'),json.dumps({'feedback':'No.','parts':['not_yet']}))
+        self.assertEqual(state['tasks'][0]['history'][-1]['parts'],['not_yet'])
+        state=self.run_job(lambda:self.app.practice.act(tid,'assess','4'),json.dumps({'feedback':'Yes.','outcome':'passed'}))
+        last=state['tasks'][0]['history'][-1]
+        self.assertEqual((last['parts'],last['outcome']),(['correct'],'passed'),'an outcome alone still assesses a single part')
+
+    def test_an_assessment_from_before_parts_counts_as_its_one_part(self):
+        from guided_learning import practice
+        old=lambda outcome:{'history':[{'action':'assess','outcome':outcome,'kind':'independent'},{'action':'hint','feedback':'.'}]}
+        self.assertEqual((practice.part_statuses(old('passed')),practice.part_statuses(old('needs_work'))),(['correct'],['not_yet']))
+        self.assertEqual(practice.part_statuses({'parts':['x','y'],'history':[]}),['not_attempted']*2)
+
+
+class ExerciseOrigin(unittest.TestCase):
+    """A generated task names the course exercise it uses, so a homework part shows its question (ADR 0012)."""
+    def generate(self, exercises, question):
+        from pathlib import Path
+        class Runner:
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompt=prompt
+                emit({'kind':'final','text':json.dumps({'questions':[question(ref)]})});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            file=Path(path)/'homework.md';file.write_text('7. (a) Normalize. (b) Measure.',encoding='utf-8')
+            source=execute(path,{'op':'source.register','path':str(file)})['source']
+            ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'States','exercises':[{**ref,'required_concepts':['a'],**e} for e in exercises]}],'route':['a'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            app.wait(app.practice.generate('a')['turn']['id'],5)
+            state=app.practice.state()
+            app.close()
+            return state,runner.prompt
+
+    def test_the_task_keeps_the_exercise_the_teacher_names(self):
+        part={'question':'7(a)','part_of':'7','other_parts':[{'question':'7(b)'}]}
+        state,prompt=self.generate([part,{'question':'8'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref],'exercise':'7(a)'})
+        self.assertEqual(state['tasks'][0]['exercise'],'7(a)')
+        self.assertIn('"exercise"',prompt)
+
+    def test_a_task_from_the_only_exercise_of_its_source_unit_takes_that_exercise(self):
+        state,_=self.generate([{'question':'7(a)','part_of':'7'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref]})
+        self.assertEqual(state['tasks'][0]['exercise'],'7(a)')
+
+    def test_an_ambiguous_or_self_created_task_names_no_exercise(self):
+        state,_=self.generate([{'question':'7(a)'},{'question':'8'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref]})
+        self.assertNotIn('exercise',state['tasks'][0])
+        state,_=self.generate([{'question':'7(a)'}],lambda ref:{'question':'Invent.','origin':'self_created','source_refs':[]})
+        self.assertNotIn('exercise',state['tasks'][0])
+
+    def test_naming_an_exercise_the_section_does_not_have_is_rejected(self):
+        state,_=self.generate([{'question':'7(a)'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref],'exercise':'9'})
+        self.assertEqual(state['tasks'],[])
+        self.assertIn('exercise',state['jobs'][0]['error'])

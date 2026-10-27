@@ -13,6 +13,7 @@ execute(root,{'op':'position.save','request_id':'setup','position':{'concept_id'
 class Runner:
  def run(self,prompt,cwd,emit,cancel):
   text='## Unit overview\n\nUnderstand interference through superposition of two paths.\n\nAdd **probability amplitudes**, then take the squared magnitude:\n\n$$\nP=|a+b|^2\n$$\n\n| Path | Amplitude |\n| --- | --- |\n| First | $a$ |\n\n[Source '+s['id']+' / line-2]\n\nEarlier records cite like this: [来源 '+s['id']+' / line-2]\n\n<img src=x onerror="window.pwned=true"><script>window.pwned=true</script>\n\n'+('\n\nThis is a complete lesson paragraph, preserving the reading position.'*60)
+  text+='\n<lesson-step>{"remaining": []}</lesson-step>' if 'This reply teaches step' in prompt else ''  # a one-step lesson
   emit({'kind':'delta','text':text});emit({'kind':'final','text':text});emit({'kind':'complete'})
 try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

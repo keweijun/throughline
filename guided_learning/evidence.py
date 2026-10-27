@@ -66,11 +66,22 @@ def view(store, request):
 OPERATIONS = {'evidence.record': record, 'evidence.view': view}
 
 
+PART_STATUSES = ('correct', 'partly_correct', 'not_yet', 'not_attempted')
+
+
 def assess(store, request):
     cid = concept(store, request)
     item = {key: required(request, key) for key in ('id', 'session_id', 'exercise_id', 'answer_id', 'assessment_id', 'outcome')}
     if item['outcome'] not in ('passed', 'needs_work'):
         raise OperationError('invalid_evidence', 'Outcome must be passed or needs_work')
+    # Optional statuses of the exercise's parts after this assessment (ADR 0011); the exercise passes exactly when every part is correct.
+    if 'parts' in request:
+        parts = request['parts']
+        if not isinstance(parts, list) or not parts or any(p not in PART_STATUSES for p in parts):
+            raise OperationError('invalid_evidence', 'parts must list a status for each part: ' + ', '.join(PART_STATUSES))
+        if (item['outcome'] == 'passed') != all(p == 'correct' for p in parts):
+            raise OperationError('invalid_evidence', 'Outcome is passed exactly when every part is correct')
+        item['parts'] = list(parts)
     answer = interaction(store, item['answer_id'], 'user', cid)
     assessment = interaction(store, item['assessment_id'], 'assistant', cid)
     if assessment['sequence'] <= answer['sequence']:

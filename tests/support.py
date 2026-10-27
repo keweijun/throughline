@@ -32,3 +32,15 @@ def host_client(workspace, runner=None, settings=None, port=8765):
     settings = settings or TeacherSettings(Path(tempfile.mkdtemp()) / 'settings.json')
     app = create_app(workspace, port=port, runner=runner, settings=settings)
     return TestClient(app, base_url=f'http://127.0.0.1:{port}'), app.state.host
+
+
+def settle(host, timeout=10):
+    """Wait until no model turn is running, including turns that completion hooks start: a turn is stored as completed
+    before its hooks run, so waiting on stored statuses alone can return between a lesson and the practice it starts."""
+    for _ in range(50):
+        workers = [thread for thread, _ in list(host.workers.values())]
+        if not workers and not any(t['status'] == 'running' for t in host.brief_turns()):
+            return
+        for thread in workers:
+            thread.join(timeout)
+    raise AssertionError('turns kept running')

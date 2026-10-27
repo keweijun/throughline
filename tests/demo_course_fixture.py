@@ -28,7 +28,7 @@ md_ref = {'source_id': md['id'], 'revision': md['revision'], 'unit_id': 'line-2'
 pdf_ref = {'source_id': pdf['id'], 'revision': pdf['revision'], 'unit_id': 'page-2'}
 exercise_ref = {'source_id': pdf['id'], 'revision': pdf['revision'], 'unit_id': 'page-3'}
 concepts = [
-    {'id': 'wave', 'title': 'Wave superposition', 'links': [md_ref, pdf_ref], 'exercises': [exercise_ref],
+    {'id': 'wave', 'title': 'Wave superposition', 'links': [md_ref, pdf_ref], 'exercises': [{**exercise_ref, 'required_concepts': ['wave']}],
      'overview': {'core_problem': 'Why do two paths sometimes cancel instead of adding up?',
                   'steps': ['Represent each path by a complex amplitude', 'Add amplitudes, not probabilities', 'Square the magnitude to get a probability'],
                   'prior': 'Builds on classical waves and complex numbers', 'next': 'leads into quantum states and measurement',
@@ -84,6 +84,8 @@ class Runner:
             text += piece
             emit({'kind': 'delta', 'text': piece})
             time.sleep(0.15)
+        if 'This reply teaches step' in prompt:
+            text += '\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

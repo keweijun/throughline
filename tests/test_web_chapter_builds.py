@@ -159,6 +159,56 @@ class ChapterBuilds(unittest.TestCase):
         self.assertTrue(build['discarded'])
         self.assertEqual([c['id'] for c in self.chapter('two')['concepts']], ['codex-made'])
 
+    def test_an_exercise_placed_before_what_it_needs_is_rejected_and_retried(self):
+        reply = json.loads(build_reply(self.ref))
+        reply['concepts'][0]['exercises'] = [{'question': '3(b)', **self.ref('line-3'), 'required_concepts': ['measure', 'evolution']}]
+        self.open(Runner([json.dumps(reply), build_reply(self.ref)]))
+        self.post('/api/chapters/two/build')
+        self.assertEqual(self.build('two')['status'], 'done')
+        first, second = self.runner.builds
+        self.assertIn('required_concepts', first)
+        self.assertIn('could not be saved', second)
+        self.assertIn('Exercise "3(b)"', second)
+        self.assertIn('"evolution"', second)
+
+    def test_a_course_with_misplaced_exercises_still_opens_teaches_and_builds(self):
+        from guided_learning.store import Store
+        store = Store(self.root)
+        with store.db:
+            model = store.get('curriculum', 'model')
+            model['concepts'][0]['exercises'] = [{'question': '1', **self.ref('line-1'), 'required_concepts': ['eigenvalues']}]
+            store.put('curriculum', 'model', model)
+        store.db.close()
+        self.assertEqual(len(execute(self.root, {'op': 'curriculum.check'})['violations']), 1)
+        self.open(Runner([build_reply(self.ref)]))
+        self.assertEqual(self.client.get('/api/state').status_code, 200)
+        turn = self.post('/api/lessons')['turn']
+        self.assertEqual(self.host.wait(turn['id'], 5)['status'], 'completed')
+        self.assertEqual(self.client.get('/api/state').json()['curriculum']['concepts'][0]['exercises'][0]['question'], '1')
+        # The app's build of the next chapter saves despite the violation it does not touch.
+        self.assertEqual(self.build('two')['status'], 'done')
+        self.assertEqual(len(execute(self.root, {'op': 'curriculum.check'})['violations']), 1)
+
+    def test_homework_parts_left_for_later_chapters_reach_their_builds(self):
+        execute(self.root, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [
+            {'id': 'state', 'title': 'What a state represents', 'links': [self.ref('line-1'), self.ref('line-2')],
+             'exercises': [{'question': '1(a)', **self.ref('line-2'), 'required_concepts': ['state'], 'part_of': '1',
+                            'other_parts': [{'question': '1(b)'}]}]}]})
+        self.open(Runner([build_reply(self.ref)]))
+        self.post('/api/chapters/two/build')
+        self.assertEqual(self.build('two')['status'], 'done')
+        data = lambda prompt: json.loads(next(line for line in prompt.split('\n') if line.startswith('{"course"')))
+        waiting = data(self.runner.builds[0])['waiting_parts']
+        self.assertEqual(waiting, [{'question': '1(b)', 'part_of': '1', **self.ref('line-2'), 'text': 'Amplitudes add',
+                                    'mapped_part': {'question': '1(a)', 'concept_id': 'state'}}])
+        execute(self.root, {'op': 'curriculum.chapter.save', 'chapter_id': 'two', 'concepts': [
+            {'id': 'measure', 'title': 'Possible outcomes', 'prerequisites': ['state'], 'links': [self.ref('line-3')],
+             'exercises': [{'question': '1(b)', **self.ref('line-2'), 'required_concepts': ['measure'], 'part_of': '1',
+                            'other_parts': [{'question': '1(a)', 'concept_id': 'state'}]}]}]})
+        self.post('/api/chapters/three/build')
+        self.build('three')
+        self.assertNotIn('waiting_parts', data(self.runner.builds[-1]))
+
     def test_studying_the_last_built_chapter_builds_the_next(self):
         self.open(Runner([build_reply(self.ref)]))
         turn = self.post('/api/lessons')['turn']

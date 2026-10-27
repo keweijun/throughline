@@ -5,10 +5,16 @@ export type Concept = {
   title: string;
   prerequisites?: string[];
   links?: Ref[];
-  exercises?: Ref[];
+  exercises?: CourseExercise[];
   objective?: string;
   goal?: string;
 };
+
+/**
+ * An original exercise mapped to a section. A part split from a homework question names the question (`part_of`) and
+ * its other parts, with the section teaching each; a part without `concept_id` waits for a chapter not built yet (ADR 0012).
+ */
+export type CourseExercise = Ref & { question?: string; part_of?: string; other_parts?: { question: string; concept_id?: string }[] };
 
 export type Coverage = Ref & {
   concept_ids?: string[];
@@ -32,6 +38,12 @@ export type Position = {
 
 export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'failed';
 
+/** A turn's channel, as `CHANNELS` in guided_learning/streaming.py: the learner's own requests, then background work. */
+export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build' | 'consolidation';
+
+/** Why an exercise was skipped, as practice.SKIP_REASONS (ADR 0011). */
+export type SkipReason = 'too_easy' | 'too_tedious' | 'not_relevant';
+
 export type Turn = {
   id: string;
   concept_id: string;
@@ -40,7 +52,7 @@ export type Turn = {
    * anchor for section-scoped records.
    */
   chapter_id?: string;
-  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build';
+  channel: Channel;
   prompt: string;
   status: TurnStatus;
   attempt: number;
@@ -55,6 +67,20 @@ export type Turn = {
   metrics: Record<string, number>;
   title?: string | null;
 };
+
+/** One step of a stepped lesson (ADR 0009); `turn_id` is set once the step is taught, `replied` once its plan block is read. */
+/** A step's check question (ADR 0009): never assessed and never evidence. `correct` indexes `options`. */
+export type CheckQuestion = { idea: string; question: string; options: { text: string; explanation: string }[]; correct: number };
+
+/** The learner's choice on a check question: an option's index or "unsure". */
+export type CheckChoice = number | 'unsure';
+
+export type CheckAnswer = { choice: CheckChoice; unsure: boolean; correct: boolean; interaction_id: string; answered_at: number };
+
+export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean; check?: CheckQuestion; answer?: CheckAnswer };
+
+/** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. */
+export type SteppedLesson = { id: string; concept_id: string; request: string; created_at: number; steps: LessonStep[] };
 
 export type Decision = {
   depth: 'short' | 'long';
@@ -87,18 +113,30 @@ export type Question = {
 
 export type EvidenceKind = 'independent' | 'retest_passed' | 'hinted' | 'needs_work';
 
+/** The status of an exercise part after an assessment (ADR 0011). */
+export type PartStatus = 'correct' | 'partly_correct' | 'not_yet' | 'not_attempted';
+
 export type PracticeHistory = {
   action: PracticeAction;
   feedback: string;
+  /** `passed` exactly when every part is correct. */
   outcome?: 'passed' | 'needs_work';
+  /** Each part's status after this assessment; an assessment from before parts has none. */
+  parts?: PartStatus[];
   kind?: EvidenceKind;
   answer?: string;
+  /** Names of images of the learner's work attached to the answer, served from /api/practice/images/{name}. */
+  images?: string[];
+  /** An ask: the learner's question, answered and never assessed (ADR 0011). */
+  question?: string;
 };
 
 export type Task = {
   id: string;
   concept_id: string;
   question: string;
+  /** What each exercise part asks, in order, optionally with a short label such as "(a)"; a task without parts is a single part (ADR 0011). */
+  parts?: (string | { label?: string; text: string })[];
   /**
    * `review` and `chapter_quiz` are retrieval questions (ADR 0008). A chapter quiz question belongs to its chapter
    * (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks an earlier exercise
@@ -109,16 +147,21 @@ export type Task = {
   chapter_id?: string;
   quiz_id?: string;
   from_task_id?: string;
+  /** The `question` of the section's course exercise the task uses, when it uses one. */
+  exercise?: string;
   created_at?: number;
   source_refs: Ref[];
-  status: 'pending' | 'attempted' | 'deferred';
+  status: 'pending' | 'attempted' | 'deferred' | 'skipped';
+  skip_reason?: SkipReason;
   history: PracticeHistory[];
 };
 
-export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess';
+export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess' | 'ask';
 
 export type PracticeJob = {
   answer?: string;
+  images?: string[];
+  question?: string;
   id: string;
   concept_id: string;
   action: 'generate' | PracticeAction;
@@ -192,11 +235,13 @@ export type State = {
   };
   deferred_explanations: DeferredExplanation[];
   turns: Turn[];
+  lessons: SteppedLesson[];
   questions: Question[];
   practice: { tasks: Task[]; jobs: PracticeJob[] };
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };
   settings: Settings;
   annotations: Annotation[];
+  memory: MemoryEntry[];
   skipped: Skipped[];
   builds: ChapterBuild[];
   review: ReviewState;
@@ -230,6 +275,21 @@ export type ReviewState = {
 export type AnnotationSource = Ref & { label?: string; page?: number };
 
 /** The learner's own highlight, note or bookmark. Never sent to the teacher. */
+/** A course memory entry (ADR 0010); a preference takes effect only once `confirmed`, a difficulty while `active`. */
+export type MemoryEntry = {
+  id: string;
+  kind: 'preference' | 'taught_term' | 'difficulty';
+  text: string;
+  status: 'suggested' | 'confirmed' | 'active' | 'cleared';
+  concept_id: string;
+  interaction_ids: string[];
+  /** Exercises skipped with the same reason, cited by a preference suggested from them (a skip has no interaction). */
+  skip_ids?: string[];
+  skip_reason?: SkipReason;
+  created_at: number;
+  updated_at: number;
+};
+
 export type Annotation = {
   id: string;
   kind: 'highlight' | 'note' | 'bookmark';

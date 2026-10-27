@@ -34,13 +34,22 @@ A request like `$throughline build the chapter "<title>" of the course <name>` c
   "prerequisites": [],
   "links": [{"source_id":"src-...","revision":"sha256...","unit_id":"page-3","detail":"Probability interpretation"}],
   "notations": [{"symbol":"psi","meaning":"Position representation of the state","source_id":"src-...","revision":"sha256...","unit_id":"page-3"}],
-  "exercises": [{"question":"7(a)","source_id":"src-...","revision":"sha256...","unit_id":"page-3"}]
+  "exercises": [{"question":"7(a)","source_id":"src-...","revision":"sha256...","unit_id":"page-3",
+                 "required_concepts":["wavefunction"],"part_of":"7","other_parts":[{"question":"7(b)","concept_id":"expectation-values"}]}]
 }
 ```
 
 Give every section a `core_question` (the one question the section answers, phrased as the learner would ask it) and an `objective` (what the learner can do afterwards, specific to this section). The app shows them as the section's goal and in "About this section", and the teacher builds the lesson around them; without them the app falls back to generic text. `overview` is optional: `core_problem`, `steps` (about three, each naming specific ideas), `prior`, `next` and `target_ability`, all strings except `steps`. Write these in the course's teaching language.
 
 Use stable concept IDs across edits. Merge duplicate concepts with multiple links, preserving incremental details, notation and exercise subquestions. Each link references an exact registered revision and extracted unit. The route contains every concept once with prerequisites first; unknown references and cycles are rejected atomically. Existing concept IDs remain present so earlier evidence can still refer to them.
+
+## Exercise placement
+
+An exercise part goes in the latest section among the concepts it requires, never earlier, so a lesson never has to teach ahead of the route. Give every exercise `required_concepts`: the IDs of all sections the part needs, its own section included. A save rejects an exercise it sends without a nonempty `required_concepts` (`invalid_request`); exercises stored earlier in concepts the save does not send may still lack it. A save is also rejected (`exercise_placement`, naming the exercise and the concept) when a required concept comes later in the route or is not in it; reordering chapters or moving a concept that would leave an exercise too early is rejected the same way. Deadlines do not change this: a learner who needs a part sooner can study the sections it needs, or ask a side question.
+
+Split homework by part. When the parts of a question need different sections, map each part (`7(a)`, `7(b)`) as its own exercise on the latest section it requires, with `part_of` naming the original question (`7`) and `other_parts` listing the other parts with the `concept_id` of the section that teaches each. When building chapter by chapter, a part that needs a chapter not built yet waits: list it in `other_parts` without `concept_id`, map it when you build that chapter, and then add its `concept_id` to the earlier part. The app's own chapter builds receive such waiting parts with their source text.
+
+`curriculum.check` reads the stored course and changes nothing. It returns `violations` (one per misplaced exercise: `concept_id`, `chapter_id`, `question`, its source reference, `later_concepts`, `unknown_concepts` and `move_to`, the latest required section already on the route), `exercises` (how many are mapped) and `without_required_concepts` (how many do not say what they need yet, which the check cannot judge; add it when you next save their chapter). Courses saved before this rule may hold violations; they still open and teach. Run the check before revising such a course, and fix the violations chapter by chapter: a save rejects violations in the concepts it sends and any it creates, but keeps earlier violations in concepts it does not send, so `curriculum.chapter.save` of one chapter succeeds while another chapter is still misplaced. `curriculum.save` sends every concept, so it needs the whole course fixed.
 
 ## Coverage
 
@@ -62,6 +71,7 @@ Changes to the relative order of existing concepts or chapters require the learn
 
 - `curriculum.view`: complete stored concepts, route, chapters and mapping model.
 - `curriculum.coverage`: live units, current source statuses and `stale_mappings`. New units are unmapped; units whose revision changed require review. Stored prior mappings remain available. Failed extraction overrides optimistic mapping status. `semantic_completeness` explicitly requires teacher review.
+- `curriculum.check`: exercise placement violations in the stored course (above); read-only.
 - `curriculum.context` with `concept_id`: selected concept, its `chapter` (with `index` and `total`, or null), direct prerequisite concepts, next concept ID, saved position and only the selected concept's linked source excerpts. Omitting the ID reads `course.position.concept_id`. Source excerpts carry `stale`; verify updated material before relying on an old excerpt.
 
 Before a source update, read the course status. Re-registering material recalculates coverage when queried and leaves learning evidence untouched. Update links and re-review mappings to the new revision; an old mapped revision cannot be submitted as current coverage. Check `curriculum.coverage` before describing a course as fully covered.

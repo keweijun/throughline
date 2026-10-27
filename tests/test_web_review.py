@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from guided_learning.api import execute
-from support import host_client
+from support import host_client, settle
 
 DAY = 86400
 
@@ -30,7 +30,7 @@ class Runner:
         elif 'Practice only' in prompt:
             text = json.dumps({'questions': [{'question': 'Normalize the state (1, 1).', 'origin': 'self_created', 'source_refs': []}]})
         else:
-            text = '## Lesson\n\nText.'
+            text = '## Lesson\n\nText.\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson leads to practice
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 
@@ -59,14 +59,7 @@ class ReviewFlow(unittest.TestCase):
         return self.client.get('/api/state').json()
 
     def settle(self):
-        """Wait until every model turn, including ones started by completion hooks, has finished."""
-        for _ in range(20):
-            running = [t for t in self.host.brief_turns() if t['status'] == 'running']
-            if not running:
-                return
-            for turn in running:
-                self.host.wait(turn['id'], 5)
-        self.fail('turns kept running')
+        settle(self.host)
 
     def answer(self, task_id, outcome='passed'):
         self.runner.outcome = outcome
@@ -183,6 +176,73 @@ class ReviewFlow(unittest.TestCase):
         self.assertEqual(len({t['quiz_id'] for t in self.state()['practice']['tasks'] if t['origin'] == 'chapter_quiz'}), 2,
                          'once every question is answered the quiz can be taken again')
 
+
+    def test_review_questions_have_parts(self):
+        reply = self.runner.run
+        def run(prompt, cwd, emit, cancel):
+            if 'Practice only (spaced review)' in prompt:
+                self.runner.prompts.append(prompt)
+                emit({'kind': 'final', 'text': json.dumps({'questions': [{'question': '1. Recall.\n2. Apply.', 'parts': ['Recall.', 'Apply.']}]})})
+                return emit({'kind': 'complete'})
+            if 'Question and help history' in prompt and '"parts": ["Recall.", "Apply."]' in prompt:
+                self.runner.prompts.append(prompt)
+                emit({'kind': 'final', 'text': json.dumps({'feedback': 'Part 1 right.', 'parts': [self.runner.part, 'not_attempted']})})
+                return emit({'kind': 'complete'})
+            return reply(prompt, cwd, emit, cancel)
+        self.runner.run = run
+        self.runner.part = 'correct'
+        self.study('a')
+        self.host.review.clock = lambda: time.time() + 2 * DAY
+        self.post('/api/review/start', {'concept_id': 'a'})
+        self.settle()
+        [task] = self.state()['review']['tasks']
+        self.assertIn('"parts"', next(p for p in self.runner.prompts if 'Practice only (spaced review)' in p))
+        self.assertEqual(task['parts'], ['Recall.', 'Apply.'])
+        self.answer(task['id'])
+        [task] = self.state()['review']['tasks']
+        self.assertEqual((task['history'][-1]['parts'], task['history'][-1]['outcome']), (['correct', 'not_attempted'], 'needs_work'))
+        self.assertEqual(self.client.get('/api/review').json()['sections'][0]['interval_days'], 1, 'the schedule reads outcome')
+
+    def test_answering_a_review_part_by_part_is_neither_a_pass_nor_a_miss_until_a_part_is_wrong(self):
+        reply = self.runner.run
+        def run(prompt, cwd, emit, cancel):
+            if 'Practice only (spaced review)' in prompt:
+                emit({'kind': 'final', 'text': json.dumps({'questions': [{'question': '1. Recall.\n2. Apply.', 'parts': ['Recall.', 'Apply.']}]})})
+                return emit({'kind': 'complete'})
+            if 'Question and help history' in prompt and '"parts": ["Recall.", "Apply."]' in prompt:
+                emit({'kind': 'final', 'text': json.dumps({'feedback': 'Checked.', 'parts': self.runner.parts})})
+                return emit({'kind': 'complete'})
+            return reply(prompt, cwd, emit, cancel)
+        self.runner.run = run
+        self.study('a')
+        now = time.time()
+
+        def review(after, parts):
+            nonlocal now
+            now += after
+            self.host.review.clock = lambda: now
+            self.post('/api/review/start', {'concept_id': 'a'})
+            self.settle()
+            task = next(t for t in self.state()['review']['tasks'] if not any(h['action'] == 'assess' for h in t['history']))
+            for statuses in parts:
+                self.runner.parts = statuses
+                self.answer(task['id'])
+            return task
+
+        def section():
+            return self.client.get('/api/review').json()['sections'][0]
+
+        review(2 * DAY, [['correct', 'correct']])
+        self.assertEqual(section()['interval_days'], 3)
+        task = review(4 * DAY, [['correct', 'not_attempted']])
+        self.assertEqual(section()['interval_days'], 3, 'one part answered correctly is not a failed review')
+        self.assertEqual(section()['task_id'], task['id'], 'the review stays open until it is passed or missed')
+        self.runner.parts = ['not_attempted', 'correct']
+        self.answer(task['id'])
+        self.assertEqual(section()['interval_days'], 7)
+        task = review(8 * DAY, [['correct', 'not_attempted'], ['not_attempted', 'not_yet']])
+        self.assertEqual(section()['interval_days'], 1, 'a real miss on a part starts the intervals over')
+        self.assertIsNone(section()['task_id'])
 
 if __name__ == '__main__':
     unittest.main()

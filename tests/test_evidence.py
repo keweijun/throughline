@@ -58,6 +58,22 @@ class EvidenceCLI(unittest.TestCase):
         self.assertEqual(self.call('evidence.view', concept_id='state')['status'], 'retest_passed')
         self.call('evidence.assess', id='reuse', session_id='s3', **later, error='invalid_evidence')
 
+    def test_part_statuses_are_stored_and_outcome_passes_exactly_when_every_part_is_correct(self):
+        self.say('answer', 'user', 'Part 1: the inner product.')
+        self.say('review', 'assistant', 'Part 1 is right.')
+        base = dict(concept_id='state', session_id='s1', exercise_id='q3', answer_id='answer', assessment_id='review')
+        self.call('evidence.assess', id='bad', **base, outcome='passed', parts=['correct', 'not_attempted'], error='invalid_evidence')
+        self.call('evidence.assess', id='bad', **base, outcome='needs_work', parts=['correct'], error='invalid_evidence')
+        self.call('evidence.assess', id='bad', **base, outcome='needs_work', parts=['right'], error='invalid_evidence')
+        self.call('evidence.assess', id='bad', **base, outcome='needs_work', parts=[], error='invalid_evidence')
+        result = self.call('evidence.assess', id='a1', **base, outcome='needs_work', parts=['correct', 'not_attempted'])
+        self.assertEqual((result['evidence']['parts'], result['evidence']['kind']), (['correct', 'not_attempted'], 'needs_work'))
+        self.say('answer2', 'user', 'Part 2: the norm.')
+        self.say('review2', 'assistant', 'Both parts are right now.')
+        result = self.call('evidence.assess', id='a2', **{**base, 'answer_id':'answer2', 'assessment_id':'review2'}, outcome='passed', parts=['correct', 'correct'])
+        self.assertEqual(result['evidence']['kind'], 'independent')
+        self.call('evidence.assess', id='a2', **{**base, 'answer_id':'answer2', 'assessment_id':'review2'}, outcome='passed', parts=['correct', 'correct', 'correct'], error='id_conflict')
+
     def test_skips_stay_unverified_and_only_revisit_at_target_or_recap(self):
         self.call('evidence.defer', id='skip', concept_id='state', reason='Continue now', target_concept_id='projection', section_id='section1')
         self.call('evidence.defer', id='skip', concept_id='state', reason='Continue now', target_concept_id='projection', section_id='section1')

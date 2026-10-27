@@ -2,7 +2,7 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { solved } from '../lib/format';
+  import { open } from '../lib/format';
   import Exercise from './Exercise.svelte';
 
   let { conceptId, isCurrent }: { conceptId: string; isCurrent: boolean } = $props();
@@ -12,7 +12,7 @@
   const practice = $derived(app.state?.practice ?? { tasks: [], jobs: [] });
   // The chapter quiz anchored to a last section is listed on the chapter page, not here.
   const tasks = $derived(app.tasks(conceptId));
-  const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !t.chapter_id && !solved(t)) : []);
+  const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !t.chapter_id && open(t)) : []);
   const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && app.isRunning(j.id)));
 
   const failed = $derived(practice.jobs.filter((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && j.error).at(-1));

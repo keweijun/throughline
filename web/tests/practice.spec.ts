@@ -27,6 +27,53 @@ test('deferred and unfinished exercises follow the learner into the next section
   await expect(page.locator('#practice article')).toHaveCount(4);
 });
 
+test('a skipped exercise is closed and does not follow the learner', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const exercises = page.locator('#practice article');
+  await expect(page.getByRole('region', { name: 'Next section' })).toContainText('3 exercises stay open');
+  await expect(exercises.nth(3).getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+
+  const first = exercises.first();
+  await first.getByRole('button', { name: 'Skip', exact: true }).click();
+  const reasons = first.getByRole('group', { name: 'Skip this exercise' });
+  await expect(reasons).toContainText('does not come back later');
+  await reasons.getByRole('button', { name: 'Cancel' }).click();
+  await expect(reasons).toHaveCount(0);
+
+  await first.getByRole('button', { name: 'Skip', exact: true }).click();
+  await reasons.getByRole('button', { name: 'Too easy' }).click();
+  await expect(first).toContainText('Skipped · Too easy');
+  await expect(first.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Next section' })).toContainText('2 exercises stay open');
+
+  await exercises.nth(1).getByRole('button', { name: 'Skip', exact: true }).click();
+  await exercises.nth(1).getByRole('button', { name: 'Skip without a reason' }).click();
+  await expect(exercises.nth(1).locator('header .chip')).toHaveText('Skipped');
+  await expect(page.getByRole('region', { name: 'Next section' })).toContainText('1 exercise stays open');
+
+  await page.getByRole('button', { name: 'Enter next section' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
+  await expect(page.getByText('Still open from earlier sections')).toContainText('(1)');
+});
+
+test('skipping two exercises for the same reason suggests a preference to confirm', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const exercises = page.locator('#practice article');
+  const banner = page.getByRole('status').filter({ hasText: 'Remember: Fewer long calculations?' });
+  for (const index of [0, 1]) {
+    await exercises.nth(index).getByRole('button', { name: 'Skip', exact: true }).click();
+    await exercises.nth(index).getByRole('button', { name: 'Too tedious' }).click();
+    await expect(exercises.nth(index)).toContainText('Skipped · Too tedious');
+    if (index === 0) await expect(banner).toHaveCount(0);
+  }
+  await expect(banner).toBeVisible();
+  await expect(page.locator('#toggle-memory .count')).toHaveText('1');
+  await banner.getByRole('button', { name: 'Remember', exact: true }).click();
+  await expect(banner).toBeHidden();
+  await page.locator('#toggle-memory').click();
+  await expect(page.locator('.memory-panel #memory-preference')).toContainText('Fewer long calculations');
+});
+
 test('a full solution asks for confirmation first', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const first = page.locator('#practice article').first();
@@ -115,7 +162,17 @@ test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ p
   await expect(task.locator('.submitted-answer')).toContainText('Second line');
 });
 
-test('an unsent answer survives looking at another section', async ({ page, course }) => {
+test('each part of a multi-part exercise shows on its own line', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const question = page.locator('#practice article').nth(1).locator('.question');
+  await expect(question.locator('li')).toHaveText(['State the rule.', /^Apply it to/]);
+  await expect(question.locator('li .katex')).toHaveCount(1);
+  // A single newline in the question is a line break.
+  await expect(question.locator('p br')).toHaveCount(1);
+  await expect(question.locator('p')).toContainText('Use the rule from the lesson.');
+});
+
+test('an unsent answer survives looking at another section',async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const box = page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' });
   await box.fill('Half-written reasoning');
@@ -126,4 +183,22 @@ test('an unsent answer survives looking at another section', async ({ page, cour
   // It also survives a reload of the tab.
   await page.reload();
   await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
+});
+
+test('asking about a solved exercise shows the answer and keeps it solved', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').nth(3);
+  await expect(task).toContainText('Solved independently');
+  await task.getByRole('textbox', { name: 'Exercise answer' }).fill('A draft answer');
+  await task.getByRole('button', { name: 'Ask about this' }).click();
+  await task.getByRole('textbox', { name: 'Question about this exercise' }).fill('What does it mean?');
+  await task.getByRole('button', { name: 'Ask', exact: true }).click();
+  const asked = task.locator('.history details').last();
+  await expect(asked.locator('.your-answer')).toContainText('What does it mean?');
+  await expect(asked.locator('.teacher-feedback')).toContainText("Teacher's answer");
+  await expect(asked.locator('.teacher-feedback')).toContainText('apply the rule to a new case');
+  await expect(task.locator('header .chip')).toHaveText('Solved independently');
+  await expect(task).not.toContainText('solved with help');
+  await expect(task.getByRole('textbox', { name: 'Question about this exercise' })).toHaveCount(0);
+  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('A draft answer');
 });

@@ -295,5 +295,71 @@ class CheckQuestions(SteppedLessons):
         self.assertEqual(self.post('/api/lessons/one/steps/nine/check', {'choice': 0}, 404)['code'], 'unknown_step')
 
 
+class CheckDifficulties(SteppedLessons):
+    """Repeated check misses on one idea become a difficulty in course memory (ADR 0010), with no model turn."""
+    PLAN = [{'title': 'Next'}, {'title': 'After'}, {'title': 'Later'}]
+
+    def answer(self, turn_id, idea, how):
+        self.runner.replies = [step_reply(turn_id, self.PLAN, check={**CHECK, 'idea': idea})]
+        self.post('/api/lessons', {'id': 'one'}) if turn_id == 'one' else self.post('/api/lessons/one/steps', {'id': turn_id})
+        self.finish(turn_id)
+        check = next(s for s in self.lesson()['steps'] if s.get('turn_id') == turn_id)['check']
+        wrong = next(i for i, o in enumerate(check['options']) if o['text'] == 'P = 1/2')
+        self.post(f'/api/lessons/one/steps/{turn_id}/check', {'choice': {'right': check['correct'], 'wrong': wrong, 'unsure': 'unsure'}[how]})
+
+    def difficulties(self):
+        return [e for e in self.state()['memory'] if e['kind'] == 'difficulty']
+
+    def test_two_misses_on_one_idea_create_a_difficulty_and_a_later_correct_check_clears_it(self):
+        self.answer('one', 'Amplitudes add before squaring', 'wrong')
+        self.assertEqual(self.difficulties(), [], 'one miss is not a difficulty')
+        self.assertIn("use that difficulty's idea as written", self.runner.prompts[0])
+        self.answer('two', 'Interference fringes', 'unsure')
+        self.assertEqual(self.difficulties(), [], 'misses on different ideas do not add up')
+        prompts = len(self.runner.prompts)
+        self.answer('three', '  amplitudes ADD before-squaring. ', 'unsure')
+        self.assertEqual(len(self.runner.prompts), prompts + 1, 'only the step itself was a model turn')
+        [difficulty] = self.difficulties()
+        self.assertEqual((difficulty['text'], difficulty['status'], difficulty['concept_id']), ('amplitudes ADD before-squaring.', 'active', 'wave'))
+        self.assertEqual(difficulty['interaction_ids'], ['check-answer:one', 'check-answer:three'])
+        self.assertEqual(execute(self.root, {'op': 'memory.prompt'})['memory']['difficulties'], [{'id': difficulty['id'], 'idea': difficulty['text']}])
+        self.assertEqual(execute(self.root, {'op': 'evidence.view', 'concept_id': 'wave'})['history'], [])
+
+        self.answer('four', 'Amplitudes add before squaring', 'right')
+        [cleared] = self.difficulties()
+        self.assertEqual((cleared['status'], cleared['cleared_by']), ('cleared', ['check-answer:four']))
+        self.assertEqual(cleared['interaction_ids'], ['check-answer:one', 'check-answer:three'])
+        self.assertNotIn('difficulties', execute(self.root, {'op': 'memory.prompt'})['memory'])
+
+    def test_a_later_miss_joins_the_difficulty_and_a_deleted_one_needs_two_new_misses(self):
+        self.answer('one', 'Amplitudes add before squaring', 'wrong')
+        self.answer('two', 'Amplitudes add before squaring', 'wrong')
+        self.answer('three', 'Amplitudes add before squaring', 'unsure')
+        [difficulty] = self.difficulties()
+        self.assertEqual(difficulty['interaction_ids'], ['check-answer:one', 'check-answer:two', 'check-answer:three'])
+        self.client.delete(f'/api/memory/{difficulty["id"]}')
+        self.answer('four', 'Amplitudes add before squaring', 'wrong')
+        self.assertEqual(self.difficulties(), [], 'a deleted difficulty is not brought back by the misses it cited')
+        self.answer('five', 'Amplitudes add before squaring', 'wrong')
+        [again] = self.difficulties()
+        self.assertEqual(again['interaction_ids'], ['check-answer:four', 'check-answer:five'])
+
+    def test_a_correct_answer_in_between_resets_the_count_and_clears_a_reworded_or_noted_difficulty(self):
+        self.answer('one', 'Amplitudes add before squaring', 'wrong')
+        self.answer('two', 'Amplitudes add before squaring', 'right')
+        self.answer('three', 'Amplitudes add before squaring', 'wrong')
+        self.assertEqual(self.difficulties(), [], 'a correct answer in between resets the count')
+        self.answer('four', 'Amplitudes add before squaring', 'wrong')
+        [difficulty] = self.difficulties()
+        self.assertEqual(difficulty['interaction_ids'], ['check-answer:three', 'check-answer:four'])
+        # The learner rewords it; checks on the idea still find it through the answers it cites.
+        self.client.put(f'/api/memory/{difficulty["id"]}', json={'text': 'Adding amplitudes'})
+        execute(self.root, {'op': 'memory.note', 'turn_id': 'x', 'concept_id': 'wave', 'interaction_ids': [],
+                            'note': {'entries': [{'kind': 'difficulty', 'text': 'Amplitudes add before squaring!'}]}})
+        self.assertEqual(len(self.difficulties()), 2)
+        self.answer('five', 'Amplitudes add before squaring', 'right')
+        self.assertEqual({e['status'] for e in self.difficulties()}, {'cleared'}, "the reworded and the teacher's entries both clear")
+
+
 if __name__ == '__main__':
     unittest.main()

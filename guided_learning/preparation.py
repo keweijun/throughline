@@ -12,8 +12,10 @@ def capture(store, cid):
     context = curriculum.context(store, {'concept_id': cid})
     context.pop('position', None)
     language = preferences(store,{})['preferences']['language']
-    data = {'context': context, 'curriculum': curriculum.view(store, {}), 'language': language,
-            'sources': store.list('sources')}
+    # Only what this section's preparation depends on: its own context (section, chapter, prerequisites and the exact
+    # source revisions it teaches from), the learner profile and the teaching language. Edits elsewhere in the course,
+    # such as another chapter being built, leave it valid.
+    data = {'context': context, 'profile': store.get('course', 'profile'), 'language': language}
     return {'fingerprint': hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False).encode()).hexdigest(), 'context':context, 'language':language}
 
 

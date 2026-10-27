@@ -78,6 +78,23 @@ def _part(p):
     return (isinstance(p,dict) and not set(p)-{'label','text'} and isinstance(p.get('text'),str) and bool(p['text'].strip())
             and ('label' not in p or isinstance(p['label'],str) and 0<len(p['label'].strip())<=MAX_PART_LABEL))
 
+# Subquestion markers in an exercise written before exercises carried parts: （1） or （a） anywhere; (1) or (a) at a line
+# start or after whitespace or punctuation, so that f(1) is not one; or "1." at a line start.
+PART_MARK=re.compile(r'（(\d{1,2}|[a-h])）|(?:(?<=[\s。；;，,：:])|^)\((\d{1,2}|[a-h])\)|^[ \t]*(\d{1,2})[.、][ \t]',re.M)
+
+def infer_parts(question):
+    """The parts of a question that numbers its subquestions (1, 2, 3, ... or a, b, c, ...), else None."""
+    marks=list(PART_MARK.finditer(question))
+    keys=[m.group(1) or m.group(2) or m.group(3) for m in marks]
+    expected=[str(i+1) for i in range(len(keys))] if keys and keys[0]=='1' else [chr(97+i) for i in range(len(keys))]
+    if len(keys)<2 or keys!=expected: return None
+    parts=[]
+    for i,m in enumerate(marks):
+        text=question[m.end():marks[i+1].start() if i+1<len(marks) else len(question)].strip()
+        if not text: return None
+        parts.append({'label':m.group(0).strip(),'text':text[:200]})
+    return parts
+
 def _check_parts(q):
     if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or not all(_part(p) for p in q['parts'])):
         raise FormatError(f'parts must list each part as nonempty text or {{label, text}} with a label of at most {MAX_PART_LABEL} characters')
@@ -118,6 +135,10 @@ def job(store, request):
     if value.get('task_id') and not store.get('practice_tasks',value['task_id']):
         raise OperationError('unknown_exercise','Unknown exercise')
     if value['action']=='assess':
+        task=store.get('practice_tasks',value['task_id'])
+        # An exercise from before parts is assessed by the subquestions its text numbers, from its next answer on.
+        if 'parts' not in task and (inferred:=infer_parts(task['question'])):
+            store.put('practice_tasks',task['id'],{**task,'parts':inferred})
         answer=teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],
                                                   'text':value['answer'] if value['answer'].strip() else IMAGE_ANSWER})['interaction']
         if value.get('images'): store.put('interactions',answer['id'],{**answer,'images':value['images']})

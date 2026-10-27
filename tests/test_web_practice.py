@@ -177,7 +177,7 @@ class AskFlow(unittest.TestCase):
                 runner.reply=text;t=app.wait(start()['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
                 return app.practice.state()
             tid=run(lambda:app.practice.generate('a'),'{"questions":[{"question":"1. State it.\\n2. Apply it.","origin":"self_created","source_refs":[]}]}')['tasks'][0]['id']
-            run(lambda:app.practice.act(tid,'assess','Both parts.'),'{"feedback":"Correct.","outcome":"passed"}')
+            run(lambda:app.practice.act(tid,'assess','Both parts.'),'{"feedback":"Correct.","parts":["correct","correct"]}')
             evidence=execute(path,{'op':'evidence.view','concept_id':'a'})['history']
             state=run(lambda:app.practice.act(tid,'ask',question='What does part 2 mean by apply?'),'{"feedback":"Use the rule on a new case."}')
             self.assertIn('What does part 2 mean by apply?',runner.prompts[-1])
@@ -265,6 +265,24 @@ class PartsFlow(unittest.TestCase):
         last=state['tasks'][0]['history'][-1]
         self.assertEqual((last['outcome'],last['kind']),('passed','independent'))
         self.assertTrue(execute(self.path,{'op':'evidence.view','concept_id':'a'})['independently_verified'])
+
+    def test_an_exercise_from_before_parts_is_assessed_by_its_numbered_subquestions(self):
+        task=self.run_job(lambda:self.app.practice.generate('a'),json.dumps({'questions':[{'question':'Setup.\n（1）State it.\n（2）Apply it.\n（3）Check it.','origin':'self_created','source_refs':[]}]}))['tasks'][0]
+        self.assertNotIn('parts',task,'generated as an old exercise would have been')
+        from guided_learning.store import Store
+        store=Store(self.path)  # saved before parts: no parts, and an earlier answer assessed as a whole
+        with store.db:
+            saved=store.get('practice_tasks',task['id'])
+            saved['history']=[{'action':'assess','feedback':'Part 1 right; 2 and 3 open.','outcome':'needs_work','kind':'needs_work','answer':'Part 1.'}]
+            store.put('practice_tasks',task['id'],saved)
+        store.db.close()
+        state=self.assess(task['id'],'Part 2.',['correct','correct','not_attempted'])
+        task=state['tasks'][0]
+        self.assertEqual([p['label'] for p in task['parts']],['（1）','（2）','（3）'])
+        self.assertEqual(task['history'][-1]['parts'],['correct','correct','not_attempted'])
+        prompt=self.runner.prompts[-1]
+        self.assertIn('exactly 3 part statuses',prompt)
+        self.assertIn('earlier ones included',prompt,'parts answered before the exercise had parts can still count')
 
     def test_part_statuses_must_match_the_parts(self):
         task=self.generate(['State it.','Apply it.','Check it.'])

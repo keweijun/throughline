@@ -194,6 +194,9 @@ def practice_feedback(action, task, sources, answer, images=0):
         count = len(task.get('parts') or [None])
         reply = ('{"feedback":"Markdown explanation","parts":["correct, partly_correct, not_yet or not_attempted"]} '
                  f'with exactly {count} part status{"es" if count > 1 else ""}, in the order of the parts. ')
+        if count > 1 and any(h.get('action') == 'assess' and not h.get('parts') for h in task.get('history', [])):
+            reply += ('Earlier answers in the history were assessed before this exercise had parts: give each part the status '
+                      'the learner\'s answers so far, earlier ones included, have earned; not_attempted only for a part no answer has addressed. ')
     else:
         reply = '{"feedback":"Markdown explanation"}. '
     return ('Practice only: return JSON ' + reply

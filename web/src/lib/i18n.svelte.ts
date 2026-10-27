@@ -525,6 +525,10 @@ const messages = {
   "Quiz question {number}": "测验题 {number}",
   "earlier exercise from {section}": "来自“{section}”的旧练习",
   "Chapter recap and quiz": "本章回顾与测验",
+  "{part}, a part of {question}": "{part}，属于 {question}",
+  "Other parts": "其他小题",
+  "taught in": "讲授于",
+  "waiting for a later chapter": "等待后续章节",
 } as const;
 export type MessageKey
  = keyof typeof messages;

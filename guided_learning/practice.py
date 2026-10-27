@@ -154,7 +154,14 @@ def _parse(store, value, text):
                 for ref in refs:
                     try: curriculum.source_unit(store,ref)
                     except OperationError as exc: raise FormatError(str(exc)) from exc
-                    if not any(all(ref.get(k)==a.get(k) for k in ('source_id','revision','unit_id')) for a in allowed): raise FormatError('Unrelated question source')
+                    if not any(_same_unit(ref,a) for a in allowed): raise FormatError('Unrelated question source')
+                exercises=context['concept'].get('exercises',[])
+                if 'exercise' in q:
+                    if q['origin']!='source' or not any(e.get('question')==q['exercise'] for e in exercises): raise FormatError('exercise must name one of the section\'s exercises')
+                else:
+                    # A task from the only exercise of its source unit uses that exercise.
+                    used=[e for e in exercises if any(_same_unit(ref,e) for ref in refs)]
+                    if q['origin']=='source' and len(used)==1 and isinstance(used[0].get('question'),str): q['exercise']=used[0]['question']
         else:
             if not isinstance(result.get('feedback'),str) or not result['feedback'].strip(): raise FormatError('feedback must be nonempty text')
             if value['action']=='assess':
@@ -170,6 +177,9 @@ def _parse(store, value, text):
         return result
     except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as exc:
         raise FormatError(str(exc)) from exc
+
+def _same_unit(ref, other):
+    return all(ref.get(k)==other.get(k) for k in ('source_id','revision','unit_id'))
 
 def complete(store, request):
     value=store.get('practice_jobs',teaching.require_text(request,'id'))
@@ -191,6 +201,7 @@ def complete(store, request):
             task={'id':value['id']+':'+str(index),'concept_id':value['concept_id'],'question':q['question'],'origin':value.get('purpose') or q['origin'],
                   'source_refs':[] if value.get('purpose') else q.get('source_refs',[]),'status':'pending','history':[]}
             if 'parts' in q: task['parts']=q['parts']
+            if not value.get('purpose') and 'exercise' in q: task['exercise']=q['exercise']
             store.put('practice_tasks',task['id'],task)
     else:
         task=store.get('practice_tasks',value['task_id'])

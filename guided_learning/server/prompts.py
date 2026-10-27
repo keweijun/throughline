@@ -144,12 +144,12 @@ PART_FIELD = '"parts":["What each part asks"]'
 
 
 def practice_generate(sources):
-    return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"origin":"source or self_created","source_refs":[]}]}. '
+    return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"origin":"source or self_created","source_refs":[],"exercise":"question of the original exercise used"}]}. '
             'Select 1 to 2 questions for the current goal. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
             'If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. '
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
             'Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. '
-            'Use source_id/revision/unit_id in source_refs. Original exercise materials: ' + json.dumps(sources, ensure_ascii=False))
+            'Use source_id/revision/unit_id in source_refs. For an original exercise, set exercise to its question exactly as listed; omit exercise for a self_created one. Original exercise materials: ' + json.dumps(sources, ensure_ascii=False))
 
 
 RETRIEVAL = ('Each question asks the learner to recall a key idea from memory and apply it to a new situation. '

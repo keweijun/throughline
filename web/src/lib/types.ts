@@ -5,10 +5,16 @@ export type Concept = {
   title: string;
   prerequisites?: string[];
   links?: Ref[];
-  exercises?: Ref[];
+  exercises?: CourseExercise[];
   objective?: string;
   goal?: string;
 };
+
+/**
+ * An original exercise mapped to a section. A part split from a homework question names the question (`part_of`) and
+ * its other parts, with the section teaching each; a part without `concept_id` waits for a chapter not built yet (ADR 0012).
+ */
+export type CourseExercise = Ref & { question?: string; part_of?: string; other_parts?: { question: string; concept_id?: string }[] };
 
 export type Coverage = Ref & {
   concept_ids?: string[];
@@ -135,6 +141,8 @@ export type Task = {
   chapter_id?: string;
   quiz_id?: string;
   from_task_id?: string;
+  /** The `question` of the section's course exercise the task uses, when it uses one. */
+  exercise?: string;
   created_at?: number;
   source_refs: Ref[];
   status: 'pending' | 'attempted' | 'deferred' | 'skipped';

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { modEnterToSend, sendKeys } from '../lib/keys';
-  import { locale, t, diagnostic } from '../lib/i18n.svelte';
+  import { locale, t, diagnostic, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
@@ -25,6 +25,7 @@
   let asking = $state(false);
   let busy = $state(false);
   let confirmSolution = $state(false);
+  let confirmSkip = $state(false);
   let preview = $state('');
 
   $effect(() => {
@@ -43,10 +44,14 @@
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
   const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
+  // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
+  const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
+  const skipReasons: Record<string, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
   const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
 
   const status = $derived.by(() => {
     if (task.status === 'deferred') return { label: t('Saved for later'), tone: 'caution' };
+    if (task.status === 'skipped') return { label: task.skip_reason ? t('Skipped · {reason}', { reason: t(skipReasons[task.skip_reason]) }) : t('Skipped'), tone: 'plain' };
     if (lastAssessment?.kind) {
       const tone = lastAssessment.kind === 'needs_work' ? 'caution' : lastAssessment.kind === 'independent' || lastAssessment.kind === 'retest_passed' ? 'good' : 'accent';
       return { label: evidenceLabel(lastAssessment.kind), tone };
@@ -54,14 +59,15 @@
     return null;
   });
 
-  async function act(action: string) {
+  async function act(action: string, body: { reason?: string } = {}) {
     if (busy) return;
     busy = true;
     confirmSolution = false;
+    confirmSkip = false;
     const submitted = answer;
     const key = draftKey;
     const result = await app.act(() =>
-      api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, action === 'assess' ? { answer: submitted } : {}),
+      api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, action === 'assess' ? { answer: submitted } : body),
     );
     busy = false;
     // Keep anything typed while the answer was being sent.
@@ -195,10 +201,13 @@
       <span class="help">
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (confirmSolution = true)}>{t("Full solution")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSolution = true), (confirmSkip = false))}>{t("Full solution")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
         {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
+        {/if}
+        {#if skippable}
+          <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSkip = true), (confirmSolution = false))}>{t("Skip")}</button>
         {/if}
       </span>
     </div>
@@ -208,6 +217,17 @@
         <div>
           <button class="btn btn-small" onclick={() => act('solution')}>{t("Show the solution")}</button>
           <button class="btn btn-quiet btn-small" onclick={() => (confirmSolution = false)}>{t("Keep trying")}</button>
+        </div>
+      </div>
+    {:else if confirmSkip}
+      <div class="confirm" role="group" aria-label={t("Skip this exercise")}>
+        <p>{t("A skipped exercise is closed: it is not counted as open and does not come back later. Why skip it?")}</p>
+        <div>
+          {#each Object.entries(skipReasons) as [reason, label]}
+            <button class="btn btn-small" onclick={() => act('skip', { reason })}>{t(label)}</button>
+          {/each}
+          <button class="btn btn-small" onclick={() => act('skip')}>{t("Skip without a reason")}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => (confirmSkip = false)}>{t("Cancel")}</button>
         </div>
       </div>
     {:else if helped && !solved}
@@ -373,6 +393,7 @@
 
   .confirm div {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.4rem;
   }
 

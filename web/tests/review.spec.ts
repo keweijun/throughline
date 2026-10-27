@@ -20,6 +20,7 @@ test('due sections are reviewed from memory with a fresh question, or put off a 
   const question = item.getByRole('article', { name: 'Review question' });
   await expect(question).toContainText('multiplied by');
   await expect(question.getByRole('button', { name: 'Do later' }), 'Not now replaces Do later for reviews').toHaveCount(0);
+  await expect(question.getByRole('button', { name: 'Skip', exact: true }), 'a review question is not skipped').toHaveCount(0);
   await question.getByRole('textbox', { name: 'Exercise answer' }).fill('No: a global phase cancels in every probability.');
   await question.getByRole('button', { name: 'Check my answer' }).click();
 
@@ -57,6 +58,7 @@ test('the last section leads to the chapter quiz, which asks an earlier exercise
   await expect(quiz).toContainText('0 of 3 answered, 0 passed');
   await expect(quiz.getByRole('button', { name: 'Take the quiz again' }), 'a new quiz waits until this one is answered').toHaveCount(0);
   await expect(questions.first().getByRole('button', { name: 'Do later' })).toHaveCount(0);
+  await expect(questions.first().getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
 
   await questions.first().getByRole('textbox', { name: 'Exercise answer' }).fill('Divide each amplitude by the norm.');
   await questions.first().getByRole('button', { name: 'Check my answer' }).click();

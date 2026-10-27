@@ -3,7 +3,7 @@
   import { onMount, untrack } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { solved } from '../lib/format';
+  import { open as isOpen } from '../lib/format';
   import type { Preview } from '../lib/types';
   import UnitOverview from './UnitOverview.svelte';
   import Lesson from './Lesson.svelte';
@@ -44,7 +44,7 @@
       return lessons.length ? t("Regenerate the unfinished lesson, or start a new one.") : t("Start the lesson for this section.");
     const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
     if (generating) return t("Exercises are being prepared from this lesson.");
-    const open = app.tasks(conceptId).filter((task) => !solved(task)).length;
+    const open = app.tasks(conceptId).filter(isOpen).length;
     const last = index === total - 1;
     if (open === 1) return last ? t("Try the open exercise below.") : t("Try the open exercise below, or enter the next section.");
     if (open) return last ? t("Try the {count} open exercises below.", { count: open }) : t("Try the {count} open exercises below, or enter the next section.", { count: open });

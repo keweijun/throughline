@@ -350,7 +350,7 @@ class Questions(Feature):
 
 
 class Practice(Feature):
-    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer')
+    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer', 'skip')
 
     def state(self):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
@@ -399,7 +399,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None, question=None):
+    def act(self, task_id, action, answer=None, question=None, reason=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -409,8 +409,11 @@ class Practice(Feature):
             raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
         if action == 'defer' and task['origin'] == 'chapter_quiz':
             raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
-        if action == 'defer':
+        if action == 'skip' and task['origin'] in RETRIEVAL_ORIGINS:
+            raise OperationError('invalid_action', 'Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+        if action in ('defer', 'skip'):
             with self.host.lock:
+                # Setting the exercise aside cancels a request still running for it, so no late assessment reopens it.
                 for job in self.state()['jobs']:
                     if job.get('task_id') == task['id'] and not job.get('processed'):
                         try:
@@ -418,7 +421,10 @@ class Practice(Feature):
                         except OperationError as exc:
                             if exc.code != 'unknown_turn':
                                 raise
-                result = self.operation({'op': 'practice.defer', 'id': task['id']})
+                request = {'op': 'practice.' + action, 'id': task['id']}
+                if action == 'skip' and reason is not None:
+                    request['reason'] = reason
+                result = self.operation(request)
                 self.host.changed()
                 return result
         return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None,

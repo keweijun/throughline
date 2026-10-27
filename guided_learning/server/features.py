@@ -580,7 +580,7 @@ class Memory(Feature):
             job = self._job(turn)
             if not job or job['action'] == 'generate' or job.get('error'):
                 return
-            own = ['practice-answer:' + job['id'], 'practice-feedback:' + job['id']]
+            own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:')]
             raw = (turn['final_text'] or '').strip()
             if raw.startswith('```'):
                 raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]

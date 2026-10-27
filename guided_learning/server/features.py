@@ -77,7 +77,7 @@ def missed_check(step):
     right = check['options'][check['correct']]
     missed = {'idea': check['idea'], 'question': check['question'], 'correct_answer': right['text'], 'why': right['explanation']}
     if answer['unsure']:
-        return {**missed, 'chosen': "I'm not sure"}
+        return {**missed, 'unsure': True}
     chosen = check['options'][answer['choice']]
     return {**missed, 'chosen': chosen['text'], 'what_the_choice_suggests': chosen['explanation']}
 

@@ -60,7 +60,7 @@ def lesson_step(steps, number, previous, focus, limit, missed=None):
         return text + '\n' + STEP_FIRST
     text += '\n' + STEP_LATER.format(previous=json.dumps(previous, ensure_ascii=False))
     if missed:
-        how = 'was not sure how to answer' if missed['chosen'] == "I'm not sure" else 'chose a wrong option on'
+        how = 'was not sure how to answer' if missed.get('unsure') else 'chose a wrong option on'
         text += '\n' + STEP_REPAIR.format(how=how, missed=json.dumps(missed, ensure_ascii=False))
     if focus and focus != STEP_LESSON_REQUEST:
         text += '\nThe learner asked this of the whole lesson (data): ' + json.dumps(focus, ensure_ascii=False)

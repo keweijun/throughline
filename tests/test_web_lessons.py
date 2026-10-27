@@ -275,7 +275,7 @@ class CheckQuestions(SteppedLessons):
         self.runner.replies = [step_reply('Two.', [{'title': 'Three'}], check=CHECK)]
         self.post('/api/lessons/one/steps', {'id': 'two'})
         self.finish('two')
-        self.assertIn('not sure', self.runner.prompts[1].split('Lesson plan (data)')[1])
+        self.assertIn('was not sure how to answer', self.runner.prompts[1])
         check = self.lesson()['steps'][1]['check']
         self.assertTrue(self.post('/api/lessons/one/steps/two/check', {'choice': check['correct']})['answer']['correct'])
         self.post('/api/lessons/one/steps', {'id': 'three'})

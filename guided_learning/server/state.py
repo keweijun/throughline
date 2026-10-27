@@ -76,7 +76,7 @@ def _practice(host):
 
 
 def _preparation(host):
-    view = host.preparation.state()
+    view = host.operation({'op': 'preparation.view', 'brief': True})
     return {'jobs': [_pick(j, JOB) for j in view['jobs']], 'next_concept_id': view['next_concept_id']}
 
 

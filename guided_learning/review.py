@@ -10,6 +10,7 @@ ordinary exercise passed later restarts the wait at the same step. Sections skip
 import time
 from datetime import datetime
 
+from . import curriculum
 from .store import OperationError
 
 DAY = 86400
@@ -89,8 +90,7 @@ def open_reviews(store):
 
 def schedule(store, request):
     now = _now(request)
-    model = store.get('curriculum', 'model', {})
-    route = set(model.get('route', []))
+    route = set(curriculum.model(store)['route'])
     states = section_states(assessments(store))
     excluded = skipped(store)
     postponed = {p['concept_id']: p['at'] for p in store.list('review_postponements')}

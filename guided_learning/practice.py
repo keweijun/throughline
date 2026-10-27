@@ -6,7 +6,7 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
-from . import curriculum, evidence, memory, review, teaching
+from . import curriculum, evidence, memory, review, streaming, teaching
 from .store import OperationError
 
 def listing(store, request):
@@ -278,7 +278,7 @@ def quiz_sections(store, chapter):
 def studied_sections(store):
     """Sections with a completed lesson of their own (a chapter recap is not one) or any learning evidence, such as
     sections taught in Codex chat before the app."""
-    return ({t['concept_id'] for t in store.list('streams') if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
+    return ({t['concept_id'] for t in store.digest('streams',streaming.brief) if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
             | {e['concept_id'] for e in store.list('evidence')})
 
 def quiz_tier(task):

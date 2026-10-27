@@ -1,7 +1,6 @@
 """Durable model delivery state; partial text never becomes teaching evidence."""
-import json
-import sqlite3
 import time
+from copy import deepcopy
 from .store import OperationError
 from . import curriculum
 from .teaching import resume as session_resume
@@ -40,7 +39,7 @@ def start(store, request):
     if 'chapter_id' in request:
         # A turn owned by a chapter (its recap) is shown on the chapter page; concept_id stays the chapter's last
         # section, the anchor for the section-scoped records every turn has (ADR 0006).
-        chapter = next((c for c in curriculum.view(store,{})['chapters'] if c['id'] == request['chapter_id']), None)
+        chapter = next((c for c in curriculum.model(store)['chapters'] if c['id'] == request['chapter_id']), None)
         if not chapter or chapter['concept_ids'][-1:] != [concept]:
             raise OperationError('invalid_request','A chapter turn is anchored to the last section of its chapter')
         identity['chapter_id'] = chapter['id']
@@ -59,13 +58,13 @@ def start(store, request):
             exact = {k:ref[k] for k in ('source_id','revision','unit_id')}
             if exact not in source_refs: source_refs.append(exact)
     context['sources'] = [{**ref, **curriculum.source_unit(store,ref), 'stale':curriculum.is_stale(store,ref)} for ref in source_refs]
-    model = curriculum.view(store,{})
-    route = [{k:c[k] for k in ('id','title','prerequisites') if k in c}
-             for cid in model['route'] for c in model['concepts'] if c['id']==cid]
+    model = curriculum.model(store)
+    concepts = {c['id']:c for c in model['concepts']}
+    route = deepcopy([{k:concepts[cid][k] for k in ('id','title','prerequisites') if k in concepts[cid]} for cid in model['route'] if cid in concepts])
     session = session_resume(store,{})
     session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
     snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
-    if model['chapters']: snapshot['chapters'] = [{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']]
+    if model['chapters']: snapshot['chapters'] = deepcopy([{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']])
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile
     memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
@@ -183,24 +182,16 @@ def summarize(turn):
 
 
 BRIEF_DROP = ('prompt_snapshot', 'resume_requests', 'attempts', 'text', 'final_text', 'metrics', 'source_refs', 'prompt')
-# SQLite trims the frozen snapshots, so polling never decodes them in Python.
-SUMMARY_SQL = '''SELECT json_set(json_remove(d.value, '$.prompt_snapshot', '$.resume_requests', '$.attempts'),
-    '$.title', json_extract(d.value, '$.prompt_snapshot.context.concept.title'),
-    '$.attempts', json((SELECT json_group_array(json_object('attempt', json_extract(a.value, '$.attempt'),
-        'text', json_extract(a.value, '$.text'), 'status', json_extract(a.value, '$.status'))) FROM json_each(d.value, '$.attempts') a)))
-    FROM documents d WHERE namespace = 'streams' '''
-BRIEF_SQL = "SELECT json_remove(value, " + ', '.join(f"'$.{k}'" for k in BRIEF_DROP) + ") FROM documents WHERE namespace = 'streams'"
+
+
+def brief(turn):
+    return {k: v for k, v in turn.items() if k not in BRIEF_DROP}
 
 
 def summaries(store, request):
-    """Turns as the interface shows them, oldest first. `brief` keeps only identity, channel, section and status."""
-    brief = request.get('brief') is True
-    try:
-        turns = [json.loads(row[0]) for row in store.db.execute(BRIEF_SQL if brief else SUMMARY_SQL)]
-    except sqlite3.OperationalError:  # SQLite built without JSON functions
-        turns = [summarize(t) for t in store.list('streams')]
-        if brief:
-            turns = [{k: v for k, v in t.items() if k not in BRIEF_DROP and k != 'title'} for t in turns]
+    """Turns as the interface shows them, oldest first. `brief` keeps only identity, channel, section and status.
+    Only turns changed since the last listing are decoded (`Store.digest`)."""
+    turns = store.digest('streams', brief if request.get('brief') is True else summarize)
     return {'turns': sorted(turns, key=lambda t: t['started_at'])}
 
 OPERATIONS['stream.summaries'] = summaries

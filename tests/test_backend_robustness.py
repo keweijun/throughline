@@ -184,11 +184,38 @@ class TurnListing(unittest.TestCase):
             self.assertEqual({k: brief[k] for k in ('id', 'channel', 'status', 'concept_id', 'attempt', 'record_user')},
                              {'id': 't', 'channel': 'mainline', 'status': 'running', 'concept_id': 'a', 'attempt': 2, 'record_user': True})
             self.assertFalse({'prompt_snapshot', 'attempts', 'text', 'final_text'} & set(brief))
-            # SQLite builds without JSON functions get the same answer from Python.
-            with mock.patch('guided_learning.streaming.SUMMARY_SQL', 'SELECT no_such_function()'), \
-                    mock.patch('guided_learning.streaming.BRIEF_SQL', 'SELECT no_such_function()'):
-                self.assertEqual(execute(path, {'op': 'stream.summaries'})['turns'], summaries)
-                self.assertEqual(execute(path, {'op': 'stream.summaries', 'brief': True})['turns'], [brief])
+
+    def test_listings_follow_every_change_and_hand_out_fresh_objects(self):
+        """Listings and the curriculum are decoded once until their documents change (issue #68); what an operation
+        returns is the caller's own."""
+        import sqlite3
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            execute(path, {'op': 'stream.start', 'id': 't', 'concept_id': 'a', 'prompt': 'Teach'})
+            [summary] = execute(path, {'op': 'stream.summaries'})['turns']
+            summary['attempts'].append('mutated')
+            summary['title'] = 'mutated'
+            execute(path, {'op': 'stream.event', 'id': 't', 'attempt': 1, 'sequence': 1, 'kind': 'delta', 'text': 'Hi'})
+            [summary] = execute(path, {'op': 'stream.summaries'})['turns']
+            self.assertEqual((summary['text'], summary['title'], summary['attempts']), ('Hi', 'A', []))
+            [brief] = execute(path, {'op': 'stream.summaries', 'brief': True})['turns']
+            self.assertEqual(brief['sequence'], 1)
+            execute(path, {'op': 'stream.start', 'id': 'u', 'concept_id': 'b', 'prompt': 'Next'})
+            self.assertEqual([t['id'] for t in execute(path, {'op': 'stream.summaries', 'brief': True})['turns']], ['t', 'u'])
+
+            context = execute(path, {'op': 'curriculum.context', 'concept_id': 'b'})
+            context['concept']['title'] = 'mutated'
+            context['prerequisites'].append('mutated')
+            self.assertEqual(execute(path, {'op': 'curriculum.context', 'concept_id': 'b'})['concept']['title'], 'B')
+            # Another process (Codex building the course, say) changes the plan behind this one's back.
+            db = sqlite3.connect(Path(path) / 'course.sqlite3')
+            with db:
+                model = json.loads(db.execute("SELECT value FROM documents WHERE namespace='curriculum'").fetchone()[0])
+                model['concepts'][1]['title'] = 'Renamed'
+                db.execute("UPDATE documents SET value=? WHERE namespace='curriculum'", (json.dumps(model),))
+            db.close()
+            self.assertEqual(execute(path, {'op': 'curriculum.context', 'concept_id': 'b'})['concept']['title'], 'Renamed')
+            self.assertEqual(execute(path, {'op': 'stream.start', 'id': 'v', 'concept_id': 'b', 'prompt': 'Again'})['turn']['prompt_snapshot']['route'][1]['title'], 'Renamed')
 
 
 class CourseCreation(unittest.TestCase):

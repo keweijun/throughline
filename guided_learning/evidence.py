@@ -1,5 +1,6 @@
 """Evidence records preserve provenance; judgments are supplied by the teacher."""
 import time
+from . import curriculum
 from .store import OperationError
 
 
@@ -12,7 +13,7 @@ def required(request, key):
 
 def concept(store, request):
     cid = required(request, 'concept_id')
-    if cid not in [c['id'] for c in store.get('curriculum', 'model', {}).get('concepts', [])]:
+    if cid not in [c['id'] for c in curriculum.model(store)['concepts']]:
         raise OperationError('invalid_reference', 'Unknown concept')
     return cid
 

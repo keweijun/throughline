@@ -17,7 +17,8 @@ def complete(job,result):
  execute(root,{'op':'practice.complete','id':job['id']})
 complete({'id':'questions','concept_id':'a','action':'generate'},{'questions':[
  {'question':'Two parts:\n1. State the rule.\n2. Apply it.','parts':['State the rule.','Apply it.'],'origin':'self_created','source_refs':[]},
- {'question':'An exercise from before parts','origin':'self_created','source_refs':[]}]})
+ {'question':'An exercise from before parts','origin':'self_created','source_refs':[]},
+ {'question':'Labelled parts:\n- (a) State the rule.\n- (b) Apply it.','parts':[{'label':'(a)','text':'State the rule.'},{'label':'(b)','text':'Apply it.'}],'origin':'self_created','source_refs':[]}]})
 # The old exercise's assessment has an outcome and no part statuses, as every assessment did before parts.
 task=execute(root,{'op':'practice.list'})['tasks'][1]
 complete({'id':'old','concept_id':'a','action':'assess','task_id':task['id'],'answer':'An old answer'},{'feedback':'Correct.','outcome':'passed'})

@@ -70,9 +70,17 @@ def part_statuses(task):
     if last and count==1: return ['correct' if last.get('outcome')=='passed' else 'not_yet']
     return ['not_attempted']*count
 
+MAX_PART_LABEL = 40
+
+def _part(p):
+    """A part is the text of what it asks, or {label?, text} with a short label such as "(a)"."""
+    if isinstance(p,str): return bool(p.strip())
+    return (isinstance(p,dict) and not set(p)-{'label','text'} and isinstance(p.get('text'),str) and bool(p['text'].strip())
+            and ('label' not in p or isinstance(p['label'],str) and 0<len(p['label'].strip())<=MAX_PART_LABEL))
+
 def _check_parts(q):
-    if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or any(not isinstance(p,str) or not p.strip() for p in q['parts'])):
-        raise FormatError('parts must list each part as nonempty text')
+    if 'parts' in q and (not isinstance(q['parts'],list) or not q['parts'] or not all(_part(p) for p in q['parts'])):
+        raise FormatError(f'parts must list each part as nonempty text or {{label, text}} with a label of at most {MAX_PART_LABEL} characters')
 
 def job(store, request):
     value = request.get('job')
@@ -308,15 +316,18 @@ def defer(store, request):
     store.put('practice_tasks',task['id'],task)
     return {'task':task}
 
-SKIP_REASONS=('too_easy','too_tedious','not_relevant')
+SKIP_REASONS=tuple(memory.SKIP_PREFERENCES['en'])  # each reason has the preference it suggests (ADR 0011)
+
+def require_skippable(task):
+    if task.get('origin') not in ('source','self_created'):
+        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
 
 def skip(store, request):
     """Close a section exercise for good, with an optional reason (ADR 0011). It records no outcome, evidence or deferral;
     answering it later reopens it like any attempt."""
     task=store.get('practice_tasks',request.get('id'))
     if not task: raise OperationError('unknown_exercise','Unknown exercise')
-    if task.get('origin') not in ('source','self_created'):
-        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+    require_skippable(task)
     reason=request.get('reason')
     if reason is not None and reason not in SKIP_REASONS:
         raise OperationError('invalid_request','reason must be one of '+', '.join(SKIP_REASONS))

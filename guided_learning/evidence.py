@@ -82,7 +82,7 @@ def assess(store, request):
         if (item['outcome'] == 'passed') != all(p == 'correct' for p in parts):
             raise OperationError('invalid_evidence', 'Outcome is passed exactly when every part is correct')
         item['parts'] = list(parts)
-    answer =interaction(store, item['answer_id'], 'user', cid)
+    answer = interaction(store, item['answer_id'], 'user', cid)
     assessment = interaction(store, item['assessment_id'], 'assistant', cid)
     if assessment['sequence'] <= answer['sequence']:
         raise OperationError('invalid_evidence', 'Assessment must follow the answer')

@@ -46,11 +46,12 @@ def validate_framing(concept):
     if 'steps' in overview and (not isinstance(overview['steps'], list) or any(not isinstance(s, str) for s in overview['steps'])):
         raise OperationError('invalid_request', 'overview steps must be an array of strings')
 
-def validate_exercise(exercise):
-    """Placement fields of an exercise part (ADR 0012); all optional, for courses mapped before them."""
+def validate_exercise(exercise, sent):
+    """Placement fields of an exercise part (ADR 0012). An exercise a save sends names the concepts it requires; one
+    stored before the rule, in a concept the save does not send, may lack them."""
     required = exercise.get('required_concepts', [])
-    if not isinstance(required, list) or any(not isinstance(cid, str) for cid in required):
-        raise OperationError('invalid_request', 'Exercise required_concepts must be an array of concept IDs')
+    if not isinstance(required, list) or any(not isinstance(cid, str) for cid in required) or sent and not required:
+        raise OperationError('invalid_request', 'Exercise required_concepts must be a nonempty array of concept IDs')
     if 'part_of' in exercise and not isinstance(exercise['part_of'], str):
         raise OperationError('invalid_request', 'Exercise part_of must be a string')
     others = exercise.get('other_parts', [])
@@ -125,7 +126,7 @@ def store_model(store, model, confirm_reorder, written=None):
             for ref in concept.get(field, []):
                 source_unit(store, ref)
         for exercise in concept.get('exercises', []):
-            validate_exercise(exercise)
+            validate_exercise(exercise, written is None or concept['id'] in written)
     for concept in concepts.values():
         if any(p not in concepts for p in concept.get('prerequisites', [])):
             raise OperationError('invalid_reference', 'Unknown prerequisite')

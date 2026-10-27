@@ -82,6 +82,19 @@ class CourseMemory(unittest.TestCase):
                     execute(tmp, {'op': op, 'id': preference['id']})
                 self.assertEqual(error.exception.code, code)
 
+    def test_a_tombstone_blocks_the_same_text_from_new_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            course(tmp)
+            execute(tmp, {'op': 'memory.note', 'turn_id': 't1', 'concept_id': 'state', 'interaction_ids': ['i1'],
+                          'note': {'entries': [{'kind': 'preference', 'text': 'Give the tedious integrals'}]}})
+            [entry] = execute(tmp, {'op': 'memory.view'})['entries']
+            execute(tmp, {'op': 'memory.delete', 'id': entry['id']})
+            result = execute(tmp, {'op': 'memory.note', 'turn_id': 't2', 'concept_id': 'spin', 'interaction_ids': ['i3'],
+                                   'note': {'entries': [{'kind': 'preference', 'text': ' give the  TEDIOUS integrals'},
+                                                        {'kind': 'taught_term', 'text': 'Give the tedious integrals'}]}})
+            self.assertEqual(result['skipped'], [{'text': 'give the TEDIOUS integrals', 'reason': 'deleted'}])
+            self.assertEqual([e['kind'] for e in result['recorded']], ['taught_term'], 'only the same kind is blocked')
+
     def test_invalid_notes_are_refused_whole(self):
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)

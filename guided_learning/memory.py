@@ -8,7 +8,8 @@ from .preferences import view as course_preferences
 from .teaching import require_text, validate_concept
 
 KINDS = ('preference', 'taught_term', 'difficulty')
-LIVE = ('active', 'suggested', 'confirmed', 'cleared')  # the rest are deleted, merged or pruned
+IN_EFFECT = ('active', 'suggested', 'confirmed')  # what a new entry saying the same thing merges into
+LIVE = IN_EFFECT + ('cleared',)  # the rest are deleted, merged or pruned
 MAX_TEXT = 300
 NOTE = re.compile(r'<course-memory>\s*(\{.*?\})\s*</course-memory>', re.S)
 
@@ -50,16 +51,20 @@ def for_prompt(store):
     return {k: v for k, v in memory.items() if v}
 
 
-def _create(store, identifier, kind, text, concept_id, interaction_ids):
+def prompt(store, request):
+    return {'memory': for_prompt(store)}
+
+
+def _create(store, identifier, kind, text, concept_id, interaction_ids, teacher=False):
     """Adds an entry, merges it into a live one saying the same thing, or refuses it when a deleted entry of the kind
-    cites any of the same interactions. Returns (entry, recorded)."""
+    cites any of the same interactions or, for the teacher's notes, says the same thing. Returns (entry, recorded)."""
     key = text.casefold()
     for entry in _entries(store):
         if entry['kind'] != kind:
             continue
-        if entry['status'] == 'deleted' and set(entry['interaction_ids']) & set(interaction_ids):
+        if entry['status'] == 'deleted' and (set(entry['interaction_ids']) & set(interaction_ids) or teacher and entry['text'].casefold() == key):
             return entry, False
-        if entry['status'] in ('active', 'suggested', 'confirmed') and entry['text'].casefold() == key:
+        if entry['status'] in IN_EFFECT and entry['text'].casefold() == key:
             merged = list(dict.fromkeys(entry['interaction_ids'] + interaction_ids))
             if merged != entry['interaction_ids']:
                 store.put('memory', entry['id'], {**entry, 'interaction_ids': merged, 'updated_at': time.time()})
@@ -95,7 +100,7 @@ def save(store, request):
 
 
 def delete(store, request):
-    """Final: the entry stays as a tombstone so the same interactions cannot bring it back."""
+    """Final: the entry stays as a tombstone so neither the same interactions nor a later note with its text bring it back."""
     entry = _live(store, request)
     store.put('memory', entry['id'], {**entry, 'status': 'deleted', 'updated_at': time.time()})
     return {'deleted': entry['id']}
@@ -130,7 +135,7 @@ def note(store, request):
         if item.get('kind') not in KINDS:
             skipped.append({'text': text, 'reason': 'unknown_kind'})
             continue
-        entry, created = _create(store, f'{turn_id}:{index}', item['kind'], text, concept_id, list(dict.fromkeys(cited + own)))
+        entry, created = _create(store, f'{turn_id}:{index}', item['kind'], text, concept_id, list(dict.fromkeys(cited + own)), teacher=True)
         (recorded if created else skipped).append(entry if created else {'text': text, 'reason': 'deleted' if entry['status'] == 'deleted' else 'exists'})
     for identifier in value.get('cleared', []):
         entry = store.get('memory', identifier) if isinstance(identifier, str) else None
@@ -140,7 +145,8 @@ def note(store, request):
     return {'recorded': recorded, 'skipped': skipped}
 
 
-# The preference a repeated skip reason suggests, in each teaching language (ADR 0011).
+# The preference a repeated skip reason suggests, in each teaching language (ADR 0011). Its keys are the skip reasons
+# (practice.SKIP_REASONS); web/src/lib/types.ts mirrors them as SkipReason.
 SKIP_PREFERENCES = {'en': {'too_easy': 'Harder exercises, without routine ones', 'too_tedious': 'Fewer long calculations',
                            'not_relevant': 'Only exercises relevant to my goals'},
                     'zh-CN': {'too_easy': '练习难一些，少出常规题', 'too_tedious': '少一些冗长的计算',
@@ -275,4 +281,4 @@ def consolidations(store, request):
 
 OPERATIONS = {'memory.consolidate': consolidate, 'memory.consolidations': consolidations,
               'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,
-              'memory.prompt': lambda store, request: {'memory': for_prompt(store)}}
+              'memory.prompt': prompt}

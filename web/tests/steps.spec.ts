@@ -50,7 +50,7 @@ test('a lesson saved before steps still displays as one reply', async ({ page, c
   expect(errors).toEqual([]);
 });
 
-test('each step ends with a check question: instant feedback, a repair after a miss, and continuing without answering', async ({ page, course }) => {
+test('a step\'s check question: instant feedback, a repair after a miss, and continuing without answering', async ({ page, course }) => {
   const { errors } = await course('steps_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const first = page.getByRole('region', { name: 'Step 1 of 4' });

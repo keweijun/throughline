@@ -203,5 +203,46 @@ class ReviewFlow(unittest.TestCase):
         self.assertEqual((task['history'][-1]['parts'], task['history'][-1]['outcome']), (['correct', 'not_attempted'], 'needs_work'))
         self.assertEqual(self.client.get('/api/review').json()['sections'][0]['interval_days'], 1, 'the schedule reads outcome')
 
+    def test_answering_a_review_part_by_part_is_neither_a_pass_nor_a_miss_until_a_part_is_wrong(self):
+        reply = self.runner.run
+        def run(prompt, cwd, emit, cancel):
+            if 'Practice only (spaced review)' in prompt:
+                emit({'kind': 'final', 'text': json.dumps({'questions': [{'question': '1. Recall.\n2. Apply.', 'parts': ['Recall.', 'Apply.']}]})})
+                return emit({'kind': 'complete'})
+            if 'Question and help history' in prompt and '"parts": ["Recall.", "Apply."]' in prompt:
+                emit({'kind': 'final', 'text': json.dumps({'feedback': 'Checked.', 'parts': self.runner.parts})})
+                return emit({'kind': 'complete'})
+            return reply(prompt, cwd, emit, cancel)
+        self.runner.run = run
+        self.study('a')
+        now = time.time()
+
+        def review(after, parts):
+            nonlocal now
+            now += after
+            self.host.review.clock = lambda: now
+            self.post('/api/review/start', {'concept_id': 'a'})
+            self.settle()
+            task = next(t for t in self.state()['review']['tasks'] if not any(h['action'] == 'assess' for h in t['history']))
+            for statuses in parts:
+                self.runner.parts = statuses
+                self.answer(task['id'])
+            return task
+
+        def section():
+            return self.client.get('/api/review').json()['sections'][0]
+
+        review(2 * DAY, [['correct', 'correct']])
+        self.assertEqual(section()['interval_days'], 3)
+        task = review(4 * DAY, [['correct', 'not_attempted']])
+        self.assertEqual(section()['interval_days'], 3, 'one part answered correctly is not a failed review')
+        self.assertEqual(section()['task_id'], task['id'], 'the review stays open until it is passed or missed')
+        self.runner.parts = ['not_attempted', 'correct']
+        self.answer(task['id'])
+        self.assertEqual(section()['interval_days'], 7)
+        task = review(8 * DAY, [['correct', 'not_attempted'], ['not_attempted', 'not_yet']])
+        self.assertEqual(section()['interval_days'], 1, 'a real miss on a part starts the intervals over')
+        self.assertIsNone(section()['task_id'])
+
 if __name__ == '__main__':
     unittest.main()

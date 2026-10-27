@@ -38,13 +38,13 @@ STEP_LESSON_REQUEST = 'Teach this section step by step, starting with the first 
 
 STEP_CONTINUE_REQUEST = 'Continue with the next step.'
 
-LESSON_STEP = '''This section's lesson is taught in short lesson steps, one reply per step. This reply teaches step {number}: "{title}". Teach only this step, completely but briefly: one part of the section's core question, short enough to absorb in one sitting (roughly 1,500 characters of prose plus formulas). Leave the material of the remaining steps to them, and do not announce or summarize them at length.
+LESSON_STEP = '''This section's lesson is taught in short lesson steps, one reply per step. This reply teaches step {number}: "{title}". Teach only this step, completely but briefly: one part of the section's core question, short enough to absorb in one sitting. Leave the material of the remaining steps to them, and do not announce or summarize them at length.
 Define each term or notation before relying on it, and work out any example before building on it.
-After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}], "check": {{"idea": "the one idea the check tests, in a few words", "question": "...", "options": [{{"text": "...", "explanation": "..."}}], "correct": 0}}}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
-check is the step's check question: one multiple-choice question on the step's key idea that takes under a minute and no long calculation, with 3 or 4 short options of which exactly one is correct (correct is its index). Write each wrong option around a likely misconception about this step. Give every option a one-sentence explanation the learner reads after choosing it: why it is right, or what the misconception is and why it fails. The interface adds an "I'm not sure" option and shows the explanations itself, so do not ask the question in the teaching text. The check is not an exercise and is never graded. Repeated misses on one idea become a difficulty, matched by the idea's words, so name an idea the same way each time a check tests it, and when a check tests a difficulty in course_memory, use that difficulty's idea as written.
+After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}], "check"?: {{"idea": "the one idea the check tests, in a few words", "question": "...", "options": [{{"text": "...", "explanation": "..."}}], "correct": 0}}}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
+check is optional: include one when a quick question would catch a likely gap at this point, and omit it otherwise. It is one multiple-choice question on the step's key idea that takes under a minute and no long calculation, with 2 to 5 short options of which exactly one is correct (correct is its index). Write each wrong option around a likely misconception about this step. Give every option a one-sentence explanation the learner reads after choosing it: why it is right, or what the misconception is and why it fails. The interface adds an "I'm not sure" option and shows the explanations itself, so do not ask the question in the teaching text. The check is not an exercise and is never graded. Repeated misses on one idea become a difficulty, matched by the idea's words, so name an idea the same way each time a check tests it, and when a check tests a difficulty in course_memory, use that difficulty's idea as written.
 Lesson plan (data): {plan}'''
 
-STEP_FIRST = 'The plan comes from the section overview. Refine it with the preparation material into about three steps in total.'
+STEP_FIRST = 'The plan comes from the section overview. Refine it with the preparation material into as many steps as the section needs; a short or simple section may be a single step.'
 
 STEP_LATER = 'Open with one sentence linking to the previous step, without repeating it. Steps taught so far (data, the learner has read them):\n{previous}'
 
@@ -60,7 +60,7 @@ def lesson_step(steps, number, previous, focus, limit, missed=None):
         return text + '\n' + STEP_FIRST
     text += '\n' + STEP_LATER.format(previous=json.dumps(previous, ensure_ascii=False))
     if missed:
-        how = 'was not sure how to answer' if missed['chosen'] == "I'm not sure" else 'chose a wrong option on'
+        how = 'was not sure how to answer' if missed.get('unsure') else 'chose a wrong option on'
         text += '\n' + STEP_REPAIR.format(how=how, missed=json.dumps(missed, ensure_ascii=False))
     if focus and focus != STEP_LESSON_REQUEST:
         text += '\nThe learner asked this of the whole lesson (data): ' + json.dumps(focus, ensure_ascii=False)
@@ -138,14 +138,15 @@ def question_protocol(language):
     return QUESTION_PROTOCOL.replace('150 English words', '250 Chinese characters') if language == 'zh-CN' else QUESTION_PROTOCOL
 
 
-PARTS = ('When a question has several parts, write each part on its own line as a Markdown numbered list (1., 2., ...) after any shared setup. '
-         'Also list the parts in "parts", in order, one short entry per part restating what it asks; a question without subquestions has one part.')
-PART_FIELD = '"parts":["What each part asks"]'
+PARTS = ('When a question has several parts, write each part on its own line as a Markdown list item that starts with its label, after any shared setup. '
+         'Also list the parts in "parts", in order, one entry per part: label is a short label such as "(a)", as the question numbers the part, '
+         'and text briefly restates what it asks; a question without subquestions has one part.')
+PART_FIELD = '"parts":[{"label":"(a)","text":"What each part asks"}]'
 
 
 def practice_generate(sources):
     return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"origin":"source or self_created","source_refs":[],"exercise":"question of the original exercise used"}]}. '
-            'Select 1 to 2 questions for the current goal. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
+            'Choose as many questions as the current goal needs, at most four; one is often enough. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
             'If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. '
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
             'Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. '
@@ -244,7 +245,7 @@ Concepts, in teaching order, each: {{"id", "title", "core_question", "objective"
 - overview (optional): {{"core_problem", "steps" (about three strings, each naming specific ideas), "prior", "next", "target_ability"}}, all strings except steps.
 - prerequisites: IDs of earlier sections in this chapter or of sections in built_route before this chapter. Never refer to sections of chapters that are not built.
 - links: [{{"source_id", "revision", "unit_id", "detail"}}] to the exact source units the section teaches from. notations: [{{"symbol", "meaning", "source_id", "revision", "unit_id"}}]. exercises: [{{"question", "source_id", "revision", "unit_id", "required_concepts", "part_of"?, "other_parts"?}}] for original exercises. Copy source_id, revision and unit_id exactly from source_units; never invent one.
-- Exercises: required_concepts lists the IDs of every section the exercise part needs, this one included. Map each part to the latest section it requires, never earlier; the host rejects a part placed before a section it requires. Split a homework question whose parts need different sections: each part ("7(a)") is its own exercise, with part_of naming the original question ("7") and other_parts [{{"question", "concept_id"?}}] naming the other parts and the sections that teach them. A part that needs a section of a chapter not built yet is left out; that chapter maps it. waiting_parts, when present, lists such parts that built chapters left for later, with their source text: map each one whose required sections this chapter completes, on the latest of them, with part_of and other_parts (naming mapped_part), and leave the rest.
+- Exercises: required_concepts is required on every exercise and lists the IDs of every section the exercise part needs, this one included. Map each part to the latest section it requires, never earlier; the host rejects a part placed before a section it requires. Split a homework question whose parts need different sections: each part ("7(a)") is its own exercise, with part_of naming the original question ("7") and other_parts [{{"question", "concept_id"?}}] naming the other parts and the sections that teach them. A part that needs a section of a chapter not built yet is left out; that chapter maps it. waiting_parts, when present, lists such parts that built chapters left for later, with their source text: map each one whose required sections this chapter completes, on the latest of them, with part_of and other_parts (naming mapped_part), and leave the rest.
 Coverage: one entry per source unit you assign to this chapter, {{"source_id", "revision", "unit_id", "disposition", "concept_ids", "reason"?, "verification": "pending"}}.
 - "mapped": nonempty concept_ids, and each listed concept links that same unit.
 - "deferred": a reason; the content is kept for later teaching. "needs_review": a reason, for uncertain extraction, mapping or interpretation.

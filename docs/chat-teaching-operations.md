@@ -24,7 +24,7 @@ When teaching a section in chat, teach its one core question. Open a chapter's f
 
 Use the course JSON CLI. Each mutation is atomic.
 
-- `interaction.record`: `{id, role:"user"|"assistant", text, concept_id?, source_refs?}` returns `{interaction}`. Concept is optional; role is the actual speaker. Identical retries succeed, conflicting ID reuse fails. Records contain a monotonic `sequence`.
+- `interaction.record`: `{id, role:"user"|"assistant", text, concept_id?, source_refs?, kind?}` returns `{interaction}`. `kind` is optional and only `check_answer` (set by the app for a check answer). Concept is optional; role is the actual speaker. Identical retries succeed, conflicting ID reuse fails. Records contain a monotonic `sequence`.
 - `mainline.enter`: `{request_id, concept_id, goal, next_step, progress?}` saves the current position and returns `due_explanations`. No mastery gate prevents the learner choosing the next concept. Close an active branch through `sidequestion.continue` when the learner chooses to continue.
 - `sidequestion.open`: `{id, interaction_id, category, depth:"short"|"long", rationale, strategy, explicit_deepen?, target_concept_id?}` saves the exact mainline restore point. Categories are `local`, `prerequisite`, `future`, `repeated`, `extension`. `interaction_id` must identify the actual user question. Future questions require a valid target. `explicit_deepen:true` forces long depth even if short was proposed.
 - `sidequestion.answer`: `{id, answer_interaction_id}` links a subsequently recorded assistant message. Short answers restore the mainline; long answers become `waiting`. A short future answer creates a pending full explanation. Long future answers are the immediate full explanation, so the teacher must actually provide it.

@@ -7,7 +7,7 @@
   import { markdown, hasMath } from '../lib/markdown';
   import { highlights } from '../lib/highlight';
   import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
-  import type { Task } from '../lib/types';
+  import type { SkipReason, Task } from '../lib/types';
   import AnswerImages from './AnswerImages.svelte';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
@@ -80,11 +80,15 @@
   const solved = $derived(isSolved(task));
   // Parts are assessed one by one and accumulate across answers (ADR 0011).
   const parts = $derived(partStatuses(task));
+  const partName = (i: number) => {
+    const part = task.parts?.[i];
+    return (typeof part === 'object' && part.label) || t('Part {number}', { number: i + 1 });
+  };
   const partsCorrect = (statuses: string[]) => ({ correct: statuses.filter((s) => s === 'correct').length, total: statuses.length });
   const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
   // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
-  const skipReasons: Record<string, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
+  const skipReasons: Record<SkipReason, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
   // A part split from a homework question shows the question and where its other parts are taught (ADR 0012).
   const homework = $derived(task.exercise ? app.concept(task.concept_id)?.exercises?.find((e) => e.question === task.exercise && e.part_of) : undefined);
   const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
@@ -194,7 +198,7 @@
     <ol class="parts" aria-label={t("Parts")}>
       {#each parts as status, i}
         <li>
-          <span class="part-name">{t('Part {number}', { number: i + 1 })}</span>
+          <span class="part-name">{partName(i)}</span>
           <span class="chip chip-{partLabels[status].tone}">{t(partLabels[status].label)}</span>
         </li>
       {/each}

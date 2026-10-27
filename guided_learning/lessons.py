@@ -7,7 +7,7 @@ from .memory import from_check
 from .store import OperationError
 from .teaching import record_interaction, require_text, validate_concept
 
-MAX_STEPS = 8  # the whole plan: about three steps, plus room for bridges
+MAX_STEPS = 8  # a sanity cap on the whole plan, bridges included; the teacher decides the count
 MAX_TITLE = 200
 MAX_OPTIONS = 5  # besides "I'm not sure", which the interface adds
 MAX_CHECK_TEXT = 1000
@@ -55,6 +55,16 @@ def _read(store, identifier):
     if lesson is None:
         raise OperationError('unknown_lesson', identifier)
     return lesson
+
+
+def _step_of(store, request):
+    """The lesson, turn id and index of the step a request names by lesson `id` and `turn_id`."""
+    lesson = _read(store, require_text(request, 'id'))
+    turn_id = require_text(request, 'turn_id')
+    index = next((i for i, item in enumerate(lesson['steps']) if item.get('turn_id') == turn_id), None)
+    if index is None:
+        raise OperationError('unknown_step', turn_id)
+    return lesson, turn_id, index
 
 
 def _started(store, step):
@@ -106,11 +116,7 @@ def step(store, request):
 def reply(store, request):
     """Record a completed step's structured reply: optionally the title of what it taught, the revised plan of the
     steps still to teach (`remaining`, each {title, added}) and its check question (`check`). Recorded once per step."""
-    lesson = _read(store, require_text(request, 'id'))
-    turn_id = require_text(request, 'turn_id')
-    index = next((i for i, item in enumerate(lesson['steps']) if item.get('turn_id') == turn_id), None)
-    if index is None:
-        raise OperationError('unknown_step', turn_id)
+    lesson, turn_id, index = _step_of(store, request)
     turn = store.get('streams', turn_id)
     if not turn or turn['status'] != 'completed':
         raise OperationError('step_unfinished', 'Only a completed step has a reply')
@@ -149,11 +155,7 @@ def answer(store, request):
     """The learner's choice on a step's check question: an option's index or "unsure". Recorded once, as an interaction
     and never as evidence, while the next step has not started; continuing without answering leaves it unanswered.
     Repeated misses on the check's idea become a difficulty in course memory, and a correct answer clears it."""
-    lesson = _read(store, require_text(request, 'id'))
-    turn_id = require_text(request, 'turn_id')
-    index = next((i for i, item in enumerate(lesson['steps']) if item.get('turn_id') == turn_id), None)
-    if index is None:
-        raise OperationError('unknown_step', turn_id)
+    lesson, turn_id, index = _step_of(store, request)
     entry = lesson['steps'][index]
     check = entry.get('check')
     if not check:
@@ -168,7 +170,7 @@ def answer(store, request):
     if any(_started(store, item) for item in lesson['steps'][index + 1:]):
         raise OperationError('check_closed', 'The next step has started')
     chosen = "I'm not sure" if choice == UNSURE else check['options'][choice]['text']
-    interaction = record_interaction(store, {'id': 'check-answer:' + turn_id, 'role': 'user', 'concept_id': lesson['concept_id'],
+    interaction = record_interaction(store, {'id': 'check-answer:' + turn_id, 'role': 'user', 'kind': 'check_answer', 'concept_id': lesson['concept_id'],
                                              'text': f"Check question: {check['question']}\nAnswer: {chosen}", 'source_refs': []})['interaction']
     entry['answer'] = {'choice': choice, 'unsure': choice == UNSURE, 'correct': choice == check['correct'],
                        'interaction_id': interaction['id'], 'answered_at': time.time()}

@@ -10,7 +10,11 @@ from .preferences import view as preferences, validate_language
 from .memory import for_prompt as course_memory
 
 
+# Turn channels, in one place for the host and its features; web/src/lib/types.ts mirrors CHANNELS.
+LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')  # the learner's own requests
 BACKGROUND = ('preparation', 'build', 'consolidation')  # channels whose turns are not teaching interactions
+SMALL_MODEL = ('preparation', 'consolidation')  # channels the small model serves
+CHANNELS = LEARNER_CHANNELS + BACKGROUND
 
 
 def read(store, request):
@@ -28,7 +32,7 @@ def start(store, request):
     if not isinstance(request.get('record_user', True), bool):
         raise OperationError('invalid_request','record_user must be boolean')
     identity = {'record_user':request.get('record_user',True), 'id':identifier, 'concept_id':concept, 'prompt':prompt, 'channel':request.get('channel','mainline')}
-    if identity['channel'] not in ('mainline','sidequestion','practice','preparation','build','consolidation'):
+    if identity['channel'] not in CHANNELS:
         raise OperationError('invalid_channel','Unknown teaching channel')
     if 'chapter_id' in request:
         # A turn owned by a chapter (its recap) is shown on the chapter page; concept_id stays the chapter's last

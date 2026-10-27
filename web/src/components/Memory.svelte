@@ -5,6 +5,7 @@
   import { autogrow } from '../lib/autogrow';
   import { enterToSend } from '../lib/keys';
   import type { MemoryEntry } from '../lib/types';
+  import RememberPrompt from './RememberPrompt.svelte';
 
   let editing = $state<string | null>(null);
   let edit = $state('');
@@ -38,11 +39,7 @@
 
   {#each suggested as entry (entry.id)}
     <div class="suggested" role="group" aria-label={t('Suggested preference')}>
-      <p>{t('Remember: {text}?', { text: entry.text })}</p>
-      <div class="actions">
-        <button class="btn btn-quiet btn-small" onclick={() => app.removeMemory(entry.id)}>{t("Don't remember")}</button>
-        <button class="btn btn-small" onclick={() => app.confirmMemory(entry.id)}>{t('Remember')}</button>
-      </div>
+      <RememberPrompt {entry} />
     </div>
   {/each}
 

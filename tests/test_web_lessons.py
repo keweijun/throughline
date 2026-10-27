@@ -255,7 +255,7 @@ class CheckQuestions(SteppedLessons):
         self.assertEqual(self.post('/api/lessons/one/steps/one/check', {'choice': 0}, 409)['code'], 'already_answered')
         # Recorded as an interaction, never as evidence; it neither makes the section reviewable nor counts as a review.
         interaction = execute(self.root, {'op': 'session.resume', 'recent_limit': 20})['recent_interactions'][-1]
-        self.assertEqual(interaction['id'], 'check-answer:one')
+        self.assertEqual((interaction['id'], interaction['kind']), ('check-answer:one', 'check_answer'))
         self.assertIn('P = 1/2', interaction['text'])
         self.assertEqual(execute(self.root, {'op': 'evidence.view', 'concept_id': 'wave'})['history'], [])
         self.assertEqual(self.state()['review']['sections'], [])
@@ -275,7 +275,7 @@ class CheckQuestions(SteppedLessons):
         self.runner.replies = [step_reply('Two.', [{'title': 'Three'}], check=CHECK)]
         self.post('/api/lessons/one/steps', {'id': 'two'})
         self.finish('two')
-        self.assertIn('not sure', self.runner.prompts[1].split('Lesson plan (data)')[1])
+        self.assertIn('was not sure how to answer', self.runner.prompts[1])
         check = self.lesson()['steps'][1]['check']
         self.assertTrue(self.post('/api/lessons/one/steps/two/check', {'choice': check['correct']})['answer']['correct'])
         self.post('/api/lessons/one/steps', {'id': 'three'})
@@ -289,7 +289,7 @@ class CheckQuestions(SteppedLessons):
         self.assertNotIn('repair', self.runner.prompts[1])
         self.assertNotIn('answer', self.lesson()['steps'][0])
         recent = execute(self.root, {'op': 'session.resume', 'recent_limit': 20})['recent_interactions']
-        self.assertFalse([i for i in recent if i['id'].startswith('check-answer:')])
+        self.assertFalse([i for i in recent if i.get('kind') == 'check_answer'])
         self.assertEqual(self.post('/api/lessons/one/steps/one/check', {'choice': 0}, 409)['code'], 'check_closed')
         self.assertEqual(self.post('/api/lessons/one/steps/two/check', {'choice': 0}, 409)['code'], 'no_check')
         self.assertEqual(self.post('/api/lessons/one/steps/nine/check', {'choice': 0}, 404)['code'], 'unknown_step')

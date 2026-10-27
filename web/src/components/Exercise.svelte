@@ -85,6 +85,8 @@
   // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
   const skipReasons: Record<string, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
+  // A part split from a homework question shows the question and where its other parts are taught (ADR 0012).
+  const homework = $derived(task.exercise ? app.concept(task.concept_id)?.exercises?.find((e) => e.question === task.exercise && e.part_of) : undefined);
   const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
 
   const status = $derived.by(() => {
@@ -160,6 +162,26 @@
   </header>
 
   <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  {#if homework}
+    <div class="homework">
+      <p>{t('{part}, a part of {question}', { part: homework.question!, question: homework.part_of! })}</p>
+      {#if homework.other_parts?.length}
+        <ul aria-label={t("Other parts")}>
+          {#each homework.other_parts as part}
+            {@const section = part.concept_id ? app.concept(part.concept_id) : undefined}
+            <li>
+              {part.question} ·
+              {#if section}
+                {t("taught in")} <button class="link" onclick={() => app.view(section.id)}>{section.title}</button>
+              {:else}
+                <span class="waiting">{t("waiting for a later chapter")}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  {/if}
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}
@@ -373,6 +395,33 @@
 
   .refs {
     margin-top: -0.4rem;
+  }
+
+  .homework {
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .homework p,
+  .homework ul {
+    margin: 0;
+  }
+
+  .homework ul {
+    padding-left: 1.2rem;
+  }
+
+  .homework .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .homework .link:hover {
+    text-decoration: underline;
   }
 
   .refs .citation {

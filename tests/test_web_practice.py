@@ -279,3 +279,45 @@ class PartsFlow(unittest.TestCase):
         old=lambda outcome:{'history':[{'action':'assess','outcome':outcome,'kind':'independent'},{'action':'hint','feedback':'.'}]}
         self.assertEqual((practice.part_statuses(old('passed')),practice.part_statuses(old('needs_work'))),(['correct'],['not_yet']))
         self.assertEqual(practice.part_statuses({'parts':['x','y'],'history':[]}),['not_attempted']*2)
+
+
+class ExerciseOrigin(unittest.TestCase):
+    """A generated task names the course exercise it uses, so a homework part shows its question (ADR 0012)."""
+    def generate(self, exercises, question):
+        from pathlib import Path
+        class Runner:
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompt=prompt
+                emit({'kind':'final','text':json.dumps({'questions':[question(ref)]})});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            file=Path(path)/'homework.md';file.write_text('7. (a) Normalize. (b) Measure.',encoding='utf-8')
+            source=execute(path,{'op':'source.register','path':str(file)})['source']
+            ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'States','exercises':[{**ref,**e} for e in exercises]}],'route':['a'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            app.wait(app.practice.generate('a')['turn']['id'],5)
+            state=app.practice.state()
+            app.close()
+            return state,runner.prompt
+
+    def test_the_task_keeps_the_exercise_the_teacher_names(self):
+        part={'question':'7(a)','part_of':'7','other_parts':[{'question':'7(b)'}]}
+        state,prompt=self.generate([part,{'question':'8'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref],'exercise':'7(a)'})
+        self.assertEqual(state['tasks'][0]['exercise'],'7(a)')
+        self.assertIn('"exercise"',prompt)
+
+    def test_a_task_from_the_only_exercise_of_its_source_unit_takes_that_exercise(self):
+        state,_=self.generate([{'question':'7(a)','part_of':'7'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref]})
+        self.assertEqual(state['tasks'][0]['exercise'],'7(a)')
+
+    def test_an_ambiguous_or_self_created_task_names_no_exercise(self):
+        state,_=self.generate([{'question':'7(a)'},{'question':'8'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref]})
+        self.assertNotIn('exercise',state['tasks'][0])
+        state,_=self.generate([{'question':'7(a)'}],lambda ref:{'question':'Invent.','origin':'self_created','source_refs':[]})
+        self.assertNotIn('exercise',state['tasks'][0])
+
+    def test_naming_an_exercise_the_section_does_not_have_is_rejected(self):
+        state,_=self.generate([{'question':'7(a)'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref],'exercise':'9'})
+        self.assertEqual(state['tasks'],[])
+        self.assertIn('exercise',state['jobs'][0]['error'])

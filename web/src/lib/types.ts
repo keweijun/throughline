@@ -93,6 +93,8 @@ export type PracticeHistory = {
   outcome?: 'passed' | 'needs_work';
   kind?: EvidenceKind;
   answer?: string;
+  /** Names of images of the learner's work attached to the answer, served from /api/practice/images/{name}. */
+  images?: string[];
 };
 
 export type Task = {
@@ -119,6 +121,7 @@ export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess';
 
 export type PracticeJob = {
   answer?: string;
+  images?: string[];
   id: string;
   concept_id: string;
   action: 'generate' | PracticeAction;

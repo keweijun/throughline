@@ -8,7 +8,8 @@ from .preferences import view as course_preferences
 from .teaching import require_text, validate_concept
 
 KINDS = ('preference', 'taught_term', 'difficulty')
-LIVE = ('active', 'suggested', 'confirmed', 'cleared')  # the rest are deleted, merged or pruned
+IN_EFFECT = ('active', 'suggested', 'confirmed')  # what a new entry saying the same thing merges into
+LIVE = IN_EFFECT + ('cleared',)  # the rest are deleted, merged or pruned
 MAX_TEXT = 300
 NOTE = re.compile(r'<course-memory>\s*(\{.*?\})\s*</course-memory>', re.S)
 
@@ -50,6 +51,10 @@ def for_prompt(store):
     return {k: v for k, v in memory.items() if v}
 
 
+def prompt(store, request):
+    return {'memory': for_prompt(store)}
+
+
 def _create(store, identifier, kind, text, concept_id, interaction_ids, teacher=False):
     """Adds an entry, merges it into a live one saying the same thing, or refuses it when a deleted entry of the kind
     cites any of the same interactions or, for the teacher's notes, says the same thing. Returns (entry, recorded)."""
@@ -59,7 +64,7 @@ def _create(store, identifier, kind, text, concept_id, interaction_ids, teacher=
             continue
         if entry['status'] == 'deleted' and (set(entry['interaction_ids']) & set(interaction_ids) or teacher and entry['text'].casefold() == key):
             return entry, False
-        if entry['status'] in ('active', 'suggested', 'confirmed') and entry['text'].casefold() == key:
+        if entry['status'] in IN_EFFECT and entry['text'].casefold() == key:
             merged = list(dict.fromkeys(entry['interaction_ids'] + interaction_ids))
             if merged != entry['interaction_ids']:
                 store.put('memory', entry['id'], {**entry, 'interaction_ids': merged, 'updated_at': time.time()})
@@ -276,4 +281,4 @@ def consolidations(store, request):
 
 OPERATIONS = {'memory.consolidate': consolidate, 'memory.consolidations': consolidations,
               'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,
-              'memory.prompt': lambda store, request: {'memory': for_prompt(store)}}
+              'memory.prompt': prompt}

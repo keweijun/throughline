@@ -90,7 +90,7 @@
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if task.source_refs.length}
     <p class="refs">
       {#each task.source_refs as ref}

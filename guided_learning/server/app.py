@@ -77,6 +77,7 @@ class GenerateRequest(Body):
 
 class PracticeRequest(Body):
     answer: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class NextSectionRequest(Body):
@@ -369,7 +370,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/practice/tasks/{task_id}/{action}')
     def practice_action(task_id: str, action: str, body: PracticeRequest):
-        result = host.practice.act(task_id, action, body.answer)
+        result = host.practice.act(task_id, action, body.answer, body.reason)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
     @app.get('/api/review')

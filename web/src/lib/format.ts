@@ -47,6 +47,9 @@ export const questionCategory = (category: string) =>
 
 export const solved = (task: Task) => task.history.filter((h) => h.action === 'assess').at(-1)?.outcome === 'passed';
 
+/** Open until solved; a skipped exercise is closed without an outcome (ADR 0011). */
+export const open = (task: Task) => task.status !== 'skipped' && !solved(task);
+
 /** Every turn that answers a side question: the answer, a foundation supplement and follow-up replies. */
 export const questionTurnIds = (question: Question) =>
   [question.turn_id, question.supplement_turn_id, ...(question.replies ?? []).map((r) => r.turn_id)].filter((id): id is string => !!id);

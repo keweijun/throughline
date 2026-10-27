@@ -111,7 +111,8 @@ export type Task = {
   from_task_id?: string;
   created_at?: number;
   source_refs: Ref[];
-  status: 'pending' | 'attempted' | 'deferred';
+  status: 'pending' | 'attempted' | 'deferred' | 'skipped';
+  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
   history: PracticeHistory[];
 };
 

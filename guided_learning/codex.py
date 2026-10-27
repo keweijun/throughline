@@ -115,6 +115,7 @@ class CodexRunner:
             process.stdin.flush()
         thread_id = turn_id = None
         phases, chunks, finals = {}, {}, {}
+        usage = {}
         order = []
         interrupted_at = None
         started = last_heard = time.monotonic()
@@ -170,6 +171,10 @@ class CodexRunner:
                             finals[iid] = item.get('text','')
                             if phases[iid] == 'final_answer':
                                 emit({'kind':'final','text':'\n\n'.join(finals[k] for k in order if k in finals)})
+                if method == 'thread/tokenUsage/updated':
+                    # One update per model request; `last` is that request, so a turn's usage is their sum.
+                    for name, value in params['tokenUsage']['last'].items():
+                        if isinstance(value, int): usage[name] = usage.get(name, 0) + value
                 if method == 'item/agentMessage/delta':
                     iid = params['itemId']; text = params.get('delta','')
                     chunks[iid] = chunks.get(iid,'') + text
@@ -181,7 +186,7 @@ class CodexRunner:
                         raise RuntimeError(_explain('Model turn did not complete successfully', _message(params['turn'].get('error')) or last_error))
                     if not any(phases.get(k)=='final_answer' for k in finals):
                         raise RuntimeError('Model finished without an authoritative final answer')
-                    emit({'kind':'complete'})
+                    emit({'kind':'complete','usage':usage} if usage else {'kind':'complete'})
                     return
             raise TimeoutError('Model generation exceeded time limit')
         finally:

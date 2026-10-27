@@ -20,15 +20,18 @@ for line in sys.stdin:
    {'method':'turn/started','params':{'threadId':'t','turn':{'id':'u'}}},
    {'method':'item/started','params':{'threadId':'t','turnId':'u','item':{'id':'c','type':'agentMessage','phase':'commentary'}}},
    {'method':'item/agentMessage/delta','params':{'threadId':'t','turnId':'u','itemId':'c','delta':'Not a lesson'}},
+   {'method':'thread/tokenUsage/updated','params':{'threadId':'t','turnId':'u','tokenUsage':{'last':{'inputTokens':100,'cachedInputTokens':60,'outputTokens':5,'reasoningOutputTokens':1,'totalTokens':105},'total':{}}}},
    {'method':'item/started','params':{'threadId':'t','turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer'}}},
    {'method':'item/agentMessage/delta','params':{'threadId':'t','turnId':'u','itemId':'a','delta':'Hello lesson'}},
+   {'method':'thread/tokenUsage/updated','params':{'threadId':'t','turnId':'u','tokenUsage':{'last':{'inputTokens':120,'cachedInputTokens':100,'outputTokens':9,'reasoningOutputTokens':2,'totalTokens':129},'total':{}}}},
    {'method':'item/completed','params':{'threadId':'t','turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer','text':'Hello lesson.'}}},
    {'method':'turn/completed','params':{'threadId':'t','turn':{'id':'u','status':'completed'}}}]
   for e in events: print(json.dumps(e),flush=True)
 ''',encoding='utf-8')
             events=[]
             CodexRunner(command=[sys.executable,str(script)]).run('teach',tmp,events.append,threading.Event())
-            self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},{'kind':'complete'}])
+            self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},
+                                     {'kind':'complete','usage':{'inputTokens':220,'cachedInputTokens':160,'outputTokens':14,'reasoningOutputTokens':3,'totalTokens':234}}])
 
     def test_model_list_follows_pages_and_hides_hidden_models(self):
         from guided_learning.codex import list_models

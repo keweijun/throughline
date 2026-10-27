@@ -63,6 +63,7 @@ def start(store, request):
     route = deepcopy([{k:concepts[cid][k] for k in ('id','title','prerequisites') if k in concepts[cid]} for cid in model['route'] if cid in concepts])
     session = session_resume(store,{})
     session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
+    session.pop('context', None)  # the learner's section again, sources and all; context.position already says where they are
     snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
     if model['chapters']: snapshot['chapters'] = deepcopy([{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']])
     profile = store.get('course','profile')
@@ -139,6 +140,8 @@ def _apply(store, turn, request):
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'
         turn['metrics'].update(full_s=elapsed, save_s=time.perf_counter()-begin)
+        if isinstance(request.get('usage'), dict):
+            turn['metrics']['usage'] = request['usage']
     elif kind == 'failed':
         turn['status'] = 'failed'
         turn['error'] = request.get('error','Model connection ended before completion')

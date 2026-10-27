@@ -94,6 +94,14 @@ OVERVIEW_FALLBACK = {
 }
 
 
+def parse_json(text):
+    """A model's JSON reply, with or without a code fence; ValueError when it is not JSON."""
+    raw = (text or '').strip()
+    if raw.startswith('```'):
+        raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]
+    return json.loads(raw)
+
+
 class Feature:
     def __init__(self, host):
         self.host = host
@@ -456,6 +464,7 @@ class Practice(Feature):
         return session.get('position') or {}
 
     def _enter(self, concept_id, request_id):
+        left = (self.operation({'op': 'course.status'})['position'] or {}).get('concept_id')
         for turn in self.host.brief_turns():
             if turn['channel'] == 'mainline' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
@@ -463,6 +472,8 @@ class Practice(Feature):
         chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
         result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': concept_id,
                                  'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''})
+        if left and left != concept_id:
+            self.host.memory.consolidate(left)
         self.host.changed()
         return result
 
@@ -559,7 +570,25 @@ class Practice(Feature):
 
 class Memory(Feature):
     """Course memory (ADR 0010). Every teaching prompt carries it through the snapshot; a lesson, side-question answer or
-    practice help ends with a memory note, which the host records once the turn completes."""
+    practice help ends with a memory note, which the host records once the turn completes. Leaving a section starts one
+    small-model turn that merges duplicate entries and prunes cleared or stale ones."""
+
+    def consolidate(self, concept_id):
+        """Starts the consolidation of the section the learner left, once per section; never in the learner's way."""
+        if not self.operation({'op': 'memory.view'})['entries']:
+            return {'created': False}
+        try:
+            return self.host.start_turn({'id': 'consolidation-' + concept_id, 'concept_id': concept_id, 'channel': 'consolidation',
+                                         'record_user': False, 'prompt': prompts.CONSOLIDATION_REQUEST})
+        except OperationError:
+            log.info('Memory consolidation of %s could not start', concept_id, exc_info=True)
+            return {'created': False}
+
+    def consolidation_prompt(self, turn):
+        titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}
+        entries = [{'id': e['id'], 'kind': e['kind'], 'status': e['status'], 'text': e['text'], 'section': titles.get(e['concept_id'], e['concept_id'])}
+                   for e in self.operation({'op': 'memory.view'})['entries']]
+        return prompts.memory_consolidation(titles.get(turn['concept_id'], turn['concept_id']), entries)
 
     def _job(self, turn):
         if turn['channel'] != 'practice':
@@ -575,6 +604,12 @@ class Memory(Feature):
         return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
 
     def on_complete(self, turn):
+        if turn['channel'] == 'consolidation':
+            try:
+                self.operation({'op': 'memory.consolidate', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'reply': parse_json(turn['final_text'])})
+            except (ValueError, OperationError):
+                log.info('Memory consolidation %s was refused; memory is unchanged', turn['id'], exc_info=True)
+            return
         if turn['channel'] in ('mainline', 'sidequestion'):
             match = memory.NOTE.search(turn['final_text'] or '')
             own = ['stream-user:' + turn['id'], 'stream:' + turn['id']]
@@ -587,11 +622,8 @@ class Memory(Feature):
             if not job or job['action'] == 'generate' or job.get('error'):
                 return
             own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:')]
-            raw = (turn['final_text'] or '').strip()
-            if raw.startswith('```'):
-                raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]
             try:
-                note = json.loads(raw).get('memory')
+                note = parse_json(turn['final_text']).get('memory')
             except (ValueError, AttributeError):
                 note = None
         if not isinstance(note, dict):
@@ -639,7 +671,7 @@ class Preparation(Feature):
 
     def before_start(self, request):
         # A chapter build runs alongside preparation; only the learner's own requests go first.
-        if request.get('channel', 'mainline') in ('preparation', 'build'):
+        if request.get('channel', 'mainline') in ('preparation', 'build', 'consolidation'):
             return
         for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':

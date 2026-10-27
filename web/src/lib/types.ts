@@ -40,7 +40,7 @@ export type Turn = {
    * anchor for section-scoped records.
    */
   chapter_id?: string;
-  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build';
+  channel: 'mainline' | 'sidequestion' | 'practice' | 'preparation' | 'build' | 'consolidation';
   prompt: string;
   status: TurnStatus;
   attempt: number;

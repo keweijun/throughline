@@ -3,6 +3,7 @@ the teacher may revise as it teaches. Each step may end with a check question, a
 recorded as an interaction, never as evidence. Lessons saved before this module are single turns with no record here."""
 import random
 import time
+from .memory import from_check
 from .store import OperationError
 from .teaching import record_interaction, require_text, validate_concept
 
@@ -146,7 +147,8 @@ def reply(store, request):
 
 def answer(store, request):
     """The learner's choice on a step's check question: an option's index or "unsure". Recorded once, as an interaction
-    and never as evidence, while the next step has not started; continuing without answering leaves it unanswered."""
+    and never as evidence, while the next step has not started; continuing without answering leaves it unanswered.
+    Repeated misses on the check's idea become a difficulty in course memory, and a correct answer clears it."""
     lesson = _read(store, require_text(request, 'id'))
     turn_id = require_text(request, 'turn_id')
     index = next((i for i, item in enumerate(lesson['steps']) if item.get('turn_id') == turn_id), None)
@@ -171,6 +173,7 @@ def answer(store, request):
     entry['answer'] = {'choice': choice, 'unsure': choice == UNSURE, 'correct': choice == check['correct'],
                        'interaction_id': interaction['id'], 'answered_at': time.time()}
     store.put('lessons', lesson['id'], lesson)
+    from_check(store, lesson['concept_id'], check['idea'])
     return {'lesson': lesson, 'answer': entry['answer'], 'changed': True}
 
 
@@ -185,4 +188,4 @@ def list_lessons(store, request):
     return {'lessons': lessons}
 
 
-OPERATIONS = {'lesson.begin': begin, 'lesson.step': step, 'lesson.reply': reply, 'lesson.answer': answer,'lesson.read': read, 'lesson.list': list_lessons}
+OPERATIONS = {'lesson.begin': begin, 'lesson.step': step, 'lesson.reply': reply, 'lesson.answer': answer, 'lesson.read': read, 'lesson.list': list_lessons}

@@ -2,6 +2,7 @@
 Entries are facts citing the interactions behind them; they are never evidence and never come from learner annotations."""
 import re
 import time
+import unicodedata
 from .store import OperationError
 from .preferences import view as course_preferences
 from .teaching import require_text, validate_concept
@@ -165,6 +166,43 @@ def suggest_from_skips(store, reason, concept_id):
     return store.put('memory', 'skip:' + reason, {'id': 'skip:' + reason, 'kind': 'preference', 'text': text, 'status': 'suggested',
                                                  'concept_id': concept_id, 'interaction_ids': [], 'skip_ids': skips,
                                                  'skip_reason': reason, 'created_at': now, 'updated_at': now})
+
+
+def idea_key(text):
+    """When two check questions test the same idea: their `idea` texts match ignoring case, punctuation and spacing."""
+    return ' '.join(re.sub(r'[\W_]+', ' ', unicodedata.normalize('NFKC', text).casefold()).split())
+
+
+def from_check(store, concept_id, idea):
+    """Keeps difficulties in step with check answers on one idea, after a check answer is recorded (ADR 0010). A correct
+    answer clears the active difficulties on the idea: those whose text has its key or that cite a check answer on it.
+    A miss (wrong or unsure) joins such a difficulty, or else creates one once two misses since the latest correct
+    answer on the idea are not cited by any difficulty, so a deleted one comes back only from new misses."""
+    key = idea_key(idea)
+    answers = sorted((s['answer'] for lesson in store.list('lessons') for s in lesson['steps']
+                      if s.get('answer') and s.get('check') and idea_key(s['check']['idea']) == key), key=lambda a: a['answered_at'])
+    latest, on_idea = answers[-1], {a['interaction_id'] for a in answers}
+    difficulties = [e for e in _entries(store) if e['kind'] == 'difficulty']
+    current = [e for e in difficulties if e['status'] == 'active' and (idea_key(e['text']) == key or on_idea & set(e['interaction_ids']))]
+    now = time.time()
+    if latest['correct']:
+        for entry in current:
+            store.put('memory', entry['id'], {**entry, 'status': 'cleared', 'cleared_by': [latest['interaction_id']], 'updated_at': now})
+        return
+    if current:
+        entry = current[0]
+        if latest['interaction_id'] not in entry['interaction_ids']:
+            store.put('memory', entry['id'], {**entry, 'interaction_ids': entry['interaction_ids'] + [latest['interaction_id']], 'updated_at': now})
+        return
+    cited = {i for e in difficulties for i in e['interaction_ids']}
+    misses = []
+    for answer in reversed(answers):
+        if answer['correct']:
+            break
+        if answer['interaction_id'] not in cited:
+            misses.insert(0, answer['interaction_id'])
+    if len(misses) >= 2:
+        _create(store, 'check:' + latest['interaction_id'], 'difficulty', _text(idea), concept_id, misses)
 
 
 def _refuse(message):

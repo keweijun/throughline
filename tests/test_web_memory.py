@@ -51,7 +51,8 @@ class MemoryFlow(unittest.TestCase):
                 settle(app)
                 self.assertIn('<course-memory>', runner.prompts[0])
                 for rule in ('Use a taught term without defining it again', 'Derive or justify an example',
-                             'Mention source verification or extraction quality only when'):
+                             'Mention source verification or extraction quality only when',
+                             'the term itself in a few words'):
                     self.assertIn(rule, runner.prompts[0])
                 self.assertNotIn('State uncertainty about formulas', runner.prompts[0])
                 entries = {e['kind']: e for e in app.operation({'op': 'memory.view'})['entries']}

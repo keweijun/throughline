@@ -9,11 +9,14 @@ def require_text(request, key):
     return value
 
 def validate_concept(store, concept_id):
-    if concept_id not in curriculum.view(store, {})['route']:
+    if concept_id not in curriculum.model(store)['route']:
         raise OperationError('unknown_concept', str(concept_id))
 
 # Optional kinds an interaction may name, for records the host makes itself (a check answer, ADR 0009).
 INTERACTION_KINDS = ('check_answer',)
+
+def order(interaction):
+    return [interaction['sequence'], interaction['id']]
 
 def record_interaction(store, request):
     identifier = require_text(request, 'id')
@@ -37,7 +40,7 @@ def record_interaction(store, request):
     if concept_id is not None:
         validate_concept(store, concept_id)
     context_id = concept_id or (store.get('course', 'position') or {}).get('concept_id')
-    concept = next((c for c in curriculum.view(store, {})['concepts'] if c['id'] == context_id), {})
+    concept = next((c for c in curriculum.model(store)['concepts'] if c['id'] == context_id), {})
     candidate_refs = request.get('source_refs', concept.get('links', []) + concept.get('exercises', []) + concept.get('notations', []))
     if not isinstance(candidate_refs, list):
         raise OperationError('invalid_reference', 'source_refs must be a list')
@@ -51,7 +54,7 @@ def record_interaction(store, request):
         value['supplied_source_refs'] = request['source_refs']
     value['source_refs'] = refs
     value['source_context_concept_id'] = context_id
-    value['sequence'] = max((item['sequence'] for item in store.list('interactions')), default=0) + 1
+    value['sequence'] = max((s for s, _ in store.digest('interactions', order)), default=0) + 1
     store.put('interactions', identifier, value)
     return {'interaction': value}
 
@@ -59,10 +62,10 @@ def resume(store, request):
     limit = request.get('recent_limit', 8)
     if not isinstance(limit, int) or isinstance(limit, bool) or not 0 <= limit <= 20:
         raise OperationError('invalid_request', 'recent_limit must be between 0 and 20')
-    recent = sorted(store.list('interactions'), key=lambda item: item['sequence'])
+    recent = [store.get('interactions', key) for _, key in sorted(store.digest('interactions', order))[-limit:]] if limit else []
     position = store.get('course', 'position') or {}
-    focused = curriculum.context(store, {}) if position.get('concept_id') in curriculum.view(store, {})['route'] else None
-    return {'position': store.get('course', 'position'), 'context': focused, 'active_branch': active_branch(store), 'due_explanations': due(store), 'unanswered_questions': [item for item in store.list('sidequestions') if not item.get('answer_interaction_id')], 'app_questions': app_questions(store), 'recent_interactions': recent[-limit:] if limit else []}
+    focused = curriculum.context(store, {}) if position.get('concept_id') in curriculum.model(store)['route'] else None
+    return {'position': store.get('course', 'position'), 'context': focused, 'active_branch': active_branch(store), 'due_explanations': due(store), 'unanswered_questions': [item for item in store.list('sidequestions') if not item.get('answer_interaction_id')], 'app_questions': app_questions(store), 'recent_interactions': recent}
 
 
 def app_questions(store):

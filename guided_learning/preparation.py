@@ -25,11 +25,17 @@ def target(store):
     return curriculum.context(store,{'concept_id':current})['next_concept_id']
 
 
+def brief(job):
+    """A job without its snapshot and material."""
+    return {k: v for k, v in job.items() if k not in ('snapshot', 'content')}
+
+
 def reconcile(store, request):
     current = store.get('course','position',{}).get('concept_id')
     upcoming = target(store)
-    for job in store.list('preparation_jobs'):
-        if job['status'] not in ('running','ready'): continue
+    for listed in store.digest('preparation_jobs', brief):
+        if listed['status'] not in ('running','ready'): continue
+        job = store.get('preparation_jobs', listed['id'])
         before=json.dumps(job,sort_keys=True)
         if job['concept_id'] not in (current,upcoming) or capture(store,job['concept_id'])['fingerprint'] != job['snapshot']['fingerprint']:
             job.update(status='stale',reason='Route, sources, or teaching language changed; the main teacher will prepare independently')
@@ -42,7 +48,9 @@ def reconcile(store, request):
         # Unchanged jobs are not rewritten, so idle polling writes nothing to the course.
         if json.dumps(job,sort_keys=True)!=before:
             store.put('preparation_jobs',job['id'],job)
-    return {'jobs':sorted(store.list('preparation_jobs'),key=lambda j:j.get('created_at',0))}
+    # `brief` lists jobs without their snapshot and material, decoding only jobs changed since the last listing.
+    jobs = store.digest('preparation_jobs', brief) if request.get('brief') is True else store.list('preparation_jobs')
+    return {'jobs':sorted(jobs,key=lambda j:j.get('created_at',0))}
 
 
 def enqueue(store, request):
@@ -62,7 +70,7 @@ def enqueue(store, request):
 
 
 def view(store, request):
-    jobs=reconcile(store,{})['jobs']
+    jobs=reconcile(store,{'brief':request.get('brief') is True})['jobs']
     cid=request.get('concept_id')
     ready=next((j for j in reversed(jobs) if j['concept_id']==cid and j['status']=='ready'),None)
     return {'jobs':jobs,'next_concept_id':target(store),'ready':ready}

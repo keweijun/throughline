@@ -11,7 +11,7 @@ T0 = datetime(2026, 3, 2, 12).timestamp()
 
 
 class MemoryStore:
-    """The two calls the schedule makes on a course store, over plain dictionaries."""
+    """The calls the schedule makes on a course store, over plain dictionaries."""
 
     def __init__(self):
         self.data = {}
@@ -25,6 +25,11 @@ class MemoryStore:
 
     def list(self, namespace):
         return [v for _, v in sorted(self.data.get(namespace, {}).items())]
+
+    shared = get
+
+    def digest(self, namespace, project):
+        return [project(v) for v in self.list(namespace)]
 
 
 class Schedule(unittest.TestCase):

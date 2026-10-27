@@ -64,7 +64,11 @@ class SlimState(unittest.TestCase):
                 self.assertEqual(set(job), {'id', 'concept_id', 'status', 'created_at'})
                 self.assertEqual((job['concept_id'], job['status']), ('b', 'ready'))
                 self.assertEqual(state['preparation']['next_concept_id'], 'b')
-                self.assertIn('snapshot', op(op='preparation.view')['jobs'][0], 'the operation itself is unchanged')
+                full = op(op='preparation.view', concept_id='b')
+                self.assertIn('snapshot', full['jobs'][0], 'the operation itself is unchanged')
+                brief = op(op='preparation.view', concept_id='b', brief=True)
+                self.assertEqual(brief, {**full, 'jobs': [{k: v for k, v in j.items() if k not in ('snapshot', 'content')} for j in full['jobs']],
+                                         'ready': {k: v for k, v in full['ready'].items() if k not in ('snapshot', 'content')}})
 
                 lesson = next(t for t in state['turns'] if t['id'] == 'lesson')
                 self.assertEqual(lesson['text'], 'Amplitudes add.')

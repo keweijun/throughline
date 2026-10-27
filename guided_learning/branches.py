@@ -3,6 +3,7 @@ import time
 from .store import OperationError
 from .migrations import lecture_excerpt
 from .teaching import require_text, create_deferred
+from .streaming import brief
 
 
 def read(store, request):
@@ -26,7 +27,7 @@ def begin(store, request):
     if selected_id and (not selected or selected['channel']!='mainline'):
         raise OperationError('invalid_selection','Selected passage must belong to a lecture')
     # The current lecture is the section's own lesson; a chapter recap anchored there is not the mainline.
-    mains=sorted((t for t in store.list('streams') if t['channel']=='mainline' and t['concept_id']==position.get('concept_id') and not t.get('chapter_id')),key=lambda t:t['started_at'])
+    mains=sorted((t for t in store.digest('streams',brief) if t['channel']=='mainline' and t['concept_id']==position.get('concept_id') and not t.get('chapter_id')),key=lambda t:t['started_at'])
     current_id=mains[-1]['id'] if mains else None
     if request.get('main_turn_id') and request['main_turn_id']!=current_id:
         raise OperationError('stale_mainline','Refresh the current lecture before asking')

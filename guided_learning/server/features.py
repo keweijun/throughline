@@ -908,7 +908,7 @@ class Preparation(Feature):
         for turn in self.host.brief_turns():
             if turn['channel'] == 'preparation' and turn['status'] == 'running':
                 self.host.pause_turn(turn['id'])
-        self.operation({'op': 'preparation.reconcile'})
+        self.operation({'op': 'preparation.reconcile', 'brief': True})
 
     def prompt(self, turn, context):
         if turn['channel'] == 'preparation':

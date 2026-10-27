@@ -1,17 +1,25 @@
 """Auditable curriculum mappings; teaching judgments remain with the teacher."""
+from copy import deepcopy
 from .store import OperationError
+
+EMPTY = {'chapters': [], 'concepts': [], 'route': [], 'coverage': []}
 
 def view(store, request):
     return {'chapters': [], **store.get('curriculum', 'model', {'concepts': [], 'route': [], 'coverage': []})}
 
+def model(store):
+    """The stored model, decoded once until it changes and shared: read it, never mutate it or return parts of it."""
+    shared = store.shared('curriculum', 'model')
+    return {**EMPTY, **shared} if shared else EMPTY
+
 def source_unit(store, ref):
     if not isinstance(ref, dict) or any(not isinstance(ref.get(k), str) for k in ('source_id', 'revision', 'unit_id')):
         raise OperationError('invalid_reference', 'Source reference requires source_id, revision and unit_id')
-    snapshot = store.get('source_revisions', ref['source_id'] + ':' + ref['revision'])
+    snapshot = store.shared('source_revisions', ref['source_id'] + ':' + ref['revision'])
     if snapshot:
         for unit in snapshot['units']:
             if unit['id'] == ref['unit_id']:
-                return unit
+                return deepcopy(unit)
     raise OperationError('invalid_reference', 'Unknown source revision or unit')
 
 def whole_course_chapter(store, route):
@@ -281,7 +289,7 @@ def chapter_view(store, request):
 
 def chapter_of(model, concept_id):
     index = next((i for i, c in enumerate(model['chapters']) if concept_id in c['concept_ids']), None)
-    return None if index is None else {**model['chapters'][index], 'index': index, 'total': len(model['chapters'])}
+    return None if index is None else {**deepcopy(model['chapters'][index]), 'index': index, 'total': len(model['chapters'])}
 
 def coverage(store, request):
     model = view(store, request)
@@ -304,15 +312,15 @@ def is_stale(store, ref):
     return source.get('revision') != ref['revision'] or source.get('status') == 'failed'
 
 def context(store, request):
-    model = view(store, request)
+    stored = model(store)
     position = store.get('course', 'position', {})
     concept_id = request.get('concept_id', position.get('concept_id'))
-    concepts = {c['id']: c for c in model['concepts']}
+    concepts = {c['id']: c for c in stored['concepts']}
     if concept_id not in concepts:
         raise OperationError('unknown_concept', str(concept_id))
-    concept = concepts[concept_id]
-    index = model['route'].index(concept_id)
-    return {'concept': concept, 'chapter': chapter_of(model, concept_id), 'position': position, 'prerequisites': [concepts[c] for c in concept.get('prerequisites', [])], 'next_concept_id': model['route'][index + 1] if index + 1 < len(model['route']) else None, 'sources': [{**ref, **source_unit(store, ref), 'stale': is_stale(store, ref)} for ref in concept.get('links', [])]}
+    concept = deepcopy(concepts[concept_id])
+    index = stored['route'].index(concept_id)
+    return {'concept': concept, 'chapter': chapter_of(stored, concept_id), 'position': position, 'prerequisites': [deepcopy(concepts[c]) for c in concept.get('prerequisites', [])], 'next_concept_id': stored['route'][index + 1] if index + 1 < len(stored['route']) else None, 'sources': [{**ref, **source_unit(store, ref), 'stale': is_stale(store, ref)} for ref in concept.get('links', [])]}
 
 OPERATIONS = {'curriculum.save': save, 'curriculum.view': view, 'curriculum.coverage': coverage, 'curriculum.context': context,
               'curriculum.outline': outline, 'curriculum.chapter.save': chapter_save, 'curriculum.chapter.view': chapter_view,

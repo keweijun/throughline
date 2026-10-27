@@ -9,6 +9,7 @@ import threading
 import uuid
 from pathlib import Path
 
+from .. import practice
 from ..store import OperationError
 from . import prompts
 
@@ -105,6 +106,10 @@ class Feature:
 
     def before_start(self, request):
         pass
+
+    def images(self, turn):
+        """Local image files sent to the teacher with this turn's prompt."""
+        return []
 
     def on_complete(self, turn):
         pass
@@ -363,7 +368,19 @@ class Practice(Feature):
                     log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
-    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None):
+    def save_image(self, data):
+        """Store an image of the learner's work in the course workspace, to attach to an answer by the returned name."""
+        return practice.save_image(self.host.workspace, data)
+
+    def image_file(self, name):
+        path = practice.image_path(self.host.workspace, name)
+        return path, practice.IMAGE_TYPES[path.suffix[1:]]
+
+    def images(self, turn):
+        job = next((j for j in self.operation({'op': 'practice.list'})['jobs'] if j['id'] == turn['id']), None)
+        return [str(practice.image_path(self.host.workspace, name)) for name in (job or {}).get('images', [])]
+
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, images=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
@@ -380,10 +397,12 @@ class Practice(Feature):
                 job['chapter_id'] = chapter_id
             if task:
                 job['task_id'] = task['id']
-            if answer is not None:
-                if not isinstance(answer, str) or not answer.strip():
+            if answer is not None or images:
+                if not isinstance(answer or '', str) or not ((answer or '').strip() or images):
                     raise OperationError('empty_answer', 'Enter your reasoning or answer first')
-                job['answer'] = answer
+                job['answer'] = answer or ''
+                if images:
+                    job['images'] = list(images)
             self.operation({'op': 'practice.job', 'job': job})
             return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'practice',
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
@@ -395,7 +414,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None):
+    def act(self, task_id, action, answer=None, images=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -417,7 +436,9 @@ class Practice(Feature):
                 result = self.operation({'op': 'practice.defer', 'id': task['id']})
                 self.host.changed()
                 return result
-        return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None)
+        if action != 'assess':
+            answer = images = None
+        return self._launch(self._assessed_section(task), action, task, answer, images=images)
 
     def _assessed_section(self, task):
         """The section a task's help and assessment are recorded for: its own, or the first section a chapter quiz question
@@ -509,7 +530,7 @@ class Practice(Feature):
             # Exercise refs need not be included in the lesson links.
             return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
-        return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'))
+        return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'), len(job.get('images', [])))
 
     def _retrieval_prompt(self, job, context, tasks):
         titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}

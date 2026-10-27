@@ -1,7 +1,11 @@
 """Durable exercises and provenance-backed teacher assessments."""
+import hashlib
 import json
+import os
+import re
 import time
 from collections import Counter
+from pathlib import Path
 from . import curriculum, evidence, review, teaching
 from .store import OperationError
 
@@ -16,6 +20,39 @@ PURPOSES=('review','chapter_quiz')
 # Earlier exercises a chapter quiz asks again, at most.
 QUIZ_EARLIER=3
 
+# Images of the learner's handwritten work attached to an answer: stored in the course workspace under a name derived
+# from their content, referenced by the assess job, its answer interaction and the task history, and sent to the teacher.
+IMAGES='answer_images'
+IMAGE_TYPES={'png':'image/png','jpg':'image/jpeg','gif':'image/gif','webp':'image/webp'}
+IMAGE_NAME=re.compile(r'[0-9a-f]{64}\.(png|jpg|gif|webp)')
+MAX_IMAGES=6
+IMAGE_ANSWER='(Answer given in the attached images)'
+
+def image_kind(data):
+    if data.startswith(b'\x89PNG\r\n\x1a\n'): return 'png'
+    if data.startswith(b'\xff\xd8\xff'): return 'jpg'
+    if data[:6] in (b'GIF87a',b'GIF89a'): return 'gif'
+    if data[:4]==b'RIFF' and data[8:12]==b'WEBP': return 'webp'
+    return None
+
+def save_image(workspace, data):
+    """Store an answer image by content and return its name; the same image saved twice is one file."""
+    kind=image_kind(data)
+    if not kind: raise OperationError('unsupported_image','Attach a PNG, JPEG, GIF or WebP image')
+    name=hashlib.sha256(data).hexdigest()+'.'+kind
+    folder=Path(workspace)/IMAGES
+    folder.mkdir(exist_ok=True)
+    if not (folder/name).is_file():
+        partial=folder/(name+'.partial')
+        partial.write_bytes(data)
+        os.replace(partial,folder/name)
+    return name
+
+def image_path(workspace, name):
+    path=Path(workspace)/IMAGES/name if isinstance(name,str) and IMAGE_NAME.fullmatch(name) else None
+    if not path or not path.is_file(): raise OperationError('unknown_image','Unknown answer image')
+    return path
+
 class FormatError(ValueError):
     """The teacher's reply is not the JSON the practice prompt asked for; a model problem, not a course error."""
 
@@ -29,8 +66,14 @@ def job(store, request):
         raise OperationError('invalid_request','action must be one of '+', '.join(ACTIONS))
     if value['action']!='generate':
         teaching.require_text(value,'task_id')
+    if 'images' in value:
+        images=value['images']
+        if value['action']!='assess' or not isinstance(images,list) or not 1<=len(images)<=MAX_IMAGES or len(set(images))!=len(images):
+            raise OperationError('invalid_request',f'images must list 1 to {MAX_IMAGES} distinct answer images, on an assess job')
+        for name in images: image_path(store.workspace,name)
     if value['action']=='assess':
-        teaching.require_text(value,'answer')
+        # With images attached, the written part of the answer may be empty.
+        if not (value.get('images') and isinstance(value.get('answer'),str)): teaching.require_text(value,'answer')
     if 'purpose' in value and (value['action']!='generate' or value['purpose'] not in PURPOSES):
         raise OperationError('invalid_request','purpose must be review or chapter_quiz, on a generate job')
     teaching.validate_concept(store,value['concept_id'])
@@ -47,7 +90,9 @@ def job(store, request):
     if value.get('task_id') and not store.get('practice_tasks',value['task_id']):
         raise OperationError('unknown_exercise','Unknown exercise')
     if value['action']=='assess':
-        teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['answer']})
+        answer=teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],
+                                                  'text':value['answer'] if value['answer'].strip() else IMAGE_ANSWER})['interaction']
+        if value.get('images'): store.put('interactions',answer['id'],{**answer,'images':value['images']})
     store.put('practice_jobs',value['id'],value)
     return {'job':value}
 
@@ -131,7 +176,8 @@ def complete(store, request):
             # Corrective feedback may reveal a method/answer; subsequent retries are assisted.
             evidence.record(store,{**base,'id':'practice-feedback-help:'+value['id'],'interaction_id':iid,'kind':'hint','level':'assessment_feedback'})
             task['status']='attempted'
-            task['history'].append({'action':'assess','feedback':feedback,'outcome':result['outcome'],'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer']})
+            task['history'].append({'action':'assess','feedback':feedback,'outcome':result['outcome'],'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer'],
+                                    **({'images':value['images']} if value.get('images') else {})})
         else:
             evidence.record(store,{**base,'interaction_id':iid,'kind':'demonstrated' if value['action']=='solution' else 'hint','level':value['action']})
             task['history'].append({'action':value['action'],'feedback':feedback})

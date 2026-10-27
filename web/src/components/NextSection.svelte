@@ -3,7 +3,7 @@
   import { api, newId } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { scrollStage } from '../lib/stage';
-  import { solved } from '../lib/format';
+  import { open as isOpen } from '../lib/format';
   import Preparation from './Preparation.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
 
@@ -14,7 +14,7 @@
   const route = $derived(app.state?.curriculum.route ?? []);
   const next = $derived(app.concept(route[route.indexOf(conceptId) + 1]));
   const pending = $derived(
-    app.tasks(conceptId).filter((task) => !solved(task)).length,
+    app.tasks(conceptId).filter(isOpen).length,
   );
   const chapter = $derived(app.chapterOf(conceptId));
   const endsChapter = $derived(!!chapter && chapter.concept_ids.at(-1) === conceptId);

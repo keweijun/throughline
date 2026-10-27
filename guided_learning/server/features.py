@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .. import practice
 from ..store import OperationError
+from .. import memory
 from . import prompts
 
 log = logging.getLogger(__name__)
@@ -336,7 +337,7 @@ class Questions(Feature):
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):
             return
-        match = DECISION.search(turn['final_text'])
+        match = DECISION.search(memory.strip(turn['final_text']))
         if not match:
             return  # the question stays unanswered when the decision is missing
         try:
@@ -355,7 +356,7 @@ class Questions(Feature):
 
 
 class Practice(Feature):
-    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer')
+    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer', 'skip')
 
     def state(self):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
@@ -418,7 +419,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None, question=None, images=None):
+    def act(self, task_id, action, answer=None, question=None, reason=None, images=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -428,8 +429,11 @@ class Practice(Feature):
             raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
         if action == 'defer' and task['origin'] == 'chapter_quiz':
             raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
-        if action == 'defer':
+        if action == 'skip' and task['origin'] in RETRIEVAL_ORIGINS:
+            raise OperationError('invalid_action', 'Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+        if action in ('defer', 'skip'):
             with self.host.lock:
+                # Setting the exercise aside cancels a request still running for it, so no late assessment reopens it.
                 for job in self.state()['jobs']:
                     if job.get('task_id') == task['id'] and not job.get('processed'):
                         try:
@@ -437,7 +441,10 @@ class Practice(Feature):
                         except OperationError as exc:
                             if exc.code != 'unknown_turn':
                                 raise
-                result = self.operation({'op': 'practice.defer', 'id': task['id']})
+                request = {'op': 'practice.' + action, 'id': task['id']}
+                if action == 'skip' and reason is not None:
+                    request['reason'] = reason
+                result = self.operation(request)
                 self.host.changed()
                 return result
         if action != 'assess':
@@ -569,6 +576,51 @@ class Practice(Feature):
         # A chapter recap asks for nothing: the chapter quiz is taken on purpose from the chapter page.
         if turn['channel'] == 'mainline' and not self.host.closing and not is_recap(turn):
             self.generate(turn['concept_id'])
+
+
+class Memory(Feature):
+    """Course memory (ADR 0010). Every teaching prompt carries it through the snapshot; a lesson, side-question answer or
+    practice help ends with a memory note, which the host records once the turn completes."""
+
+    def _job(self, turn):
+        if turn['channel'] != 'practice':
+            return None
+        return next((j for j in self.operation({'op': 'practice.list'})['jobs'] if j['id'] == turn['id']), None)
+
+    def prompt(self, turn, context):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            return prompts.memory_note(json_reply=False)
+        job = self._job(turn)
+        if job and job['action'] != 'generate':
+            return prompts.memory_note(json_reply=True)
+        return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
+
+    def on_complete(self, turn):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            match = memory.NOTE.search(turn['final_text'] or '')
+            own = ['stream-user:' + turn['id'], 'stream:' + turn['id']]
+            try:
+                note = json.loads(match.group(1)) if match else None
+            except ValueError:
+                note = None
+        else:
+            job = self._job(turn)
+            if not job or job['action'] == 'generate' or job.get('error'):
+                return
+            own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:')]
+            raw = (turn['final_text'] or '').strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]
+            try:
+                note = json.loads(raw).get('memory')
+            except (ValueError, AttributeError):
+                note = None
+        if not isinstance(note, dict):
+            return
+        try:
+            self.operation({'op': 'memory.note', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'interaction_ids': own, 'note': note})
+        except OperationError:
+            log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
 
 
 class Preparation(Feature):

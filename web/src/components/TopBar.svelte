@@ -9,6 +9,8 @@
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
 
+  const suggested = $derived((app.state?.memory ?? []).filter((e) => e.status === 'suggested').length);
+
   // Review is always there while studying; before anything is reviewable its page explains when that happens (ADR 0008).
   // The count is what is due today.
   const review = $derived(app.state?.review);
@@ -84,6 +86,10 @@
       <button id="toggle-notes" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Notes")}</span>
+      </button>
+      <button id="toggle-memory" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('memory')} aria-label={t("Memory")} title={t("What the teacher remembers about this course")} onclick={() => toggle('memory')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3.5a5 5 0 0 0-3 9v2.5h6V12.5a5 5 0 0 0-3-9zM8 17h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Memory")}</span>{#if suggested}<span class="count">{suggested}</span>{/if}
       </button>
       </div>
     {/if}

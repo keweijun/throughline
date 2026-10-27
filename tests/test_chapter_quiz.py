@@ -42,6 +42,12 @@ class EarlierExercises(unittest.TestCase):
         self.task('quiz', 'd', origin='chapter_quiz', chapter_id='one', from_task_id='a-hinted')
         self.assertEqual(practice.quiz_earlier(self.store, CHAPTER), ['a-missed', 'a-hinted'])
 
+    def test_a_skipped_exercise_is_never_asked_again(self):
+        self.task('a-skipped', 'a', 'hinted', status='skipped')
+        self.task('b-skipped', 'b', status='skipped')
+        self.task('b-hinted', 'b', 'hinted')
+        self.assertEqual(practice.quiz_earlier(self.store, CHAPTER), ['b-hinted'])
+
     def test_a_chapter_with_nothing_answered_asks_only_new_questions(self):
         self.task('a-open', 'a')
         self.assertEqual(practice.quiz_earlier(self.store, CHAPTER), [])

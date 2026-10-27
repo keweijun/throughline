@@ -7,6 +7,7 @@ from . import curriculum
 from .teaching import resume as session_resume
 from .teaching import require_text, validate_concept, record_interaction
 from .preferences import view as preferences, validate_language
+from .memory import for_prompt as course_memory
 
 
 def read(store, request):
@@ -57,6 +58,8 @@ def start(store, request):
     if model['chapters']: snapshot['chapters'] = [{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']]
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile
+    memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
+    if memory and identity['channel'] != 'build': snapshot['course_memory'] = memory
     branch=next((b for b in store.list('web_branches') if identifier in [b['turn_id'],b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]),None)
     if branch:
         snapshot['branch']=branch

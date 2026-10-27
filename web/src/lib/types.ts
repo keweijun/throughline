@@ -115,7 +115,8 @@ export type Task = {
   from_task_id?: string;
   created_at?: number;
   source_refs: Ref[];
-  status: 'pending' | 'attempted' | 'deferred';
+  status: 'pending' | 'attempted' | 'deferred' | 'skipped';
+  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
   history: PracticeHistory[];
 };
 
@@ -203,6 +204,7 @@ export type State = {
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };
   settings: Settings;
   annotations: Annotation[];
+  memory: MemoryEntry[];
   skipped: Skipped[];
   builds: ChapterBuild[];
   review: ReviewState;
@@ -236,6 +238,18 @@ export type ReviewState = {
 export type AnnotationSource = Ref & { label?: string; page?: number };
 
 /** The learner's own highlight, note or bookmark. Never sent to the teacher. */
+/** A course memory entry (ADR 0010); a preference takes effect only once `confirmed`, a difficulty while `active`. */
+export type MemoryEntry = {
+  id: string;
+  kind: 'preference' | 'taught_term' | 'difficulty';
+  text: string;
+  status: 'suggested' | 'confirmed' | 'active' | 'cleared';
+  concept_id: string;
+  interaction_ids: string[];
+  created_at: number;
+  updated_at: number;
+};
+
 export type Annotation = {
   id: string;
   kind: 'highlight' | 'note' | 'bookmark';

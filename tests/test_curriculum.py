@@ -189,3 +189,81 @@ class ChapterCLI(CurriculumCLI):
             model = self.model()
             model['concepts'][0].update(bad)
             self.call('curriculum.save', error='invalid_request', **model)
+
+
+class ExercisePlacement(CurriculumCLI):
+    """An exercise part is mapped no earlier than the latest concept it requires (ADR 0012)."""
+    chapter = ChapterCLI.chapter
+
+    def exercise(self, question, *required, **fields):
+        return {'question': question, **self.refs[1], 'required_concepts': list(required), **fields}
+
+    def placed(self, state_exercises=(), projection_exercises=()):
+        state, projection = self.model()['concepts']
+        return {**state, 'exercises': list(state_exercises)}, {**projection, 'exercises': list(projection_exercises)}
+
+    def plant(self, model):
+        """Store a model as an earlier version would have, without validation."""
+        from guided_learning.store import Store
+        store = Store(self.workspace)
+        with store.db:
+            store.put('curriculum', 'model', model)
+        store.db.close()
+
+    def test_saving_an_exercise_before_a_concept_it_needs_fails_naming_both(self):
+        model = self.model()
+        model['concepts'][0]['exercises'] = [self.exercise('7(b)', 'state', 'projection')]
+        error = self.call('curriculum.save', error='exercise_placement', **model)['error']['message']
+        self.assertIn('7(b)', error)
+        self.assertIn('"state"', error)
+        self.assertIn('"projection"', error)
+        self.assertEqual(self.call('curriculum.view')['route'], [])
+        model['concepts'][0]['exercises'] = [self.exercise('7(b)', 'missing')]
+        self.assertIn('"missing"', self.call('curriculum.save', error='exercise_placement', **model)['error']['message'])
+        model['concepts'][0]['exercises'] = [{**self.exercise('7(b)'), 'required_concepts': 'projection'}]
+        self.call('curriculum.save', error='invalid_request', **model)
+        model = self.model()
+        split = {'part_of': '7', 'other_parts': [{'question': '7(b)', 'concept_id': 'projection'}]}
+        model['concepts'][0]['exercises'] = [self.exercise('7(a)', 'state', **split)]
+        model['concepts'][1]['exercises'] = [self.exercise('7(b)', 'state', 'projection', part_of='7', other_parts=[{'question': '7(a)', 'concept_id': 'state'}])]
+        self.call('curriculum.save', **model)
+        self.assertEqual(self.call('curriculum.view')['concepts'][0]['exercises'][0]['other_parts'], split['other_parts'])
+        model['concepts'][0]['exercises'][0]['other_parts'] = 'projection'
+        self.call('curriculum.save', error='invalid_request', **model)
+
+    def test_chapter_saves_and_outlines_cannot_place_an_exercise_too_early(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.placed([self.exercise('7(b)', 'projection')])
+        # The section it needs is in a chapter not built yet: the part is mapped when that chapter is built.
+        self.assertIn('"projection"', self.chapter([state], chapter_id='states', error='exercise_placement')['error']['message'])
+        state, projection = self.placed(projection_exercises=[self.exercise('7(b)', 'state', 'projection')])
+        self.chapter([state], chapter_id='states')
+        self.chapter([{**projection, 'prerequisites': []}], chapter_id='measure')
+        self.call('curriculum.outline', confirm_reorder=True, error='exercise_placement',
+                  chapters=[{'id': 'measure', 'title': 'Measurement'}, {'id': 'states', 'title': 'States'}])
+        self.assertEqual(self.call('curriculum.view')['route'], ['state', 'projection'])
+
+    def test_check_reports_existing_violations_which_only_block_the_saves_that_write_them(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.placed([self.exercise('7(b)', 'state', 'projection'), {'question': '8', **self.refs[1]}])
+        good_state, _ = self.placed()
+        self.chapter([good_state], chapter_id='states')
+        self.chapter([projection], chapter_id='measure')
+        model = self.call('curriculum.view')
+        self.plant({**model, 'concepts': [state, projection]})
+        before = self.call('curriculum.view')
+        report = self.call('curriculum.check')
+        self.assertEqual(report['violations'], [{'concept_id': 'state', 'chapter_id': 'states', 'question': '7(b)', **self.refs[1],
+                                                 'later_concepts': ['projection'], 'unknown_concepts': [], 'move_to': 'projection'}])
+        self.assertEqual((report['exercises'], report['without_required_concepts']), (2, 1))
+        self.assertEqual(self.call('curriculum.view'), before)
+        # The course still opens; saving another chapter keeps the violation it does not touch.
+        self.assertEqual(self.call('curriculum.context', concept_id='state')['concept']['exercises'][0]['question'], '7(b)')
+        self.chapter([{**projection, 'title': 'Projections'}], chapter_id='measure')
+        self.assertEqual(len(self.call('curriculum.check')['violations']), 1)
+        self.chapter([state], chapter_id='states', error='exercise_placement')
+        self.call('curriculum.save', error='exercise_placement', **{**self.call('curriculum.view'), 'concepts': [state, projection]})
+        state, projection = self.placed([], [self.exercise('7(b)', 'state', 'projection')])
+        self.chapter([state], chapter_id='states')
+        self.chapter([projection], chapter_id='measure')
+        self.assertEqual(self.call('curriculum.check')['violations'], [])

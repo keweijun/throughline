@@ -99,6 +99,8 @@ export type PracticeHistory = {
   outcome?: 'passed' | 'needs_work';
   kind?: EvidenceKind;
   answer?: string;
+  /** An ask: the learner's question, answered and never assessed (ADR 0011). */
+  question?: string;
 };
 
 export type Task = {
@@ -117,14 +119,16 @@ export type Task = {
   from_task_id?: string;
   created_at?: number;
   source_refs: Ref[];
-  status: 'pending' | 'attempted' | 'deferred';
+  status: 'pending' | 'attempted' | 'deferred' | 'skipped';
+  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
   history: PracticeHistory[];
 };
 
-export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess';
+export type PracticeAction = 'hint' | 'steps' | 'solution' | 'assess' | 'ask';
 
 export type PracticeJob = {
   answer?: string;
+  question?: string;
   id: string;
   concept_id: string;
   action: 'generate' | PracticeAction;

@@ -454,7 +454,7 @@ class Questions(Feature):
 
 
 class Practice(Feature):
-    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'defer')
+    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer', 'skip')
 
     def state(self):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
@@ -467,7 +467,7 @@ class Practice(Feature):
                     log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
-    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None):
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, question=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
@@ -488,6 +488,10 @@ class Practice(Feature):
                 if not isinstance(answer, str) or not answer.strip():
                     raise OperationError('empty_answer', 'Enter your reasoning or answer first')
                 job['answer'] = answer
+            if action == 'ask':
+                if not isinstance(question, str) or not question.strip():
+                    raise OperationError('empty_question', 'Enter your question first')
+                job['question'] = question
             self.operation({'op': 'practice.job', 'job': job})
             return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'practice',
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
@@ -499,7 +503,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None):
+    def act(self, task_id, action, answer=None, question=None, reason=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -509,8 +513,11 @@ class Practice(Feature):
             raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
         if action == 'defer' and task['origin'] == 'chapter_quiz':
             raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
-        if action == 'defer':
+        if action == 'skip' and task['origin'] in RETRIEVAL_ORIGINS:
+            raise OperationError('invalid_action', 'Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+        if action in ('defer', 'skip'):
             with self.host.lock:
+                # Setting the exercise aside cancels a request still running for it, so no late assessment reopens it.
                 for job in self.state()['jobs']:
                     if job.get('task_id') == task['id'] and not job.get('processed'):
                         try:
@@ -518,10 +525,14 @@ class Practice(Feature):
                         except OperationError as exc:
                             if exc.code != 'unknown_turn':
                                 raise
-                result = self.operation({'op': 'practice.defer', 'id': task['id']})
+                request = {'op': 'practice.' + action, 'id': task['id']}
+                if action == 'skip' and reason is not None:
+                    request['reason'] = reason
+                result = self.operation(request)
                 self.host.changed()
                 return result
-        return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None)
+        return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None,
+                            question=question if action == 'ask' else None)
 
     def _assessed_section(self, task):
         """The section a task's help and assessment are recorded for: its own, or the first section a chapter quiz question
@@ -613,6 +624,8 @@ class Practice(Feature):
             # Exercise refs need not be included in the lesson links.
             return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
+        if job['action'] == 'ask':
+            return prompts.practice_ask(task, self._sources(task['source_refs']), job['question'])
         return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'))
 
     def _retrieval_prompt(self, job, context, tasks):

@@ -8,7 +8,8 @@ from .store import OperationError
 def listing(store, request):
     return {'tasks':store.list('practice_tasks'),'jobs':store.list('practice_jobs')}
 
-ACTIONS=('generate','hint','steps','solution','assess')
+ACTIONS=('generate','hint','steps','solution','assess','ask')
+# An ask answers the learner's question about an exercise; it is never assessed and records no evidence (ADR 0011).
 # A generate job may ask for retrieval questions instead of a section's exercises (ADR 0008): one question for a spaced
 # review of the section, or a chapter quiz: two or three new questions spanning the chapter, asked together with a few
 # earlier exercises from its sections.
@@ -31,6 +32,8 @@ def job(store, request):
         teaching.require_text(value,'task_id')
     if value['action']=='assess':
         teaching.require_text(value,'answer')
+    if value['action']=='ask':
+        teaching.require_text(value,'question')
     if 'purpose' in value and (value['action']!='generate' or value['purpose'] not in PURPOSES):
         raise OperationError('invalid_request','purpose must be review or chapter_quiz, on a generate job')
     teaching.validate_concept(store,value['concept_id'])
@@ -48,6 +51,8 @@ def job(store, request):
         raise OperationError('unknown_exercise','Unknown exercise')
     if value['action']=='assess':
         teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['answer']})
+    if value['action']=='ask':
+        teaching.record_interaction(store,{'id':'practice-question:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['question']})
     store.put('practice_jobs',value['id'],value)
     return {'job':value}
 
@@ -122,7 +127,9 @@ def complete(store, request):
         cid=value['concept_id']
         teaching.record_interaction(store,{'id':iid,'role':'assistant','text':feedback,'concept_id':cid,'source_refs':task['source_refs']})
         base={'id':'practice-evidence:'+value['id'],'concept_id':cid,'session_id':'practice:'+task['id'],'exercise_id':task['id']}
-        if value['action']=='assess':
+        if value['action']=='ask':
+            task['history'].append({'action':'ask','question':value['question'],'feedback':feedback})
+        elif value['action']=='assess':
             request={**base,'answer_id':'practice-answer:'+value['id'],'assessment_id':iid,'outcome':result['outcome']}
             retest=task.get('origin')=='review' or (task.get('origin')=='chapter_quiz' and task.get('tests_concept_ids')==[cid])
             prior=retest_target(store,task,cid) if retest else None
@@ -151,7 +158,9 @@ def studied_sections(store):
 
 def quiz_tier(task):
     """Which earlier exercises a chapter quiz asks first: ones solved with help or needing another try, then ones set
-    aside, then ones solved independently. An exercise never answered nor set aside is still open, so it is not asked."""
+    aside, then ones solved independently. An exercise never answered nor set aside is still open, so it is not asked;
+    a skipped one is closed for good (ADR 0011)."""
+    if task.get('status')=='skipped': return None
     last=next((h for h in reversed(task.get('history',[])) if h.get('action')=='assess'),None)
     kind=last.get('kind') if last else None
     if kind in ('hinted','needs_work'): return 0
@@ -209,4 +218,22 @@ def defer(store, request):
     store.put('practice_tasks',task['id'],task)
     return {'task':task}
 
-OPERATIONS={'practice.list':listing,'practice.job':job,'practice.complete':complete,'practice.defer':defer}
+SKIP_REASONS=('too_easy','too_tedious','not_relevant')
+
+def skip(store, request):
+    """Close a section exercise for good, with an optional reason (ADR 0011). It records no outcome, evidence or deferral;
+    answering it later reopens it like any attempt."""
+    task=store.get('practice_tasks',request.get('id'))
+    if not task: raise OperationError('unknown_exercise','Unknown exercise')
+    if task.get('origin') not in ('source','self_created'):
+        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+    reason=request.get('reason')
+    if reason is not None and reason not in SKIP_REASONS:
+        raise OperationError('invalid_request','reason must be one of '+', '.join(SKIP_REASONS))
+    task['status']='skipped'
+    task.pop('skip_reason',None)
+    if reason: task['skip_reason']=reason
+    store.put('practice_tasks',task['id'],task)
+    return {'task':task}
+
+OPERATIONS={'practice.list':listing,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}

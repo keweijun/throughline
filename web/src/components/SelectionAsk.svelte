@@ -15,6 +15,11 @@
   let note = $state('');
   let left = $state(0);
   let top = $state(0);
+  /** The passage the toolbar points at, and which side of it the toolbar sits on. */
+  let anchor = $state<DOMRect | null>(null);
+  let side = $state<'above' | 'below'>('above');
+  let caret = $state(0);
+  let pop: HTMLElement | undefined = $state();
   let pending = $state<Pending | null>(null);
   /** A highlight the learner clicked: the toolbar then edits or removes it instead of offering new ones. */
   let target = $state<Annotation | null>(null);
@@ -27,11 +32,27 @@
   const scope = (node: Node | null | undefined) =>
     (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer], [data-exercise]') ?? null;
 
-  /** Places the toolbar under a passage, kept inside the window. */
-  function place(rect: DOMRect, width: number, height: number) {
-    left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 8));
-    top = Math.max(8, Math.min(rect.bottom + 10, window.innerHeight - height));
+  function place(rect: DOMRect) {
+    anchor = rect;
   }
+
+  // Once shown, centre on the passage at its real size: the toolbar above it, so the next lines stay readable, and
+  // the note form below it, so the passage stays in view while writing. Either flips when the window edge is too close.
+  $effect(() => {
+    if (!pop || !anchor) return;
+    void writing;
+    const { width, height } = pop.getBoundingClientRect();
+    const gap = 10;
+    // The top bar covers the top of the window, so the reading area's top is the edge to keep clear of.
+    const edge = (document.getElementById('stage')?.getBoundingClientRect().top ?? 0) + 8;
+    const fitsAbove = anchor.top - gap - height >= edge;
+    const fitsBelow = anchor.bottom + gap + height <= window.innerHeight - 8;
+    side = writing ? (fitsBelow || !fitsAbove ? 'below' : 'above') : fitsAbove || !fitsBelow ? 'above' : 'below';
+    top = side === 'above' ? Math.max(edge, anchor.top - gap - height) : Math.min(anchor.bottom + gap, window.innerHeight - height - 8);
+    const centre = anchor.left + anchor.width / 2;
+    left = Math.max(8, Math.min(centre - width / 2, window.innerWidth - width - 8));
+    caret = Math.max(12, Math.min(centre - left, width - 12));
+  });
 
   /** The learner's highlight under a click. */
   function clickedHighlight(x: number, y: number): { annotation: Annotation; rect: DOMRect } | null {
@@ -52,7 +73,7 @@
       if (!hit) return;
       target = hit.annotation;
       pending = null;
-      place(hit.rect, 220, 52);
+      place(hit.rect);
       visible = true;
       return;
     }
@@ -75,7 +96,7 @@
       const turnId = area.closest<HTMLElement>('[data-turn-id]')?.dataset.turnId ?? null;
       pending = { text: text.trim(), occurrence: occurrence(text), turnId, questionId: area.closest<HTMLElement>('[data-question-id]')?.dataset.questionId };
     }
-    place(range.getBoundingClientRect(), (annotatable ? 180 : 0) + (askable ? 210 : 0), annotatable ? 170 : 52);
+    place(range.getBoundingClientRect());
     visible = true;
   }
 
@@ -181,7 +202,7 @@
 <svelte:window onscrollcapture={() => !writing && (visible = false)} />
 
 {#if visible && writing}
-  <form class="pop writing" style:left="{left}px" style:top="{top}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
+  <form bind:this={pop} class="pop writing" data-side={side} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
     <label for="quick-note">{target?.note ? t("Edit your note") : t("Note on this passage")}</label>
     <!-- svelte-ignore a11y_autofocus -->
     <textarea id="quick-note" rows="3" bind:value={note} use:autogrow={note} use:enterToSend onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
@@ -191,23 +212,27 @@
     </div>
   </form>
 {:else if visible && target}
-  <div class="pop bar" role="toolbar" aria-label={t("Your highlight")} style:left="{left}px" style:top="{top}px">
+  <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Your highlight")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
     <button onpointerdown={(e) => e.preventDefault()} onclick={startNote}>
-      <span class="swatch mine" aria-hidden="true"></span>{target.note ? t("Edit note") : t("Add note")}
+      <span class="icon note" aria-hidden="true">✎</span>{target.note ? t("Edit note") : t("Add note")}
     </button>
-    <button onpointerdown={(e) => e.preventDefault()} onclick={remove}>{t("Remove highlight")}</button>
+    <button class="danger" onpointerdown={(e) => e.preventDefault()} onclick={remove}>
+      <span class="icon" aria-hidden="true">×</span>{t("Remove highlight")}
+    </button>
   </div>
 {:else if visible}
-  <div class="pop bar" role="toolbar" aria-label={t("Selected passage")} style:left="{left}px" style:top="{top}px">
+  <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Selected passage")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
     {#if annotatable}
       <button onpointerdown={(e) => e.preventDefault()} onclick={() => save(false)}>
-        <span class="swatch mine" aria-hidden="true"></span>{t("Highlight")}
+        <span class="icon swatch" aria-hidden="true"></span>{t("Highlight")}
       </button>
-      <button onpointerdown={(e) => e.preventDefault()} onclick={() => (writing = true)}>{t("Note")}</button>
+      <button onpointerdown={(e) => e.preventDefault()} onclick={() => (writing = true)}>
+        <span class="icon note" aria-hidden="true">✎</span>{t("Note")}
+      </button>
     {/if}
     {#if askable}
       <button onpointerdown={(e) => e.preventDefault()} onclick={ask}>
-        <span class="swatch asked" aria-hidden="true"></span>{t("Ask about this passage")}
+        <span class="icon asked" aria-hidden="true">?</span>{t("Ask about this passage")}
       </button>
     {/if}
   </div>
@@ -220,60 +245,128 @@
     z-index: 50;
     display: flex;
     border: 1px solid var(--rule-strong);
-    border-radius: var(--radius);
+    border-radius: 8px;
     background: var(--raised);
     box-shadow: var(--shadow);
   }
 
+  /* A small pointer from the toolbar to the passage it acts on. */
+  .pop::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--caret) - 5px);
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--rule-strong);
+    background: var(--raised);
+    rotate: 45deg;
+  }
+
+  .pop[data-side='above']::after {
+    bottom: -6px;
+    border-top: 0;
+    border-left: 0;
+  }
+
+  .pop[data-side='below']::after {
+    top: -6px;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
   .bar {
+    align-items: center;
     padding: 0.2rem;
     gap: 0.1rem;
   }
 
   .bar > button {
+    position: relative;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.35rem 0.7rem;
+    height: 2rem;
+    padding: 0 0.65rem 0 0.45rem;
     border: 0;
-    border-radius: calc(var(--radius) - 2px);
+    border-radius: 6px;
     background: none;
     color: var(--ink);
     font-size: var(--step--1);
-    font-weight: 600;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
   }
 
-  .bar > button:hover {
+  .bar > button:hover,
+  .bar > button:focus-visible {
     background: var(--accent-wash);
   }
 
-  .bar > button + button {
-    box-shadow: -1px 0 0 var(--rule);
+  .bar > button.danger:hover,
+  .bar > button.danger:focus-visible {
+    background: var(--danger-wash);
+    color: var(--danger);
   }
 
-  .swatch {
-    width: 0.7rem;
-    height: 0.7rem;
-    border-radius: 2px;
+  .bar > button + button::before {
+    content: '';
+    position: absolute;
+    left: -0.1rem;
+    top: 0.45rem;
+    bottom: 0.45rem;
+    width: 1px;
+    background: var(--rule);
   }
 
-  .swatch.mine {
+  /* The same marks the margin uses for notes and questions, so each action shows what it leaves behind. */
+  .icon {
+    display: inline-grid;
+    place-items: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50% 50% 50% 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--pencil);
+  }
+
+  .icon.swatch {
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 3px;
     background: var(--mine-wash);
     box-shadow: inset 0 0 0 1px var(--mine);
   }
 
-  .swatch.asked {
-    background: var(--marker-wash);
-    box-shadow: inset 0 0 0 1px var(--marker);
+  .icon.note {
+    border: 1px solid var(--mine);
+    background: var(--mine-wash);
+    color: var(--ink);
+  }
+
+  .icon.asked {
+    border: 1px solid #c9a82b;
+    background: var(--marker);
+    color: #2a2208;
+  }
+
+  .danger .icon {
+    font-size: 1rem;
+    font-weight: 400;
   }
 
   .writing {
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.4rem;
     width: min(340px, calc(100vw - 16px));
     padding: 0.6rem;
+  }
+
+  .writing > * {
+    position: relative;
+    z-index: 1;
   }
 
   .writing label {

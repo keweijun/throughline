@@ -6,7 +6,7 @@ We teach a section's lesson as a short sequence of **lesson steps**:
 
 - Preparation plans about three steps from the section's core question; the unit overview already names them. A step is one turn of the mainline lesson and keeps the lesson lifecycle: it streams, can be paused, and is regenerated as a new attempt.
 - Each step ends with one **check question**: multiple choice, with options written around likely misconceptions and an "I'm not sure" option. The step's turn returns the question with the correct option and a one-line explanation for every option, so the learner sees feedback at once without another model turn.
-- A correct answer leads to the next step. A wrong or "not sure" answer shows that option's explanation, and the next step opens with a short fix aimed at that misconception before going on. Repairs never cost an extra turn.
+- A correct answer leads to the next step. A wrong or "not sure" answer shows that option's explanation and the correct answer with its own, and the next step opens with a short fix aimed at that misconception before going on. Repairs never cost an extra turn.
 - The learner may continue without answering. The check is then left unanswered and nothing is repaired.
 - The teacher may adapt the plan freely while teaching: add a bridge step, reorder or merge the remaining steps. It may only use material that belongs to the section or its taught prerequisites; content of later sections stays with them (ADR 0006). The interface shows the step position and any added step.
 - Grouped practice still ends the section. Check questions are not exercises.

@@ -255,8 +255,10 @@ def quiz_sections(store, chapter):
     return [c for c in chapter['concept_ids'] if c in allowed]
 
 def studied_sections(store):
-    """Sections with a completed lesson of their own; a chapter recap is not one."""
-    return {t['concept_id'] for t in store.list('streams') if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
+    """Sections with a completed lesson of their own (a chapter recap is not one) or any learning evidence, such as
+    sections taught in Codex chat before the app."""
+    return ({t['concept_id'] for t in store.list('streams') if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
+            | {e['concept_id'] for e in store.list('evidence')})
 
 def quiz_tier(task):
     """Which earlier exercises a chapter quiz asks first: ones solved with help or needing another try, then ones set

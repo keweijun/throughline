@@ -2,7 +2,7 @@
   import { locale, t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown, RENDERED } from '../lib/markdown';
-  import { mark, clear } from '../lib/highlight';
+  import { mark, clear, annotationPassage } from '../lib/highlight';
   import { lessonStatus } from '../lib/format';
   import type { Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
@@ -70,7 +70,7 @@
       add(row);
     };
     mark('asked', turn.id, body, asked.map((q) => q.selection)).forEach((range, i) => place(range, (row) => row.questions.push(asked[i].id)));
-    mark('mine', turn.id, body, mine.map((a) => a.passage)).forEach((range, i) => {
+    mark('mine', turn.id, body, mine.map(annotationPassage)).forEach((range, i) => {
       if (mine[i].note) place(range, (row) => row.notes.push(mine[i].id));
     });
     rows = found;
@@ -79,6 +79,9 @@
       clear('mine', turn.id);
     };
   });
+
+  const noteText = (id: string) => app.state?.annotations.find((a) => a.id === id)?.note ?? '';
+  const questionText = (id: string) => app.state?.questions.find((q) => q.id === id)?.question ?? '';
 
   function openThread(id: string) {
     app.focusThread = id;
@@ -117,27 +120,39 @@
 
   {#if turn.text}
     <div class="notes" aria-label={t("Questions and notes on this lesson")}>
-      {#each rows as row}
+      {#each rows as row, r}
         <div class="markers" style:top="{row.top}px">
           {#if row.notes.length}
-            <button
-              class="note mine"
-              onclick={() => app.showAnnotation(row.notes[0])}
-              aria-label={t("Open your note on this passage")}
-              title={t("Your note on this passage")}
-            >
-              <span aria-hidden="true">✎</span>{#if row.notes.length > 1}<sup>{row.notes.length}</sup>{/if}
-            </button>
+            <div class="marker">
+              <button
+                class="note mine"
+                onclick={() => app.showAnnotation(row.notes[0])}
+                aria-label={t("Open your note on this passage")}
+                aria-describedby="peek-notes-{turn.id}-{r}"
+              >
+                <span aria-hidden="true">✎</span>{#if row.notes.length > 1}<sup>{row.notes.length}</sup>{/if}
+              </button>
+              <div class="peek" role="tooltip" id="peek-notes-{turn.id}-{r}">
+                <p class="peek-title">{row.notes.length > 1 ? t('{count} notes on this passage', { count: row.notes.length }) : t("Your note on this passage")}</p>
+                {#each row.notes as id (id)}<p class="peek-text">{noteText(id)}</p>{/each}
+              </div>
+            </div>
           {/if}
           {#if row.questions.length}
-            <button
-              class="note"
-              onclick={() => openThread(row.questions[0])}
-              aria-label={t("Open your question about this passage")}
-              title={row.questions.length > 1 ? t('{count} questions about this passage', { count: row.questions.length }) : t('Your question about this passage')}
-            >
-              <span aria-hidden="true">?</span>{#if row.questions.length > 1}<sup>{row.questions.length}</sup>{/if}
-            </button>
+            <div class="marker">
+              <button
+                class="note"
+                onclick={() => openThread(row.questions[0])}
+                aria-label={t("Open your question about this passage")}
+                aria-describedby="peek-questions-{turn.id}-{r}"
+              >
+                <span aria-hidden="true">?</span>{#if row.questions.length > 1}<sup>{row.questions.length}</sup>{/if}
+              </button>
+              <div class="peek" role="tooltip" id="peek-questions-{turn.id}-{r}">
+                <p class="peek-title">{row.questions.length > 1 ? t('{count} questions about this passage', { count: row.questions.length }) : t('Your question about this passage')}</p>
+                {#each row.questions as id (id)}<p class="peek-text">{questionText(id)}</p>{/each}
+              </div>
+            </div>
           {/if}
         </div>
       {/each}
@@ -199,6 +214,62 @@
     display: flex;
     gap: 0.3rem;
     margin-top: 0.15rem;
+  }
+
+  .marker {
+    position: relative;
+  }
+
+  /* Hovering a marker previews what it opens, after a short pause so passing over it stays quiet. */
+  .peek {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    left: 0;
+    z-index: 20;
+    display: grid;
+    gap: 0.35rem;
+    width: max-content;
+    max-width: 20rem;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--raised);
+    box-shadow: var(--shadow);
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    text-align: left;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--quick) ease, visibility 0s linear var(--quick);
+  }
+
+  .marker:hover .peek,
+  .marker:has(:focus-visible) .peek {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--quick) ease 0.25s, visibility 0s linear 0.25s;
+  }
+
+  .peek-title {
+    font-weight: 600;
+    color: var(--pencil);
+  }
+
+  .peek-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
+    overflow: hidden;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .peek-text + .peek-text {
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--rule);
   }
 
   .note {

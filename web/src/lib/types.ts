@@ -274,7 +274,6 @@ export type ReviewState = {
 
 export type AnnotationSource = Ref & { label?: string; page?: number };
 
-/** The learner's own highlight, note or bookmark. Never sent to the teacher. */
 /** A course memory entry (ADR 0010); a preference takes effect only once `confirmed`, a difficulty while `active`. */
 export type MemoryEntry = {
   id: string;
@@ -290,6 +289,7 @@ export type MemoryEntry = {
   updated_at: number;
 };
 
+/** The learner's own highlight, note or bookmark. Never sent to the teacher. */
 export type Annotation = {
   id: string;
   kind: 'highlight' | 'note' | 'bookmark';
@@ -298,6 +298,8 @@ export type Annotation = {
   task_id?: string | null;
   source: AnnotationSource | null;
   passage: string;
+  /** Which repeat of the passage in its lesson, answer or exercise; missing means the first. */
+  occurrence?: number;
   note: string;
   created_at: number;
   updated_at: number;

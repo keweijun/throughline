@@ -3,7 +3,7 @@
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
   import { openPdf, pdfjs } from '../lib/pdf';
-  import { mark, clear } from '../lib/highlight';
+  import { mark, clear, type Passage } from '../lib/highlight';
 
   let {
     url,
@@ -18,7 +18,7 @@
     document?: string;
     page: number;
     label: string;
-    highlights?: { page: number; passage: string }[];
+    highlights?: { page: number; passage: Passage }[];
     current?: number;
   } = $props();
 

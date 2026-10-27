@@ -44,6 +44,8 @@ class Runner:
             text = json.dumps({'questions': [{'question': 'Normalize (1, 1).', 'origin': 'self_created', 'source_refs': []}]})
         else:
             text = '## Lesson\n\nA short lesson.'
+        if 'This reply teaches step' in prompt:
+            text += '\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

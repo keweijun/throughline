@@ -177,6 +177,22 @@ class AppStore {
     return this.state?.turns.find((t) => t.id === id);
   }
 
+  /** The stepped lesson a turn teaches a step of, with the step's number; null for a single-reply lesson. */
+  stepOf(turnId: string) {
+    for (const lesson of this.state?.lessons ?? []) {
+      const index = lesson.steps.findIndex((s) => s.turn_id === turnId);
+      if (index >= 0) return { lesson, number: index + 1 };
+    }
+    return null;
+  }
+
+  /** The section's stepped lesson that still has steps to teach, once its first step has started. */
+  openLesson(conceptId: string | null) {
+    return (this.state?.lessons ?? []).find(
+      (l) => l.concept_id === conceptId && !!this.turn(l.steps[0]?.turn_id) && l.steps.some((s) => !s.turn_id),
+    );
+  }
+
   hasLesson(conceptId: string | null) {
     return this.lessons(conceptId).some((t) => t.status === 'completed' || t.status === 'running');
   }
@@ -571,6 +587,11 @@ class AppStore {
 
   startLesson(prompt: string) {
     return this.act(() => api.post('/api/lessons', { id: newId(), prompt }));
+  }
+
+  /** Continue: teach the next planned step of a stepped lesson. */
+  continueLesson(lessonId: string) {
+    return this.act(() => api.post(`/api/lessons/${encodeURIComponent(lessonId)}/steps`, { id: newId() }));
   }
 
   async setLanguage(language: Language) {

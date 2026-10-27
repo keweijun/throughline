@@ -84,6 +84,8 @@ class Runner:
             text += piece
             emit({'kind': 'delta', 'text': piece})
             time.sleep(0.15)
+        if 'This reply teaches step' in prompt:
+            text += '\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

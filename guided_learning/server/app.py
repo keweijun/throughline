@@ -101,6 +101,10 @@ class RecapRequest(Body):
     id: Optional[str] = None
 
 
+class StepRequest(Body):
+    id: Optional[str] = None
+
+
 class SettingsRequest(Body):
     model: str = ''
     small_model: str = ''
@@ -276,6 +280,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'review': review,
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
+                'lessons': current.operation({'op': 'lesson.list'})['lessons'],
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
                 'skipped': current.practice.skipped(),
                 'builds': current.builds.state()}
@@ -301,6 +306,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/lessons')
     def start_lesson(body: LessonRequest):
         return host.start_lesson(body.model_dump())
+
+    @app.post('/api/lessons/{lesson_id}/steps')
+    def continue_lesson(lesson_id: str, body: StepRequest):
+        result = host.navigation.continue_lesson(lesson_id, body.model_dump())
+        return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.put('/api/preferences')
     def preferences(body: PreferencesRequest):

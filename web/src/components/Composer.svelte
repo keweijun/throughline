@@ -45,8 +45,8 @@
       <h2>{t("Start this section")}</h2>
       {@const chapter = app.chapterOf(conceptId)}
       <p>
-        {#if !chapter || chapter.concept_ids[0] === conceptId}{t("The teacher opens with an overview of the whole chapter, then teaches this section. You can pause at any time.")}
-        {:else}{t("The teacher connects this section to the previous one, then teaches it. You can pause at any time.")}{/if}
+        {#if !chapter || chapter.concept_ids[0] === conceptId}{t("The teacher opens with an overview of the whole chapter, then teaches this section in short steps. You can pause at any time.")}
+        {:else}{t("The teacher connects this section to the previous one, then teaches it in short steps. You can pause at any time.")}{/if}
       </p>
       <details>
         <summary>{t("Change what the lesson focuses on")}</summary>

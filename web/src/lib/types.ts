@@ -56,6 +56,12 @@ export type Turn = {
   title?: string | null;
 };
 
+/** One step of a stepped lesson (ADR 0009); `turn_id` is set once the step is taught, `replied` once its plan block is read. */
+export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean };
+
+/** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. */
+export type SteppedLesson = { id: string; concept_id: string; request: string; created_at: number; steps: LessonStep[] };
+
 export type Decision = {
   depth: 'short' | 'long';
   category: string;
@@ -192,6 +198,7 @@ export type State = {
   };
   deferred_explanations: DeferredExplanation[];
   turns: Turn[];
+  lessons: SteppedLesson[];
   questions: Question[];
   practice: { tasks: Task[]; jobs: PracticeJob[] };
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };

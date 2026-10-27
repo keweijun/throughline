@@ -27,6 +27,8 @@ class Runner:
             text = '## Unit overview\n\nStates carry phase.\n\nThis answers your earlier question about phase in full.'
         else:
             text = '## Unit overview\n\nTwo paths add.\n\nAmplitudes add before squaring.'
+        if 'This reply teaches step' in prompt:
+            text += '\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

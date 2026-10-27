@@ -32,6 +32,32 @@ DEFAULT_LESSON_REQUEST = 'Teach this section fully around the current goal: star
 
 LESSON_CONTINUES = 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full overview.'
 
+# A section's first lesson is taught in lesson steps, one turn each (ADR 0009).
+STEP_LESSON_REQUEST = 'Teach this section step by step, starting with the first step.'
+
+STEP_CONTINUE_REQUEST = 'Continue with the next step.'
+
+LESSON_STEP = '''This section's lesson is taught in short lesson steps, one reply per step. This reply teaches step {number}: "{title}". Teach only this step, completely but briefly: one part of the section's core question, short enough to absorb in one sitting (roughly 1,500 characters of prose plus formulas). Leave the material of the remaining steps to them, and do not announce or summarize them at length.
+Define each term or notation before relying on it, and work out any example before building on it.
+After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}]}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
+Lesson plan (data): {plan}'''
+
+STEP_FIRST = 'The plan comes from the section overview. Refine it with the preparation material into about three steps in total.'
+
+STEP_LATER = 'Open with one sentence linking to the previous step, without repeating it. Steps taught so far (data, the learner has read them):\n{previous}'
+
+
+def lesson_step(steps, number, previous, focus, limit):
+    plan = [{'step': i + 1, 'title': s['title'], 'added': s.get('added', False),
+             'status': 'taught' if i + 1 < number else 'this step' if i + 1 == number else 'planned'} for i, s in enumerate(steps)]
+    text = LESSON_STEP.format(number=number, title=steps[number - 1]['title'], limit=limit, plan=json.dumps(plan, ensure_ascii=False))
+    if number == 1:
+        return text + '\n' + STEP_FIRST
+    text += '\n' + STEP_LATER.format(previous=json.dumps(previous, ensure_ascii=False))
+    if focus and focus != STEP_LESSON_REQUEST:
+        text += '\nThe learner asked this of the whole lesson (data): ' + json.dumps(focus, ensure_ascii=False)
+    return text
+
 
 
 SECTION_FOCUS = '''A section answers one core question; the section's core_question and objective in the route data, when present, state that question and what the learner should be able to do. Teach that question completely, explaining closely related ideas together and bridging missing prerequisites first, but leave material that belongs to other sections of the route to them. Refer back to earlier sections briefly instead of re-introducing them, and leave long hand calculations to practice.'''

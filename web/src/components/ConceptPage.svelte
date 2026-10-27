@@ -40,6 +40,11 @@
   // The host records where a section starts; what to do next follows from the lessons and practice so far.
   const nextStep = $derived.by(() => {
     if (lessons.some((l) => l.status === 'running')) return t("Follow the lesson as it is written. Select any passage to ask about it.");
+    const stepped = app.openLesson(conceptId);
+    if (stepped) {
+      const latest = app.turn(stepped.steps.filter((s) => s.turn_id).at(-1)?.turn_id);
+      return latest?.status === 'completed' ? t("Continue with the next step when you are ready.") : t("Regenerate the unfinished step to go on.");
+    }
     if (!lessons.some((l) => l.status === 'completed'))
       return lessons.length ? t("Regenerate the unfinished lesson, or start a new one.") : t("Start the lesson for this section.");
     const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
@@ -229,7 +234,8 @@
       <p class="quiet">{t("No lesson yet. This section starts when you reach it on the route.")}</p>
     {/if}
 
-    {#if isCurrent}
+    <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
+    {#if isCurrent && !app.openLesson(conceptId)}
       <Composer conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} />
     {/if}
 

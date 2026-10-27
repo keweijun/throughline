@@ -90,6 +90,18 @@ test('a step\'s check question: instant feedback, a repair after a miss, and con
   expect(errors).toEqual([]);
 });
 
+test('a right answer to a check moves on to the next step by itself', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const first = page.getByRole('region', { name: 'Step 1 of 4' });
+  const check = first.getByRole('group', { name: 'Check question' });
+  await check.getByRole('button', { name: 'A complex amplitude' }).click();
+  await expect(check.getByRole('status')).toContainText('Correct.');
+  await expect(page.getByRole('region', { name: /Step 2 of/ }), 'no Continue needed after a right answer').toHaveCount(1);
+  await expect(check.getByRole('status'), 'the explanation stays with its step').toContainText('Correct.');
+  expect(errors).toEqual([]);
+});
+
 test('Continue shows the next step at once: it was written while the learner read the current one', async ({ page, course }) => {
   const { errors } = await course('prepared_steps_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();

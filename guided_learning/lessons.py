@@ -7,7 +7,7 @@ from .memory import from_check
 from .store import OperationError
 from .teaching import record_interaction, require_text, validate_concept
 
-MAX_STEPS = 8  # the whole plan: about three steps, plus room for bridges
+MAX_STEPS = 8  # a sanity cap on the whole plan, bridges included; the teacher decides the count
 MAX_TITLE = 200
 MAX_OPTIONS = 5  # besides "I'm not sure", which the interface adds
 MAX_CHECK_TEXT = 1000

@@ -31,10 +31,10 @@ _Avoid_: End of chat, latest message.
 **Learning section**: A part of the route that answers one core question, explaining closely related ideas together; it may span sources and turns and ends with grouped practice.
 _Avoid_: Single reply, fixed page count, slide subheading, a whole chapter.
 
-**Lesson step**: One turn of a section's lesson, teaching one part of its core question and ending with a check question; the teacher may add a bridge step or reorder steps within the section (ADR 0009).
+**Lesson step**: One turn of a section's lesson, teaching one part of its core question; it may end with a check question. The teacher decides how many steps a section needs and whether a step ends with a check, and may add a bridge step or reorder steps within the section (ADR 0009).
 _Avoid_: Unit overview step list, a whole lesson, a slide.
 
-**Check question**: A multiple-choice question ending a lesson step, with explanations for every option, used to catch a gap before the next step; it is never assessed and is not learning evidence.
+**Check question**: A multiple-choice question that may end a lesson step, with explanations for every option, used to catch a gap before the next step; it is never assessed and is not learning evidence.
 _Avoid_: Exercise, quiz, diagnostic test.
 
 **Exercise part**: One subquestion of an exercise, assessed on its own; an exercise is solved when all its parts are correct (ADR 0011).

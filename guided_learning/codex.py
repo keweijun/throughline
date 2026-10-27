@@ -92,14 +92,14 @@ def list_models(command=None, timeout=20):
 
 class CodexRunner:
     """One ephemeral Codex thread per turn. A turn fails when Codex stays silent for `idle_timeout` seconds,
-    or, however lively, runs past the `timeout` cap."""
+    or, however lively, runs past the `timeout` cap. `images` are paths of local image files sent with the prompt."""
 
     def __init__(self, model=None, effort='medium', command=None, timeout=3600, idle_timeout=300, service_tier=None):
         self.model, self.effort, self.timeout, self.idle_timeout = model, effort, timeout, idle_timeout
         self.service_tier = service_tier
         self.command = command
 
-    def run(self, prompt, cwd, emit, cancel):
+    def run(self, prompt, cwd, emit, cancel, images=()):
         command = self.command or [find_codex() or 'codex','app-server','--stdio']
         process = subprocess.Popen(command,cwd=cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
                                    text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
@@ -146,7 +146,7 @@ class CodexRunner:
                     send({'id':2,'method':'thread/start','params':params})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
-                    params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]}
+                    params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':prompt}]+[{'type':'localImage','path':str(p)} for p in images]}
                     if self.model: params['model'] = self.model
                     if cancel.is_set(): return
                     send({'id':3,'method':'turn/start','params':params})

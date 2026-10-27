@@ -8,6 +8,7 @@
   import { highlights } from '../lib/highlight';
   import { evidenceLabel, helpLabels, solved as isSolved } from '../lib/format';
   import type { Task } from '../lib/types';
+  import AnswerImages from './AnswerImages.svelte';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
 
@@ -19,11 +20,45 @@
   const draftKey = $derived(`exercise:${task.id}`);
   const answer = $derived(app.drafts.get(draftKey));
   const setAnswer = (value: string) => app.drafts.set(draftKey, value);
+  // Attached images are uploaded at once and kept, by name, as part of the draft.
+  const imagesKey = $derived(`exercise-images:${task.id}`);
+  const readImages = (key: string): string[] => {
+    try {
+      return JSON.parse(app.drafts.get(key) || '[]');
+    } catch {
+      return [];
+    }
+  };
+  const images = $derived(readImages(imagesKey));
+  const setImages = (value: string[]) => app.drafts.set(imagesKey, value.length ? JSON.stringify(value) : '');
+  const IMAGE_TYPES = 'image/png,image/jpeg,image/gif,image/webp';
+  let uploading = $state(0);
+  let picker = $state<HTMLInputElement>();
+
+  async function attach(files: File[]) {
+    const key = imagesKey;
+    for (const file of files.filter((f) => f.type.startsWith('image/'))) {
+      uploading += 1;
+      const result = await app.act(() => api.upload<{ image: string }>('/api/practice/images', file));
+      uploading -= 1;
+      const current = readImages(key);
+      if (result && !current.includes(result.image)) app.drafts.set(key, JSON.stringify([...current, result.image]));
+    }
+  }
+
+  function pasteImages(event: ClipboardEvent) {
+    const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+    if (!files.length) return;
+    event.preventDefault();
+    void attach(files);
+  }
+
   // A question about the exercise has its own draft: asking is never assessed (ADR 0011).
   const askKey = $derived(`exercise-ask:${task.id}`);
   const question = $derived(app.drafts.get(askKey));
   let asking = $state(false);
   let busy = $state(false);
+  const canCheck = $derived(!busy && !uploading && (answer.trim() !== '' || images.length > 0));
   let confirmSolution = $state(false);
   let confirmSkip = $state(false);
   let preview = $state('');
@@ -39,7 +74,7 @@
   const latestJob = $derived([...jobs].sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1));
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
-  const submittedAnswer = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob.answer : undefined);
+  const submittedJob = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob : undefined);
   const submittedQuestion = $derived(latestJob?.action === 'ask' && (!latestJob.processed || latestJob.error) ? latestJob.question : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
@@ -65,13 +100,20 @@
     confirmSolution = false;
     confirmSkip = false;
     const submitted = answer;
+    const attached = images;
     const key = draftKey;
-    const result = await app.act(() =>
-      api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, action === 'assess' ? { answer: submitted } : body),
-    );
+    const imageKey = imagesKey;
+    const sent = action !== 'assess' ? body : attached.length ? { answer: submitted, images: attached } : { answer: submitted };
+    const result = await app.act(() => api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, sent));
     busy = false;
-    // Keep anything typed while the answer was being sent.
+    // Keep anything typed or attached while the answer was being sent.
     if (result && action === 'assess' && app.drafts.get(key) === submitted) app.drafts.set(key, '');
+    if (result && action === 'assess' && JSON.stringify(readImages(imageKey)) === JSON.stringify(attached)) app.drafts.set(imageKey, '');
+  }
+
+  function restoreSubmitted() {
+    setAnswer(submittedJob?.answer ?? '');
+    setImages(submittedJob?.images ?? []);
   }
 
   async function ask() {
@@ -135,10 +177,11 @@
               <div class="prose" use:markdown={{ language: locale.language, text: entry.question, breaks: true }}></div>
             </section>
           {/if}
-          {#if entry.answer}
+          {#if entry.answer || entry.images?.length}
             <section class="your-answer" aria-label={t("Your answer")}>
               <p class="answer-label">{t("Your answer")}</p>
-              <div class="prose" use:markdown={{ language: locale.language, text: entry.answer, breaks: true }}></div>
+              {#if entry.answer}<div class="prose" use:markdown={{ language: locale.language, text: entry.answer, breaks: true }}></div>{/if}
+              <AnswerImages images={entry.images ?? []} />
             </section>
           {/if}
           <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
@@ -150,12 +193,13 @@
     </div>
   {/if}
 
-  {#if submittedAnswer}
+  {#if submittedJob}
     <section class="your-answer submitted-answer" aria-label={t("Submitted answer")}>
       <p class="answer-label">{t("Submitted answer")}</p>
-      <div class="prose" use:markdown={{ language: locale.language, text: submittedAnswer, breaks: true }}></div>
+      {#if submittedJob.answer}<div class="prose" use:markdown={{ language: locale.language, text: submittedJob.answer, breaks: true }}></div>{/if}
+      <AnswerImages images={submittedJob.images ?? []} />
       {#if failedJob}
-        <button class="btn btn-small" onclick={() => setAnswer(submittedAnswer ?? '')}>{t("Restore submitted answer")}</button>
+        <button class="btn btn-small" onclick={restoreSubmitted}>{t("Restore submitted answer")}</button>
       {/if}
     </section>
   {/if}
@@ -182,12 +226,14 @@
         rows="3"
         bind:value={() => answer, setAnswer}
         use:autogrow={answer}
-        use:modEnterToSend={() => !busy && answer.trim() && act('assess')}
-        placeholder={t("Write your reasoning and answer. Use $…$ for math.")}
+        use:modEnterToSend={() => canCheck && act('assess')}
+        onpaste={pasteImages}
+        placeholder={t("Write your reasoning and answer, or paste or attach images of your work. Use $…$ for math.")}
         aria-label={t("Exercise answer")}
         aria-describedby="exercise-keys-{task.id}"
       ></textarea>
     </label>
+    <AnswerImages {images} onremove={(name) => setImages(images.filter((n) => n !== name))} />
     {#if preview && answer}
       <section class="answer-preview" aria-label={t("Answer preview")}>
         <p class="answer-label">{t("Preview")}</p>
@@ -195,7 +241,24 @@
       </section>
     {/if}
     <div class="actions">
-      <button class="btn btn-primary" disabled={busy || !answer.trim()} onclick={() => act('assess')}>{t("Check my answer")}</button>
+      <button class="btn btn-primary" disabled={!canCheck} onclick={() => act('assess')}>{t("Check my answer")}</button>
+      <input
+        bind:this={picker}
+        class="visually-hidden"
+        type="file"
+        accept={IMAGE_TYPES}
+        multiple
+        tabindex="-1"
+        aria-label={t("Choose images of your work")}
+        onchange={(e) => {
+          const input = e.currentTarget;
+          void attach([...(input.files ?? [])]);
+          input.value = '';
+        }}
+      />
+      <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => picker?.click()}>
+        {uploading ? t("Attaching…") : t("Attach image")}
+      </button>
       <span class="keys" id="exercise-keys-{task.id}">{t("{keys} to check · Enter for a new line", { keys: sendKeys })}</span>
 
       <span class="help">

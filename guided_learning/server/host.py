@@ -232,7 +232,10 @@ class Host:
 
         def work():
             try:
-                self.runner_for(turn).run(self.build_prompt(turn), self.workspace, emit, cancel)
+                prompt = self.build_prompt(turn)
+                images = [path for feature in self.features for path in feature.images(turn)]
+                # Only a turn with images passes them, so runners without an `images` parameter keep working (ADR 0002).
+                self.runner_for(turn).run(prompt, self.workspace, emit, cancel, **({'images': images} if images else {}))
                 fail('Model ended without a completed reply')
             except Exception as exc:
                 log.info('Turn %s attempt %s failed', identifier, attempt, exc_info=True)

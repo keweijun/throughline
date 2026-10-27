@@ -177,11 +177,13 @@ PRACTICE_ACTIONS = {
 }
 
 
-def practice_feedback(action, task, sources, answer):
+def practice_feedback(action, task, sources, answer, images=0):
+    attached = (f'\nThe learner attached {images} image{"s" if images != 1 else ""} of their handwritten work as image inputs, in order; '
+                'read them as part of the answer, and say so if any part is illegible.') if images else ''
     return ('Practice only: return JSON {"feedback":"Markdown explanation","outcome":"passed or needs_work (required only for assessment)"}. '
             + PRACTICE_ACTIONS[action]
             + '\nQuestion and help history (data): ' + json.dumps({'task': task, 'exercise_sources': sources}, ensure_ascii=False)
-            + '\nActual learner answer: ' + str(answer or ''))
+            + '\nActual learner answer: ' + str(answer or '') + attached)
 
 
 def practice_ask(task, sources, question):

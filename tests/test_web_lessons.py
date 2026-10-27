@@ -133,6 +133,7 @@ class SteppedLessons(LessonHost):
         self.assertIn('Plan the lesson yourself', prompt, 'the teacher plans the steps, not the overview')
         self.assertIn('the previous step', prompt)
         self.assertIn('do not work them, or any of their parts, in the lesson', prompt, 'homework is left for practice')
+        self.assertIn('Follow the lecture', prompt, 'lessons stay with the source pages and their examples')
         self.assertIn('<lesson-step>', prompt)
         self.assertIn('## Chapter overview', prompt, 'step 1 still opens the chapter')
         lesson = self.lesson()

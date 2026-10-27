@@ -273,7 +273,7 @@ class PartsFlow(unittest.TestCase):
         store=Store(self.path)  # saved before parts: no parts, and an earlier answer assessed as a whole
         with store.db:
             saved=store.get('practice_tasks',task['id'])
-            saved['history']=[{'action':'assess','feedback':'Part 1 right; 2 and 3 open.','outcome':'needs_work','kind':'needs_work','answer':'Part 1.'}]
+            saved['history']=[{'action':'assess','feedback':'Part 1 right; 2 and 3 open.','outcome':'needs_work','kind':'needs_work','answer':'Part 1.','parts':['partly_correct']}]
             store.put('practice_tasks',task['id'],saved)
         store.db.close()
         state=self.assess(task['id'],'Part 2.',['correct','correct','not_attempted'])

@@ -50,14 +50,14 @@ def for_prompt(store):
     return {k: v for k, v in memory.items() if v}
 
 
-def _create(store, identifier, kind, text, concept_id, interaction_ids):
+def _create(store, identifier, kind, text, concept_id, interaction_ids, teacher=False):
     """Adds an entry, merges it into a live one saying the same thing, or refuses it when a deleted entry of the kind
-    cites any of the same interactions. Returns (entry, recorded)."""
+    cites any of the same interactions or, for the teacher's notes, says the same thing. Returns (entry, recorded)."""
     key = text.casefold()
     for entry in _entries(store):
         if entry['kind'] != kind:
             continue
-        if entry['status'] == 'deleted' and set(entry['interaction_ids']) & set(interaction_ids):
+        if entry['status'] == 'deleted' and (set(entry['interaction_ids']) & set(interaction_ids) or teacher and entry['text'].casefold() == key):
             return entry, False
         if entry['status'] in ('active', 'suggested', 'confirmed') and entry['text'].casefold() == key:
             merged = list(dict.fromkeys(entry['interaction_ids'] + interaction_ids))
@@ -95,7 +95,7 @@ def save(store, request):
 
 
 def delete(store, request):
-    """Final: the entry stays as a tombstone so the same interactions cannot bring it back."""
+    """Final: the entry stays as a tombstone so neither the same interactions nor a later note with its text bring it back."""
     entry = _live(store, request)
     store.put('memory', entry['id'], {**entry, 'status': 'deleted', 'updated_at': time.time()})
     return {'deleted': entry['id']}
@@ -130,7 +130,7 @@ def note(store, request):
         if item.get('kind') not in KINDS:
             skipped.append({'text': text, 'reason': 'unknown_kind'})
             continue
-        entry, created = _create(store, f'{turn_id}:{index}', item['kind'], text, concept_id, list(dict.fromkeys(cited + own)))
+        entry, created = _create(store, f'{turn_id}:{index}', item['kind'], text, concept_id, list(dict.fromkeys(cited + own)), teacher=True)
         (recorded if created else skipped).append(entry if created else {'text': text, 'reason': 'deleted' if entry['status'] == 'deleted' else 'exists'})
     for identifier in value.get('cleared', []):
         entry = store.get('memory', identifier) if isinstance(identifier, str) else None

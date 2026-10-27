@@ -148,6 +148,26 @@ test('a long formula scrolls inside the preview instead of widening the page', a
   }
 });
 
+test('a wide formula in an earlier answer stays inside the exercise', async ({ page, course }) => {
+  await course('practice_continuity_browser_fixture');
+  const task = page.locator('#practice article').filter({ has: page.locator('.history .your-answer') }).first();
+  const answer = task.locator('.history .your-answer .prose').first();
+  await expect(answer).toBeVisible();
+  const width = await task.evaluate((node) => node.getBoundingClientRect().width);
+  // Stand-ins for a long display formula and a long inline one.
+  for (const markup of ['<div class="katex-display"><span style="display:inline-block;width:3000px">x</span></div>', '<span style="display:inline-block;width:3000px">x</span>']) {
+    const overflow = await answer.evaluate((node, html) => {
+      node.innerHTML = html;
+      const box = node.closest('.your-answer')!.getBoundingClientRect();
+      const card = node.closest('article')!.getBoundingClientRect();
+      return box.right - card.right;
+    }, markup);
+    expect(overflow).toBeLessThanOrEqual(0);
+    expect(await task.evaluate((node) => node.getBoundingClientRect().width)).toBeCloseTo(width, 0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
 test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const task = page.locator('#practice article').nth(2);

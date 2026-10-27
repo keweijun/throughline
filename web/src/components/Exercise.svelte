@@ -455,6 +455,7 @@
 
   .history {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
     padding-left: 0.9rem;
     border-left: 2px solid var(--accent-wash);

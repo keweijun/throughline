@@ -560,6 +560,8 @@ summary:focus-visible {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.2em 0;
+  /* Scroll a long formula instead of letting its width stretch grid and flex ancestors. */
+  contain: inline-size;
 }
 
 .citation {

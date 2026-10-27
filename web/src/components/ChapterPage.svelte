@@ -28,7 +28,7 @@
 
   const rows = $derived(
     ids.map((id) => {
-      const tasks = app.tasks(id);
+      const tasks = app.tasks(id).filter((task) => task.status !== 'skipped');
       return {
         id,
         title: app.concept(id)?.title ?? id,

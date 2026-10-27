@@ -32,6 +32,32 @@ DEFAULT_LESSON_REQUEST = 'Teach this section fully around the current goal: star
 
 LESSON_CONTINUES = 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full overview.'
 
+# A section's first lesson is taught in lesson steps, one turn each (ADR 0009).
+STEP_LESSON_REQUEST = 'Teach this section step by step, starting with the first step.'
+
+STEP_CONTINUE_REQUEST = 'Continue with the next step.'
+
+LESSON_STEP = '''This section's lesson is taught in short lesson steps, one reply per step. This reply teaches step {number}: "{title}". Teach only this step, completely but briefly: one part of the section's core question, short enough to absorb in one sitting (roughly 1,500 characters of prose plus formulas). Leave the material of the remaining steps to them, and do not announce or summarize them at length.
+Define each term or notation before relying on it, and work out any example before building on it.
+After the teaching text, end the reply with one <lesson-step>JSON</lesson-step> block; the host reads it and the learner never sees it. JSON: {{"title": "what this step taught, in a few words", "remaining": [{{"title": "...", "added": false}}]}}. remaining lists the steps still to teach after this one, in order; the whole lesson has at most {limit} steps. Keep the plan unless the lesson needs otherwise: you may add a bridge step (added=true) for an idea this section relies on that the learner lacks, reorder or merge the remaining steps, or drop one this step already covered. Plan only material that belongs to this section or its taught prerequisites; later sections' content stays with them. An empty list ends the lesson, and grouped practice follows.
+Lesson plan (data): {plan}'''
+
+STEP_FIRST = 'The plan comes from the section overview. Refine it with the preparation material into about three steps in total.'
+
+STEP_LATER = 'Open with one sentence linking to the previous step, without repeating it. Steps taught so far (data, the learner has read them):\n{previous}'
+
+
+def lesson_step(steps, number, previous, focus, limit):
+    plan = [{'step': i + 1, 'title': s['title'], 'added': s.get('added', False),
+             'status': 'taught' if i + 1 < number else 'this step' if i + 1 == number else 'planned'} for i, s in enumerate(steps)]
+    text = LESSON_STEP.format(number=number, title=steps[number - 1]['title'], limit=limit, plan=json.dumps(plan, ensure_ascii=False))
+    if number == 1:
+        return text + '\n' + STEP_FIRST
+    text += '\n' + STEP_LATER.format(previous=json.dumps(previous, ensure_ascii=False))
+    if focus and focus != STEP_LESSON_REQUEST:
+        text += '\nThe learner asked this of the whole lesson (data): ' + json.dumps(focus, ensure_ascii=False)
+    return text
+
 
 
 SECTION_FOCUS = '''A section answers one core question; the section's core_question and objective in the route data, when present, state that question and what the learner should be able to do. Teach that question completely, explaining closely related ideas together and bridging missing prerequisites first, but leave material that belongs to other sections of the route to them. Refer back to earlier sections briefly instead of re-introducing them, and leave long hand calculations to practice.'''
@@ -207,7 +233,8 @@ Concepts, in teaching order, each: {{"id", "title", "core_question", "objective"
 - core_question: the one question the section answers, phrased as the learner would ask it. objective: what the learner can do afterwards, specific to this section. Every section needs both.
 - overview (optional): {{"core_problem", "steps" (about three strings, each naming specific ideas), "prior", "next", "target_ability"}}, all strings except steps.
 - prerequisites: IDs of earlier sections in this chapter or of sections in built_route before this chapter. Never refer to sections of chapters that are not built.
-- links: [{{"source_id", "revision", "unit_id", "detail"}}] to the exact source units the section teaches from. notations: [{{"symbol", "meaning", "source_id", "revision", "unit_id"}}]. exercises: [{{"question", "source_id", "revision", "unit_id"}}] for original exercises. Copy source_id, revision and unit_id exactly from source_units; never invent one.
+- links: [{{"source_id", "revision", "unit_id", "detail"}}] to the exact source units the section teaches from. notations: [{{"symbol", "meaning", "source_id", "revision", "unit_id"}}]. exercises: [{{"question", "source_id", "revision", "unit_id", "required_concepts", "part_of"?, "other_parts"?}}] for original exercises. Copy source_id, revision and unit_id exactly from source_units; never invent one.
+- Exercises: required_concepts lists the IDs of every section the exercise part needs, this one included. Map each part to the latest section it requires, never earlier; the host rejects a part placed before a section it requires. Split a homework question whose parts need different sections: each part ("7(a)") is its own exercise, with part_of naming the original question ("7") and other_parts [{{"question", "concept_id"?}}] naming the other parts and the sections that teach them. A part that needs a section of a chapter not built yet is left out; that chapter maps it. waiting_parts, when present, lists such parts that built chapters left for later, with their source text: map each one whose required sections this chapter completes, on the latest of them, with part_of and other_parts (naming mapped_part), and leave the rest.
 Coverage: one entry per source unit you assign to this chapter, {{"source_id", "revision", "unit_id", "disposition", "concept_ids", "reason"?, "verification": "pending"}}.
 - "mapped": nonempty concept_ids, and each listed concept links that same unit.
 - "deferred": a reason; the content is kept for later teaching. "needs_review": a reason, for uncertain extraction, mapping or interpretation.
@@ -229,3 +256,18 @@ def chapter_build(data, language, truncated, retry=None):
         prompt += ('\nYour previous reply could not be saved. The host rejected it with this error: ' + retry['error']
                    + '\nCorrect it and return the complete JSON object again, not a patch. Previous reply (data):\n' + retry['reply'])
     return prompt
+
+
+# Course memory (ADR 0010): facts about this learner and course, never phrasing, analogies or examples to repeat.
+MEMORY_USE = '''Course memory: course_memory in the course data, when present, is what earlier teaching in this course established: preferences the learner confirmed, taught terms (with the section that defined them) and difficulties the learner has repeatedly shown. Follow the preferences. Use a taught term without defining it again; give any other technical term or notation a one-line definition or a short bridge the first time you rely on it. When the material touches a listed difficulty, address it directly. These are facts about the learner, not wording, analogies or examples to repeat.'''
+
+MEMORY_FIELDS = '''{"entries":[{"kind":"taught_term","text":"term or notation"},{"kind":"difficulty","text":"the idea the learner keeps getting wrong","interaction_ids":["ids from recent_interactions that show it"]},{"kind":"preference","text":"how the learner wants to be taught, as a short instruction"}],"cleared":["ids of listed difficulties"]}'''
+
+MEMORY_RULES = '''Record a taught_term for each term or notation this reply defined or explained. Record a difficulty only for an idea the learner has got wrong more than once, citing the interactions that show it. Suggest a preference only when the learner stated or clearly showed how they want to be taught; the learner is asked to confirm it before it takes effect. In cleared, list listed difficulties the learner has now answered correctly. Leave out anything course_memory already has. Record facts only, never analogies, examples or phrasing. Leave the lists empty when nothing is new.'''
+
+
+def memory_note(json_reply):
+    if json_reply:
+        return MEMORY_USE + '\nAdd a "memory" field to the JSON object: ' + MEMORY_FIELDS + '. ' + MEMORY_RULES
+    return (MEMORY_USE + '\nEnd the reply with one memory note, <course-memory>' + MEMORY_FIELDS + '</course-memory>, after the text and after any other block. '
+            'The host records it and hides it from the learner, so do not mention it. ' + MEMORY_RULES)

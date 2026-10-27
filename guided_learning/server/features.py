@@ -9,13 +9,17 @@ import threading
 import uuid
 from pathlib import Path
 
+from .. import lessons
 from ..store import OperationError
+from .. import memory
 from . import prompts
 
 log = logging.getLogger(__name__)
 
 RETRIEVAL_ORIGINS = ('review', 'chapter_quiz')
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
+STEP_REPLY = re.compile(r'<lesson-step>\s*(\{.*?\})\s*</lesson-step>', re.S)
+STEP_BLOCK = re.compile(r'\s*<lesson-step>.*$', re.S)
 _PDF_LOCK = threading.Lock()
 
 
@@ -195,16 +199,112 @@ class Navigation(Feature):
         chapter = context.get('chapter')
         if is_recap(turn):
             return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
+        lesson, number = self.step_of(turn['id'])
         earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed' and not chapter_owned(t)]
-        if earlier:
+        if earlier and not lesson:
             text = prompts.LESSON_CONTINUES
+        elif number and number > 1:
+            text = ''
         else:
             # Every routed section is in a chapter: flat routes become one chapter (ADR 0006, migration 3).
-            text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language)
-        text += '\n' + prompts.SECTION_FOCUS
+            text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language) + '\n'
+        if lesson:
+            previous = [{'step': i + 1, 'title': s['title'], 'text': self._step_text(s['turn_id'])} for i, s in enumerate(lesson['steps'][:number - 1])]
+            text += prompts.lesson_step(lesson['steps'], number, previous, lesson.get('request'), lessons.MAX_STEPS) + '\n'
+        text += prompts.SECTION_FOCUS
         due = [i for i in self._due(turn) if i['status'] == 'pending']
         return text + '\n' + prompts.due_explanations(due) if due else text
+
+    def _step_text(self, turn_id):
+        return STEP_BLOCK.sub('', self.operation({'op': 'stream.read', 'id': turn_id})['turn']['final_text'] or '')
+
+    def step_of(self, turn_id):
+        """The stepped lesson a turn teaches a step of, and the step's number; (None, None) for a single-reply lesson."""
+        for lesson in self.operation({'op': 'lesson.list'})['lessons']:
+            for index, step in enumerate(lesson['steps']):
+                if step.get('turn_id') == turn_id:
+                    return lesson, index + 1
+        return None, None
+
+    def steps_remain(self, turn):
+        """Whether the stepped lesson this turn belongs to still has steps to teach after it."""
+        lesson, number = self.step_of(turn['id'])
+        return bool(lesson) and number < len(lesson['steps'])
+
+    def start_lesson(self, concept_id, body):
+        """A section's first lesson is taught in steps planned from its overview (ADR 0009); a later request over a
+        section that already has a lesson, including one saved before steps, is a single reply."""
+        identifier = body.get('id') or str(uuid.uuid4())
+        prompt = (body.get('prompt') or '').strip()
+        with self.host.lock:
+            existing = self._existing(identifier)
+            if existing:
+                return existing
+            taught = any(t['channel'] == 'mainline' and t['concept_id'] == concept_id and not chapter_owned(t) for t in self.host.brief_turns())
+            if taught:
+                return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt or prompts.DEFAULT_LESSON_REQUEST})
+            self.host._ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+            preview = self.preview(concept_id)
+            plan = [s.strip()[:lessons.MAX_TITLE] for s in preview['overview']['steps'] if isinstance(s, str) and s.strip()][:lessons.MAX_STEPS]
+            prompt = prompt or prompts.STEP_LESSON_REQUEST
+            self.operation({'op': 'lesson.begin', 'id': identifier, 'concept_id': concept_id, 'request': prompt,
+                            'steps': plan or [preview['concept']['title'][:lessons.MAX_TITLE]]})
+            return self._start_step(identifier, identifier, concept_id, prompt)
+
+    def continue_lesson(self, lesson_id, body):
+        """Continue: teach the next planned step of a lesson in the current section."""
+        identifier = body.get('id') or str(uuid.uuid4())
+        with self.host.lock:
+            lesson = self.operation({'op': 'lesson.read', 'id': lesson_id})['lesson']
+            existing = self._existing(identifier)
+            if existing:
+                return existing
+            position = self.operation({'op': 'course.status'})['position'] or {}
+            if position.get('concept_id') != lesson['concept_id']:
+                raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
+            self.host._ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+            return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
+
+    def _existing(self, identifier):
+        """A retried request whose turn already started."""
+        try:
+            turn = self.operation({'op': 'stream.read', 'id': identifier})['turn']
+        except OperationError:
+            return None
+        if turn['channel'] != 'mainline':
+            raise OperationError('id_conflict', identifier)
+        return {'turn': turn, 'created': False}
+
+    def _start_step(self, lesson_id, identifier, concept_id, prompt):
+        self.operation({'op': 'lesson.step', 'id': lesson_id, 'turn_id': identifier})
+        return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt})
+
+    def _record_step(self, lesson, turn):
+        """Read the plan block a completed step ends with. A missing or invalid block keeps the plan as it was."""
+        request = {'op': 'lesson.reply', 'id': lesson['id'], 'turn_id': turn['id']}
+        match = STEP_REPLY.search(turn['final_text'] or '')
+        try:
+            reply = json.loads(match.group(1)) if match else None
+        except ValueError:
+            reply = None
+        if isinstance(reply, dict):
+            try:
+                return self.operation({**request, **{k: reply[k] for k in ('title', 'remaining') if k in reply}})
+            except OperationError as exc:
+                if exc.code != 'invalid_plan':
+                    raise
+                log.info('Step %s returned an invalid plan: %s', turn['id'], exc)
+        return self.operation(request)
+
+    def recover(self):
+        """Read the plans of steps completed just before a crash, without a model call."""
+        for lesson in self.operation({'op': 'lesson.list'})['lessons']:
+            for step in lesson['steps']:
+                if step.get('turn_id') and not step.get('replied'):
+                    turn = next((t for t in self.host.brief_turns() if t['id'] == step['turn_id']), None)
+                    if turn and turn['status'] == 'completed':
+                        self._record_step(lesson, self.operation({'op': 'stream.read', 'id': turn['id']})['turn'])
 
     def _recap_data(self, chapter):
         model = self.operation({'op': 'curriculum.view'})
@@ -249,6 +349,11 @@ class Navigation(Feature):
         if turn['channel'] != 'mainline' or is_recap(turn):
             return
         self.host.practice.resolve_skip(turn)
+        lesson, _ = self.step_of(turn['id'])
+        if lesson:
+            self._record_step(lesson, turn)
+            if self.steps_remain(turn):
+                return  # pending explanations are given within the lesson, by its last step at the latest
         for item in self._due(turn):
             if item['status'] != 'pending':
                 continue
@@ -331,7 +436,7 @@ class Questions(Feature):
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):
             return
-        match = DECISION.search(turn['final_text'])
+        match = DECISION.search(memory.strip(turn['final_text']))
         if not match:
             return  # the question stays unanswered when the decision is missing
         try:
@@ -350,7 +455,7 @@ class Questions(Feature):
 
 
 class Practice(Feature):
-    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer')
+    ACTIONS = ('hint', 'steps', 'solution', 'assess', 'ask', 'defer', 'skip')
 
     def state(self):
         # Reconcile jobs completed just before a crash, before their completion hook ran.
@@ -399,7 +504,7 @@ class Practice(Feature):
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None, question=None):
+    def act(self, task_id, action, answer=None, question=None, reason=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
@@ -409,8 +514,11 @@ class Practice(Feature):
             raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
         if action == 'defer' and task['origin'] == 'chapter_quiz':
             raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
-        if action == 'defer':
+        if action == 'skip' and task['origin'] in RETRIEVAL_ORIGINS:
+            raise OperationError('invalid_action', 'Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+        if action in ('defer', 'skip'):
             with self.host.lock:
+                # Setting the exercise aside cancels a request still running for it, so no late assessment reopens it.
                 for job in self.state()['jobs']:
                     if job.get('task_id') == task['id'] and not job.get('processed'):
                         try:
@@ -418,7 +526,10 @@ class Practice(Feature):
                         except OperationError as exc:
                             if exc.code != 'unknown_turn':
                                 raise
-                result = self.operation({'op': 'practice.defer', 'id': task['id']})
+                request = {'op': 'practice.' + action, 'id': task['id']}
+                if action == 'skip' and reason is not None:
+                    request['reason'] = reason
+                result = self.operation(request)
                 self.host.changed()
                 return result
         return self._launch(self._assessed_section(task), action, task, answer if action == 'assess' else None,
@@ -546,8 +657,53 @@ class Practice(Feature):
     def on_complete(self, turn):
         self.operation({'op': 'practice.complete', 'id': turn['id']})
         # A chapter recap asks for nothing: the chapter quiz is taken on purpose from the chapter page.
-        if turn['channel'] == 'mainline' and not self.host.closing and not is_recap(turn):
+        if turn['channel'] == 'mainline' and not self.host.closing and not is_recap(turn) and not self.host.navigation.steps_remain(turn):
             self.generate(turn['concept_id'])
+
+
+class Memory(Feature):
+    """Course memory (ADR 0010). Every teaching prompt carries it through the snapshot; a lesson, side-question answer or
+    practice help ends with a memory note, which the host records once the turn completes."""
+
+    def _job(self, turn):
+        if turn['channel'] != 'practice':
+            return None
+        return next((j for j in self.operation({'op': 'practice.list'})['jobs'] if j['id'] == turn['id']), None)
+
+    def prompt(self, turn, context):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            return prompts.memory_note(json_reply=False)
+        job = self._job(turn)
+        if job and job['action'] != 'generate':
+            return prompts.memory_note(json_reply=True)
+        return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
+
+    def on_complete(self, turn):
+        if turn['channel'] in ('mainline', 'sidequestion'):
+            match = memory.NOTE.search(turn['final_text'] or '')
+            own = ['stream-user:' + turn['id'], 'stream:' + turn['id']]
+            try:
+                note = json.loads(match.group(1)) if match else None
+            except ValueError:
+                note = None
+        else:
+            job = self._job(turn)
+            if not job or job['action'] == 'generate' or job.get('error'):
+                return
+            own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:')]
+            raw = (turn['final_text'] or '').strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0]
+            try:
+                note = json.loads(raw).get('memory')
+            except (ValueError, AttributeError):
+                note = None
+        if not isinstance(note, dict):
+            return
+        try:
+            self.operation({'op': 'memory.note', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'interaction_ids': own, 'note': note})
+        except OperationError:
+            log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
 
 
 class Preparation(Feature):

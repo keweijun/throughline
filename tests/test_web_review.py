@@ -30,7 +30,7 @@ class Runner:
         elif 'Practice only' in prompt:
             text = json.dumps({'questions': [{'question': 'Normalize the state (1, 1).', 'origin': 'self_created', 'source_refs': []}]})
         else:
-            text = '## Lesson\n\nText.'
+            text = '## Lesson\n\nText.\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson leads to practice
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

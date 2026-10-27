@@ -67,6 +67,10 @@ class NoteRequest(Body):
     note: str
 
 
+class MemoryRequest(Body):
+    text: str
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -78,6 +82,7 @@ class GenerateRequest(Body):
 class PracticeRequest(Body):
     answer: Optional[str] = None
     question: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class NextSectionRequest(Body):
@@ -99,6 +104,10 @@ class ReviewRequest(Body):
 
 
 class RecapRequest(Body):
+    id: Optional[str] = None
+
+
+class StepRequest(Body):
     id: Optional[str] = None
 
 
@@ -277,7 +286,9 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
                 'review': review,
                 'preparation': current.preparation.state(),
                 'settings': current.settings.public(),
+                'lessons': current.operation({'op': 'lesson.list'})['lessons'],
                 'annotations': current.operation({'op': 'annotations.list'})['annotations'],
+                'memory': current.operation({'op': 'memory.view'})['entries'],
                 'skipped': current.practice.skipped(),
                 'builds': current.builds.state()}
 
@@ -302,6 +313,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/lessons')
     def start_lesson(body: LessonRequest):
         return host.start_lesson(body.model_dump())
+
+    @app.post('/api/lessons/{lesson_id}/steps')
+    def continue_lesson(lesson_id: str, body: StepRequest):
+        result = host.navigation.continue_lesson(lesson_id, body.model_dump())
+        return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.put('/api/preferences')
     def preferences(body: PreferencesRequest):
@@ -363,6 +379,24 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         host.changed()
         return result
 
+    @app.put('/api/memory/{identifier}')
+    def edit_memory(identifier: str, body: MemoryRequest):
+        result = host.operation({'op': 'memory.save', 'id': identifier, 'text': body.text})
+        host.changed()
+        return result
+
+    @app.post('/api/memory/{identifier}/confirm')
+    def confirm_memory(identifier: str):
+        result = host.operation({'op': 'memory.confirm', 'id': identifier})
+        host.changed()
+        return result
+
+    @app.delete('/api/memory/{identifier}')
+    def remove_memory(identifier: str):
+        result = host.operation({'op': 'memory.delete', 'id': identifier})
+        host.changed()
+        return result
+
     @app.post('/api/practice/generate')
     def generate(body: GenerateRequest):
         result = host.practice.generate(body.concept_id)
@@ -370,7 +404,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/practice/tasks/{task_id}/{action}')
     def practice_action(task_id: str, action: str, body: PracticeRequest):
-        result = host.practice.act(task_id, action, body.answer, body.question)
+        result = host.practice.act(task_id, action, body.answer, body.question, body.reason)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
     @app.get('/api/review')

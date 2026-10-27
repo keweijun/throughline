@@ -65,6 +65,9 @@ export const partLabels: Record<PartStatus, { label: MessageKey; tone: Tone }> =
   not_attempted: { label: 'Not attempted', tone: 'plain' },
 };
 
+/** Open until solved; a skipped exercise is closed without an outcome (ADR 0011). */
+export const open = (task: Task) => task.status !== 'skipped' && !solved(task);
+
 /** Every turn that answers a side question: the answer, a foundation supplement and follow-up replies. */
 export const questionTurnIds = (question: Question) =>
   [question.turn_id, question.supplement_turn_id, ...(question.replies ?? []).map((r) => r.turn_id)].filter((id): id is string => !!id);

@@ -27,6 +27,8 @@
     document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Throughline')}` : t('Throughline');
   });
 
+  const suggestion = $derived(app.libraryOpen ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'));
+
   function step(offset: number) {
     const route = app.state?.curriculum.route ?? [];
     const next = route[route.indexOf(app.viewingId ?? '') + offset];
@@ -70,6 +72,17 @@
   <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
     <p>{app.notice}</p>
     <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
+  </div>
+{/if}
+
+<!-- A preference the teacher suggested takes effect only once the learner confirms it (ADR 0010). -->
+{#if suggestion && !(app.panelOpen && app.panelTab === 'memory')}
+  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
+    <p>{t("Remember: {text}?", { text: suggestion.text })}</p>
+    <span>
+      <button class="btn btn-quiet btn-small" onclick={() => app.removeMemory(suggestion.id)}>{t("Don't remember")}</button>
+      <button class="btn btn-small" onclick={() => app.confirmMemory(suggestion.id)}>{t("Remember")}</button>
+    </span>
   </div>
 {/if}
 

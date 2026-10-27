@@ -56,6 +56,12 @@ export type Turn = {
   title?: string | null;
 };
 
+/** One step of a stepped lesson (ADR 0009); `turn_id` is set once the step is taught, `replied` once its plan block is read. */
+export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean };
+
+/** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. */
+export type SteppedLesson = { id: string; concept_id: string; request: string; created_at: number; steps: LessonStep[] };
+
 export type Decision = {
   depth: 'short' | 'long';
   category: string;
@@ -121,7 +127,8 @@ export type Task = {
   from_task_id?: string;
   created_at?: number;
   source_refs: Ref[];
-  status: 'pending' | 'attempted' | 'deferred';
+  status: 'pending' | 'attempted' | 'deferred' | 'skipped';
+  skip_reason?: 'too_easy' | 'too_tedious' | 'not_relevant';
   history: PracticeHistory[];
 };
 
@@ -203,11 +210,13 @@ export type State = {
   };
   deferred_explanations: DeferredExplanation[];
   turns: Turn[];
+  lessons: SteppedLesson[];
   questions: Question[];
   practice: { tasks: Task[]; jobs: PracticeJob[] };
   preparation: { jobs: PreparationJob[]; next_concept_id: string | null };
   settings: Settings;
   annotations: Annotation[];
+  memory: MemoryEntry[];
   skipped: Skipped[];
   builds: ChapterBuild[];
   review: ReviewState;
@@ -241,6 +250,18 @@ export type ReviewState = {
 export type AnnotationSource = Ref & { label?: string; page?: number };
 
 /** The learner's own highlight, note or bookmark. Never sent to the teacher. */
+/** A course memory entry (ADR 0010); a preference takes effect only once `confirmed`, a difficulty while `active`. */
+export type MemoryEntry = {
+  id: string;
+  kind: 'preference' | 'taught_term' | 'difficulty';
+  text: string;
+  status: 'suggested' | 'confirmed' | 'active' | 'cleared';
+  concept_id: string;
+  interaction_ids: string[];
+  created_at: number;
+  updated_at: number;
+};
+
 export type Annotation = {
   id: string;
   kind: 'highlight' | 'note' | 'bookmark';

@@ -17,6 +17,7 @@ class Runner:
   emit({'kind':'delta','text':text})
   if cancel.wait(2): return
   text+='\n\n讲解完成。' if chinese else '\n\nLesson complete.'
+  text+='\n<lesson-step>{"remaining": []}</lesson-step>' if 'This reply teaches step' in prompt else ''  # a one-step lesson
   emit({'kind':'final','text':text});emit({'kind':'complete'})
 try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

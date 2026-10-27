@@ -16,6 +16,7 @@ class Runner:
     def __init__(self, target='b'):
         self.prompts = []
         self.target = target
+        self.lessons = []
 
     def run(self, prompt, cwd, emit, cancel):
         self.prompts.append(prompt)
@@ -23,7 +24,7 @@ class Runner:
             text = ('Short: phase matters later.\n<teaching-decision>{"depth":"short","category":"future","rationale":"interference later",'
                     '"suggest_supplement":false,"supplement_goal":"","target_concept_id":"' + self.target + '"}</teaching-decision>')
         else:
-            text = 'A full lesson.'
+            text = self.lessons.pop(0) if self.lessons else 'A full lesson.\n<lesson-step>{"remaining": []}</lesson-step>'  # one step ends the lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 
@@ -54,6 +55,28 @@ class Continuity(unittest.TestCase):
                 self.assertEqual(item['status'], 'resolved')
                 self.assertEqual(item['answer_interaction_id'], 'stream:lesson-b')
                 self.assertEqual(app.snapshot()['session']['due_explanations'], [])
+            finally:
+                app.close()
+
+    def test_a_stepped_lesson_resolves_pending_explanations_with_its_last_step(self):
+        from guided_learning.server import Host
+        runner = Runner()
+        runner.lessons = ['Step one.\n<lesson-step>{"remaining": [{"title": "Phase"}]}</lesson-step>', 'Step two.\n<lesson-step>{"remaining": []}</lesson-step>']
+        with tempfile.TemporaryDirectory() as tmp:
+            course(tmp)
+            app = Host(tmp, runner=runner)
+            try:
+                app.questions.ask({'id': 'q', 'question': 'Why does phase matter?'})
+                app.wait('branch:q', 3)
+                app.practice.next_section('a', 'n')
+                app.start_lesson({'id': 'one'})
+                app.wait('one', 3)
+                self.assertEqual(app.snapshot()['deferred_explanations'][0]['status'], 'pending')
+                app.navigation.continue_lesson('one', {'id': 'two'})
+                app.wait('two', 3)
+                self.assertIn('Pending explanations', next(p for p in runner.prompts if 'teaches step 2' in p))
+                [item] = app.snapshot()['deferred_explanations']
+                self.assertEqual((item['status'], item['answer_interaction_id']), ('resolved', 'stream:two'))
             finally:
                 app.close()
 

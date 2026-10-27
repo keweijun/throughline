@@ -73,7 +73,7 @@ turn_summary = summarize
 
 class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
-        from .features import Navigation, Practice, Preparation, Questions
+        from .features import Memory, Navigation, Practice, Preparation, Questions
         from .builds import ChapterBuilds
         from .review import Review
         self.workspace = Path(workspace).resolve()
@@ -92,9 +92,12 @@ class Host:
         self.preparation = Preparation(self)
         self.builds = ChapterBuilds(self)
         self.review = Review(self)
-        # Order matters: prompt additions are appended in this order.
-        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds)
+        self.memory = Memory(self)
+        # Order matters: prompt additions are appended, and completions handled, in this order; memory goes last, after
+        # practice has recorded the interactions a note cites.
+        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.memory)
         self.questions.recover()
+        self.navigation.recover()
         self.preparation.start()
         self.builds.start()
 
@@ -191,8 +194,7 @@ class Host:
                                 'goal': prompts.section_goal(first, chinese),
                                 'next_step': '阅读讲解，然后尝试练习' if chinese else 'Read the lesson, then try the exercises'})
                 position = self.operation({'op': 'course.status'})['position']
-            prompt = (body.get('prompt') or '').strip() or prompts.DEFAULT_LESSON_REQUEST
-            return self.start_turn({'id': body.get('id'), 'concept_id': position['concept_id'], 'prompt': prompt, 'channel': 'mainline'})
+            return self.navigation.start_lesson(position['concept_id'], body)
 
     def _launch(self, turn):
         cancel = threading.Event()

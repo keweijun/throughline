@@ -7,7 +7,10 @@ import { scrollStage, stageScroll } from './stage';
 
 const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$)/g;
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
-const DECISION = /<teaching-decision>[\s\S]*$/;
+// Structured blocks a teacher reply ends with; the host reads them and the learner never sees them.
+const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
+// The teacher's course memory note (ADR 0010), wherever it is and while it is still streaming.
+const MEMORY = /\s*<course-memory>[\s\S]*?(<\/course-memory>|$)/g;
 
 function parse(text: string, breaks = false): DocumentFragment {
   const math: { tex: string; display: boolean }[] = [];
@@ -121,7 +124,7 @@ export const RENDERED = 'markdown-rendered';
 export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource }: MarkdownOptions) {
   const key = locale.language + breaks + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
   if (node.dataset.key === key) return;
-  const fragment = parse(text.replace(DECISION, ''), breaks);
+  const fragment = parse(text.replace(MEMORY, '').replace(DECISION, ''), breaks);
   linkCitations(fragment, refs, onSource);
   const scrollY = stageScroll();
   const incoming = [...fragment.childNodes];

@@ -12,7 +12,23 @@
   let body: HTMLElement | undefined = $state();
   const status = $derived(lessonStatus[turn.status]);
   const lessons = $derived(app.lessons(turn.concept_id));
-  const number = $derived(lessons.findIndex((t) => t.id === turn.id) + 1);
+  // A stepped lesson (ADR 0009) counts once among the section's lessons, however many steps it has.
+  const step = $derived(app.stepOf(turn.id));
+  const units = $derived([...new Set(lessons.map((l) => app.stepOf(l.id)?.lesson.id ?? l.id))]);
+  const number = $derived(units.indexOf(step?.lesson.id ?? turn.id) + 1);
+  const planned = $derived(step ? step.lesson.steps.slice(step.number) : []);
+  // Continue is offered under the latest step once it is complete and the plan has steps left.
+  const continues = $derived(
+    !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),
+  );
+  let continuing = $state(false);
+
+  async function next() {
+    if (!step || continuing) return;
+    continuing = true;
+    await app.continueLesson(step.lesson.id);
+    continuing = false;
+  }
   const asked = $derived(
     (app.state?.questions ?? []).filter((q) => q.selection && (q.selected_turn_id ?? q.main_turn_id) === turn.id),
   );
@@ -64,16 +80,29 @@
   }
 </script>
 
-<section class="lesson" id="turn-{turn.id}" data-turn-id={turn.id} aria-label={turn.id.startsWith('recap:') ? t("Chapter recap") : lessons.length > 1 ? t('Lesson {number}', { number }) : t('Lesson')}>
+<section
+  class="lesson"
+  class:step={!!step}
+  id="turn-{turn.id}"
+  data-turn-id={turn.id}
+  aria-label={turn.id.startsWith('recap:') ? t("Chapter recap")
+    : step ? t('Step {number} of {total}', { number: step.number, total: step.lesson.steps.length })
+    : units.length > 1 ? t('Lesson {number}', { number }) : t('Lesson')}
+>
   <div class="meta">
     {#if turn.id.startsWith('recap:')}<span class="number">{t("Chapter recap")}</span>
-    {:else if lessons.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}
+    {:else if units.length > 1}<span class="number">{t('Lesson {number}', { number })}</span>{/if}
+    {#if step}
+      <span class="number step-position">{t('Step {number} of {total}', { number: step.number, total: step.lesson.steps.length })}</span>
+      <span class="step-title">{step.lesson.steps[step.number - 1].title}</span>
+      {#if step.lesson.steps[step.number - 1].added}<span class="chip chip-accent">{t("Added step")}</span>{/if}
+    {/if}
     {#if turn.status === 'running'}
       <span class="chip"><span class="live-dot"></span>{t(status.label)}</span>
     {:else if turn.status !== 'completed'}
       <span class="chip chip-{status.tone}">{t(status.label)}</span>
     {/if}
-    <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Regenerate lesson")} />
+    <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={step ? t("Regenerate step") : t("Regenerate lesson")} />
   </div>
 
   {#if turn.error && turn.status !== 'completed'}
@@ -116,6 +145,20 @@
     ></div>
   {:else if turn.status === 'running'}
     <p class="waiting">{t("The teacher is reading the goal and sources. Text appears here as it is written.")}</p>
+  {/if}
+
+  {#if continues}
+    <div class="next" role="group" aria-label={t("Next step")}>
+      <ol class="plan" start={step!.number + 1}>
+        {#each planned as item}
+          <li>{item.title}{#if item.added} <span class="chip chip-accent">{t("Added step")}</span>{/if}</li>
+        {/each}
+      </ol>
+      <div class="row">
+        <button class="btn btn-primary" onclick={next} disabled={continuing || !!app.runningLesson}>{t("Continue")}</button>
+        {#if app.runningLesson}<span class="hint">{t("Another lesson is being written. Pause it first.")}</span>{/if}
+      </div>
+    </div>
   {/if}
 
   {#if turn.attempts.length}
@@ -219,6 +262,44 @@
 
   .number {
     font-weight: 600;
+  }
+
+  .step-title {
+    color: var(--ink-soft);
+  }
+
+  .next {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    font-size: var(--step-0);
+  }
+
+  .plan {
+    margin: 0;
+    padding-left: 1.4rem;
+    color: var(--ink-soft);
+  }
+
+  .plan li:first-child {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .next .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .next .hint {
+    font-size: var(--step--1);
+    color: var(--pencil);
   }
 
   .error {

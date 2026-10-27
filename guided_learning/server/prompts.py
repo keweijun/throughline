@@ -64,9 +64,9 @@ def lesson_step(steps, number, previous, focus, limit):
 SECTION_FOCUS = '''A section answers one core question; the section's core_question and objective in the route data, when present, state that question and what the learner should be able to do. Teach that question completely, explaining closely related ideas together and bridging missing prerequisites first, but leave material that belongs to other sections of the route to them. Refer back to earlier sections briefly instead of re-introducing them, and leave long hand calculations to practice.'''
 
 CHAPTER_FIRST = '''This is the first lesson of the chapter "{title}" (see chapters in the route data). Begin the reply with a substantive "## Chapter overview", then teach this section, the chapter's first, directly without asking the learner to confirm.
-In the overview, describe the chapter's core problem, its sections in order and how each leads to the next, connections to earlier chapters, and what the learner will be able to explain or calculate at the end of the chapter. Keep unverified material explicitly uncertain and do not insert preparation status messages.'''
+In the overview, describe the chapter's core problem, its sections in order and how each leads to the next, connections to earlier chapters, and what the learner will be able to explain or calculate at the end of the chapter. Do not insert preparation status messages.'''
 
-CHAPTER_SECTION = '''This is the first lesson for this section, part of the chapter "{title}". Open with one or two sentences connecting it to the previous section, without a chapter or unit overview, then teach it directly without asking the learner to confirm. Keep unverified material explicitly uncertain and do not insert preparation status messages.'''
+CHAPTER_SECTION = '''This is the first lesson for this section, part of the chapter "{title}". Open with one or two sentences connecting it to the previous section, without a chapter or unit overview, then teach it directly without asking the learner to confirm. Do not insert preparation status messages.'''
 
 
 def chapter_lesson(chapter, first, language):

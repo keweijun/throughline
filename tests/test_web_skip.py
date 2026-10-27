@@ -76,6 +76,7 @@ class SkipFlow(SkipCourse):
         self.assertEqual(self.task(task['id'])['status'], 'pending')
 
     def test_review_and_quiz_questions_cannot_be_skipped(self):
+        self.runner.quiz_tests = [['a'], ['a']]  # only a is studied here
         task = self.exercise()
         self.runner.outcome = 'passed'
         self.post(f'/api/practice/tasks/{task["id"]}/assess', {'answer': 'My reasoning.'})

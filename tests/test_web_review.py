@@ -17,14 +17,15 @@ class Runner:
     def __init__(self):
         self.prompts = []
         self.outcome = 'passed'
+        self.quiz_tests = [['a', 'b'], ['b']]  # the sections each new quiz question tests
 
     def run(self, prompt, cwd, emit, cancel):
         self.prompts.append(prompt)
         if 'Practice only (spaced review)' in prompt:
             text = json.dumps({'questions': [{'question': 'A new situation: why does the norm stay 1?'}]})
         elif 'Practice only (chapter quiz)' in prompt:
-            text = json.dumps({'questions': [{'question': 'Connect states and superposition.', 'tests_concept_ids': ['a', 'b']},
-                                             {'question': 'Superposition in a new basis.', 'tests_concept_ids': ['b']}]})
+            text = json.dumps({'questions': [{'question': 'Connect states and superposition.', 'tests_concept_ids': self.quiz_tests[0]},
+                                             {'question': 'Superposition in a new basis.', 'tests_concept_ids': self.quiz_tests[1]}]})
         elif 'Question and help history' in prompt:
             text = json.dumps({'feedback': 'Checked.', 'outcome': self.outcome})
         elif 'Practice only' in prompt:
@@ -122,6 +123,17 @@ class ReviewFlow(unittest.TestCase):
         self.post('/api/review/postpone', {'concept_id': 'a'}, status=409)
         self.host.review.clock = lambda: now + 4 * DAY + 60
         self.assertEqual(len(self.state()['review']['due']), 1)
+
+    def test_new_quiz_questions_test_only_studied_sections(self):
+        self.study('a')
+        self.post('/api/chapters/one/quiz')
+        self.settle()
+        prompt = next(p for p in self.runner.prompts if 'Practice only (chapter quiz)' in p)
+        sections = prompt.split('Sections (data): ')[1].split('\n')[0]
+        self.assertIn('"id": "a"', sections)
+        self.assertNotIn('"id": "b"', sections, 'b has no lesson yet, so a new question may not test it')
+        job = next(j for j in self.state()['practice']['jobs'] if j.get('purpose') == 'chapter_quiz')
+        self.assertIn('studied', job.get('error', ''), 'the canned reply tests b, which is refused')
 
     def test_a_chapter_quiz_mixes_earlier_exercises_with_new_questions_and_counts_as_reviews(self):
         first = self.study('a')

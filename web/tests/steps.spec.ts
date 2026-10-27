@@ -89,3 +89,21 @@ test('a step\'s check question: instant feedback, a repair after a miss, and con
   await expect(page.getByRole('region', { name: 'Step 3 of 3' }).getByRole('group', { name: 'Check question' }).getByRole('status')).toContainText('Correct.');
   expect(errors).toEqual([]);
 });
+
+test('Continue shows the next step at once: it was written while the learner read the current one', async ({ page, course }) => {
+  const { errors } = await course('prepared_steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const first = page.getByRole('region', { name: 'Step 1 of 2' });
+  await expect(first).toContainText('Each path carries a complex amplitude.');
+  // The teacher takes 3 s over step 2; the learner reads step 1 for longer, and the step being written stays hidden.
+  await page.waitForTimeout(3500);
+  await expect(page.locator('section.lesson')).toHaveCount(1);
+  await expect(page.getByText('Written while you read')).toHaveCount(0);
+
+  await first.getByRole('group', { name: 'Next step' }).getByRole('button', { name: 'Continue' }).click();
+  const second = page.getByRole('region', { name: 'Step 2 of 2' });
+  await expect(second, 'shown complete, without waiting for the teacher').toContainText('Written while you read', { timeout: 1000 });
+  await expect(second.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+  await expect(page.locator('#practice article').first(), 'the revealed last step leads to grouped practice').toContainText('Find');
+  expect(errors).toEqual([]);
+});

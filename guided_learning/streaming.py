@@ -12,9 +12,12 @@ from .memory import for_prompt as course_memory
 
 # Turn channels, in one place for the host and its features; web/src/lib/types.ts mirrors CHANNELS.
 LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')  # the learner's own requests
+# A lesson step written ahead while the learner reads the current one: hidden, and no teaching interaction, until
+# lesson.step reveals it as a mainline turn (ADR 0009).
+PREPARED_STEP = 'prepared_step'
 BACKGROUND = ('preparation', 'build', 'consolidation')  # channels whose turns are not teaching interactions
 SMALL_MODEL = ('preparation', 'consolidation')  # channels the small model serves
-CHANNELS = LEARNER_CHANNELS + BACKGROUND
+CHANNELS = LEARNER_CHANNELS + (PREPARED_STEP,) + BACKGROUND
 
 
 def read(store, request):
@@ -67,6 +70,12 @@ def start(store, request):
     if profile: snapshot['learner_profile'] = profile
     memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
     if memory and identity['channel'] not in ('build','consolidation'): snapshot['course_memory'] = memory
+    if identity['channel'] == PREPARED_STEP:
+        # The step it writes and the check repair it assumed, so Continue can tell whether its prompt still applies.
+        step = request.get('lesson_step')
+        if not isinstance(step, dict):
+            raise OperationError('invalid_request','A prepared step names its lesson_step')
+        snapshot['lesson_step'] = step
     branch=next((b for b in store.list('web_branches') if identifier in [b['turn_id'],b.get('supplement_turn_id')] + [r['turn_id'] for r in b.get('replies', [])]),None)
     if branch:
         snapshot['branch']=branch
@@ -87,6 +96,18 @@ def start(store, request):
             'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
     store.put('streams', identifier, turn)
     return {'turn':turn, 'created':True}
+
+
+def reveal(store, turn):
+    """A prepared step becomes the mainline turn the learner asked for with Continue; a completed one is now taught."""
+    if turn['channel'] != PREPARED_STEP:
+        raise OperationError('invalid_transition', 'Only a prepared step is revealed')
+    turn.update(channel='mainline', record_user=True)
+    record_interaction(store, {'id':'stream-user:'+turn['id'], 'role':'user', 'text':turn['prompt'], 'concept_id':turn['concept_id']})
+    if turn['status'] == 'completed':
+        record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
+    store.put('streams', turn['id'], turn)
+    return turn
 
 
 def event(store, request):
@@ -114,7 +135,7 @@ def event(store, request):
             raise OperationError('missing_final','No authoritative final answer')
         begin = time.perf_counter()
         # Background work is not a teaching interaction.
-        if turn['channel'] not in BACKGROUND:
+        if turn['channel'] not in BACKGROUND + (PREPARED_STEP,):
             record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
         turn['text'] = turn['final_text']
         turn['status'] = 'completed'

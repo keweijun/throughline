@@ -72,11 +72,11 @@ class Continuity(unittest.TestCase):
                 app.start_lesson({'id': 'one'})
                 app.wait('one', 3)
                 self.assertEqual(app.snapshot()['deferred_explanations'][0]['status'], 'pending')
-                app.navigation.continue_lesson('one', {'id': 'two'})
-                app.wait('two', 3)
+                two = app.navigation.continue_lesson('one', {'id': 'two'})['turn']['id']
+                app.wait(two, 3)
                 self.assertIn('Pending explanations', next(p for p in runner.prompts if 'teaches step 2' in p))
                 [item] = app.snapshot()['deferred_explanations']
-                self.assertEqual((item['status'], item['answer_interaction_id']), ('resolved', 'stream:two'))
+                self.assertEqual((item['status'], item['answer_interaction_id']), ('resolved', 'stream:' + two))
             finally:
                 app.close()
 

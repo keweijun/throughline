@@ -3,7 +3,7 @@ import threading
 import unittest
 from pathlib import Path
 from guided_learning.api import execute
-from support import host_client
+from support import host_client, settle
 
 
 class Runner:
@@ -45,6 +45,7 @@ class Chapters(unittest.TestCase):
     def lesson(self):
         turn = self.post('/api/lessons', {})['turn']
         self.host.wait(turn['id'], 5)
+        settle(self.host)  # the next step is written ahead; let it finish before a test clears the prompts
         return next(p for p in self.runner.prompts if 'Current learner request' in p and 'Practice only' not in p)
 
     def test_chapter_overview_opens_the_first_section_and_later_sections_bridge(self):

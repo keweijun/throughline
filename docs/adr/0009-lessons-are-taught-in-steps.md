@@ -17,5 +17,5 @@ A check answer is recorded as an interaction, never through `evidence.assess`, a
 
 ## Consequences
 
-- A lesson takes several turns, so the learner waits between steps. Preparation may draft the first step ahead; later steps depend on the learner's answers and are generated when needed.
+- A lesson takes several turns; preparation may draft the first step ahead. In trials a step took 30–70 s to write, all of it spent after the learner pressed Continue, so the next step is now written as soon as the current one completes, hidden as a **prepared step** until Continue reveals it, still streaming or already complete. Only the check answer changes what the next step says, so the prepared step's prompt records the repair it assumed (none while the check is unanswered): a correct answer, or none, keeps it; a wrong or "not sure" answer replaces it with one that opens with the repair, still written while the learner reads the feedback. A prepared step is not an interaction, evidence or a taught step until revealed; pausing the lesson, starting another lesson or leaving the section drops it, and a lesson has at most one. It costs a model turn whenever it is dropped, which we accept for the wait it saves. Preparation of the next section still waits while a step is being written.
 - Lessons saved before this change stay single replies and are shown as they are.

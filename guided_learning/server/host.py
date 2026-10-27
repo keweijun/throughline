@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
-from ..streaming import SMALL_MODEL, summarize
+from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError
 from . import prompts
@@ -137,7 +137,20 @@ class Host:
                 'curriculum': self.operation({'op': 'curriculum.view'}),
                 'session': self.operation({'op': 'session.resume', 'recent_limit': 20}),
                 'deferred_explanations': self.operation({'op': 'deferred.list'})['deferred_explanations'],
-                'turns': self.operation({'op': 'stream.summaries'})['turns']}
+                # A prepared step stays hidden until Continue reveals it.
+                'turns': [t for t in self.operation({'op': 'stream.summaries'})['turns'] if t['channel'] != PREPARED_STEP]}
+
+    def publish_turn(self, turn):
+        if turn['channel'] != PREPARED_STEP:
+            self.events.publish({'type': 'turn', 'turn': turn_summary(turn)})
+
+    def completed(self, turn):
+        """Run every feature's completion hook for a turn stored as completed."""
+        for feature in self.features:
+            try:
+                feature.on_complete(turn)
+            except Exception:
+                log.exception('%s could not finish turn %s', feature.__class__.__name__, turn['id'])
 
     def set_language(self, language):
         with self.lock:
@@ -203,7 +216,7 @@ class Host:
         cancel = threading.Event()
         identifier, attempt = turn['id'], turn['attempt']
         key = (identifier, attempt)
-        self.events.publish({'type': 'turn', 'turn': turn_summary(turn)})
+        self.publish_turn(turn)
 
         def emit(event):
             sequence = emit.sequence + 1
@@ -213,15 +226,13 @@ class Host:
             if result.get('ignored'):
                 return
             if event['kind'] == 'delta':
-                self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, 'text': event.get('text', '')})
+                # A prepared step's text is published once Continue reveals it, and streams from there.
+                if result['turn']['channel'] != PREPARED_STEP:
+                    self.events.publish({'type': 'delta', 'id': identifier, 'attempt': attempt, 'sequence': emit.sequence, 'text': event.get('text', '')})
             elif event['kind'] in ('complete', 'failed'):
-                self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
+                self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
-                    for feature in self.features:
-                        try:
-                            feature.on_complete(result['turn'])
-                        except Exception:
-                            log.exception('%s could not finish turn %s', feature.__class__.__name__, identifier)
+                    self.completed(result['turn'])
                 self.changed()
         emit.sequence = 0
 
@@ -261,7 +272,9 @@ class Host:
             worker = self.workers.get((identifier, result['turn']['attempt']))
             if worker:
                 worker[1].set()
-            self.events.publish({'type': 'turn', 'turn': turn_summary(result['turn'])})
+            self.publish_turn(result['turn'])
+            if result['turn']['channel'] == 'mainline':
+                self.navigation.discard_prepared()  # pausing the lesson, for a side question say, stops writing ahead
             self._wake_background()
             return result
 
@@ -270,6 +283,8 @@ class Host:
             if self.closing:
                 raise OperationError('host_closing', 'Learning server is closing')
             previous = self.operation({'op': 'stream.read', 'id': identifier})['turn']
+            if previous['channel'] == PREPARED_STEP:
+                raise OperationError('invalid_transition', 'A prepared step that stopped is discarded, not regenerated')
             if previous['channel'] == 'mainline':
                 self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))

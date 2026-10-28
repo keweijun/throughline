@@ -186,8 +186,8 @@ export type ChapterBuild = {
   discarded?: boolean;
 };
 
-/** Every reasoning effort Codex knows, lowest first; each model offers its own subset. */
-export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+/** The reasoning efforts Throughline offers, lowest first (Codex's `ultra` is left out); each model offers its own subset. */
+export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export type Settings = {
   model: string;

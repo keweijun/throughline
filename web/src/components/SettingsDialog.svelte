@@ -57,7 +57,6 @@
     { id: 'high', label: 'High' },
     { id: 'xhigh', label: 'Extra high' },
     { id: 'max', label: 'Max' },
-    { id: 'ultra', label: 'Ultra' },
   ];
   function effortsFor(id: string) {
     const chosen = models?.find((m) => (id ? m.id === id : m.default));

@@ -150,7 +150,7 @@ test('teacher settings save the Codex model and effort as they change', async ({
   await expect(page.getByRole('textbox', { name: 'Model', exact: true })).toHaveValue('gpt-6.1-sol');
 });
 
-test('reasoning effort offers every level the model lists, up to ultra', async ({ page, course }) => {
+test('reasoning effort offers the levels the model lists up to max, never ultra', async ({ page, course }) => {
   const { base } = await course('demo_course_fixture');
   const models = [{ id: 'gpt-6.1-sol', name: 'GPT-6.1-Sol', description: '', default: true,
     efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], tiers: [] }];
@@ -158,10 +158,10 @@ test('reasoning effort offers every level the model lists, up to ultra', async (
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Teacher', exact: true }).click();
   const effort = page.getByRole('radiogroup', { name: 'Reasoning effort' });
-  await expect(effort.getByRole('radio')).toHaveCount(6);
-  await expect(effort.locator('label')).toHaveText(['Low', 'Medium', 'High', 'Extra high', 'Max', 'Ultra']);
-  await effort.getByRole('radio', { name: 'Ultra' }).check();
-  await expect.poll(async () => (await (await page.request.get(base + '/api/settings')).json()).effort).toBe('ultra');
+  await expect(effort.getByRole('radio')).toHaveCount(5);
+  await expect(effort.locator('label')).toHaveText(['Low', 'Medium', 'High', 'Extra high', 'Max']);
+  await effort.getByRole('radio', { name: 'Max' }).check();
+  await expect.poll(async () => (await (await page.request.get(base + '/api/settings')).json()).effort).toBe('max');
 });
 
 test('teacher settings offer the models Codex lists, a small model and fast mode', async ({ page, course }) => {

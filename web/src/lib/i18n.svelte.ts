@@ -365,7 +365,6 @@ const messages = {
   "High": "高",
   "Extra high": "超高",
   "Max": "最大",
-  "Ultra": "极限",
   "Questions and sources": "答疑与来源",
   "Questions": "答疑",
   "Source": "来源",

@@ -7,8 +7,9 @@ from pathlib import Path
 from ..codex import CodexRunner, list_models
 from ..store import OperationError
 
-# Every reasoning effort Codex knows, lowest first; each model offers its own subset (`model/list`).
-EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+# The reasoning efforts Throughline offers, lowest first; each model offers its own subset (`model/list`). Codex's
+# `ultra` is left out on purpose.
+EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
 
 
 def default_path():

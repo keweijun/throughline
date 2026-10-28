@@ -186,15 +186,20 @@ export type ChapterBuild = {
   discarded?: boolean;
 };
 
+/** The reasoning efforts Throughline offers, lowest first (Codex's `ultra` is left out); each model offers its own subset. */
+export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
 export type Settings = {
   model: string;
   small_model: string;
-  effort: 'minimal' | 'low' | 'medium' | 'high';
-  small_effort: '' | 'minimal' | 'low' | 'medium' | 'high';
+  effort: Effort;
+  small_effort: '' | Effort;
   service_tier: string;
   overridden: boolean;
   path: string;
 };
+
+export type UpdateCheck = { version: string; latest: string; available: boolean };
 
 export type ServiceTier = { id: string; name: string; description: string };
 

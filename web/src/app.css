@@ -137,6 +137,24 @@ a {
   background-color: var(--mine-wash);
 }
 
+/* A formula inside a highlighted or asked passage is painted whole: KaTeX's glyph boxes would leave gaps. */
+[data-highlight-mine] > .katex,
+[data-highlight-mine] > .katex-display > .katex {
+  border-radius: 2px;
+  background-color: var(--mine-wash);
+}
+
+[data-highlight-asked] > .katex,
+[data-highlight-asked] > .katex-display > .katex {
+  border-bottom: 2px solid var(--marker);
+}
+
+/* A display formula is a full-width block; its mark hugs the formula and stays centred. */
+:is([data-highlight-mine], [data-highlight-asked]) > .katex-display > .katex {
+  display: table;
+  margin-inline: auto;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -402,6 +420,123 @@ summary:focus-visible {
 }
 
 /* Status chips carry state, so each color has a meaning. */
+/* Route markers, shared by the full route and its folded capsule so the two read as one system. A chapter is a
+   numbered badge whose rim fills with the share studied (--progress), solid once finished, with a yellow centre for the
+   chapter being studied and a dashed rim when not built. A section is a dot: filled once visited, yellow with a halo
+   where the learner is. --marker-ground is the surface the marks sit on. */
+.route-badge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) var(--progress, 0deg), var(--rule-strong) 0);
+  color: var(--pencil);
+  font: 600 0.66rem/1 var(--sans);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform var(--quick) var(--ease-out),
+    box-shadow var(--quick) ease;
+}
+
+.route-badge::after {
+  content: '';
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: var(--marker-ground, var(--sheet));
+}
+
+.route-badge > span {
+  position: relative;
+  z-index: 1;
+}
+
+.route-badge:hover {
+  transform: scale(1.1);
+}
+
+.route-badge.open {
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.route-badge.here {
+  color: var(--ink);
+}
+
+.route-badge.here::after {
+  background: var(--marker);
+}
+
+.route-badge.done {
+  color: var(--on-accent);
+}
+
+.route-badge.done::after {
+  content: none;
+}
+
+.route-badge.unbuilt {
+  background: none;
+  border: 1.5px dashed var(--rule-strong);
+  cursor: default;
+}
+
+.route-badge.unbuilt::after {
+  content: none;
+}
+
+.route-dot {
+  display: block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border: 2px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--marker-ground, var(--sheet));
+  transition:
+    transform var(--quick) var(--ease-out),
+    background-color var(--settle) ease,
+    border-color var(--settle) ease;
+}
+
+:hover > .route-dot {
+  transform: scale(1.25);
+}
+
+.route-dot.visited {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.route-dot.skipped {
+  border-color: var(--caution);
+  background: var(--marker-ground, var(--sheet));
+}
+
+.route-dot.current {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-color: var(--accent);
+  background: var(--marker);
+  box-shadow: 0 0 0 3px var(--marker-wash);
+}
+
+.route-dot.viewing:not(.current) {
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-badge,
+  .route-dot {
+    transition: none;
+  }
+}
+
 .chip {
   display: inline-flex;
   align-items: center;

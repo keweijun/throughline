@@ -39,7 +39,7 @@ export function occurrences(root: HTMLElement, needle: string, options: LocateOp
 function search(root: HTMLElement, needle: string, options: LocateOptions): Range[] {
   const target = options.loose ? needle.replace(/\s+/g, '') : needle.replace(/\s+/g, ' ').trim();
   if (target.length < 3) return [];
-  const skip = options.skip ?? '.katex, .citation';
+  const skip = options.skip ?? '.katex, .citation, .widget';
   const nodes: Text[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (node) => (node.parentElement?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),

@@ -1,4 +1,6 @@
 import { defineConfig } from 'vite';
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 const host = process.env.GL_HOST ?? 'http://127.0.0.1:8765';
@@ -13,8 +15,21 @@ const woff2Only = {
   },
 };
 
+// Mermaid's optional ELK layout is 1.4 MB of EPL-2.0 code, loaded only by a diagram that asks for it. Such a diagram
+// is laid out by Mermaid's default dagre layout instead, which exports the same `render`.
+const dagreForElk = {
+  name: 'dagre-for-elk',
+  enforce: 'pre' as const,
+  resolveId(source: string, importer?: string) {
+    if (!importer?.includes('/node_modules/mermaid/') || !/^\.\/elk-[A-Z0-9]+\.mjs$/.test(source)) return;
+    const dagre = readdirSync(path.dirname(importer)).find((name) => /^dagre-[A-Z0-9]+\.mjs$/.test(name));
+    if (!dagre) throw new Error('Mermaid no longer has a dagre layout chunk next to its ELK chunk; update vite.config.ts');
+    return path.join(path.dirname(importer), dagre);
+  },
+};
+
 export default defineConfig({
-  plugins: [woff2Only, svelte()],
+  plugins: [woff2Only, dagreForElk, svelte()],
   build: {
     outDir: '../guided_learning/web_dist',
     emptyOutDir: true,

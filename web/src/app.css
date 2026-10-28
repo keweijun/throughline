@@ -570,6 +570,177 @@ summary:focus-visible {
   contain: inline-size;
 }
 
+/* Callouts: > [!NOTE] and the like (ADR 0013). */
+.prose blockquote.callout {
+  --callout: var(--accent);
+  padding: 0.6em 0.9em;
+  border-left-color: var(--callout);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: color-mix(in srgb, var(--callout) 7%, transparent);
+  color: var(--ink);
+  font-style: normal;
+}
+
+.prose blockquote.callout > * + * {
+  margin-top: 0.5em;
+}
+
+.prose blockquote.callout-tip {
+  --callout: var(--good);
+}
+
+.prose blockquote.callout-important {
+  --callout: var(--mine);
+}
+
+.prose blockquote.callout-warning {
+  --callout: var(--caution);
+}
+
+.prose blockquote.callout-caution {
+  --callout: var(--danger);
+}
+
+.prose .callout-title {
+  color: var(--callout);
+  font-family: var(--sans);
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Diagrams and plots: drawn from fenced code blocks, scrolled rather than squeezed when wide. */
+.prose .widget {
+  overflow-x: auto;
+  contain: inline-size;
+}
+
+.prose .widget-diagram svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+.prose .widget-plot svg {
+  display: block;
+  width: 100%;
+  max-width: 36rem;
+  height: auto;
+  margin-inline: auto;
+  font-family: var(--sans);
+}
+
+.widget-plot .grid {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.widget-plot .axis {
+  stroke: var(--pencil);
+  stroke-width: 1.2;
+}
+
+.widget-plot .tick {
+  fill: var(--pencil);
+  font-size: 11px;
+}
+
+.widget-plot .curve {
+  fill: none;
+  stroke: var(--series);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+
+.widget-plot .point {
+  fill: var(--ink);
+}
+
+.widget-plot .point-label {
+  fill: var(--ink);
+  font-size: 12px;
+}
+
+.widget-plot .series-0 { --series: var(--accent); }
+.widget-plot .series-1 { --series: var(--caution); }
+.widget-plot .series-2 { --series: var(--good); }
+.widget-plot .series-3 { --series: var(--danger); }
+.widget-plot .series-4 { --series: var(--mine); }
+.widget-plot .series-5 { --series: var(--pencil); }
+
+.widget-plot .legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.3em 1.2em;
+  margin-top: 0.3em;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.widget-plot .key::before {
+  content: '';
+  display: inline-block;
+  width: 1.1em;
+  height: 0.18em;
+  margin-right: 0.45em;
+  vertical-align: middle;
+  border-radius: 1px;
+  background: var(--series);
+}
+
+.prose .widget-note {
+  color: var(--caution);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  margin-bottom: 0.4em;
+}
+
+/* Highlighted code: token colors from the theme, readable in both schemes. */
+.prose .hljs-keyword,
+.prose .hljs-selector-tag,
+.prose .hljs-built_in,
+.prose .hljs-literal,
+.prose .hljs-type {
+  color: var(--accent);
+}
+
+.prose .hljs-string,
+.prose .hljs-regexp,
+.prose .hljs-symbol,
+.prose .hljs-attr,
+.prose .hljs-selector-attr {
+  color: var(--good);
+}
+
+.prose .hljs-number,
+.prose .hljs-variable.constant_,
+.prose .hljs-meta {
+  color: var(--caution);
+}
+
+.prose .hljs-title,
+.prose .hljs-title.function_,
+.prose .hljs-section {
+  color: var(--danger);
+}
+
+.prose .hljs-comment,
+.prose .hljs-quote {
+  color: var(--pencil);
+  font-style: italic;
+}
+
+.prose .hljs-emphasis {
+  font-style: italic;
+}
+
+.prose .hljs-strong {
+  font-weight: 600;
+}
+
 .citation {
   display: inline-flex;
   align-items: center;

@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import katex from 'katex';
 import { marked } from 'marked';
 import type { Ref } from './types';
+import { chemistryReady, drawWidgets, endsInFence, subscribe } from './widgets';
 import { scrollStage, stageScroll } from './stage';
 
 const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$)/g;
@@ -32,12 +33,16 @@ function parse(text: string, breaks = false): DocumentFragment {
     const span = document.createElement('span');
     span.dataset.tex = item.tex;
     try {
-      katex.render(item.tex, span, { displayMode: item.display, throwOnError: false, trust: false, maxExpand: 1000, maxSize: 20 });
+      // A chemistry formula shows as TeX until mhchem has loaded, rather than as an error.
+      if (chemistryReady(item.tex)) katex.render(item.tex, span, { displayMode: item.display, throwOnError: false, trust: false, maxExpand: 1000, maxSize: 20 });
+      else span.textContent = item.tex;
     } catch {
       span.textContent = item.tex;
     }
     return span;
   });
+  drawWidgets(fragment, endsInFence(text), { diagram: t("Couldn't draw this diagram"), plot: t("Couldn't draw this plot") });
+  markCallouts(fragment);
   // Only web links stay live, opening in a new tab; in-page anchors have no targets because ids are stripped.
   for (const link of fragment.querySelectorAll('a')) {
     const href = link.getAttribute('href') ?? '';
@@ -50,7 +55,32 @@ function parse(text: string, breaks = false): DocumentFragment {
   return fragment;
 }
 
-function replaceText(root: Node, pattern: RegExp, build: (match: RegExpExecArray) => Node, skip = 'code,pre,.katex') {
+// Callout titles by language; "Note" alone would take the translation of a learner's note.
+const CALLOUTS = {
+  note: { en: 'Note', 'zh-CN': '说明' }, tip: { en: 'Tip', 'zh-CN': '提示' }, important: { en: 'Important', 'zh-CN': '重点' },
+  warning: { en: 'Warning', 'zh-CN': '注意' }, caution: { en: 'Caution', 'zh-CN': '警告' },
+} as const;
+
+/** GitHub-style callouts: a blockquote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION]. */
+function markCallouts(fragment: DocumentFragment) {
+  for (const quote of fragment.querySelectorAll('blockquote')) {
+    const first = quote.firstElementChild;
+    const marker = first?.tagName === 'P' ? first.firstChild : null;
+    const match = marker?.nodeType === Node.TEXT_NODE ? marker.textContent!.match(/^\s*\[!(note|tip|important|warning|caution)\][ \t]*\n?/i) : null;
+    if (!match) continue;
+    const kind = match[1].toLowerCase() as keyof typeof CALLOUTS;
+    marker!.textContent = marker!.textContent!.slice(match[0].length);
+    if (marker!.nextSibling?.nodeName === 'BR') marker!.nextSibling.remove();
+    if (!first!.textContent!.trim() && !first!.querySelector('*')) first!.remove();
+    quote.classList.add('callout', `callout-${kind}`);
+    const title = document.createElement('p');
+    title.className = 'callout-title';
+    title.textContent = CALLOUTS[kind][locale.language];
+    quote.prepend(title);
+  }
+}
+
+function replaceText(root: Node, pattern: RegExp, build: (match: RegExpExecArray) => Node, skip = 'code,pre,.katex,.widget') {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   while (walker.nextNode()) {
@@ -139,13 +169,24 @@ export function render(node: HTMLElement, { text, breaks = false, refs = [], onS
   node.dispatchEvent(new CustomEvent(RENDERED));
 }
 
+// Mounted Markdown and its latest options, rendered again when a widget finishes drawing or the theme changes.
+const live = new Map<HTMLElement, MarkdownOptions>();
+subscribe(() => {
+  for (const [node, options] of live) {
+    delete node.dataset.key;
+    render(node, options);
+  }
+});
+
 export function markdown(node: HTMLElement, options: MarkdownOptions) {
   let frame = 0;
   let latest = options;
   render(node, options);
+  live.set(node, options);
   return {
     update(next: MarkdownOptions) {
       latest = next;
+      live.set(node, next);
       // Streaming text arrives in many small deltas; parsing and typesetting each one would block the page.
       if (next.streaming) {
         frame ||= requestAnimationFrame(() => {
@@ -159,6 +200,7 @@ export function markdown(node: HTMLElement, options: MarkdownOptions) {
       render(node, next);
     },
     destroy() {
+      live.delete(node);
       cancelAnimationFrame(frame);
     },
   };

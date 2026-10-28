@@ -114,8 +114,10 @@ test('a later section can be studied now, and the unstudied sections before it s
 
 test('beside an open panel the route folds to a badge per chapter, whichever are collapsed, and opens the full route on hover', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
-  await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  // Folding turns the full route straight into the hidden drawer; it never shows on its way out.
+  expect(await page.locator('#route .full').evaluate((node) => getComputedStyle(node).visibility)).toBe('hidden');
   const mini = page.locator('#route .mini');
   await expect(mini).toBeVisible();
   await expect(mini.locator('.route-badge')).toHaveCount(3);
@@ -172,5 +174,18 @@ test('in a long course the folded route shows every chapter and a window of the 
   await expect(mini.locator('.route-badge.done')).toHaveCount(4);
   const box = (await mini.boundingBox())!;
   expect(box.height).toBeLessThan(800);
+
+  // In a short window the drawer opens scrolled to the current section, every time it opens.
+  await page.setViewportSize({ width: 1440, height: 600 });
+  const full = page.locator('#route .full');
+  const current = full.locator('.current .entry');
+  for (let opened = 0; opened < 2; opened++) {
+    await full.evaluate((node) => (node.scrollTop = 0));
+    await mini.hover({ position: { x: 18, y: 40 } });
+    await expect(full).toBeVisible();
+    await expect(current).toBeInViewport();
+    await page.mouse.move(1300, 500);
+    await expect(full).toBeHidden();
+  }
   expect(errors).toEqual([]);
 });

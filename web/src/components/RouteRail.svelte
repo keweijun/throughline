@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { slide } from 'svelte/transition';
+  import { prefersReducedMotion } from 'svelte/motion';
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
@@ -78,14 +80,29 @@
     return () => window.removeEventListener('pointermove', away);
   });
 
+  // The full route turns into the hidden drawer the moment the route folds, without the delayed fade that keeps the
+  // drawer from flickering on hover; that fade would show it for a moment. Set before the update, so both apply at once.
+  let entering = $state(false);
+  let foldedBefore = app.folded;
+  $effect.pre(() => {
+    const folded = app.folded;
+    if (folded && !foldedBefore) {
+      entering = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => (entering = false)));
+    }
+    foldedBefore = folded;
+  });
+
   // When the full route opens beside the capsule, it shows the section being read.
   let full = $state<HTMLElement>();
   function reveal() {
     if (!full || !app.folded) return;
     requestAnimationFrame(() => {
-      const item = full!.querySelector<HTMLElement>('[aria-current="page"], .current .entry');
+      // The current section, else whatever is open on the page. Positions come from the screen, since each row is
+      // positioned and offsetTop would count from the row instead of the drawer.
+      const item = full!.querySelector<HTMLElement>('.current .entry') ?? full!.querySelector<HTMLElement>('[aria-current="page"]');
       if (!item) return;
-      const top = item.offsetTop - full!.offsetTop;
+      const top = item.getBoundingClientRect().top - full!.getBoundingClientRect().top + full!.scrollTop;
       if (top < full!.scrollTop || top + item.offsetHeight > full!.scrollTop + full!.clientHeight) full!.scrollTop = top - full!.clientHeight / 3;
     });
   }
@@ -119,7 +136,7 @@
   </li>
 {/snippet}
 
-<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} class:resting aria-label={t("Course route")} onpointerenter={reveal} bind:this={nav}>
+<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} class:resting class:entering aria-label={t("Course route")} onpointerenter={reveal} bind:this={nav}>
   {#if app.folded}<FoldedRoute />{/if}
   <div class="full" bind:this={full}>
     <div class="head">
@@ -177,7 +194,7 @@
               </button>
             </div>
             {#if open && total}
-              <ol class="tray" id="chapter-{chapter.id}">
+              <ol class="tray" id="chapter-{chapter.id}" transition:slide={{ duration: prefersReducedMotion.current ? 0 : 220 }}>
                 {#each chapter.concept_ids as id (id)}
                   {@render section(id)}
                 {/each}
@@ -475,6 +492,10 @@
       opacity var(--quick) ease 0.12s,
       transform var(--quick) ease 0.12s,
       visibility 0s linear calc(var(--quick) + 0.12s);
+  }
+
+  .rail.folded.entering .full {
+    transition: none;
   }
 
   .rail.folded:not(.resting):has(:global(.mini:hover), .full:hover) .full {

@@ -21,7 +21,7 @@
 安装 https://github.com/keweijun/throughline
 ```
 
-Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throughline` 技能，创建贯学文件夹，在应用菜单中添加 **Throughline** 启动器，并显示一份简短的欢迎指南。**更新**时粘贴 `更新 https://github.com/keweijun/throughline` 即可，已有课程不受影响。
+Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throughline` 技能，创建贯学文件夹，在应用菜单中添加 **Throughline** 启动器，并显示一份简短的欢迎指南。**更新**时粘贴 `更新 https://github.com/keweijun/throughline` 即可，已有课程不受影响。在 **设置 → 检查更新** 中可以查看是否有新版本，并直接在 Codex 中打开这条请求。
 
 ### 给 Codex 的说明：安装或更新贯学
 

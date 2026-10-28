@@ -83,3 +83,24 @@ test('course actions open Codex with a $throughline request, and new courses app
     path.join(library.root, 'organic')], { cwd: root });
   await expect(page.locator('.courses > li').filter({ hasText: 'Organic Chemistry' })).toBeVisible({ timeout: 8000 });
 });
+
+test('Settings checks for updates and hands the update to Codex', async ({ page, course }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
+  });
+  let latest = '0.5.1';
+  await page.route('**/api/update', (route) => route.fulfill({ json: { version: '0.5.1', latest, available: latest !== '0.5.1' } }));
+  const { errors } = await course('library_browser_fixture');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const check = page.getByRole('button', { name: 'Check for updates' });
+  await check.click();
+  await expect(page.getByText('Version 0.5.1 is the latest.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Update in Codex' })).toHaveCount(0);
+
+  latest = '0.6.0';
+  await check.click();
+  await expect(page.getByText('Version 0.6.0 is available; you have 0.5.1.')).toBeVisible();
+  const link = page.getByRole('link', { name: 'Update in Codex' });
+  expect(decodeURIComponent((await link.getAttribute('href'))!)).toContain('prompt=Update https://github.com/keweijun/throughline');
+  expect(errors).toEqual([]);
+});

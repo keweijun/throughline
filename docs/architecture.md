@@ -89,6 +89,7 @@ A teaching prompt (`prompts.Prompt`, from `Host.build_prompt`) has two parts. It
 | PUT/DELETE | `/api/annotations/{id}` | Edit an annotation's note, or delete it |
 | PUT/DELETE | `/api/memory/{id}` | Edit a course memory entry's `text`, or delete it (a dismissed suggestion is deleted too); `/api/state` lists entries under `memory` |
 | POST | `/api/memory/{id}/confirm` | Confirm a suggested preference so it enters prompts |
+| GET | `/api/update` | The installed version, the version on GitHub `main` and whether it is newer; 502 when GitHub cannot be reached. Installing it is handed to Codex |
 | GET | `/api/health` | Process id and launch id; the cheap liveness probe `guided-learning open` and `stop` use |
 
 The browser cannot call domain operations directly; there is no generic operation passthrough. Domain errors return `{error, code}`: 404 for codes starting `unknown_`, 409 for the rest, 400 for invalid request bodies; anything unexpected is logged and returns 500 with code `internal_error`. Besides the Host/Origin guard, any `/api/` request whose `Sec-Fetch-Site` is present and not `same-origin` or `none` is refused.

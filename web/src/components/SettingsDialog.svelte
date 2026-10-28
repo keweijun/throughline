@@ -2,7 +2,8 @@
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import type { CodexModel, Settings } from '../lib/types';
+  import type { CodexModel, Settings, UpdateCheck } from '../lib/types';
+  import CodexLink from './CodexLink.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
 
@@ -19,6 +20,9 @@
   let savingLanguage = $state(false);
   let dailyReviews = $state(5);
   let savingReviews = $state(false);
+  let update = $state<UpdateCheck | null>(null);
+  let updateError = $state('');
+  let checking = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
@@ -110,6 +114,18 @@
     savingReviews = true;
     dailyReviews = (await app.savePreferences({ daily_reviews: dailyReviews }))?.daily_reviews ?? saved;
     savingReviews = false;
+  }
+
+  async function checkForUpdates() {
+    checking = true;
+    updateError = '';
+    try {
+      update = await api.get<UpdateCheck>('/api/update');
+    } catch (error) {
+      update = null;
+      updateError = error instanceof Error ? error.message : String(error);
+    }
+    checking = false;
   }
 
   function openMemory() {
@@ -278,6 +294,27 @@
         {/if}
         <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
       </form>
+    {/if}
+  </section>
+
+  <section aria-labelledby="update-title">
+    <h3 id="update-title">{t("Updates")}</h3>
+    <div class="row">
+      <button type="button" class="btn btn-quiet btn-small" onclick={checkForUpdates} disabled={checking}>
+        {t(checking ? "Checking…" : "Check for updates")}
+      </button>
+      {#if update && !update.available}
+        <span role="status">{t("Version {version} is the latest.", { version: update.version })}</span>
+      {/if}
+    </div>
+    {#if update?.available}
+      <p role="status">{t("Version {latest} is available; you have {version}.", { latest: update.latest, version: update.version })}</p>
+      <div class="row">
+        <CodexLink class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+      </div>
+      <p class="note">{t("Codex installs it and keeps your courses. Throughline closes while it updates; open it again afterwards.")}</p>
+    {:else if updateError}
+      <p class="note" role="status">{t("Could not check for updates:")} {updateError}</p>
     {/if}
   </section>
 

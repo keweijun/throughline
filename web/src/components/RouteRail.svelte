@@ -57,26 +57,15 @@
   let toggled = $state<Record<string, boolean>>({});
   const expanded = (id: string) => toggled[id] ?? (id === currentChapter || id === app.chapterOf(app.viewingId)?.id || id === app.viewingChapter);
   const studied = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
+  // Folding needs room to unfold into; without it the route stays folded and opens on hover.
+  const foldable = $derived(!app.stageNarrow && !app.phone);
 
-  // Two folded designs are on trial: ?rail=track or ?rail=stepper picks one, and this browser remembers it.
-  const folded: 'track' | 'stepper' = (() => {
-    try {
-      const asked = new URLSearchParams(location.search).get('rail');
-      if (asked === 'track' || asked === 'stepper') localStorage.setItem('folded-rail', asked);
-      return localStorage.getItem('folded-rail') === 'stepper' ? 'stepper' : 'track';
-    } catch {
-      return 'track';
-    }
-  })();
-
-  // When the full route opens beside the folded one, it shows the section being read.
-  let nav = $state<HTMLElement>();
+  // When the full route opens beside the capsule, it shows the section being read.
   let full = $state<HTMLElement>();
   function reveal() {
-    const mini = nav?.querySelector<HTMLElement>('.mini');
-    if (!full || !mini || getComputedStyle(mini).display === 'none') return;
+    if (!full || !app.folded) return;
     requestAnimationFrame(() => {
-      const item = full!.querySelector<HTMLElement>('[aria-current="page"], .current button');
+      const item = full!.querySelector<HTMLElement>('[aria-current="page"], .current .entry');
       if (!item) return;
       const top = item.offsetTop - full!.offsetTop;
       if (top < full!.scrollTop || top + item.offsetHeight > full!.scrollTop + full!.clientHeight) full!.scrollTop = top - full!.clientHeight / 3;
@@ -92,13 +81,10 @@
   {@const waiting = saved.get(id)}
   {@const skipped = app.isSkipped(id)}
   {@const step = status === 'current' ? app.stepProgress(id) : null}
+  {@const viewing = id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
-    <span class="node" aria-hidden="true"></span>
-    <button
-      class:viewing={id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
-      aria-current={id === app.viewingId && !app.viewingChapter && !app.reviewOpen ? 'page' : undefined}
-      onclick={() => app.view(id)}
-    >
+    <span class="node" aria-hidden="true"><span class="route-dot {status}" class:viewing class:skipped></span></span>
+    <button class="entry" class:viewing aria-current={viewing ? 'page' : undefined} onclick={() => app.view(id)}>
       <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
       {#if status === 'current' || count || waiting || skipped || prepared.has(id)}
         <span class="meta">
@@ -115,77 +101,99 @@
   </li>
 {/snippet}
 
-<nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")} onpointerenter={reveal} bind:this={nav}>
-  <FoldedRoute variant={folded} />
+<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} aria-label={t("Course route")} onpointerenter={reveal}>
+  {#if app.folded}<FoldedRoute />{/if}
   <div class="full" bind:this={full}>
-  <h2>{t("Route")}</h2>
-  {#if chapters.length}
-    <ol class="chapters">
-      {#each chapters as chapter, number (chapter.id)}
-        {@const open = expanded(chapter.id)}
-        <li class="chapter" class:here={chapter.id === currentChapter}>
-          <div class="chapter-head">
-            <button
-              class="toggle"
-              aria-expanded={open}
-              aria-controls="chapter-{chapter.id}"
-              aria-label={open ? t("Collapse chapter") : t("Expand chapter")}
-              disabled={!chapter.concept_ids.length}
-              onclick={() => (toggled[chapter.id] = !open)}
-            ><span aria-hidden="true">{open ? '▾' : '▸'}</span></button>
-            <button
-              class="chapter-name"
-              class:viewing={app.viewingChapter === chapter.id && !app.reviewOpen}
-              aria-current={app.viewingChapter === chapter.id && !app.reviewOpen ? 'page' : undefined}
-              onclick={() => app.viewChapter(chapter.id)}
-            >
-              <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>
-              <span class="meta">
-                {#if chapter.concept_ids.length}
-                  <span>{t("{studied}/{total} sections studied", { studied: studied(chapter.concept_ids), total: chapter.concept_ids.length })}</span>
-                {:else if ['queued', 'building'].includes(app.buildOf(chapter.id)?.status ?? '')}
-                  <span class="building"><span class="live-dot" aria-hidden="true"></span>{t("Building…")}</span>
-                {:else}
-                  <span>{t("Not built yet")}</span>
-                {/if}
-              </span>
-            </button>
-          </div>
-          {#if open && chapter.concept_ids.length}
-            <ol id="chapter-{chapter.id}">
-              {#each chapter.concept_ids as id (id)}
-                {@render section(id)}
-              {/each}
-            </ol>
-          {/if}
-        </li>
-      {/each}
-    </ol>
-  {:else}
-    <ol>
-      {#each route as id (id)}
-        {@render section(id)}
-      {/each}
-    </ol>
-  {/if}
-  {#if course}
-    <section class="codex" aria-labelledby="codex-title">
-      <h3 id="codex-title">{t('Change this course in Codex')}</h3>
-      <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
-      {#if course.needs_review}
-        <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
-          {t('Check {count} source locations in Codex', { count: course.needs_review })}
-        </CodexLink>
+    <div class="head">
+      <h2>{t("Route")}</h2>
+      {#if foldable}
+        <button
+          class="fold"
+          aria-label={app.folded ? t('Unfold the route') : t('Fold the route')}
+          title={app.folded ? t('Unfold the route (r)') : t('Fold the route (r)')}
+          onclick={() => app.toggleRoute()}
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d={app.folded ? 'M6 4l4 4-4 4' : 'M10 4L6 8l4 4'} fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
       {/if}
-    </section>
-  {/if}
+    </div>
+    {#if chapters.length}
+      <ol class="chapters">
+        {#each chapters as chapter, number (chapter.id)}
+          {@const open = expanded(chapter.id)}
+          {@const total = chapter.concept_ids.length}
+          {@const done = studied(chapter.concept_ids)}
+          <li class="chapter" class:here={chapter.id === currentChapter}>
+            <div class="chapter-head">
+              <!-- The chapter's badge is the folded route's badge; here it also opens and closes the chapter. -->
+              <button
+                class="route-badge"
+                class:open={open && total > 0}
+                class:here={chapter.id === currentChapter}
+                class:unbuilt={!total}
+                class:done={total > 0 && done === total}
+                style:--progress="{total ? (done / total) * 360 : 0}deg"
+                aria-expanded={total ? open : undefined}
+                aria-controls={total ? `chapter-${chapter.id}` : undefined}
+                aria-label={open ? t("Collapse chapter") : t("Expand chapter")}
+                title={t("Chapter {number}", { number: number + 1 }) + ' · ' + chapter.title}
+                disabled={!total}
+                onclick={() => (toggled[chapter.id] = !open)}
+              ><span aria-hidden="true">{number + 1}</span></button>
+              <button
+                class="entry chapter-name"
+                class:viewing={app.viewingChapter === chapter.id && !app.reviewOpen}
+                aria-current={app.viewingChapter === chapter.id && !app.reviewOpen ? 'page' : undefined}
+                onclick={() => app.viewChapter(chapter.id)}
+              >
+                <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>
+                <span class="meta">
+                  {#if total}
+                    <span>{t("{studied}/{total} sections studied", { studied: done, total })}</span>
+                  {:else if ['queued', 'building'].includes(app.buildOf(chapter.id)?.status ?? '')}
+                    <span class="building"><span class="live-dot" aria-hidden="true"></span>{t("Building…")}</span>
+                  {:else}
+                    <span>{t("Not built yet")}</span>
+                  {/if}
+                </span>
+              </button>
+            </div>
+            {#if open && total}
+              <ol class="tray" id="chapter-{chapter.id}">
+                {#each chapter.concept_ids as id (id)}
+                  {@render section(id)}
+                {/each}
+              </ol>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    {:else}
+      <ol class="tray">
+        {#each route as id (id)}
+          {@render section(id)}
+        {/each}
+      </ol>
+    {/if}
+    {#if course}
+      <section class="codex" aria-labelledby="codex-title">
+        <h3 id="codex-title">{t('Change this course in Codex')}</h3>
+        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+        {#if course.needs_review}
+          <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
+            {t('Check {count} source locations in Codex', { count: course.needs_review })}
+          </CodexLink>
+        {/if}
+      </section>
+    {/if}
   </div>
 </nav>
 
 <style>
   .rail {
-    --node: 0.8rem;
     --gutter: 1.75rem;
+    --capsule: 2.25rem;
+    --marker-ground: var(--ground);
     position: sticky;
     top: 0;
     max-height: calc(100dvh - var(--topbar));
@@ -193,11 +201,45 @@
     padding: 2.5rem 0.75rem 2rem clamp(0.75rem, 2vw, 1.5rem);
   }
 
-  h2 {
+  /* Unfolding brings the labels back in rather than snapping them. */
+  .rail:not(.folded) .full {
+    animation: enter-fade var(--settle) ease;
+  }
+
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
     margin: 0 0 0.75rem var(--gutter);
+  }
+
+  h2 {
+    margin: 0;
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
+  }
+
+  .fold {
+    display: grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--pencil);
+    cursor: pointer;
+    transition:
+      color var(--quick) ease,
+      background-color var(--quick) ease;
+  }
+
+  .fold:hover {
+    background: var(--accent-wash);
+    color: var(--accent);
   }
 
   ol {
@@ -206,7 +248,7 @@
     list-style: none;
   }
 
-  li {
+  .tray > li {
     position: relative;
     display: grid;
     grid-template-columns: var(--gutter) minmax(0, 1fr);
@@ -214,51 +256,61 @@
     padding-bottom: 0.25rem;
   }
 
-  /* Connector from this node to the next; both share the gutter centre, so they always line up. */
-  li:not(:last-child)::before {
+  /* An open chapter's sections sit in a tray along the spine, as in the folded route. */
+  .tray {
+    position: relative;
+    isolation: isolate;
+    margin-top: 0.3rem;
+  }
+
+  .tray::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0.1rem;
+    bottom: 0.1rem;
+    left: 0.15rem;
+    width: calc(var(--gutter) - 0.3rem);
+    border-radius: 999px;
+    background: var(--accent-wash);
+    animation: tray-in var(--settle) var(--ease-out);
+  }
+
+  @keyframes tray-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Connector from this dot to the next; both share the gutter centre, so they always line up. */
+  .tray > li:not(:last-child)::before {
     content: '';
     position: absolute;
     left: calc(var(--gutter) / 2 - 1px);
-    top: calc(0.62rem + var(--node) / 2);
-    bottom: calc(-0.62rem - var(--node) / 2);
+    top: 1rem;
+    bottom: -1rem;
     width: 2px;
-    background: linear-gradient(var(--accent), var(--accent)) top / 100% var(--fill, 0%) no-repeat, var(--rule);
+    background: linear-gradient(var(--accent), var(--accent)) top / 100% var(--fill, 0%) no-repeat, var(--rule-strong);
     transition: background-size 0.7s cubic-bezier(0.3, 0, 0.2, 1);
   }
 
-  li.passed::before {
+  .tray > li.passed::before {
     --fill: 100%;
   }
 
   .node {
-    transition:
-      background-color var(--settle) ease,
-      border-color var(--settle) ease,
-      box-shadow var(--settle) ease;
     position: relative;
     z-index: 1;
-    justify-self: center;
-    width: var(--node);
-    height: var(--node);
-    margin-top: 0.62rem;
-    border: 2px solid var(--rule-strong);
-    border-radius: 50%;
-    background: var(--ground);
-    transition: background-color 0.3s, border-color 0.3s;
+    display: grid;
+    place-items: center;
+    height: 2rem;
   }
 
-  .visited .node {
-    border-color: var(--accent);
-    background: var(--accent);
+  .tray > li:hover .route-dot {
+    transform: scale(1.25);
   }
 
-  .current .node {
-    border-color: var(--accent);
-    background: var(--marker);
-    box-shadow: 0 0 0 4px var(--marker-wash);
-  }
-
-  .arriving .node {
+  .arriving .route-dot {
     animation: arrive 0.5s 0.55s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
   }
 
@@ -269,7 +321,7 @@
     }
   }
 
-  button {
+  .entry {
     display: grid;
     gap: 0.1rem;
     min-width: 0;
@@ -280,13 +332,17 @@
     text-align: left;
     cursor: pointer;
     color: var(--ink-soft);
+    transition:
+      background-color var(--quick) ease,
+      color var(--quick) ease;
   }
 
-  button:hover {
+  .entry:hover {
     background: color-mix(in srgb, var(--accent-wash) 60%, transparent);
+    color: var(--ink);
   }
 
-  button.viewing {
+  .entry.viewing {
     background: var(--accent-wash);
     color: var(--ink);
   }
@@ -324,16 +380,7 @@
     color: var(--accent);
   }
 
-  .chapters > li {
-    display: block;
-    padding-bottom: 0;
-  }
-
-  .chapters > li::before {
-    content: none;
-  }
-
-  .chapters > li + li {
+  .chapter + .chapter {
     margin-top: 0.6rem;
   }
 
@@ -343,19 +390,9 @@
     align-items: start;
   }
 
-  .toggle {
+  .chapter-head .route-badge {
     justify-self: center;
-    padding: 0.4rem 0;
-    color: var(--pencil);
-  }
-
-  .toggle:disabled {
-    visibility: hidden;
-  }
-
-  .toggle:hover {
-    background: transparent;
-    color: var(--ink);
+    margin-top: 0.4rem;
   }
 
   .chapter-name .name {
@@ -367,10 +404,6 @@
 
   .chapter.here .chapter-name .name {
     color: var(--ink);
-  }
-
-  .chapter ol {
-    margin-top: 0.15rem;
   }
 
   .codex {
@@ -392,47 +425,64 @@
     color: var(--mine);
   }
 
-  /* Folded beside a narrow stage, the route is FoldedRoute's capsule, centred in the column. Pointing at the capsule
-     opens the full route as a drawer beside it; the empty rest of the column does not react. */
-  @media (min-width: 56.01rem) {
-    @container stage (max-width: 66rem) {
-      .rail {
-        --capsule: 2.25rem;
-        z-index: 20;
-        display: flex;
-        width: var(--rail-folded);
-        height: calc(100dvh - var(--topbar));
-        max-height: none;
-        overflow: visible;
-        padding: 0;
-        pointer-events: none;
-      }
+  /* Folded, the route is FoldedRoute's capsule centred in the column. Pointing at the capsule opens the full route as a
+     drawer beside it, which slides in, and waits a moment before closing so brushing past its edge does not flicker. */
+  .rail.folded {
+    z-index: 20;
+    display: flex;
+    width: var(--rail-folded);
+    height: calc(100dvh - var(--topbar));
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    pointer-events: none;
+  }
 
-      .full {
-        display: none;
-        pointer-events: auto;
-      }
+  .rail.folded .full {
+    --marker-ground: var(--sheet);
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% + var(--capsule) / 2 - 1px);
+    width: var(--rail);
+    overflow-y: auto;
+    padding: 2.5rem 0.75rem 2rem;
+    background: var(--sheet);
+    border-right: 1px solid var(--rule);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-0.6rem);
+    transition:
+      opacity var(--quick) ease 0.12s,
+      transform var(--quick) ease 0.12s,
+      visibility 0s linear calc(var(--quick) + 0.12s);
+  }
 
-      /* The drawer starts at the capsule's edge, so the pointer can move from one to the other without closing it. */
-      .rail:has(:global(.mini:hover), .full:hover) .full {
-        display: block;
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: calc(50% + var(--capsule) / 2 - 1px);
-        width: var(--rail);
-        overflow-y: auto;
-        padding: 2.5rem 0.75rem 2rem;
-        background: var(--sheet);
-        border-right: 1px solid var(--rule);
-        box-shadow: var(--shadow);
-        animation: enter-fade var(--quick) ease;
-      }
+  .rail.folded:has(:global(.mini:hover), .full:hover) .full {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+    transition:
+      opacity var(--quick) ease,
+      transform var(--settle) var(--ease-out),
+      visibility 0s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rail .full,
+    .rail.folded .full,
+    .tray::before,
+    .arriving .route-dot {
+      animation: none;
+      transition: none;
     }
   }
 
   @media (max-width: 56rem) {
     .rail {
+      --marker-ground: var(--sheet);
       position: fixed;
       top: var(--topbar);
       bottom: 0;

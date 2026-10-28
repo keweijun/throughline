@@ -112,64 +112,65 @@ test('a later section can be studied now, and the unstudied sections before it s
   expect(errors).toEqual([]);
 });
 
-test('beside an open panel the route folds to a progress track: a segment per chapter, whichever are collapsed', async ({ page, course }) => {
+test('beside an open panel the route folds to a badge per chapter, whichever are collapsed, and opens the full route on hover', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.setViewportSize({ width: 1280, height: 900 });
   const mini = page.locator('#route .mini');
   await expect(mini).toBeVisible();
-  await expect(mini.locator('.segment')).toHaveCount(3);
-  await expect(mini.locator('.marker')).toHaveCount(1);
-  await expect(mini.getByRole('button', { name: 'Chapter 3 · Time evolution, Not built yet' })).toBeVisible();
+  await expect(mini.locator('.route-badge')).toHaveCount(3);
+  await expect(mini.locator('.route-dot')).toHaveCount(2);
+  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+  // Without room beside the reading column the route cannot be unfolded, only opened on hover.
+  await expect(page.getByRole('button', { name: 'Unfold the route' })).toHaveCount(0);
 
-  // Pointing at the track opens the full route beside it; collapsing a chapter there changes nothing in the track.
   await mini.hover();
   const full = page.locator('#route .full');
   await expect(full).toBeVisible();
   await full.getByRole('button', { name: 'Collapse chapter' }).first().click();
   await page.mouse.move(900, 600);
   await expect(full).toBeHidden();
-  await expect(mini.locator('.segment')).toHaveCount(3);
-
-  await mini.getByRole('button', { name: /^Chapter 2 · Measurement/ }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Measurement');
-  expect(errors).toEqual([]);
-});
-
-test('the chapter stepper rings every chapter and opens the sections of the chapter in view', async ({ page, course }) => {
-  const { base, errors } = await course('chapters_browser_fixture');
-  await page.goto(base + '/?rail=stepper');
-  await page.getByRole('button', { name: 'Notes', exact: true }).click();
-  await page.setViewportSize({ width: 1280, height: 900 });
-  const mini = page.locator('#route .mini');
-  await expect(mini.locator('.ring')).toHaveCount(3);
-  await expect(mini.locator('.dot')).toHaveCount(2);
-  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+  await expect(mini.locator('.route-badge')).toHaveCount(3);
 
   await mini.getByRole('button', { name: /^Superposition/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
-  // Another chapter in view opens instead; the choice of design is remembered.
+  // The chapter in view opens instead.
   await mini.getByRole('button', { name: /^Chapter 2 · Measurement/ }).click();
-  await expect(mini.locator('.dot')).toHaveCount(1);
-  await page.reload();
-  await expect(page.locator('#route .mini.stepper')).toBeAttached();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Measurement');
+  await expect(mini.locator('.route-dot')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
-test('in a long course the track keeps its height and the stepper shows a window of the open chapter', async ({ page, course }) => {
-  const { base, errors } = await course('long_course_browser_fixture');
+test('the learner folds the route and unfolds it again, and the choice is remembered', async ({ page, course }) => {
+  const { errors } = await course('chapters_browser_fixture');
+  const full = page.locator('#route .full');
+  await expect(full.getByRole('button', { name: 'Collapse chapter' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fold the route' }).click();
+  const mini = page.locator('#route .mini');
+  await expect(mini).toBeVisible();
+  await page.mouse.move(900, 600);
+  await expect(full).toBeHidden();
+
+  await page.reload();
+  await expect(mini).toBeVisible();
+  await page.keyboard.press('r');
+  await expect(mini).toHaveCount(0);
+  await expect(full).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#route .mini')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('in a long course the folded route shows every chapter and a window of the open one', async ({ page, course }) => {
+  const { errors } = await course('long_course_browser_fixture');
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   const mini = page.locator('#route .mini');
-  await expect(mini.locator('.segment')).toHaveCount(13);
-  const track = (await mini.boundingBox())!;
-  expect(track.height).toBeLessThan(450);
-
-  await page.goto(base + '/?rail=stepper');
-  await page.getByRole('button', { name: 'Notes', exact: true }).click();
   // Section 4 of the 30-section chapter: nine dots from its start, and the other 21 counted.
-  await expect(mini.locator('.ring')).toHaveCount(13);
-  await expect(mini.locator('.dot')).toHaveCount(9);
+  await expect(mini.locator('.route-badge')).toHaveCount(13);
+  await expect(mini.locator('.route-dot')).toHaveCount(9);
   await expect(mini.locator('.more')).toHaveText(['+21']);
-  await expect(mini.locator('.ring.done')).toHaveCount(4);
+  await expect(mini.locator('.route-badge.done')).toHaveCount(4);
+  const box = (await mini.boundingBox())!;
+  expect(box.height).toBeLessThan(800);
   expect(errors).toEqual([]);
 });

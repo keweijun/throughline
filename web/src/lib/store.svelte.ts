@@ -33,6 +33,14 @@ function drop(annotations: Annotation[], id: string) {
   if (index >= 0) annotations.splice(index, 1);
 }
 
+function storedFold() {
+  try {
+    return localStorage.getItem('route-folded') === 'yes';
+  } catch {
+    return false;
+  }
+}
+
 function storedWidth() {
   try {
     return Number(localStorage.getItem('panel-width')) || DEFAULT_PANEL;
@@ -99,6 +107,11 @@ class AppStore {
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
   routeOpen = $state(false);
+  /** The learner folded the route to its capsule; a stage too narrow for it folds it regardless. */
+  routeFolded = $state(storedFold());
+  /** Set by the app: the reading column has no room beside the full route, and the window is a phone's. */
+  stageNarrow = $state(false);
+  phone = $state(false);
   shortcutsOpen = $state(false);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
@@ -618,6 +631,22 @@ class AppStore {
     if (!chosen) return;
     this.#widthChosen = true;
     if (save) this.savePanelWidth();
+  }
+
+  /** The route shows as its folded capsule; on a phone it is a drawer instead. */
+  get folded() {
+    return !this.phone && (this.stageNarrow || this.routeFolded);
+  }
+
+  /** Fold or unfold the route; only possible when the stage has room for it unfolded. */
+  toggleRoute() {
+    if (this.stageNarrow || this.phone) return;
+    this.routeFolded = !this.routeFolded;
+    try {
+      localStorage.setItem('route-folded', this.routeFolded ? 'yes' : '');
+    } catch {
+      // The choice still applies for this visit.
+    }
   }
 
   savePanelWidth() {

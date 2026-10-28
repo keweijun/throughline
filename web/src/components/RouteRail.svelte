@@ -56,6 +56,24 @@
   let toggled = $state<Record<string, boolean>>({});
   const expanded = (id: string) => toggled[id] ?? (id === currentChapter || id === app.chapterOf(app.viewingId)?.id || id === app.viewingChapter);
   const studied = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
+
+  // The folded strip keeps the section being read in view; the full route, when it opens over the page, shows it too.
+  let mini = $state<HTMLElement>();
+  let full = $state<HTMLElement>();
+  const into = (box: HTMLElement | undefined, selector: string) => {
+    const item = box?.querySelector<HTMLElement>(selector);
+    if (!box || !item) return;
+    const top = item.offsetTop - box.offsetTop;
+    if (top < box.scrollTop || top + item.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top - box.clientHeight / 3;
+  };
+  $effect(() => {
+    void app.viewingId;
+    void app.currentId;
+    requestAnimationFrame(() => into(mini, '.dot.viewing, .dot.current'));
+  });
+  function reveal() {
+    if (mini && getComputedStyle(mini).display !== 'none') requestAnimationFrame(() => into(full, '[aria-current="page"], .current button'));
+  }
 </script>
 
 {#snippet section(id: string)}
@@ -89,7 +107,41 @@
   </li>
 {/snippet}
 
-<nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")}>
+<nav id="route" class="rail" class:open={app.routeOpen} aria-label={t("Course route")} onpointerenter={reveal}>
+  <!-- Folded beside a narrow stage, the route is one marker per section of every chapter, whichever chapters are
+       collapsed or however the full route was scrolled. Pointing at it opens the full route over the page; from the
+       keyboard each marker is a labelled button. -->
+  <ol class="mini" bind:this={mini}>
+    {#each chapters.length ? chapters : [{ id: '', title: '', concept_ids: route }] as chapter, number (chapter.id)}
+      <li class:here={chapter.id === currentChapter}>
+        {#if chapter.id}
+          <button
+            class="tick"
+            class:unbuilt={!chapter.concept_ids.length}
+            aria-label={t("Chapter {number}", { number: number + 1 }) + ' · ' + chapter.title}
+            title={t("Chapter {number}", { number: number + 1 }) + ' · ' + chapter.title}
+            onclick={() => app.viewChapter(chapter.id)}
+          ></button>
+        {/if}
+        <ol>
+          {#each chapter.concept_ids as id (id)}
+            {@const status = stateOf(id, route.indexOf(id))}
+            <li>
+              <button
+                class="dot {status}"
+                class:viewing={id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
+                class:skipped={app.isSkipped(id)}
+                aria-label={(app.concept(id)?.title ?? id) + ', ' + diagnostic(label[status])}
+                title={app.concept(id)?.title ?? id}
+                onclick={() => app.view(id)}
+              ></button>
+            </li>
+          {/each}
+        </ol>
+      </li>
+    {/each}
+  </ol>
+  <div class="full" bind:this={full}>
   <h2>{t("Route")}</h2>
   {#if chapters.length}
     <ol class="chapters">
@@ -151,6 +203,7 @@
       {/if}
     </section>
   {/if}
+  </div>
 </nav>
 
 <style>
@@ -363,30 +416,136 @@
     color: var(--mine);
   }
 
-  /* Folded beside a narrow stage: only the route markers show, and the rail opens over the page on hover or focus.
-     Its content keeps the full width, so nothing reflows and the markers stay where they were. */
+  .mini {
+    display: none;
+  }
+
+  /* Folded beside a narrow stage: the strip of markers shows, and the full route opens over the page on hover,
+     scrolling on its own. */
   @media (min-width: 56.01rem) {
-    @container stage (max-width: 64rem) {
+    @container stage (max-width: 66rem) {
       .rail {
         z-index: 20;
         width: var(--rail-folded);
-        overflow: hidden;
-        padding-left: 0.75rem;
-        transition: width var(--quick) var(--ease-out), box-shadow var(--quick) ease;
+        max-height: none;
+        overflow: visible;
+        padding: 0;
       }
 
-      .rail > * {
-        width: calc(var(--rail) - 1.5rem);
-      }
-
-      .rail:not(:hover, :focus-within) :is(h2, button, .codex) {
-        opacity: 0;
-      }
-
-      .rail:hover,
-      .rail:focus-within {
-        width: var(--rail);
+      .mini {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        max-height: calc(100dvh - var(--topbar));
+        margin: 0;
+        padding: 2.6rem 0 2rem;
         overflow-y: auto;
+        scrollbar-width: none;
+        list-style: none;
+      }
+
+      .mini > li {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0;
+      }
+
+      .mini > li::before {
+        content: none;
+      }
+
+      .mini ol {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .mini ol li {
+        display: block;
+        padding: 0;
+      }
+
+      .mini ol li::before {
+        content: none;
+      }
+
+      .mini button {
+        display: block;
+        padding: 0;
+        border-radius: 999px;
+      }
+
+      .tick {
+        width: 1.1rem;
+        height: 0.6rem;
+        background: linear-gradient(var(--rule-strong), var(--rule-strong)) center / 100% 2px no-repeat;
+      }
+
+      .here > .tick {
+        background-image: linear-gradient(var(--accent), var(--accent));
+      }
+
+      .tick.unbuilt {
+        opacity: 0.45;
+      }
+
+      /* Each marker has a comfortable target; the dot itself is drawn inside it. */
+      .dot {
+        position: relative;
+        width: 1.5rem;
+        height: 1.15rem;
+      }
+
+      .dot::after {
+        content: '';
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: 0.55rem;
+        height: 0.55rem;
+        border: 2px solid var(--rule-strong);
+        border-radius: 50%;
+        background: var(--ground);
+        transform: translate(-50%, -50%);
+      }
+
+      .dot.visited::after {
+        border-color: var(--accent);
+        background: var(--accent);
+      }
+
+      .dot.skipped::after {
+        border-color: var(--caution);
+        background: var(--ground);
+      }
+
+      .dot.current::after {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-color: var(--accent);
+        background: var(--marker);
+        box-shadow: 0 0 0 3px var(--marker-wash);
+      }
+
+      .dot.viewing {
+        background: var(--accent-wash);
+      }
+
+      .full {
+        display: none;
+      }
+
+      /* The full route opens beside the strip, so the markers stay in view and can still be clicked. */
+      .rail:hover .full {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 100%;
+        width: var(--rail);
+        max-height: calc(100dvh - var(--topbar));
+        overflow-y: auto;
+        padding: 2.5rem 0.75rem 2rem;
         background: var(--sheet);
         box-shadow: var(--shadow);
         border-radius: 0 var(--radius) var(--radius) 0;

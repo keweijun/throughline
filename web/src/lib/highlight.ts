@@ -2,7 +2,10 @@ import { RENDERED } from './markdown';
 import { stageOffset } from './stage';
 import type { Annotation } from './types';
 
-/** Marks passages using the CSS Custom Highlight API (no DOM changes): ones the learner asked about, and their own highlights. */
+/**
+ * Marks passages the learner asked about, and their own highlights: text through the CSS Custom Highlight API, so the
+ * text is never rewrapped, and a whole formula through an attribute on its element.
+ */
 
 const layers = { asked: new Map<string, Range[]>(), mine: new Map<string, Range[]>() };
 type Layer = keyof typeof layers;
@@ -14,10 +17,43 @@ const owner = new WeakMap<Range, string>();
 
 export const annotationPassage = (a: Annotation): Passage => ({ text: a.passage, occurrence: a.occurrence ?? 0, id: a.id });
 
+// A rendered formula is a `[data-tex]` element holding KaTeX's glyph boxes. Painting those one by one leaves a patchy
+// highlight, so a formula inside a passage is marked whole with an attribute the stylesheet paints, and only the text
+// around it goes to the highlight registry.
+const FORMULA_ELEMENT = '[data-tex]';
+const formulaAttribute = (layer: Layer) => `data-highlight-${layer}`;
+const markedFormulas = { asked: new Set<Element>(), mine: new Set<Element>() };
+
+/** The formulas a range covers, and the text pieces between them. */
+function split(range: Range): { pieces: Range[]; formulas: Element[] } {
+  const scope = range.commonAncestorContainer;
+  const root = scope instanceof Element ? scope : scope.parentElement;
+  const inside = root?.closest(FORMULA_ELEMENT);
+  if (inside) return { pieces: [], formulas: [inside] };
+  const formulas = [...(root?.querySelectorAll(FORMULA_ELEMENT) ?? [])].filter((f) => range.intersectsNode(f));
+  if (!formulas.length) return { pieces: [range], formulas };
+  const pieces: Range[] = [];
+  let piece = range.cloneRange();
+  for (const formula of formulas) {
+    piece.setEndBefore(formula);
+    if (!piece.collapsed) pieces.push(piece);
+    piece = range.cloneRange();
+    piece.setStartAfter(formula);
+  }
+  if (!piece.collapsed) pieces.push(piece);
+  return { pieces, formulas };
+}
+
 function publish(layer: Layer) {
+  const parts = [...layers[layer].values()].flat().map(split);
+  const formulas = new Set(parts.flatMap((p) => p.formulas));
+  const attribute = formulaAttribute(layer);
+  for (const formula of markedFormulas[layer]) if (!formulas.has(formula)) formula.removeAttribute(attribute);
+  for (const formula of formulas) formula.setAttribute(attribute, '');
+  markedFormulas[layer] = formulas;
   if (!('highlights' in CSS)) return;
-  const all = [...layers[layer].values()].flat();
-  if (all.length) CSS.highlights.set(layer, new Highlight(...all));
+  const pieces = parts.flatMap((p) => p.pieces);
+  if (pieces.length) CSS.highlights.set(layer, new Highlight(...pieces));
   else CSS.highlights.delete(layer);
 }
 
@@ -27,28 +63,51 @@ export type LocateOptions = {
   skip?: string;
 };
 
-// A passage keeps its formulas as TeX, which rendered text does not contain.
+// A passage keeps its formulas as TeX ($…$ or $$…$$), as the selection recorded them.
 const FORMULA = /\$\$[\s\S]+?\$\$|\$[^$\n]+?\$/g;
+// In the text searched, a formula stands as its TeX between two markers that ordinary text never contains.
+const token = (tex: string) => `\u0001${tex.replace(/\s+/g, '')}\u0002`;
+const tokenize = (needle: string) => needle.replace(FORMULA, (m) => token(m.startsWith('$$') ? m.slice(2, -2) : m.slice(1, -1)));
 
-/** Every occurrence of a passage in rendered text, ignoring whitespace differences, formulas and citation chips. */
+/**
+ * Every occurrence of a passage in rendered text, ignoring whitespace differences and citation chips. A formula in the
+ * passage matches the rendered formula with the same TeX; passages saved from text whose formulas differ since are
+ * matched on their words alone.
+ */
 export function occurrences(root: HTMLElement, needle: string, options: LocateOptions = {}): Range[] {
-  const found = search(root, needle, options);
-  return found.length || !needle.includes('$') ? found : search(root, needle.replace(FORMULA, ' '), options);
+  const found = search(root, tokenize(needle), options, true);
+  return found.length || !needle.includes('$') ? found : search(root, needle.replace(FORMULA, ' '), options, false);
 }
 
-function search(root: HTMLElement, needle: string, options: LocateOptions): Range[] {
+type Position = [Text, number] | Element;
+
+function search(root: HTMLElement, needle: string, options: LocateOptions, formulas: boolean): Range[] {
   const target = options.loose ? needle.replace(/\s+/g, '') : needle.replace(/\s+/g, ' ').trim();
   if (target.length < 3) return [];
   const skip = options.skip ?? '.katex, .citation';
-  const nodes: Text[] = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => (node.parentElement?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  const nodes: (Text | Element)[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (node) => {
+      const parent = node.parentElement;
+      if (parent?.closest(FORMULA_ELEMENT)) return NodeFilter.FILTER_REJECT;
+      if (node instanceof Element) {
+        if (node.matches(FORMULA_ELEMENT)) return formulas ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        return node.matches(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
+      }
+      return parent?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    },
   });
-  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
-  // Build a whitespace-collapsed copy of the text with a map back to node offsets.
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text | Element);
+  // Build a whitespace-collapsed copy of the text with a map back to node offsets, or to the formula a token stands for.
   let flat = '';
-  const map: [Text, number][] = [];
+  const map: Position[] = [];
   for (const node of nodes) {
+    if (node instanceof Element) {
+      const text = token((node as HTMLElement).dataset.tex ?? '');
+      flat += text;
+      for (let i = 0; i < text.length; i++) map.push(node);
+      continue;
+    }
     const value = node.data;
     for (let i = 0; i < value.length; i++) {
       const space = /\s/.test(value[i]);
@@ -59,11 +118,13 @@ function search(root: HTMLElement, needle: string, options: LocateOptions): Rang
   }
   const ranges: Range[] = [];
   for (let start = flat.indexOf(target); start >= 0; start = flat.indexOf(target, start + 1)) {
-    const [startNode, startOffset] = map[start];
-    const [endNode, endOffset] = map[start + target.length - 1];
+    const first = map[start];
+    const last = map[start + target.length - 1];
     const range = document.createRange();
-    range.setStart(startNode, startOffset);
-    range.setEnd(endNode, endOffset + 1);
+    if (first instanceof Element) range.setStartBefore(first);
+    else range.setStart(first[0], first[1]);
+    if (last instanceof Element) range.setEndAfter(last);
+    else range.setEnd(last[0], last[1] + 1);
     ranges.push(range);
   }
   return ranges;

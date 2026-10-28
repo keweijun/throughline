@@ -137,6 +137,24 @@ a {
   background-color: var(--mine-wash);
 }
 
+/* A formula inside a highlighted or asked passage is painted whole: KaTeX's glyph boxes would leave gaps. */
+[data-highlight-mine] > .katex,
+[data-highlight-mine] > .katex-display > .katex {
+  border-radius: 2px;
+  background-color: var(--mine-wash);
+}
+
+[data-highlight-asked] > .katex,
+[data-highlight-asked] > .katex-display > .katex {
+  border-bottom: 2px solid var(--marker);
+}
+
+/* A display formula is a full-width block; its mark hugs the formula and stays centred. */
+:is([data-highlight-mine], [data-highlight-asked]) > .katex-display > .katex {
+  display: table;
+  margin-inline: auto;
+}
+
 [hidden] {
   display: none !important;
 }

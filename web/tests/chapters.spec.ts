@@ -110,3 +110,27 @@ test('a later section can be studied now, and the unstudied sections before it s
   expect(state.skipped.map((s: { concept_id: string }) => s.concept_id).sort()).toEqual(['state', 'superposition']);
   expect(errors).toEqual([]);
 });
+
+test('beside an open panel the route folds to a marker per section, whichever chapters are collapsed', async ({ page, course }) => {
+  const { errors } = await course('chapters_browser_fixture');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const mini = page.locator('#route .mini');
+  await expect(mini).toBeVisible();
+  await expect(mini.locator('.dot')).toHaveCount(3);
+  await expect(mini.locator('.tick')).toHaveCount(3);
+  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+
+  // Pointing at the strip opens the full route over the page; collapsing a chapter there leaves every marker in place.
+  await mini.hover();
+  const full = page.locator('#route .full');
+  await expect(full).toBeVisible();
+  await full.getByRole('button', { name: 'Collapse chapter' }).first().click();
+  await page.mouse.move(900, 600);
+  await expect(full).toBeHidden();
+  await expect(mini.locator('.dot')).toHaveCount(3);
+
+  await mini.getByRole('button', { name: /^Possible outcomes/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
+  expect(errors).toEqual([]);
+});

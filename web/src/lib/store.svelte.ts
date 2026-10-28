@@ -582,7 +582,16 @@ class AppStore {
     else this.view(annotation.concept_id);
     if (annotation.task_id) {
       await tick();
-      requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      requestAnimationFrame(() => {
+        const exercise = document.getElementById(`exercise-${annotation.task_id}`);
+        if (!exercise) return;
+        // The passage may be in the question or the teacher's feedback; land on it, else on the exercise.
+        const range = annotation.passage
+          ? [...exercise.querySelectorAll<HTMLElement>('[data-exercise]')].map((block) => occurrences(block, annotation.passage)[annotation.occurrence ?? 0]).find(Boolean)
+          : undefined;
+        if (range) scrollStage(Math.max(0, stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3));
+        else exercise.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
       return;
     }
     if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0 });

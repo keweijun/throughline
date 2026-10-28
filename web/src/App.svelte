@@ -165,15 +165,17 @@
   .layout {
     display: grid;
     grid-template-columns: var(--rail) minmax(0, 1fr);
+    column-gap: clamp(1rem, 3vw, 3rem);
     align-items: start;
-    max-width: calc(var(--rail) + var(--measure) + 9rem);
+    max-width: calc(var(--rail) + var(--measure) + 12rem);
     margin-inline: auto;
   }
 
   @media (min-width: 56.01rem) {
-    @container stage (max-width: 64rem) {
+    @container stage (max-width: 66rem) {
       .layout {
         grid-template-columns: var(--rail-folded) minmax(0, 1fr);
+        column-gap: 0;
       }
     }
   }

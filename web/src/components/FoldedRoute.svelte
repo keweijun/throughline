@@ -105,7 +105,7 @@
             aria-label={name(chapter, index) + ', ' + progress(chapter)}
             title={name(chapter, index) + ' · ' + progress(chapter)}
             onclick={() => app.viewChapter(chapter.id)}
-          ></button>
+          ><span aria-hidden="true">{index + 1}</span></button>
         {/if}
         {#if chapter.id === openChapter && total}
           {@const shown = windowed(chapter.concept_ids)}
@@ -221,6 +221,8 @@
         gap: 0;
       }
 
+      /* A chapter is a numbered badge on the spine, so it never reads as a section; the chapter in view hangs its
+         sections below it in a tray of their own. */
       .chapter {
         display: flex;
         flex-direction: column;
@@ -230,37 +232,57 @@
       .chapter + .chapter::before {
         content: '';
         width: 2px;
-        height: 0.45rem;
+        height: 0.5rem;
         background: var(--rule);
       }
 
+      /* The badge's rim fills with the share of the chapter studied. */
       .ring {
-        width: 1rem;
-        height: 1rem;
+        display: grid;
+        place-items: center;
+        width: 1.4rem;
+        height: 1.4rem;
         border-radius: 50%;
         background: conic-gradient(var(--accent) var(--progress), var(--rule-strong) 0);
+        font: 600 0.66rem/1 var(--sans);
+        font-variant-numeric: tabular-nums;
+        color: var(--pencil);
+        transition: transform var(--quick) var(--ease-out);
       }
 
       .ring::after {
         content: '';
         position: absolute;
-        inset: 3px;
+        inset: 2.5px;
         border-radius: 50%;
         background: var(--sheet);
+      }
+
+      .ring span {
+        position: relative;
+        z-index: 1;
+      }
+
+      .ring.here {
+        color: var(--ink);
       }
 
       .ring.here::after {
         background: var(--marker);
       }
 
-      /* A finished chapter reads as a solid mark, apart from the outlines of chapters still to study. */
+      /* A finished chapter is solid. */
+      .ring.done {
+        color: var(--on-accent);
+      }
+
       .ring.done::after {
         content: none;
       }
 
       .ring.unbuilt {
         background: none;
-        border: 2px dashed var(--rule-strong);
+        border: 1.5px dashed var(--rule-strong);
       }
 
       .ring.unbuilt::after {
@@ -268,16 +290,23 @@
       }
 
       .ring:hover {
-        transform: scale(1.15);
+        transform: scale(1.12);
+      }
+
+      .open > .ring {
+        box-shadow: 0 0 0 3px var(--accent-wash);
       }
 
       .sections {
         display: flex;
         flex-direction: column;
         align-items: center;
-        margin: 0.2rem 0;
-        padding: 0;
+        width: 1.75rem;
+        margin: 0.3rem 0 0.1rem;
+        padding: 0.3rem 0;
         list-style: none;
+        border-radius: 999px;
+        background: var(--accent-wash);
       }
 
       .sections li {

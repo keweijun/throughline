@@ -28,10 +28,12 @@ Codex reads the steps below, installs the app (no Node.js needed), adds the `$th
 When a user asks you to install or update Throughline, run these steps yourself, outside the sandbox (they need the network and write outside the workspace). The user should not have to type anything.
 
 1. If `guided-learning --version` already works, run `guided-learning stop` first. On Windows a running Throughline locks its own files and the upgrade would fail.
+
+   Then remove the package's pre-0.5.1 name, which installs the same command, with the tool that installed it: `uv tool uninstall codex-guided-learning`, `pipx uninstall codex-guided-learning`, or `python -m pip uninstall -y codex-guided-learning`. An error that it is not installed is fine. Courses are kept.
 2. Install the latest version from GitHub, using the first tool that is available:
-   - `uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
-   - `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
-   - `python -m pip install --user --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
    If `guided-learning` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
 3. Run `guided-learning setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher and never touches existing courses.
@@ -43,13 +45,15 @@ With [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```sh
 guided-learning stop                 # when updating; skip on a first install
-uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"
+uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"
 guided-learning setup                # add --language zh-CN for the Chinese welcome guide
 ```
 
-With pipx, replace the second line with `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`. Both forms always fetch the latest version, so the same three lines install and update. Run `guided-learning --version` to see what you have.
+With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`. Both forms always fetch the latest version, so the same three lines install and update. Run `guided-learning --version` to see what you have.
 
-To uninstall, run `guided-learning stop`, then `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`), and delete `~/.agents/skills/throughline` and the launcher. Your courses stay in your Throughline folder until you delete it.
+Updating from a version before 0.5.1, when the package was named `codex-guided-learning`: run `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`) after `guided-learning stop`, then continue as above.
+
+To uninstall, run `guided-learning stop`, then `uv tool uninstall throughline` (or `pipx uninstall throughline`), and delete `~/.agents/skills/throughline` and the launcher. Your courses stay in your Throughline folder until you delete it.
 
 ## Create your first course
 
@@ -128,4 +132,4 @@ npx playwright test                                # browser tests against dispo
 
 Read [architecture](docs/architecture.md), the [glossary](GLOSSARY.md) and the [decisions](docs/adr/) before larger changes; agent instructions are in [AGENTS.md](AGENTS.md). Tasks live in GitHub Issues.
 
-Throughline is licensed under [MIT](LICENSE); bundled dependencies keep the licenses listed in [third-party notices](THIRD_PARTY_LICENSES.md). The Python package and command are named `guided-learning` (package `codex-guided-learning`).
+Throughline is licensed under [MIT](LICENSE); bundled dependencies keep the licenses listed in [third-party notices](THIRD_PARTY_LICENSES.md). The Python package is named `throughline` (`codex-guided-learning` before 0.5.1) and the command `guided-learning`.

@@ -28,10 +28,12 @@ Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throug
 用户请你安装或更新贯学时，请自己在沙箱外执行以下步骤（需要联网，并会写入工作区以外的位置），不要让用户手动输入命令。
 
 1. 如果 `guided-learning --version` 已经可以运行，先执行 `guided-learning stop`。在 Windows 上，正在运行的贯学会锁住自身文件，导致升级失败。
+
+   然后用当初安装它的工具卸载旧包名（0.5.1 之前的包名，会提供同一个命令）：`uv tool uninstall codex-guided-learning`、`pipx uninstall codex-guided-learning` 或 `python -m pip uninstall -y codex-guided-learning`。如果提示未安装，忽略即可。课程不受影响。
 2. 用第一个可用的工具从 GitHub 安装最新版：
-   - `uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
-   - `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
-   - `python -m pip install --user --upgrade "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
    如果之后找不到 `guided-learning` 命令，运行 `uv tool update-shell`（或 `pipx ensurepath`），并在下一步使用安装程序输出的完整路径。
 3. 运行 `guided-learning setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程。
@@ -43,13 +45,15 @@ Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throug
 
 ```sh
 guided-learning stop                 # 更新时执行；首次安装可跳过
-uv tool install --reinstall "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"
+uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"
 guided-learning setup --language zh-CN
 ```
 
-使用 pipx 时，把第二行换成 `pipx install --force "codex-guided-learning[pdf] @ git+https://github.com/keweijun/throughline"`。两种方式都会获取最新版，所以安装和更新用的是同样三行命令。运行 `guided-learning --version` 可查看当前版本。
+使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`。两种方式都会获取最新版，所以安装和更新用的是同样三行命令。运行 `guided-learning --version` 可查看当前版本。
 
-卸载：先运行 `guided-learning stop`，再运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），然后删除 `~/.agents/skills/throughline` 和启动器。课程会一直保留在贯学文件夹中，直到你手动删除。
+从 0.5.1 之前的版本（包名为 `codex-guided-learning`）更新时：在 `guided-learning stop` 之后运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），再按上面的步骤继续。
+
+卸载：先运行 `guided-learning stop`，再运行 `uv tool uninstall throughline`（或 `pipx uninstall throughline`），然后删除 `~/.agents/skills/throughline` 和启动器。课程会一直保留在贯学文件夹中，直到你手动删除。
 
 ## 创建第一门课程
 
@@ -128,4 +132,4 @@ npx playwright test                                # 用临时示例课程运行
 
 较大的改动前请先阅读[架构](docs/architecture.md)、[术语表](GLOSSARY.md)和[设计决策](docs/adr/)（均为英文）；面向智能体的说明在 [AGENTS.md](AGENTS.md)。任务通过 GitHub Issues 管理。
 
-贯学采用 [MIT](LICENSE) 许可证；随附的第三方依赖保留各自的许可证，见[第三方许可声明](THIRD_PARTY_LICENSES.md)。Python 包和命令名为 `guided-learning`（包名 `codex-guided-learning`）。
+贯学采用 [MIT](LICENSE) 许可证；随附的第三方依赖保留各自的许可证，见[第三方许可声明](THIRD_PARTY_LICENSES.md)。Python 包名为 `throughline`（0.5.1 之前为 `codex-guided-learning`），命令名为 `guided-learning`。

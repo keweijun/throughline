@@ -128,10 +128,13 @@ COMMANDS = ('setup', 'open', 'stop', 'courses')
 
 
 def version():
-    try:
-        return package_version('codex-guided-learning')
-    except PackageNotFoundError:
-        return 'development'
+    # Before 0.5.1 the package was named codex-guided-learning.
+    for name in ('throughline', 'codex-guided-learning'):
+        try:
+            return package_version(name)
+        except PackageNotFoundError:
+            pass
+    return 'development'
 
 
 def skills_dir():

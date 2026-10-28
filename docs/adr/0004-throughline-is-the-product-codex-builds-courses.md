@@ -28,7 +28,7 @@ Earlier versions let the skill teach a course in a Codex chat as a fallback, sha
 
 ## Distribution
 
-Throughline is a Python package that bundles the skill (`guided_learning/skill/`); `guided-learning setup` installs it to `~/.agents/skills/throughline` (replacing the pre-0.5 `guided-learning` folder), so the skill always matches the code it calls. The learner installs by pasting one prompt into Codex. The command and package keep the names `guided-learning` and `codex-guided-learning`; the skill is `throughline`.
+Throughline is a Python package that bundles the skill (`guided_learning/skill/`); `guided-learning setup` installs it to `~/.agents/skills/throughline` (replacing the pre-0.5 `guided-learning` folder), so the skill always matches the code it calls. The learner installs by pasting one prompt into Codex. The package is `throughline` and the skill is `throughline`; the command keeps the name `guided-learning`. Until 0.5.1 the package was `codex-guided-learning`; both names install the same `guided-learning` executable, so updating from an older install uninstalls the old name first, and `guided-learning --version` reads either name.
 
 ## Considered and not chosen
 

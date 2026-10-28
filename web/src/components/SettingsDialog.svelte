@@ -1,12 +1,17 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import type { CodexModel, Settings } from '../lib/types';
 
   type Theme = 'system' | 'light' | 'dark';
+  type Pane = 'course' | 'teacher' | 'appearance';
+
+  const MAX_DAILY_REVIEWS = 20;
 
   let dialog: HTMLDialogElement | undefined = $state();
+  let pane = $state<Pane>('course');
   let model = $state('');
   let smallModel = $state('');
   let serviceTier = $state('');
@@ -14,14 +19,20 @@
   let modelsError = $state('');
   let effort = $state<Settings['effort']>('medium');
   let smallEffort = $state<Settings['small_effort']>('');
-  let message = $state<MessageKey | null>(null);
-  let busy = $state(false);
+  let teacherSaved = $state(false);
+  let savingTeacher = $state(false);
   let savingLanguage = $state(false);
   let dailyReviews = $state(5);
   let savingReviews = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
+  // Without an open course there is nothing course-wide to set; the language then sits under Appearance, shown first.
+  const panes = $derived<{ id: Pane; label: MessageKey }[]>(
+    app.state
+      ? [{ id: 'course', label: 'Course' }, { id: 'teacher', label: 'Teacher' }, { id: 'appearance', label: 'Appearance' }]
+      : [{ id: 'appearance', label: 'Appearance' }, { id: 'teacher', label: 'Teacher' }],
+  );
   const confirmedPreferences = $derived(
     app.state?.memory.filter((entry) => entry.kind === 'preference' && entry.status === 'confirmed').length ?? 0,
   );
@@ -60,7 +71,6 @@
     if (smallEffort) smallEffort = nearest(smallEffort, smallEfforts);
   });
 
-
   async function loadModels() {
     if (models) return;
     modelsError = '';
@@ -87,28 +97,28 @@
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
       dailyReviews = app.state?.preferences.daily_reviews ?? 5;
-      message = null;
+      teacherSaved = false;
+      if (!panes.some((p) => p.id === pane)) pane = panes[0].id;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
 
-  async function changeLanguage(event: Event) {
-    const select = event.currentTarget as HTMLSelectElement;
+  async function changeLanguage(language: Language) {
     savingLanguage = true;
-    await app.setLanguage(select.value as Language);
-    select.value = locale.language;
+    await app.setLanguage(language);
     savingLanguage = false;
   }
 
-  async function changeDailyReviews() {
+  async function saveDailyReviews(value: number) {
     const saved = app.state?.preferences.daily_reviews ?? 5;
-    if (!Number.isInteger(dailyReviews) || dailyReviews < 1 || dailyReviews > 20) {
+    if (!Number.isInteger(value) || value < 1 || value > MAX_DAILY_REVIEWS) {
       dailyReviews = saved;
       return;
     }
-    if (dailyReviews === saved) return;
+    dailyReviews = value;
+    if (value === saved) return;
     savingReviews = true;
-    dailyReviews = (await app.savePreferences({ daily_reviews: dailyReviews }))?.daily_reviews ?? saved;
+    dailyReviews = (await app.savePreferences({ daily_reviews: value }))?.daily_reviews ?? saved;
     savingReviews = false;
   }
 
@@ -117,7 +127,8 @@
     app.openPanel('memory');
   }
 
-  function changeTheme() {
+  function changeTheme(next: Theme) {
+    theme = next;
     const root = document.documentElement;
     if (theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = theme;
@@ -129,9 +140,18 @@
     }
   }
 
-  async function save(event: SubmitEvent) {
-    event.preventDefault();
-    busy = true;
+  // Every teacher choice saves at once, after a new model has settled the effort it supports. Saves run one at a
+  // time, each sending the choices as they are when it starts, so a quick series of changes ends with the last.
+  let queue = Promise.resolve();
+  function saveTeacher() {
+    queue = queue.then(sendTeacher);
+    return queue;
+  }
+
+  async function sendTeacher() {
+    await tick();
+    savingTeacher = true;
+    teacherSaved = false;
     const result = await app.act(() => api.put<Settings>('/api/settings', {
       model,
       small_model: smallModel,
@@ -140,169 +160,241 @@
       // A teacher model without a Fast tier runs at the standard speed.
       service_tier: models && !fastTier ? '' : serviceTier,
     }));
-    busy = false;
+    savingTeacher = false;
     if (result) {
       app.settings = result;
-      message = 'Saved. New lessons, answers and feedback use these settings.';
+      teacherSaved = true;
     }
   }
 </script>
 
+{#snippet icon(id: Pane)}
+  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    {#if id === 'course'}
+      <path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" />
+    {:else if id === 'teacher'}
+      <path d="M10 3.5l1.6 3.6 3.9.4-2.9 2.6.8 3.9L10 12l-3.4 2 .8-3.9-2.9-2.6 3.9-.4z" />
+    {:else}
+      <circle cx="10" cy="10" r="6.5" /><path d="M10 3.5v13a6.5 6.5 0 0 0 0-13z" fill="currentColor" />
+    {/if}
+  </svg>
+{/snippet}
+
+{#snippet languageChoice()}
+  <div class="segmented" role="radiogroup" aria-label={t("Language")}>
+    {#each [['en', 'English'], ['zh-CN', '简体中文']] as [id, name] (id)}
+      <label>
+        <input
+          type="radio"
+          name="language"
+          value={id}
+          checked={locale.language === id}
+          disabled={savingLanguage}
+          onchange={() => changeLanguage(id as Language)}
+        />{name}
+      </label>
+    {/each}
+  </div>
+{/snippet}
+
 <dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
     <h2 id="settings-title">{t("Settings")}</h2>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>{t("Close")}</button>
+    <button class="btn btn-quiet close" onclick={() => (app.settingsOpen = false)} aria-label={t("Close")}>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+    </button>
   </header>
 
-  <section aria-labelledby="course-title">
-    <h3 id="course-title">{t(app.state ? "Course" : "Language")}</h3>
-    <label class="field">
-      <span class:visually-hidden={!app.state}>{t("Language")}</span>
-      <select value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
-        <option value="en">English</option>
-        <option value="zh-CN">简体中文</option>
-      </select>
-    </label>
-    <p class="note">
-      {app.state
-        ? t("For this course: the interface and new teaching content. Sources and saved lessons keep their language.")
-        : t("For this page. Each course keeps its own language once it is open.")}
-    </p>
-    {#if app.state}
-      <label class="field">
-        <span>{t("Daily reviews")}</span>
-        <input
-          class="count"
-          type="number"
-          min="1"
-          max="20"
-          step="1"
-          bind:value={dailyReviews}
-          onchange={changeDailyReviews}
-          disabled={savingReviews}
-        />
-      </label>
-      <p class="note">{t("At most this many sections come up for review each day; the rest wait for later days.")}</p>
-      <div class="field">
-        <span>{t("Teaching preferences")}</span>
-        <div class="row">
-          <span>{confirmedPreferences ? t("{count} confirmed", { count: confirmedPreferences }) : t("None yet")}</span>
-          <button type="button" class="btn btn-quiet btn-small" onclick={openMemory}>{t("Open course memory")}</button>
-        </div>
-      </div>
-      <p class="note">{t("Tell the teacher how you like to be taught; it asks before remembering it.")}</p>
-    {/if}
-  </section>
+  <div class="body">
+    <nav aria-label={t("Settings")}>
+      {#each panes as item (item.id)}
+        <button class="category" aria-current={pane === item.id ? 'page' : undefined} onclick={() => (pane = item.id)}>
+          {@render icon(item.id)}{t(item.label)}
+        </button>
+      {/each}
+      <p class="scope">
+        {pane === 'course'
+          ? t("Saved in this course.")
+          : pane === 'teacher'
+            ? t("Saved for your user account, for every course.")
+            : t("Saved in this browser.")}
+      </p>
+    </nav>
 
-  <section aria-labelledby="teacher-title">
-    <h3 id="teacher-title">{t("Teacher")}</h3>
-    {#if settings}
-      <form onsubmit={save}>
-        <p class="note">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
-        <label class="field">
-          <span>{t("Model")}</span>
-          {#if models}
-            <select bind:value={model}>
-              <option value="">{t("Codex default")}</option>
-              {#each choices(model) as option (option.id)}
-                <option value={option.id} title={option.description}>{option.name}</option>
-              {/each}
-            </select>
-          {:else}
-            <input type="text" bind:value={model} placeholder={t("Leave empty for your Codex default")} autocomplete="off" />
-          {/if}
-        </label>
-        {#if !models}
-          {#if modelsError}
-            <p class="note">{t("Could not load models from Codex:")} {modelsError}</p>
-          {:else}
-            <p class="note" role="status">{t("Loading models from Codex…")}</p>
-          {/if}
-        {/if}
-        <label class="field">
-          <span>{t("Reasoning effort")}</span>
-          <select bind:value={effort}>
-            {#each teacherEfforts as option (option.id)}
-              <option value={option.id}>{t(option.label)}</option>
-            {/each}
-          </select>
-        </label>
-        {#if fastId}
-          <label class="check">
+    <div class="pane">
+      {#if pane === 'course' && app.state}
+        <h3>{t("Course")}</h3>
+        <div class="setting">
+          <div class="text">
+            <span class="title">{t("Language")}</span>
+            <p>{t("The interface and new teaching content. Sources and saved lessons keep their language.")}</p>
+          </div>
+          {@render languageChoice()}
+        </div>
+        <div class="setting">
+          <div class="text">
+            <label class="title" for="daily-reviews">{t("Daily reviews")}</label>
+            <p>{t("At most this many sections come up for review each day; the rest wait for later days.")}</p>
+          </div>
+          <div class="stepper">
+            <button class="btn btn-quiet" aria-label={t("Fewer")} disabled={savingReviews || dailyReviews <= 1} onclick={() => saveDailyReviews(dailyReviews - 1)}>−</button>
             <input
-              type="checkbox"
-              checked={serviceTier === fastId}
-              onchange={(event) => (serviceTier = event.currentTarget.checked ? fastId : '')}
+              id="daily-reviews"
+              type="number"
+              min="1"
+              max={MAX_DAILY_REVIEWS}
+              step="1"
+              bind:value={dailyReviews}
+              onchange={() => saveDailyReviews(dailyReviews)}
+              disabled={savingReviews}
             />
-            <span>{t("Fast mode")}</span>
-          </label>
-          <p class="note">
-            {fastTier?.description ? `${fastTier.description}. ` : ''}{t("Applies to lessons, answers and feedback; background preparation keeps the standard speed.")}
-          </p>
-        {/if}
-        <!-- A saved small model or effort keeps the fold open, so a choice in effect is never hidden. -->
-        <details open={!!(settings.small_model || settings.small_effort)}>
-          <summary>{t("Advanced")}</summary>
-          <div class="advanced">
-            <p class="note">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
-            <label class="field">
-              <span>{t("Small model")}</span>
-              {#if models}
-                <select bind:value={smallModel}>
-                  <option value="">{t("Same as the teacher model")}</option>
-                  {#each choices(smallModel) as option (option.id)}
-                    <option value={option.id} title={option.description}>{option.name}</option>
-                  {/each}
-                </select>
-              {:else}
-                <input type="text" bind:value={smallModel} placeholder={t("Leave empty to use the teacher model")} autocomplete="off" />
+            <button class="btn btn-quiet" aria-label={t("More")} disabled={savingReviews || dailyReviews >= MAX_DAILY_REVIEWS} onclick={() => saveDailyReviews(dailyReviews + 1)}>+</button>
+          </div>
+        </div>
+        <div class="setting">
+          <div class="text">
+            <span class="title">{t("Teaching preferences")}</span>
+            <p>
+              {confirmedPreferences ? t("{count} confirmed", { count: confirmedPreferences }) : t("None yet")}.
+              {t("Tell the teacher how you like to be taught; it asks before remembering it.")}
+            </p>
+          </div>
+          <button class="btn btn-small" onclick={openMemory}>{t("Open course memory")}</button>
+        </div>
+      {:else if pane === 'teacher'}
+        <h3>{t("Teacher")}</h3>
+        <p class="lead">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
+        {#if settings}
+          <div class="setting">
+            <div class="text">
+              <label class="title" for="teacher-model">{t("Model")}</label>
+              {#if !models}
+                <p role="status">{modelsError ? `${t("Could not load models from Codex:")} ${modelsError}` : t("Loading models from Codex…")}</p>
               {/if}
-            </label>
-            <label class="field">
-              <span>{t("Small model reasoning effort")}</span>
-              <select bind:value={smallEffort}>
-                <option value="">{t("Same as the teacher")}</option>
-                {#each smallEfforts as option (option.id)}
-                  <option value={option.id}>{t(option.label)}</option>
+            </div>
+            {#if models}
+              <select id="teacher-model" bind:value={model} onchange={saveTeacher}>
+                <option value="">{t("Codex default")}</option>
+                {#each choices(model) as option (option.id)}
+                  <option value={option.id} title={option.description}>{option.name}</option>
                 {/each}
               </select>
-            </label>
+            {:else}
+              <input id="teacher-model" type="text" bind:value={model} onchange={saveTeacher} placeholder={t("Codex default")} autocomplete="off" />
+            {/if}
           </div>
-        </details>
-        <div class="row">
-          <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save")}</button>
-          {#if message}<span class="message" role="status">{t(message)}</span>{/if}
-        </div>
-        {#if settings.overridden}
-          <p class="note">{t("This host was started with model or effort options. Saving here replaces them.")}</p>
-        {/if}
-        <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
-      </form>
-    {/if}
-  </section>
+          <div class="setting">
+            <div class="text">
+              <span class="title">{t("Reasoning effort")}</span>
+              <p>{t("More effort gives more careful answers, and takes longer.")}</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
+              {#each teacherEfforts as option (option.id)}
+                <label><input type="radio" name="effort" value={option.id} bind:group={effort} onchange={saveTeacher} />{t(option.label)}</label>
+              {/each}
+            </div>
+          </div>
+          {#if fastId}
+            <div class="setting">
+              <div class="text">
+                <label class="title" for="fast-mode">{t("Fast mode")}</label>
+                <p>{fastTier?.description ? `${fastTier.description}. ` : ''}{t("Applies to lessons, answers and feedback; background preparation keeps the standard speed.")}</p>
+              </div>
+              <input
+                id="fast-mode"
+                class="switch"
+                type="checkbox"
+                role="switch"
+                checked={serviceTier === fastId}
+                onchange={(event) => {
+                  serviceTier = event.currentTarget.checked ? fastId : '';
+                  void saveTeacher();
+                }}
+              />
+            </div>
+          {/if}
 
-  <section aria-labelledby="theme-title">
-    <h3 id="theme-title">{t("Appearance")}</h3>
-    <label class="field">
-      <span class="visually-hidden">{t("Appearance")}</span>
-      <select aria-label={t("Appearance")} bind:value={theme} onchange={changeTheme}>
-        <option value="system">{t("Match the system")}</option>
-        <option value="light">{t("Light")}</option>
-        <option value="dark">{t("Dark")}</option>
-      </select>
-    </label>
-  </section>
+          <h4>{t("Background work")}</h4>
+          <p class="lead">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
+          <div class="setting">
+            <div class="text"><label class="title" for="small-model">{t("Small model")}</label></div>
+            {#if models}
+              <select id="small-model" bind:value={smallModel} onchange={saveTeacher}>
+                <option value="">{t("Same as the teacher model")}</option>
+                {#each choices(smallModel) as option (option.id)}
+                  <option value={option.id} title={option.description}>{option.name}</option>
+                {/each}
+              </select>
+            {:else}
+              <input id="small-model" type="text" bind:value={smallModel} onchange={saveTeacher} placeholder={t("Same as the teacher model")} autocomplete="off" />
+            {/if}
+          </div>
+          <div class="setting">
+            <div class="text"><label class="title" for="small-effort">{t("Small model reasoning effort")}</label></div>
+            <select id="small-effort" bind:value={smallEffort} onchange={saveTeacher}>
+              <option value="">{t("Same as the teacher")}</option>
+              {#each smallEfforts as option (option.id)}
+                <option value={option.id}>{t(option.label)}</option>
+              {/each}
+            </select>
+          </div>
+
+          <div class="foot">
+            {#if savingTeacher}
+              <span role="status">{t("Saving…")}</span>
+            {:else if teacherSaved}
+              <span class="saved" role="status">{t("Saved. New lessons, answers and feedback use these settings.")}</span>
+            {/if}
+            {#if settings.overridden}
+              <p>{t("This host was started with model or effort options. Changes here replace them.")}</p>
+            {/if}
+            <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
+          </div>
+        {/if}
+      {:else}
+        <h3>{t("Appearance")}</h3>
+        {#if !app.state}
+          <div class="setting">
+            <div class="text">
+              <span class="title">{t("Language")}</span>
+              <p>{t("For this page. Each course keeps its own language once it is open.")}</p>
+            </div>
+            {@render languageChoice()}
+          </div>
+        {/if}
+        <div class="setting stacked">
+          <div class="text"><span class="title">{t("Theme")}</span></div>
+          <div class="themes" role="radiogroup" aria-label={t("Theme")}>
+            {#each [['system', 'Match the system'], ['light', 'Light'], ['dark', 'Dark']] as const as [id, label] (id)}
+              <label class="theme">
+                <input type="radio" name="theme" value={id} checked={theme === id} onchange={() => changeTheme(id)} />
+                <span class="swatch {id}" aria-hidden="true"></span>
+                {t(label)}
+              </label>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
+  </div>
 </dialog>
 
 <style>
   dialog {
-    width: min(30rem, calc(100vw - 2rem));
-    padding: 1.25rem 1.5rem 1.5rem;
+    width: min(54rem, calc(100vw - 2rem));
+    height: min(38rem, calc(100vh - 4rem));
+    padding: 0;
     border: 1px solid var(--rule);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--sheet);
     color: var(--ink);
     box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  dialog[open] {
+    display: flex;
+    flex-direction: column;
   }
 
   dialog::backdrop {
@@ -313,7 +405,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    padding: 1rem 1.25rem 1rem 1.5rem;
+    border-bottom: 1px solid var(--rule);
   }
 
   h2 {
@@ -322,63 +415,262 @@
     font-weight: 600;
   }
 
-  form {
-    display: grid;
-    gap: 0.9rem;
+  .close {
+    padding: 0.35rem;
   }
 
-  section {
+  .body {
+    flex: 1;
+    min-height: 0;
     display: grid;
-    gap: 0.5rem;
-    padding-block: 1rem;
-    border-top: 1px solid var(--rule);
+    grid-template-columns: 13rem 1fr;
   }
 
-  h3 {
-    font-family: var(--sans);
-    font-size: var(--step--1);
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 1rem 0.75rem;
+    border-right: 1px solid var(--rule);
+    background: var(--ground);
+  }
+
+  .category {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.75rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .category:hover {
+    background: var(--raised);
+    color: var(--ink);
+  }
+
+  .category[aria-current='page'] {
+    background: var(--raised);
+    color: var(--accent);
     font-weight: 600;
-    letter-spacing: 0.02em;
+    box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px var(--shadow-near);
+  }
+
+  .scope {
+    margin-top: auto;
+    padding: 0.75rem 0.75rem 0;
+    border-top: 1px solid var(--rule);
+    font-size: var(--step--1);
     color: var(--pencil);
   }
 
-  .note {
+  .pane {
+    overflow-y: auto;
+    padding: 1.25rem 1.75rem 1.75rem;
+  }
+
+  h3 {
+    font-size: var(--step-1);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  h4 {
+    margin-top: 1.75rem;
+    font-size: var(--step-0);
+    font-weight: 600;
+  }
+
+  .lead {
+    font-size: var(--step--1);
+    color: var(--pencil);
+    margin-bottom: 0.25rem;
+  }
+
+  .setting {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+    padding-block: 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .setting.stacked {
+    grid-template-columns: 1fr;
+    border-bottom: 0;
+  }
+
+  .setting > select,
+  .setting > input[type='text'] {
+    width: 15rem;
+  }
+
+  .title {
+    font-weight: 500;
+  }
+
+  .text p {
+    margin-top: 0.15rem;
     font-size: var(--step--1);
     color: var(--pencil);
     overflow-wrap: anywhere;
   }
 
-  .row {
-    display: flex;
-    flex-wrap: wrap;
+  .stepper {
+    display: inline-flex;
     align-items: center;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--raised);
+  }
+
+  .stepper .btn {
+    width: 2rem;
+    padding: 0.35rem 0;
+    justify-content: center;
+    border-radius: 0;
+  }
+
+  .stepper input {
+    width: 3rem;
+    padding: 0.35rem 0;
+    border: 0;
+    border-inline: 1px solid var(--rule);
+    border-radius: 0;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .stepper input::-webkit-inner-spin-button,
+  .stepper input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .switch {
+    appearance: none;
+    position: relative;
+    width: 2.5rem;
+    height: 1.4rem;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--rule-strong);
+    cursor: pointer;
+    transition: background var(--quick) var(--ease-out);
+  }
+
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 0.2rem;
+    left: 0.2rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: var(--raised);
+    box-shadow: 0 1px 2px var(--shadow-far);
+    transition: transform var(--quick) var(--ease-out);
+  }
+
+  .switch:checked {
+    background: var(--accent);
+  }
+
+  .switch:checked::after {
+    transform: translateX(1.1rem);
+  }
+
+  .themes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.75rem;
   }
 
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .count {
-    width: 5rem;
-  }
-
-  summary {
+  .theme {
+    position: relative;
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--raised);
+    color: var(--ink-soft);
+    font-weight: 500;
     cursor: pointer;
+  }
+
+  .theme:hover {
+    border-color: var(--rule-strong);
+  }
+
+  .theme:has(input:checked) {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .theme:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .theme input {
+    position: absolute;
+    opacity: 0;
+  }
+
+  .swatch {
+    height: 3.5rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+  }
+
+  .swatch.light {
+    background: linear-gradient(#eef1f5 0 30%, #fbfcfd 30%);
+  }
+
+  .swatch.dark {
+    background: linear-gradient(#11141b 0 30%, #171b24 30%);
+  }
+
+  .swatch.system {
+    background: linear-gradient(135deg, #fbfcfd 50%, #171b24 50%);
+  }
+
+  .foot {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 1.25rem;
     font-size: var(--step--1);
     color: var(--pencil);
+    overflow-wrap: anywhere;
   }
 
-  .advanced {
-    display: grid;
-    gap: 0.9rem;
-    margin-top: 0.75rem;
-  }
-
-  .message {
-    font-size: var(--step--1);
+  .saved {
     color: var(--good);
+  }
+
+  @media (max-width: 40rem) {
+    .body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+
+    nav {
+      flex-direction: row;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .scope {
+      display: none;
+    }
   }
 </style>

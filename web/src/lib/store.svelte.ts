@@ -668,9 +668,12 @@ class AppStore {
     scrollStage(0);
   }
 
-  /** Moving the position always lands on the new section. */
+  /** Moving the position lands on the new section, unless the learner has gone elsewhere while it was being made. */
   async #move(action: () => Promise<unknown>) {
+    const before = [this.viewing, this.viewingChapter, this.reviewOpen];
     if (await this.act(action)) {
+      const after = [this.viewing, this.viewingChapter, this.reviewOpen];
+      if (after.some((value, i) => value !== before[i])) return;
       this.viewing = this.viewingChapter = null;
       this.reviewOpen = false;
       scrollStage(0);

@@ -102,6 +102,7 @@ test('a later section can be studied now, and the unstudied sections before it s
   await expect(page.getByText("You're previewing this section")).toHaveCount(0);
   // The chapter left behind folds in the route; opening it shows its sections marked skipped.
   await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await expect(page.locator('#route').getByRole('button', { name: /What a state represents/ })).toContainText('Skipped');
   await expect(page.locator('#route').getByRole('button', { name: /Superposition/ })).toContainText('Skipped');
 
@@ -111,26 +112,64 @@ test('a later section can be studied now, and the unstudied sections before it s
   expect(errors).toEqual([]);
 });
 
-test('beside an open panel the route folds to a marker per section, whichever chapters are collapsed', async ({ page, course }) => {
+test('beside an open panel the route folds to a progress track: a segment per chapter, whichever are collapsed', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.setViewportSize({ width: 1280, height: 900 });
   const mini = page.locator('#route .mini');
   await expect(mini).toBeVisible();
-  await expect(mini.locator('.dot')).toHaveCount(3);
-  await expect(mini.locator('.tick')).toHaveCount(3);
-  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+  await expect(mini.locator('.segment')).toHaveCount(3);
+  await expect(mini.locator('.marker')).toHaveCount(1);
+  await expect(mini.getByRole('button', { name: 'Chapter 3 · Time evolution, Not built yet' })).toBeVisible();
 
-  // Pointing at the strip opens the full route over the page; collapsing a chapter there leaves every marker in place.
+  // Pointing at the track opens the full route beside it; collapsing a chapter there changes nothing in the track.
   await mini.hover();
   const full = page.locator('#route .full');
   await expect(full).toBeVisible();
   await full.getByRole('button', { name: 'Collapse chapter' }).first().click();
   await page.mouse.move(900, 600);
   await expect(full).toBeHidden();
-  await expect(mini.locator('.dot')).toHaveCount(3);
+  await expect(mini.locator('.segment')).toHaveCount(3);
 
-  await mini.getByRole('button', { name: /^Possible outcomes/ }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
+  await mini.getByRole('button', { name: /^Chapter 2 · Measurement/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Measurement');
+  expect(errors).toEqual([]);
+});
+
+test('the chapter stepper rings every chapter and opens the sections of the chapter in view', async ({ page, course }) => {
+  const { base, errors } = await course('chapters_browser_fixture');
+  await page.goto(base + '/?rail=stepper');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const mini = page.locator('#route .mini');
+  await expect(mini.locator('.ring')).toHaveCount(3);
+  await expect(mini.locator('.dot')).toHaveCount(2);
+  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+
+  await mini.getByRole('button', { name: /^Superposition/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
+  // Another chapter in view opens instead; the choice of design is remembered.
+  await mini.getByRole('button', { name: /^Chapter 2 · Measurement/ }).click();
+  await expect(mini.locator('.dot')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('#route .mini.stepper')).toBeAttached();
+  expect(errors).toEqual([]);
+});
+
+test('in a long course the track keeps its height and the stepper shows a window of the open chapter', async ({ page, course }) => {
+  const { base, errors } = await course('long_course_browser_fixture');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  const mini = page.locator('#route .mini');
+  await expect(mini.locator('.segment')).toHaveCount(13);
+  const track = (await mini.boundingBox())!;
+  expect(track.height).toBeLessThan(450);
+
+  await page.goto(base + '/?rail=stepper');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  // Section 4 of the 30-section chapter: nine dots from its start, and the other 21 counted.
+  await expect(mini.locator('.ring')).toHaveCount(13);
+  await expect(mini.locator('.dot')).toHaveCount(9);
+  await expect(mini.locator('.more')).toHaveText(['+21']);
+  await expect(mini.locator('.ring.done')).toHaveCount(4);
   expect(errors).toEqual([]);
 });

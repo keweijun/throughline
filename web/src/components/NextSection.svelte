@@ -54,7 +54,11 @@
         <p class="note">{t("Finish or close the foundation supplement in Questions before moving on.")}</p>
       {:else if pending}
         <p class="note">
-          {pending === 1 ? t('1 exercise stays open and will be waiting for you.') : t('{count} exercises stay open and will be waiting for you.', { count: pending })}
+          {#if nextChapter?.id !== chapter?.id}
+            {pending === 1 ? t("1 exercise stays open on this chapter's page.") : t("{count} exercises stay open on this chapter's page.", { count: pending })}
+          {:else}
+            {pending === 1 ? t('1 exercise stays open and will be waiting for you.') : t('{count} exercises stay open and will be waiting for you.', { count: pending })}
+          {/if}
         </p>
 
       {/if}

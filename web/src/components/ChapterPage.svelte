@@ -1,11 +1,12 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { solved } from '../lib/format';
+  import { open, solved } from '../lib/format';
   import CodexLink from './CodexLink.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
   import ChapterRecap from './ChapterRecap.svelte';
   import ChapterQuiz from './ChapterQuiz.svelte';
+  import Exercise from './Exercise.svelte';
 
   let { chapterId }: { chapterId: string } = $props();
 
@@ -42,6 +43,9 @@
       };
     }),
   );
+
+  // Unfinished exercises stay with their chapter rather than following the learner into the next one.
+  const openTasks = $derived(ids.flatMap((id) => app.tasks(id).filter(open)));
 
   // What the course plan links to this chapter: a location may serve several sections, so count each once.
   const coverage = $derived.by(() => {
@@ -109,6 +113,15 @@
           {/each}
         </ol>
       </section>
+
+      {#if openTasks.length}
+        <section class="open-tasks" aria-labelledby="open-tasks-title">
+          <h2 id="open-tasks-title">{t("Open exercises")} <span>({openTasks.length})</span></h2>
+          {#each openTasks as task (task.id)}
+            <Exercise {task} showSection />
+          {/each}
+        </section>
+      {/if}
 
       <section class="coverage" aria-labelledby="coverage-title">
         <h2 id="coverage-title">{t("Source coverage")}</h2>
@@ -233,6 +246,20 @@
 
   .meta .saved {
     color: var(--accent);
+  }
+
+  .open-tasks {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .open-tasks h2 {
+    margin-bottom: 0;
+  }
+
+  .open-tasks h2 span {
+    color: var(--pencil);
+    font-weight: 400;
   }
 
   .coverage p {

@@ -10,7 +10,6 @@
   import Composer from './Composer.svelte';
   import Practice from './Practice.svelte';
   import NextSection from './NextSection.svelte';
-  import EarlierHistory from './EarlierHistory.svelte';
   import CodexLink from './CodexLink.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
@@ -257,7 +256,6 @@
 
     {#if isCurrent}
       <NextSection conceptId={conceptId} />
-      <EarlierHistory />
     {/if}
   </article>
 {/if}

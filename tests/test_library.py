@@ -72,6 +72,7 @@ class CourseLibrary(unittest.TestCase):
             self.assertIn('$throughline', agents.read_text(encoding='utf-8'))
             self.assertIn('## Welcome to Throughline', result.stdout)
             self.assertIn('$throughline make a course from these files', result.stdout)
+            self.assertIn('What Codex does while building', result.stdout)
             self.assertNotIn('codex://', result.stdout)
             chinese = cli(home, 'setup', '--no-launcher', '--language', 'zh-CN')
             self.assertIn('欢迎使用贯学', chinese.stdout)

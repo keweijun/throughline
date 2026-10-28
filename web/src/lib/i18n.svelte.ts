@@ -401,7 +401,7 @@ const messages = {
   "Create your first course": "创建你的第一门课程",
   "Choose New course in Codex, or start any Codex chat with $throughline. A chat opens with the request typed in.": "点击“在 Codex 中新建课程”，或在任意 Codex 对话中输入 $throughline。对话中会填好请求。",
   "Attach your PDFs or notes, or name the folder they are in, and say in a sentence what you want to learn.": "附上你的 PDF 或笔记（也可以写出它们所在的文件夹），并用一句话说明你想学什么。",
-  "Send. Codex proposes a route, says what still needs checking, and opens the course here when it is done.": "发送。Codex 会给出学习路线、说明仍需核对的内容，完成后在这里打开课程。",
+  "Send. Codex asks a few questions about your goal and background, each with a recommended answer, proposes a route, and opens the course here when it is done.": "发送。Codex 会就你的目标和基础问几个问题，每个都附推荐答案，然后给出学习路线，完成后在这里打开课程。",
   "Goal: {goal}": "目标：{goal}",
   "Each Codex button also copies its request. Using the Codex CLI, or nothing opened? Paste it into Codex started in your Throughline folder.": "每个 Codex 按钮也会复制对应的请求。使用 Codex CLI，或者点击后没有反应？把它粘贴到在贯学文件夹中启动的 Codex 里。",
   "Request copied. If Codex did not open, paste it into any Codex chat.": "请求已复制。如果 Codex 没有打开，把它粘贴到任意 Codex 对话即可。",

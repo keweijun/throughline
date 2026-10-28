@@ -16,7 +16,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import library
+from .. import library, updates
+from ..commands import version
 from ..preferences import MAX_DAILY_REVIEWS
 from ..store import OperationError
 from . import state as public_state
@@ -497,6 +498,17 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return courses.settings.models()
         except (OSError, RuntimeError) as exc:
             return JSONResponse({'error': str(exc)}, 502)
+
+    @app.get('/api/about')
+    def about():
+        return {'version': version()}
+
+    @app.get('/api/update')
+    def update_view():
+        try:
+            return updates.check()
+        except OperationError as exc:
+            return JSONResponse({'error': str(exc), 'code': exc.code}, 502)
 
     @app.get('/api/health')
     def health():

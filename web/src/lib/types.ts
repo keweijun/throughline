@@ -196,6 +196,8 @@ export type Settings = {
   path: string;
 };
 
+export type UpdateCheck = { version: string; latest: string; available: boolean };
+
 export type ServiceTier = { id: string; name: string; description: string };
 
 export type CodexModel = {

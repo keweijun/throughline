@@ -215,6 +215,14 @@ test('highlights show before the host answers, preview on hover and can be noted
   await expect(page.locator('.notes-panel .item.highlight .kind')).toHaveText('Note');
   await page.locator('#toggle-notes').click();
 
+  // Closing the panel unfolds the route and slides the lesson back; aim at the highlight once it has settled.
+  await expect.poll(async () => {
+    const before = await spot();
+    await page.waitForTimeout(80);
+    const after = await spot();
+    return before.x === after.x && before.y === after.y;
+  }).toBe(true);
+
   // Removing it from the page asks first, since the note goes with it.
   page.once('dialog', (dialog) => dialog.accept());
   ({ x, y } = await spot());

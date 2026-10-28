@@ -49,12 +49,14 @@
   // Without a model list, a saved tier can still be switched off.
   const fastId = $derived(fastTier?.id ?? (models ? '' : serviceTier));
 
-  // Offer only the reasoning efforts the chosen model supports; the saved one stays selectable either way.
+  // Offer only the reasoning efforts the chosen model supports, or all of them when Codex cannot list models.
   const EFFORTS: { id: Settings['effort']; label: MessageKey }[] = [
     { id: 'minimal', label: 'Minimal' },
     { id: 'low', label: 'Low' },
     { id: 'medium', label: 'Medium' },
     { id: 'high', label: 'High' },
+    { id: 'xhigh', label: 'Extra high' },
+    { id: 'max', label: 'Max' },
   ];
   function effortsFor(id: string) {
     const chosen = models?.find((m) => (id ? m.id === id : m.default));
@@ -179,19 +181,16 @@
     await tick();
     savingTeacher = true;
     teacherSaved = false;
-    const result = await app.act(() => api.put<Settings>('/api/settings', {
+    const result = await app.saveSettings({
       model,
       small_model: smallModel,
       effort,
       small_effort: smallEffort,
       // A teacher model without a Fast tier runs at the standard speed.
       service_tier: models && !fastTier ? '' : serviceTier,
-    }));
+    });
     savingTeacher = false;
-    if (result) {
-      app.settings = result;
-      teacherSaved = true;
-    }
+    teacherSaved = !!result;
   }
 </script>
 

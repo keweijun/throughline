@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
-  import { onMount, untrack } from 'svelte';
+  import { untrack } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { open as isOpen } from '../lib/format';
@@ -17,6 +17,7 @@
 
   let preview = $state<Preview | null>(null);
   let previewFailed = $state(false);
+  // The overview is a reference the learner opens; the teacher's first lesson opens the chapter with its own.
   let overviewOpen = $state(false);
 
   const concept = $derived(app.concept(conceptId));
@@ -25,7 +26,6 @@
   const isCurrent = $derived(conceptId === app.currentId);
   const lessons = $derived(app.lessons(conceptId));
   const position = $derived(app.state?.position);
-  const seenKey = $derived(`overview-seen:${app.state?.course.id}:${conceptId}`);
   const explanations = $derived(app.explanationsFor(conceptId));
   const bookmarked = $derived(!!app.bookmark(conceptId));
   const chapter = $derived(app.chapterOf(conceptId));
@@ -45,8 +45,7 @@
       const latest = app.turn(stepped.steps.filter((s) => s.turn_id).at(-1)?.turn_id);
       return latest?.status === 'completed' ? t("Continue with the next step when you are ready.") : t("Regenerate the unfinished step to go on.");
     }
-    if (!lessons.some((l) => l.status === 'completed'))
-      return lessons.length ? t("Regenerate the unfinished lesson, or start a new one.") : t("Start the lesson for this section.");
+    if (!lessons.some((l) => l.status === 'completed')) return t("Regenerate the unfinished lesson, or start a new one.");
     const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
     if (generating) return t("Exercises are being prepared from this lesson.");
     const open = app.tasks(conceptId).filter(isOpen).length;
@@ -60,25 +59,6 @@
     app.focusThread = id.replace(/^web:/, '');
     app.openPanel('questions');
   }
-
-  // The first lesson of a chapter opens with its own overview, so the route summary steps aside once teaching starts.
-  let hadLesson: boolean | null = null;
-  $effect(() => {
-    const has = app.hasLesson(conceptId);
-    if (has && hadLesson === false) overviewOpen = false;
-    hadLesson = has;
-  });
-
-  onMount(async () => {
-    if (!conceptId) return;
-    let seen = false;
-    try {
-      seen = !!localStorage.getItem(seenKey);
-    } catch {
-      seen = false;
-    }
-    overviewOpen = !app.hasLesson(conceptId) && !seen;
-  });
 
   // The preview follows the course plan and its sources, so fetch it again when Codex changes them. Only the newest
   // reply counts, and none after this page has gone. The section is read through the version too: the prop reads the
@@ -109,13 +89,6 @@
 
   function toggleOverview(event: Event) {
     overviewOpen = (event.currentTarget as HTMLDetailsElement).open;
-    if (!overviewOpen) {
-      try {
-        localStorage.setItem(seenKey, 'seen');
-      } catch {
-        // Only affects whether the overview opens next time.
-      }
-    }
   }
 </script>
 
@@ -149,7 +122,7 @@
 
     <header class="head">
       <div class="eyebrow-row">
-        {#if chapter}
+        {#if chapter && app.chapters.length > 1}
           <p class="eyebrow">
             <button class="chapter-link" onclick={() => app.viewChapter(chapter.id)}>{chapter.title}</button>
             · {t('Section {number} of {total}', { number: chapter.concept_ids.indexOf(conceptId) + 1, total: chapter.concept_ids.length })}
@@ -174,10 +147,13 @@
             <dt>{t("Goal")}</dt>
             <dd>{goal}</dd>
           </div>
-          <div>
-            <dt>{t("Next step")}</dt>
-            <dd id="next-step">{nextStep}</dd>
-          </div>
+          <!-- Before the first lesson, the Start card below says what comes next. -->
+          {#if lessons.length}
+            <div>
+              <dt>{t("Next step")}</dt>
+              <dd id="next-step">{nextStep}</dd>
+            </div>
+          {/if}
         </dl>
         {#if position?.progress}
           <details class="left-off">
@@ -218,6 +194,9 @@
       <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
         <summary>
           {t("About this section")}
+          {#if preview.overview.origin === 'teacher' && preview.overview.core_problem && !overviewOpen}
+            <span class="teaser">{preview.overview.core_problem}</span>
+          {/if}
         </summary>
         <UnitOverview {preview} />
       </details>
@@ -232,7 +211,18 @@
         {/each}
       </div>
     {:else if !isCurrent}
-      <p class="quiet">{t("No lesson yet. This section starts when you reach it on the route.")}</p>
+      {@const ahead = index - app.routeIndex(app.currentId)}
+      <!-- The route is studied in order (ADR 0006), so a later section says how far off it is; the note above leads back. -->
+      <div class="ahead">
+        <p>
+          {#if ahead > 1}{t("No lesson yet. You'll reach this section after {count} more on the route.", { count: ahead - 1 })}
+          {:else if ahead === 1}{t("No lesson yet. This is the next section after the one you're on.")}
+          {:else}{t("No lesson yet.")}{/if}
+        </p>
+        {#if chapter && chapter.id !== app.chapterOf(app.currentId)?.id}
+          <button class="btn btn-small" onclick={() => app.viewChapter(chapter.id)}>{t("Open its chapter")}</button>
+        {/if}
+      </div>
     {/if}
 
     <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
@@ -390,6 +380,14 @@
     margin-bottom: 0.9rem;
   }
 
+  .teaser {
+    margin-left: 0.4rem;
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+
   .overview.loading {
     color: var(--pencil);
     font-size: var(--step-0);
@@ -439,8 +437,11 @@
     gap: 2.5rem;
   }
 
-  .quiet {
-    color: var(--pencil);
+  .ahead {
+    display: grid;
+    gap: 0.75rem;
+    justify-items: start;
+    color: var(--ink-soft);
     font-size: var(--step-0);
   }
 

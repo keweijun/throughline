@@ -12,7 +12,7 @@ test('route groups sections by chapter and the chapter page shows progress and c
   await rail.getByRole('button', { name: /Chapter 1 · States/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await expect(page.getByText('What a quantum state represents')).toBeVisible();
-  await expect(page.locator('.coverage')).toContainText('Still to review: 1.');
+  await expect(page.locator('.coverage')).toContainText('Still to check: 1.');
   await expect(page.getByRole('button', { name: 'Skip to the next chapter' })).toBeVisible();
 
   await rail.getByRole('button', { name: /Time evolution/ }).click();

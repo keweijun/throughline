@@ -28,7 +28,7 @@ test('lesson streams, renders math safely, survives reload and opens sources', a
 
   await page.getByRole('button', { name: 'View source line 2' }).first().click();
   await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);
-  await expect(page.locator('.source-view')).toContainText('Pending verification');
+  await expect(page.locator('.source-view')).toContainText('Not checked yet');
 
   await page.locator('#close-aux').click();
   await page.mouse.wheel(0, 1500);

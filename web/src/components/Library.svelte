@@ -69,7 +69,7 @@
           </div>
           <div class="state">
             {#if course.needs_review}
-              <span class="chip chip-caution">{t('{count} locations need review', { count: course.needs_review })}</span>
+              <span class="chip chip-caution">{t('{count} source locations not checked yet', { count: course.needs_review })}</span>
             {/if}
             {#if active}
               <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Continue')}</button>
@@ -88,7 +88,7 @@
               {/if}
               <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
               {#if course.needs_review}
-                <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>{t('Review in Codex')}</CodexLink>
+                <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>{t('Check sources in Codex')}</CodexLink>
               {/if}
             </div>
           {/if}
@@ -97,11 +97,14 @@
     </ul>
   {/if}
 
+  <!-- Without a library folder there are no Codex buttons for this to explain. -->
+  {#if library?.root}
   <aside class="codex" aria-labelledby="codex-title">
     <h2 id="codex-title">{t('Courses are built in Codex')}</h2>
     <p class="muted">{t('The Codex buttons open a new Codex chat with a $throughline request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
     <p class="muted">{t('Each Codex button also copies its request. Using the Codex CLI, or nothing opened? Paste it into Codex started in your Throughline folder.')}</p>
   </aside>
+  {/if}
 </section>
 
 <style>

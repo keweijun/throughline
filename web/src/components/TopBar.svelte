@@ -4,6 +4,8 @@
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
+  // The bar fills as sections are studied to the end, so starting the last section does not read as finishing the course.
+  const studied = $derived(route.filter((id) => app.studied(id)).length);
   const studying = $derived(!!app.state && !app.libraryOpen);
   const openQuestions = $derived(
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
@@ -43,9 +45,9 @@
   </div>
 
   {#if route.length && index >= 0 && studying}
-    <div class="progress" title={t("Your position on the course route")}>
+    <div class="progress" title={t("{studied} of {total} sections studied", { studied, total: route.length })}>
       <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
-      <span class="track" aria-hidden="true"><span style:width="{((index + 1) / route.length) * 100}%"></span></span>
+      <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
     </div>
   {/if}
 
@@ -178,9 +180,9 @@
   .switcher {
     display: flex;
     gap: 2px;
-    margin-inline: 0.35rem;
+    margin-inline: 0.6rem 0.35rem;
     padding: 2px;
-    border: 1px solid transparent;
+    border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
     border-radius: 999px;
     transition: border-color var(--quick) ease, background-color var(--quick) ease;
   }

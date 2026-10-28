@@ -211,6 +211,18 @@ class AppStore {
     return this.lessons(conceptId).some((t) => t.status === 'completed' || t.status === 'running');
   }
 
+  /** Whether the section's lesson is finished: one completed, none being written, and no planned step left to teach. */
+  studied(conceptId: string | null) {
+    const lessons = this.lessons(conceptId);
+    return lessons.some((t) => t.status === 'completed') && !lessons.some((t) => t.status === 'running') && !this.openLesson(conceptId);
+  }
+
+  /** How far an unfinished stepped lesson has come: the steps taught so far, of those planned now. */
+  stepProgress(conceptId: string | null) {
+    const lesson = this.openLesson(conceptId);
+    return lesson ? { number: lesson.steps.filter((s) => s.turn_id).length, total: lesson.steps.length } : null;
+  }
+
   get runningLesson() {
     return this.state?.turns.find((t) => t.channel === 'mainline' && t.status === 'running') ?? null;
   }

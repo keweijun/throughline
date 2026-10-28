@@ -3,7 +3,7 @@ import { test, expect } from './fixture';
 test('a question saved for a later section is shown there and explained when that lesson runs', async ({ page, course }) => {
   const { errors } = await course('continuity_browser_fixture');
   const nextStep = page.locator('#next-step');
-  await expect(nextStep).toHaveText('Start the lesson for this section.');
+  await expect(nextStep, 'before the first lesson the Start card says what comes next').toHaveCount(0);
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('Amplitudes add before squaring.');
   await expect(nextStep).toHaveText('Try the open exercise below, or enter the next section.');

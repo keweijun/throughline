@@ -11,11 +11,13 @@
   });
 
   const keys: [string, MessageKey][] = [
+    ['c', 'Continue the lesson'],
     ['/', 'Ask a side question'],
     ['[', 'Previous section'],
     [']', 'Next section'],
     ['s', 'Show or hide the source reader'],
     ['n', 'Show or hide your notes'],
+    ['m', 'Show or hide course memory'],
     ['Esc', 'Close a drawer or popup'],
     ['?', 'Show these shortcuts'],
   ];

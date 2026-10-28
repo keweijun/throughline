@@ -11,7 +11,8 @@ test('a multi-part exercise is answered part by part and solved once every part 
   await answer('Part 1: the rule is linearity.');
   await expect(parts.locator('li')).toHaveText([/Part 1\s*Correct/, /Part 2\s*Not attempted/]);
   await expect(task.locator('header .chip')).toHaveText('1/2 parts correct');
-  await expect(task.locator('.history summary').last()).toContainText('1/2 parts correct');
+  // The header chip names the latest result; the feedback it came from does not repeat it.
+  await expect(task.locator('.history summary').last()).toHaveText('Teacher feedback');
 
   await answer('Part 2: I apply it.');
   await expect(parts.locator('li')).toHaveText([/Part 1\s*Correct/, /Part 2\s*Partly correct/], { timeout: 10000 });
@@ -36,5 +37,6 @@ test('an exercise assessed before parts still shows its result as one part', asy
   const task = page.locator('#practice article').nth(1);
   await expect(task.locator('header .chip')).toHaveText('Solved independently');
   await expect(task.getByRole('list', { name: 'Parts' })).toHaveCount(0);
-  await expect(task.locator('.history summary')).toContainText('Solved independently');
+  // The header names the result, so the feedback it came from does not repeat it.
+  await expect(task.locator('.history summary')).toHaveText('Teacher feedback');
 });

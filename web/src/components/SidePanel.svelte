@@ -136,8 +136,9 @@
     position: absolute;
     top: 0.7rem;
     right: 0.6rem;
-    z-index: 1;
+    z-index: 2;
     padding-inline: 0.45rem;
+    background: var(--sheet);
     color: var(--pencil);
   }
 
@@ -146,11 +147,16 @@
     animation: enter-fade var(--quick) ease;
   }
 
+  /* The views carry the vertical padding, so a sticky header or composer inside one sits flush with the panel's edge. */
   .body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 1.1rem 1.1rem 3rem;
+    padding: 0 1.1rem;
+  }
+
+  .view {
+    padding: 1.1rem 0 3rem;
   }
 
   /* The reader scrolls inside itself, so the source tab fills the panel instead. */
@@ -158,6 +164,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  .body.fill > .view {
     padding-bottom: 1rem;
   }
 

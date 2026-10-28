@@ -70,7 +70,7 @@
         {#if course}
           <p class="muted">
             <CodexLink prompt={t('$throughline review {location} (source {source}, unit {unit}) in the course {course}', { location: label, source: s.source_id, unit: s.unit_id, course: course.name })}>
-              {t('Review this location in Codex')}
+              {t('Check this location in Codex')}
             </CodexLink>
           </p>
         {/if}

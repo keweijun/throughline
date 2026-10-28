@@ -9,7 +9,7 @@
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
   import { markdown } from '../lib/markdown';
-  import { lessonStatus, questionCategory, questionTurnIds } from '../lib/format';
+  import { lessonStatus, questionTurnIds } from '../lib/format';
   import type { Question, QuestionReply } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
 
@@ -146,25 +146,18 @@
     </div>
   {/if}
 
-  {#if decision}
-    <p class="decision">
-      {t(decision.depth === 'short' ? "Short answer, {category}." : "Detailed answer, {category}.", { category: questionCategory(decision.category) })}
-      <span>{decision.rationale}</span>
+  <!-- How the teacher placed the question on the route is its own reasoning; the learner sees only what it changes. -->
+  {#if later}
+    <p class="later">
+      {#if scheduled?.status === 'resolved'}
+        {t("Explained in full in {section}.", { section: later.title })}
+      {:else}
+        {t("The full explanation is saved for {section}.", { section: later.title })}
+      {/if}
+      {#if later.id !== app.viewingId}
+        <button class="btn btn-quiet btn-small" onclick={previewLater}>{t("Look at that section")}</button>
+      {/if}
     </p>
-    {#if later}
-      <p class="later">
-        {#if scheduled?.status === 'resolved'}
-          {t("Explained in full in {section}.", { section: later.title })}
-        {:else}
-          {t("The full explanation is saved for {section}.", { section: later.title })}
-        {/if}
-        {#if later.id !== app.viewingId}
-          <button class="btn btn-quiet btn-small" onclick={previewLater}>{t("Look at that section")}</button>
-        {/if}
-      </p>
-    {/if}
-  {:else if answer?.status === 'completed'}
-    <p class="decision">{t("Answered. The teacher did not say how this question fits the route, so it is not scheduled for a later section.")}</p>
   {/if}
 
   {#if question.status === 'suggested' && decision}
@@ -196,8 +189,11 @@
   {#each question.replies ?? [] as item (item.id)}
     {@const turn = app.turn(item.turn_id)}
     <section class="reply">
-      {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
-      <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
+      <div class="asked">
+        <span class="who">{t("You")}</span>
+        {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
+        <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
+      </div>
       {#if turn}
         <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r), streaming: turn.status === 'running' }}></div>
         {#if turn.status !== 'completed'}
@@ -211,26 +207,27 @@
     </section>
   {/each}
 
+  <!-- The follow-up box stays in reach at the bottom of the panel while the thread is read. -->
   <form class="followup" onsubmit={reply}>
     {#if quote}
-      <blockquote class="prose" use:markdown={{ language: locale.language, text: quote.text }}></blockquote>
-      <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
+      <div class="quoted">
+        <blockquote class="prose" use:markdown={{ language: locale.language, text: quote.text }}></blockquote>
+        <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
+      </div>
     {/if}
     <label class="field">
-      <span>{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={() => replyText, setReplyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Continue this question…")}></textarea>
+      <span class="visually-hidden">{t("Follow up")}</span>
+      <textarea id="reply-input-{question.id}" rows="2" bind:value={() => replyText, setReplyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Ask a follow-up about this…")}></textarea>
     </label>
-    <button class="btn btn-small" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
-  </form>
-
-  {#if canReturn}
-    <div class="row end">
-      <button class="btn btn-quiet btn-small" disabled={busy} onclick={backToLesson}>
-
-        {question.selection && question.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
-      </button>
+    <div class="row">
+      {#if canReturn}
+        <button type="button" class="btn btn-quiet btn-small back" disabled={busy} onclick={backToLesson}>
+          ← {question.selection && question.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
+        </button>
+      {/if}
+      <button class="btn btn-small btn-primary send" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
     </div>
-  {/if}
+  </form>
   </div>
   {/if}
 </article>
@@ -282,9 +279,84 @@
   }
 
   .your-notes { padding: 0; border: 0; background: none; color: var(--mine); font: inherit; font-weight: 600; cursor: pointer; }
-  .reply { border-top: 1px solid var(--rule); padding-top: 1rem; display: grid; gap: 0.6rem; }
-  .followup { display: grid; gap: 0.5rem; margin-top: 0.75rem; }
-  .followup > button { justify-self: start; }
+
+  /* An open thread keeps its question in view while its answers scroll by, clear of the panel's close button. */
+  .thread.open .head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: -0.4rem 0 0;
+    padding: 0.4rem 2.2rem 0.5rem 0;
+    background: var(--sheet);
+    box-shadow: 0 1px 0 var(--rule);
+  }
+
+  .reply {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.9rem;
+  }
+
+  /* What the learner asked reads apart from the teacher's answers. */
+  .asked {
+    display: grid;
+    gap: 0.35rem;
+    justify-self: end;
+    max-width: 92%;
+    padding: 0.5rem 0.75rem 0.6rem;
+    border-radius: var(--radius) var(--radius) 2px var(--radius);
+    background: var(--accent-wash);
+  }
+
+  .who {
+    font-size: var(--step--1);
+    font-weight: 600;
+    color: var(--pencil);
+  }
+
+  .asked .title {
+    font-family: var(--sans);
+    font-weight: 500;
+  }
+
+  .followup {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.75rem;
+    padding: 0.6rem 0;
+    background: var(--sheet);
+    box-shadow: 0 -1px 0 var(--rule);
+  }
+
+  .followup textarea {
+    min-height: 2.75rem;
+  }
+
+  .followup .row {
+    justify-content: space-between;
+  }
+
+  .followup .send {
+    margin-left: auto;
+  }
+
+  .back {
+    padding-left: 0;
+    color: var(--accent);
+  }
+
+  .quoted {
+    display: flex;
+    align-items: start;
+    gap: 0.4rem;
+  }
+
+  .quoted blockquote {
+    flex: 1;
+  }
 
   .thread.flash {
     animation: flash 1.6s ease-out;

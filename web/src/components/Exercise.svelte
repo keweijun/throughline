@@ -60,6 +60,8 @@
   let busy = $state(false);
   const canCheck = $derived(!busy && !uploading && (answer.trim() !== '' || images.length > 0));
   let confirmSolution = $state(false);
+  // A solved exercise folds its answer box away until the learner chooses to answer again; a draft keeps it open.
+  let reopened = $state(false);
   let confirmSkip = $state(false);
   let preview = $state('');
 
@@ -85,6 +87,8 @@
     return (typeof part === 'object' && part.label) || t('Part {number}', { number: i + 1 });
   };
   const partsCorrect = (statuses: string[]) => ({ correct: statuses.filter((s) => s === 'correct').length, total: statuses.length });
+  const composing = $derived(!solved || reopened || answer.trim() !== '' || images.length > 0);
+  const latestAssessment = $derived(task.history.map((h) => h.action).lastIndexOf('assess'));
   const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
   // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
@@ -210,7 +214,7 @@
       {#each task.history as entry, i}
         <details open={i === task.history.length - 1}>
           <summary>
-            {t(helpLabels[entry.action])}{#if entry.parts && entry.parts.length > 1 && entry.outcome !== 'passed'}<span class="kind"> · {t('{correct}/{total} parts correct', partsCorrect(entry.parts))}</span>{:else if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}
+            {t(helpLabels[entry.action])}{#if i !== latestAssessment || !status}{#if entry.parts && entry.parts.length > 1 && entry.outcome !== 'passed'}<span class="kind"> · {t('{correct}/{total} parts correct', partsCorrect(entry.parts))}</span>{:else if entry.kind}<span class="kind"> · {evidenceLabel(entry.kind)}</span>{/if}{/if}
           </summary>
           {#if entry.question}
             <section class="your-answer" aria-label={t("Your question")}>
@@ -226,7 +230,8 @@
             </section>
           {/if}
           <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
-            <p class="answer-label">{entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}</p>
+            <!-- The summary already names feedback and help; only an answer needs telling apart from the question above it. -->
+            {#if entry.action === 'ask'}<p class="answer-label">{t("Teacher's answer")}</p>{/if}
             <div class="prose feedback" data-exercise={task.id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
           </section>
         </details>
@@ -261,6 +266,12 @@
     {#if failedJob}
       <p class="problem">{t("The last request did not finish:")} {diagnostic(failedJob.error ?? latestTurn?.error ?? t("The response was interrupted. Please try again."))}</p>
     {/if}
+    {#if !composing}
+      <div class="solved-row">
+        <button class="btn btn-small" onclick={() => (reopened = true)}>{t("Answer again")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
+      </div>
+    {:else}
     <label class="field">
       <span class="visually-hidden">{t("Exercise answer")}</span>
       <textarea
@@ -302,11 +313,17 @@
       </button>
       <span class="keys" id="exercise-keys-{task.id}">{t("{keys} to check · Enter for a new line", { keys: sendKeys })}</span>
 
-      <span class="help">
+    </div>
+    <!-- Help toward an answer comes first; setting the exercise aside is a different choice, so it sits apart. -->
+    <div class="help-row">
+      <span class="help" role="group" aria-label={t("Help with this exercise")}>
+        <span class="stuck">{t("Stuck?")}</span>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSolution = true), (confirmSkip = false))}>{t("Full solution")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
+      </span>
+      <span class="aside">
         {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}
@@ -315,6 +332,7 @@
         {/if}
       </span>
     </div>
+    {/if}
     {#if confirmSolution}
       <div class="confirm" role="group" aria-label={t("Confirm full solution")}>
         <p>{t("After you see the solution, a correct answer to this exercise counts as solved with help, not on your own.")}</p>
@@ -527,10 +545,36 @@
     color: var(--pencil);
   }
 
-  .help {
+  .help-row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    margin-top: -0.35rem;
+  }
+
+  .help,
+  .aside,
+  .solved-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 0.15rem;
+  }
+
+  .stuck {
+    margin-right: 0.25rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .aside .btn {
+    color: var(--pencil);
+  }
+
+  .solved-row {
+    gap: 0.5rem;
   }
 
   .confirm {

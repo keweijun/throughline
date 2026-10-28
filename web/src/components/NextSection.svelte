@@ -25,6 +25,8 @@
     const later = chapters.slice(chapters.findIndex((c) => c.id === chapter?.id) + 1);
     return endsChapter && !next ? later.find((c) => !c.concept_ids.length) : undefined;
   });
+  // Until the lesson is finished, moving on stays possible but is not the suggested next step.
+  const studied = $derived(app.studied(conceptId));
   const activeSupplement = $derived((app.state?.questions ?? []).some((q) => q.choice === 'accept' && !q.returned));
 
   // Stays busy until the refreshed state shows the move, so a second click cannot repeat it.
@@ -37,7 +39,7 @@
   }
 </script>
 
-{#if endsChapter && chapter && app.hasLesson(conceptId)}
+{#if endsChapter && chapter && studied}
   <p class="chapter-end">
     <button class="link" onclick={() => app.viewChapter(chapter.id)}>{t("End of chapter: recap and quiz →")}</button>
   </p>
@@ -58,7 +60,7 @@
       {/if}
       <Preparation />
     </div>
-    <button class="btn btn-primary" disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
+    <button class="btn" class:btn-primary={studied} disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
   </section>
 {:else if unbuilt}
   <section class="next done" aria-label={t("Next chapter")}>
@@ -67,7 +69,7 @@
       <ChapterBuild chapter={unbuilt} compact />
     </div>
   </section>
-{:else if !next && app.hasLesson(conceptId)}
+{:else if !next && studied}
   <section class="next done" aria-label={t("End of route")}>
     <p class="title">{t("This is the last section on the route.")}</p>
   </section>

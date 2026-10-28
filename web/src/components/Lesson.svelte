@@ -180,7 +180,7 @@
         {/each}
       </ol>
       <div class="row">
-        <button class="btn btn-primary" onclick={next} disabled={continuing || !!app.runningLesson}>{t("Continue")}</button>
+        <button id="continue-step" class="btn btn-primary" onclick={next} disabled={continuing || !!app.runningLesson}>{t("Continue")}</button>
         {#if app.runningLesson}<span class="hint">{t("Another lesson is being written. Pause it first.")}</span>{/if}
       </div>
     </div>

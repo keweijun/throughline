@@ -84,7 +84,7 @@ type Position = [Text, number] | Element;
 function search(root: HTMLElement, needle: string, options: LocateOptions, formulas: boolean): Range[] {
   const target = options.loose ? needle.replace(/\s+/g, '') : needle.replace(/\s+/g, ' ').trim();
   if (target.length < 3) return [];
-  const skip = options.skip ?? '.katex, .citation';
+  const skip = options.skip ?? '.katex, .citation, .widget';
   const nodes: (Text | Element)[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
     acceptNode: (node) => {

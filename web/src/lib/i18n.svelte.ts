@@ -190,6 +190,8 @@ const messages = {
   "{count} exercises stay open and will be waiting for you.": "{count} 道练习仍保留待完成。",
   "This citation does not match a registered source location": "此引用未匹配已登记的来源位置",
   "source unverified": "来源未核验",
+  "Couldn't draw this diagram": "无法绘制此图",
+  "Couldn't draw this plot": "无法绘制此函数图",
   "Open the cited source": "打开引用来源",
   "View source {location}": "查看来源 {location}",
   "p. {number}": "第 {number} 页",

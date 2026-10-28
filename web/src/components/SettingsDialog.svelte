@@ -3,10 +3,11 @@
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import type { CodexModel, Settings } from '../lib/types';
+  import type { CodexModel, Settings, UpdateCheck } from '../lib/types';
+  import CodexLink from './CodexLink.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
-  type Pane = 'course' | 'teacher' | 'appearance';
+  type Pane = 'course' | 'teacher' | 'appearance' | 'about';
 
   const MAX_DAILY_REVIEWS = 20;
 
@@ -24,14 +25,18 @@
   let savingLanguage = $state(false);
   let dailyReviews = $state(5);
   let savingReviews = $state(false);
+  let about = $state<{ version: string } | null>(null);
+  let update = $state<UpdateCheck | null>(null);
+  let updateError = $state('');
+  let checking = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
   // Without an open course there is nothing course-wide to set; the language then sits under Appearance, shown first.
   const panes = $derived<{ id: Pane; label: MessageKey }[]>(
     app.state
-      ? [{ id: 'course', label: 'Course' }, { id: 'teacher', label: 'Teacher' }, { id: 'appearance', label: 'Appearance' }]
-      : [{ id: 'appearance', label: 'Appearance' }, { id: 'teacher', label: 'Teacher' }],
+      ? [{ id: 'course', label: 'Course' }, { id: 'teacher', label: 'Teacher' }, { id: 'appearance', label: 'Appearance' }, { id: 'about', label: 'About' }]
+      : [{ id: 'appearance', label: 'Appearance' }, { id: 'teacher', label: 'Teacher' }, { id: 'about', label: 'About' }],
   );
   const confirmedPreferences = $derived(
     app.state?.memory.filter((entry) => entry.kind === 'preference' && entry.status === 'confirmed').length ?? 0,
@@ -81,6 +86,27 @@
     }
   }
 
+  async function loadAbout() {
+    if (about) return;
+    try {
+      about = await api.get<{ version: string }>('/api/about');
+    } catch {
+      // The pane still works without the version.
+    }
+  }
+
+  async function checkForUpdates() {
+    checking = true;
+    updateError = '';
+    try {
+      update = await api.get<UpdateCheck>('/api/update');
+    } catch (error) {
+      update = null;
+      updateError = error instanceof Error ? error.message : String(error);
+    }
+    checking = false;
+  }
+
   // A saved model the list does not offer stays selectable rather than being silently replaced.
   function choices(current: string) {
     const list = models ?? [];
@@ -94,6 +120,7 @@
       smallModel = settings?.small_model ?? '';
       serviceTier = settings?.service_tier ?? '';
       void loadModels();
+      void loadAbout();
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
       dailyReviews = app.state?.preferences.daily_reviews ?? 5;
@@ -175,6 +202,8 @@
         <path d="M10 5.6C8.4 4.3 6.1 4 3.3 4.6v10.2c2.8-.6 5.1-.3 6.7 1 1.6-1.3 3.9-1.6 6.7-1V4.6C13.9 4 11.6 4.3 10 5.6zM10 5.6v10.2" />
       {:else if id === 'teacher'}
         <path d="M10 4.2 2.6 7.6 10 11l7.4-3.4zM5.6 9.2v3.4c1.2 1.3 2.7 1.9 4.4 1.9s3.2-.6 4.4-1.9V9.2M17.4 7.6v4.2" />
+      {:else if id === 'about'}
+        <circle cx="10" cy="10" r="6.6" /><path d="M10 9v4.6M10 6.4v.1" />
       {:else}
         <circle cx="10" cy="10" r="6.6" /><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none" />
       {/if}
@@ -214,13 +243,15 @@
           {@render icon(item.id)}{t(item.label)}
         </button>
       {/each}
-      <p class="scope">
-        {pane === 'course'
-          ? t("Saved in this course.")
-          : pane === 'teacher'
-            ? t("Saved for your user account, for every course.")
-            : t("Saved in this browser.")}
-      </p>
+      {#if pane !== 'about'}
+        <p class="scope">
+          {pane === 'course'
+            ? t("Saved in this course.")
+            : pane === 'teacher'
+              ? t("Saved for your user account, for every course.")
+              : t("Saved in this browser.")}
+        </p>
+      {/if}
     </nav>
 
     <div class="pane">
@@ -353,6 +384,43 @@
             <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
           </div>
         {/if}
+      {:else if pane === 'about'}
+        <div class="identity">
+          <img src="/favicon.svg" alt="" width="48" height="48" />
+          <div>
+            <h3>{t("Throughline")}</h3>
+            <p class="lead">{about ? t("Version {version}", { version: about.version }) : '\u00a0'}</p>
+          </div>
+        </div>
+        <p class="tagline">{t("One line of teaching through all your documents.")}</p>
+        <p class="lead">{t("A local study app that turns your PDFs and notes into a guided course. Codex teaches on this computer, with your own sign-in; your courses stay in your Throughline folder.")}</p>
+        <div class="setting">
+          <div class="text">
+            <span class="title">{t("Updates")}</span>
+            {#if update?.available}
+              <p role="status">{t("Version {latest} is available.", { latest: update.latest })} {t("Codex installs it and keeps your courses. Throughline closes while it updates; open it again afterwards.")}</p>
+            {:else if update}
+              <p role="status">{t("You have the latest version.")}</p>
+            {:else if updateError}
+              <p role="status">{t("Could not check for updates:")} {updateError}</p>
+            {/if}
+          </div>
+          {#if update?.available}
+            <CodexLink class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+          {:else}
+            <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
+          {/if}
+        </div>
+
+        <h4>{t("Credits")}</h4>
+        <div class="credits">
+          <p>{t("Made by")} <a href="https://github.com/keweijun" target="_blank" rel="noreferrer">Keweijun</a></p>
+          <p><a href="https://github.com/keweijun/throughline" target="_blank" rel="noreferrer">{t("Source code on GitHub")}</a> · {t("MIT License")}</p>
+          <p class="lead">
+            {t("Built with PDF.js, KaTeX, marked and DOMPurify, set in Source Serif 4 and IBM Plex Sans.")}
+            <a href="https://github.com/keweijun/throughline/blob/main/THIRD_PARTY_LICENSES.md" target="_blank" rel="noreferrer">{t("Their licenses")}</a>
+          </p>
+        </div>
       {:else}
         <h3>{t("Appearance")}</h3>
         {#if !app.state}
@@ -527,6 +595,28 @@
     font-size: var(--step--1);
     color: var(--pencil);
     margin-bottom: 0.25rem;
+  }
+
+  .identity {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+  }
+
+  .identity h3 {
+    font-family: var(--serif);
+    margin-bottom: 0;
+  }
+
+  .tagline {
+    margin-top: 1rem;
+    font-family: var(--serif);
+  }
+
+  .credits {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
   }
 
   .setting {

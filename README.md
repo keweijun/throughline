@@ -21,7 +21,7 @@ You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.co
 Install https://github.com/keweijun/throughline
 ```
 
-Codex reads the steps below, installs the app (no Node.js needed), adds the `$throughline` skill, creates your Throughline folder and a **Throughline** launcher in your app menu, and shows a short welcome guide. To **update**, paste `Update https://github.com/keweijun/throughline`; your courses are kept.
+Codex reads the steps below, installs the app (no Node.js needed), adds the `$throughline` skill, creates your Throughline folder and a **Throughline** launcher in your app menu, and shows a short welcome guide. To **update**, paste `Update https://github.com/keweijun/throughline`; your courses are kept. **Settings → Check for updates** tells you when a newer version is out and opens that request in Codex.
 
 ### For Codex: installing or updating Throughline
 

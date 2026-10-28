@@ -169,15 +169,17 @@
 </script>
 
 {#snippet icon(id: Pane)}
-  <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    {#if id === 'course'}
-      <path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" />
-    {:else if id === 'teacher'}
-      <path d="M10 3.5l1.6 3.6 3.9.4-2.9 2.6.8 3.9L10 12l-3.4 2 .8-3.9-2.9-2.6 3.9-.4z" />
-    {:else}
-      <circle cx="10" cy="10" r="6.5" /><path d="M10 3.5v13a6.5 6.5 0 0 0 0-13z" fill="currentColor" />
-    {/if}
-  </svg>
+  <span class="glyph" aria-hidden="true">
+    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      {#if id === 'course'}
+        <path d="M10 5.6C8.4 4.3 6.1 4 3.3 4.6v10.2c2.8-.6 5.1-.3 6.7 1 1.6-1.3 3.9-1.6 6.7-1V4.6C13.9 4 11.6 4.3 10 5.6zM10 5.6v10.2" />
+      {:else if id === 'teacher'}
+        <path d="M10 4.2 2.6 7.6 10 11l7.4-3.4zM5.6 9.2v3.4c1.2 1.3 2.7 1.9 4.4 1.9s3.2-.6 4.4-1.9V9.2M17.4 7.6v4.2" />
+      {:else}
+        <circle cx="10" cy="10" r="6.6" /><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none" />
+      {/if}
+    </svg>
+  </span>
 {/snippet}
 
 {#snippet languageChoice()}
@@ -429,7 +431,7 @@
   nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0.25rem;
     padding: 1rem 0.75rem;
     border-right: 1px solid var(--rule);
     background: var(--ground);
@@ -438,27 +440,62 @@
   .category {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.75rem;
-    border: 0;
-    border-radius: var(--radius);
+    gap: 0.65rem;
+    padding: 0.4rem 0.6rem 0.4rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
     background: none;
     color: var(--ink-soft);
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition:
+      background-color var(--quick) var(--ease-out),
+      border-color var(--quick) var(--ease-out),
+      color var(--quick) var(--ease-out);
+  }
+
+  .glyph {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 6px;
+    color: var(--pencil);
+    transition:
+      background-color var(--quick) var(--ease-out),
+      color var(--quick) var(--ease-out);
   }
 
   .category:hover {
-    background: var(--raised);
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
     color: var(--ink);
   }
 
+  .category:hover .glyph {
+    color: var(--ink);
+  }
+
+  /* The open category reads as a raised sheet with a filled icon tile, matching the pane it opens. */
   .category[aria-current='page'] {
-    background: var(--raised);
-    color: var(--accent);
+    border-color: var(--rule);
+    background: var(--sheet);
+    color: var(--ink);
     font-weight: 600;
-    box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px var(--shadow-near);
+    box-shadow: 0 1px 2px var(--shadow-near);
+  }
+
+  .category[aria-current='page'] .glyph {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .category,
+    .glyph {
+      transition: none;
+    }
   }
 
   .scope {

@@ -84,7 +84,7 @@ test('course actions open Codex with a $throughline request, and new courses app
   await expect(page.locator('.courses > li').filter({ hasText: 'Organic Chemistry' })).toBeVisible({ timeout: 8000 });
 });
 
-test('the About tab shows the version and credits, checks for updates and hands the update to Codex', async ({ page, course }) => {
+test('About in Settings shows the version and credits, checks for updates and hands the update to Codex', async ({ page, course }) => {
   await page.addInitScript(() => {
     document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
   });
@@ -92,28 +92,21 @@ test('the About tab shows the version and credits, checks for updates and hands 
   await page.route('**/api/about', (route) => route.fulfill({ json: { version: '0.5.1' } }));
   await page.route('**/api/update', (route) => route.fulfill({ json: { version: '0.5.1', latest, available: latest !== '0.5.1' } }));
   const { errors } = await course('library_browser_fixture');
-  await page.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
-  await page.getByRole('tab', { name: 'General' }).press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'About' })).toHaveAttribute('aria-selected', 'true');
-  const about = page.getByRole('tabpanel', { name: 'About' });
-  await expect(about.getByText('Version 0.5.1')).toBeVisible();
-  await expect(about.getByRole('link', { name: 'Keweijun' })).toHaveAttribute('href', 'https://github.com/keweijun');
-  await expect(page.getByRole('combobox', { name: 'Language' })).toBeHidden();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('button', { name: 'About' }).click();
+  await expect(dialog.getByRole('button', { name: 'About' })).toHaveAttribute('aria-current', 'page');
+  await expect(dialog.getByText('Version 0.5.1')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Keweijun' })).toHaveAttribute('href', 'https://github.com/keweijun');
 
-  const check = about.getByRole('button', { name: 'Check for updates' });
-  await check.click();
-  await expect(about.getByText('You have the latest version.')).toBeVisible();
-  await expect(about.getByRole('link', { name: 'Update in Codex' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Check for updates' }).click();
+  await expect(dialog.getByText('You have the latest version.')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Update in Codex' })).toHaveCount(0);
 
   latest = '0.6.0';
-  await check.click();
-  await expect(about.getByText('Version 0.6.0 is available.')).toBeVisible();
-  const link = about.getByRole('link', { name: 'Update in Codex' });
+  await dialog.getByRole('button', { name: 'Check for updates' }).click();
+  await expect(dialog.getByText('Version 0.6.0 is available.')).toBeVisible();
+  const link = dialog.getByRole('link', { name: 'Update in Codex' });
   expect(decodeURIComponent((await link.getAttribute('href'))!)).toContain('prompt=Update https://github.com/keweijun/throughline');
-
-  await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true');
   expect(errors).toEqual([]);
 });

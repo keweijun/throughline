@@ -207,9 +207,10 @@ class Host:
             except Exception:
                 log.exception('%s could not finish turn %s', feature.__class__.__name__, turn['id'])
 
-    def set_language(self, language):
+    def set_preferences(self, changes):
+        """Save course preferences; a new language makes preparation stale, and its running turns pause."""
         with self.lock:
-            result = self.operation({'op': 'preferences.save', 'language': language})
+            result = self.operation({'op': 'preferences.save', **changes})
             stale = {job['id'] for job in self.preparation.state()['jobs'] if job['status'] == 'stale'}
             for turn in self.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':

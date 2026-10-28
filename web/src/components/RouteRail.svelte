@@ -60,6 +60,24 @@
   // Folding needs room to unfold into; without it the route stays folded and opens on hover.
   const foldable = $derived(!app.stageNarrow && !app.phone);
 
+  // Folding leaves the pointer where the full route was; the drawer stays shut until the pointer has left the rail,
+  // so folding does not look like it reopened at once.
+  let nav = $state<HTMLElement>();
+  let resting = $state(false);
+  let wasFolded = app.folded;
+  $effect(() => {
+    if (app.folded && !wasFolded && nav?.matches(':hover')) resting = true;
+    wasFolded = app.folded;
+  });
+  $effect(() => {
+    if (!resting) return;
+    const away = (event: PointerEvent) => {
+      if (!nav?.contains(event.target as Node)) resting = false;
+    };
+    window.addEventListener('pointermove', away);
+    return () => window.removeEventListener('pointermove', away);
+  });
+
   // When the full route opens beside the capsule, it shows the section being read.
   let full = $state<HTMLElement>();
   function reveal() {
@@ -101,7 +119,7 @@
   </li>
 {/snippet}
 
-<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} aria-label={t("Course route")} onpointerenter={reveal}>
+<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} class:resting aria-label={t("Course route")} onpointerenter={reveal} bind:this={nav}>
   {#if app.folded}<FoldedRoute />{/if}
   <div class="full" bind:this={full}>
     <div class="head">
@@ -459,7 +477,7 @@
       visibility 0s linear calc(var(--quick) + 0.12s);
   }
 
-  .rail.folded:has(:global(.mini:hover), .full:hover) .full {
+  .rail.folded:not(.resting):has(:global(.mini:hover), .full:hover) .full {
     opacity: 1;
     visibility: visible;
     transform: none;

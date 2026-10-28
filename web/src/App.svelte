@@ -189,7 +189,8 @@
     margin-inline: auto;
     transition:
       grid-template-columns var(--settle) var(--ease-out),
-      column-gap var(--settle) var(--ease-out);
+      column-gap var(--settle) var(--ease-out),
+      max-width var(--settle) var(--ease-out);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -198,9 +199,11 @@
     }
   }
 
+  /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
   .layout.folded {
     grid-template-columns: var(--rail-folded) minmax(0, 1fr);
     column-gap: 0;
+    max-width: 100vw;
   }
 
   main {

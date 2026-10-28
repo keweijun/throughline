@@ -11,7 +11,8 @@ def status(store, request):
 
 
 def save_profile(store, request):
-    """What the learner told Codex while the course was built: goal, depth and prior knowledge. Never evidence of mastery."""
+    """What the learner told Codex while the course was built: goal, depth, prior knowledge and focus. A prerequisite's
+    optional `check` says what a quick check in that interview showed. Never evidence of mastery."""
     profile = request.get('profile')
     if not isinstance(profile, dict) or not str(profile.get('goal', '')).strip():
         raise OperationError('invalid_profile', 'profile must be an object with a nonempty goal')
@@ -21,7 +22,8 @@ def save_profile(store, request):
     if not isinstance(prerequisites, list) or any(not isinstance(p, dict) or not str(p.get('topic', '')).strip() or p.get('level') not in LEVELS for p in prerequisites):
         raise OperationError('invalid_profile', 'each prerequisite needs a topic and a level of none, some or solid')
     clean = {'goal': str(profile['goal']).strip(), 'depth': profile['depth'],
-             'prerequisites': [{'topic': str(p['topic']).strip(), 'level': p['level']} for p in prerequisites]}
+             'prerequisites': [{'topic': str(p['topic']).strip(), 'level': p['level'],
+                                **({'check': str(p['check']).strip()} if str(p.get('check', '')).strip() else {})} for p in prerequisites]}
     for field in ('focus', 'notes'):
         if str(profile.get(field, '')).strip():
             clean[field] = str(profile[field]).strip()

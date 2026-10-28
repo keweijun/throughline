@@ -39,6 +39,16 @@ class CourseMemory(unittest.TestCase):
             self.assertEqual(again['recorded'], [])
             self.assertEqual(len(execute(tmp, {'op': 'memory.view'})['entries']), 3)
 
+    def test_a_preference_stated_while_building_the_course_needs_no_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp, {'op': 'course.init', 'title': 'Quantum'})  # no route yet
+            entry = execute(tmp, {'op': 'memory.save', 'id': 'intake-1', 'kind': 'preference', 'text': 'Worked examples before theory'})['entry']
+            self.assertIsNone(entry['concept_id'])
+            execute(tmp, {'op': 'memory.confirm', 'id': 'intake-1'})
+            self.assertEqual(execute(tmp, {'op': 'memory.prompt'})['memory'], {'preferences': ['Worked examples before theory']})
+            with self.assertRaises(OperationError):
+                execute(tmp, {'op': 'memory.save', 'id': 'term', 'kind': 'taught_term', 'text': 'plane wave'})
+
     def test_duplicates_merge_and_cleared_difficulties_leave_prompts(self):
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)

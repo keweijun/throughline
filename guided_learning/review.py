@@ -11,11 +11,11 @@ import time
 from datetime import datetime
 
 from . import curriculum
+from .preferences import view as preferences
 from .store import OperationError
 
 DAY = 86400
 INTERVALS = (1, 3, 7, 21, 60)
-DAILY_CAP = 5
 REVIEW_ORIGINS = ('review', 'chapter_quiz')
 UNAIDED = ('independent', 'retest_passed')
 MISSES = ('partly_correct', 'not_yet')
@@ -96,6 +96,7 @@ def schedule(store, request):
     postponed = {p['concept_id']: p['at'] for p in store.list('review_postponements')}
     started = open_reviews(store)
     today = start_of_day(now)
+    cap = preferences(store, {})['preferences']['daily_reviews']
     sections = []
     for cid, state in states.items():
         if cid not in route or cid in excluded:
@@ -109,11 +110,11 @@ def schedule(store, request):
     # A review already started stays listed until it is answered; the rest fill what is left of today's cap.
     in_progress = sorted((s for s in sections if s['task_id']), key=lambda s: s['due_at'])
     waiting = sorted((s for s in sections if not s['task_id'] and s['due_at'] <= now), key=lambda s: s['due_at'])
-    room = max(0, DAILY_CAP - len(done_today) - len(in_progress))
+    room = max(0, cap - len(done_today) - len(in_progress))
     upcoming = [s for s in sections if not s['task_id'] and s['due_at'] > now]
     return {'due': in_progress + waiting[:room], 'waiting': len(waiting) - min(room, len(waiting)), 'upcoming': len(upcoming),
             'next_due_at': min((s['due_at'] for s in upcoming), default=None), 'reviewable': len(sections),
-            'done_today': len(done_today), 'cap': DAILY_CAP, 'now': now,
+            'done_today': len(done_today), 'cap': cap, 'now': now,
             'sections': sorted(sections, key=lambda s: s['due_at'])}
 
 

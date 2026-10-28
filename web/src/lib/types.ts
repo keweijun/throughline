@@ -218,9 +218,12 @@ export type DeferredExplanation = {
 
 export type Interaction = { id: string; role: 'user' | 'assistant'; text: string; concept_id?: string };
 
+/** A course's own presentation preferences; `daily_reviews` is the most reviews listed a day (ADR 0008). */
+export type Preferences = { language: 'en' | 'zh-CN'; daily_reviews: number };
+
 export type State = {
-  preferences: { language: 'en' | 'zh-CN' };
-  course: { id: string; title: string };
+  preferences: Preferences;
+  course:{ id: string; title: string };
   position: Position | null;
   sources: { id: string; path: string; revision: string; status: string }[];
   /** `version` changes with any part of the course plan, including fields left out here. */

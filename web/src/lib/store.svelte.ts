@@ -3,7 +3,7 @@ import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -713,12 +713,18 @@ class AppStore {
       locale.language = rememberLanguage(language) ?? language;
       return;
     }
-    const result = await this.act(() => api.put<{ preferences: { language: Language } }>('/api/preferences', { language }));
+    const result = await this.savePreferences({ language });
     if (result) {
-      locale.language = result.preferences.language;
+      locale.language = result.language;
       rememberLanguage(locale.language);
-      if (this.state) this.state.preferences = result.preferences;
     }
+  }
+
+  /** Saves some of the course's preferences; the others keep their value. */
+  async savePreferences(changes: Partial<Preferences>) {
+    const result = await this.act(() => api.put<{ preferences: Preferences }>('/api/preferences', changes));
+    if (result && this.state) this.state.preferences = result.preferences;
+    return result?.preferences ?? null;
   }
 
   pause(turnId: string) {

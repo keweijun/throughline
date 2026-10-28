@@ -8,15 +8,16 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .. import library
+from ..preferences import MAX_DAILY_REVIEWS
 from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
@@ -40,7 +41,8 @@ class LessonRequest(Body):
 
 
 class PreferencesRequest(Body):
-    language: Literal['en', 'zh-CN']
+    language: Optional[Literal['en', 'zh-CN']] = None
+    daily_reviews: Optional[Annotated[int, Field(ge=1, le=MAX_DAILY_REVIEWS)]] = None
 
 
 class ResumeRequest(Body):
@@ -330,7 +332,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.put('/api/preferences')
     def preferences(body: PreferencesRequest):
-        return host.set_language(body.language)
+        return host.set_preferences(body.model_dump(exclude_none=True))
 
     @app.post('/api/turns/{identifier}/pause')
     def pause(identifier: str):

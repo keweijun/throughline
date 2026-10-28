@@ -129,21 +129,25 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
   await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
 });
 
-test('teacher settings save the Codex model and effort', async ({ page, course }) => {
+test('teacher settings save the Codex model and effort as they change', async ({ page, course }) => {
   const { base } = await course('demo_course_fixture');
   // Without a model list from Codex, models are typed.
   await page.route('**/api/models', (route) => route.fulfill({ status: 502, json: { error: 'Codex CLI not found' } }));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
   await expect(page.getByText('Codex CLI not found')).toBeVisible();
   await page.getByRole('textbox', { name: 'Model', exact: true }).fill('gpt-6.1-sol');
-  await page.getByRole('combobox', { name: 'Reasoning effort', exact: true }).selectOption('high');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('textbox', { name: 'Model', exact: true }).press('Tab');
+  await page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio', { name: 'High' }).check();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  await expect.poll(async () => {
+    const settings = await (await page.request.get(base + '/api/settings')).json();
+    return [settings.model, settings.effort];
+  }).toEqual(['gpt-6.1-sol', 'high']);
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  // The dialog reopens on the category last shown.
   await expect(page.getByRole('textbox', { name: 'Model', exact: true })).toHaveValue('gpt-6.1-sol');
-  const settings = await (await page.request.get(base + '/api/settings')).json();
-  expect([settings.model, settings.effort]).toEqual(['gpt-6.1-sol', 'high']);
 });
 
 test('teacher settings offer the models Codex lists, a small model and fast mode', async ({ page, course }) => {
@@ -155,34 +159,29 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   ];
   await page.route('**/api/models', (route) => route.fulfill({ json: { models } }));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
   const model = page.getByRole('combobox', { name: 'Model', exact: true });
   await expect(model.locator('option')).toHaveText(['Codex default', 'GPT-6.1-Sol', 'GPT-6-Luna']);
   // The Codex default model offers Fast; a model without a Fast tier hides the choice.
-  await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toBeVisible();
+  const fastMode = page.getByRole('switch', { name: 'Fast mode' });
+  await expect(fastMode).toBeVisible();
   // Reasoning efforts follow what the chosen model supports.
-  const effort = page.getByRole('combobox', { name: 'Reasoning effort', exact: true });
-  await expect(effort.locator('option')).toHaveText(['Low', 'High']);
+  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio');
+  await expect(effort).toHaveCount(2);
   await model.selectOption('gpt-6-luna');
-  await expect(effort.locator('option')).toHaveText(['Low']);
-  await expect(effort).toHaveValue('low');
-  await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toHaveCount(0);
+  await expect(effort).toHaveCount(1);
+  await expect(page.getByRole('radio', { name: 'Low' })).toBeChecked();
+  await expect(fastMode).toHaveCount(0);
   await model.selectOption('gpt-6.1-sol');
-  await page.getByRole('checkbox', { name: 'Fast mode' }).check();
-  // The small model waits under Advanced until one is chosen.
-  await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toBeHidden();
-  await page.getByText('Advanced').click();
+  await fastMode.check();
   await page.getByRole('combobox', { name: 'Small model', exact: true }).selectOption('gpt-6-luna');
-  await expect(page.getByRole('combobox', { name: 'Small model reasoning effort' }).locator('option')).toHaveText(['Same as the teacher', 'Low']);
-  await page.getByRole('combobox', { name: 'Small model reasoning effort' }).selectOption('low');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
-  const settings = await (await page.request.get(base + '/api/settings')).json();
-  expect([settings.model, settings.small_model, settings.small_effort, settings.service_tier]).toEqual([
-    'gpt-6.1-sol',
-    'gpt-6-luna',
-    'low',
-    'priority',
-  ]);
+  const smallEffort = page.getByRole('combobox', { name: 'Small model reasoning effort' });
+  await expect(smallEffort.locator('option')).toHaveText(['Same as the teacher', 'Low']);
+  await smallEffort.selectOption('low');
+  await expect.poll(async () => {
+    const settings = await (await page.request.get(base + '/api/settings')).json();
+    return [settings.model, settings.small_model, settings.small_effort, settings.service_tier];
+  }).toEqual(['gpt-6.1-sol', 'gpt-6-luna', 'low', 'priority']);
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
@@ -196,8 +195,21 @@ test('course settings set the daily review limit and lead to teaching preference
   await limit.fill('3');
   await limit.press('Tab');
   await expect.poll(async () => (await (await page.request.get(base + '/api/state')).json()).preferences.daily_reviews).toBe(3);
-  await expect(page.getByText('None yet')).toBeVisible();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await expect(limit).toHaveValue('4');
+  await expect.poll(async () => (await (await page.request.get(base + '/api/state')).json()).preferences.daily_reviews).toBe(4);
+  await expect(page.getByText('None yet', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Open course memory' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByText('No preferences yet', { exact: false })).toBeVisible();
+});
+
+test('appearance offers the theme as cards and applies the choice at once', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+  await page.getByRole('radio', { name: 'Dark' }).check();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('radio', { name: 'Match the system' }).check();
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme');
 });

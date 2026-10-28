@@ -19,7 +19,7 @@ _Avoid_: Off-topic, irrelevant question.
 **Route-aware question answering**: Choosing side-question depth using the current goal, prerequisites, upcoming topics, and known difficulties while preserving teaching continuity.
 _Avoid_: Always brief, always detailed, depth determined by question length.
 
-**Learner profile**: What the learner reported when the course was built: goal, desired depth, prior knowledge of each prerequisite and focus. It shapes the route and lesson depth.
+**Learner profile**: What the learner reported when the course was built: goal, desired depth, prior knowledge of each prerequisite (with what a quick check showed, when one was taken) and focus. It shapes the route and lesson depth. How they said they like to learn goes into course memory as preferences.
 _Avoid_: Mastery, assessment, learning evidence, preferences learned during teaching (course memory).
 
 **Pending explanation**: Content answered sufficiently for current use whose full explanation is explicitly scheduled for a later concept.
@@ -64,7 +64,7 @@ _Avoid_: Revision of the course plan, reviewing source locations in Codex, a tes
 **Retrieval question**: A question answered from memory that asks the learner to recall a key idea and apply it to a new situation, without new material or hints. A review asks one; a chapter quiz adds two or three new ones to the earlier exercises it asks again.
 _Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks earlier exercises again as such, not as new questions).
 
-**Skipped section**: A section deferred when the learner skipped the rest of its chapter; it stays on the route until a lesson there is studied.
+**Skipped section**: A section deferred when the learner skipped the rest of its chapter or jumped past it to a later section; it stays on the route until a lesson there is studied.
 _Avoid_: Excluded, completed, mastered.
 
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening. The view never edits a course; changes happen in Codex.
@@ -94,7 +94,7 @@ _Avoid_: Uncertainty notes in preparation material, progress note.
 **Bookmark**: A learner annotation marking a section or a source location to come back to.
 _Avoid_: Deferred item, mainline restore point.
 
-**Course memory**: What the teacher keeps about one course while teaching it: confirmed learner preferences, taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
+**Course memory**: What the teacher keeps about one course: confirmed learner preferences (from teaching, or stated when the course was built), taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
 _Avoid_: Learner profile (reported when the course was built), learner annotation, evidence, mastery, chat history.
 
 **Taught term**: A term or notation recorded in course memory with the section, lesson step or side question that defined it; the teacher may use it without defining it again.

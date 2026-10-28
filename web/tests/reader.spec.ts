@@ -13,7 +13,7 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   }).toPass();
   await expect(peek).toContainText('lecture-2.pdf');
   await expect(peek).toContainText('The last term is the interference term.');
-  await expect(peek).toContainText('Pending verification');
+  await expect(peek).toContainText('Not checked yet');
 
   await citation.click();
   const cited = page.locator('.pdf-page.cited');
@@ -168,6 +168,9 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(page.getByRole('checkbox', { name: 'Fast mode' })).toHaveCount(0);
   await model.selectOption('gpt-6.1-sol');
   await page.getByRole('checkbox', { name: 'Fast mode' }).check();
+  // The small model waits under Advanced until one is chosen.
+  await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toBeHidden();
+  await page.getByText('Advanced').click();
   await page.getByRole('combobox', { name: 'Small model', exact: true }).selectOption('gpt-6-luna');
   await expect(page.getByRole('combobox', { name: 'Small model reasoning effort' }).locator('option')).toHaveText(['Same as the teacher', 'Low']);
   await page.getByRole('combobox', { name: 'Small model reasoning effort' }).selectOption('low');
@@ -180,4 +183,21 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
     'low',
     'priority',
   ]);
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
+});
+
+test('course settings set the daily review limit and lead to teaching preferences', async ({ page, course }) => {
+  const { base } = await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const limit = page.getByRole('spinbutton', { name: 'Daily reviews' });
+  await expect(limit).toHaveValue('5');
+  await limit.fill('3');
+  await limit.press('Tab');
+  await expect.poll(async () => (await (await page.request.get(base + '/api/state')).json()).preferences.daily_reviews).toBe(3);
+  await expect(page.getByText('None yet')).toBeVisible();
+  await page.getByRole('button', { name: 'Open course memory' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(page.getByText('No preferences yet', { exact: false })).toBeVisible();
 });

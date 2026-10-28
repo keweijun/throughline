@@ -129,6 +129,15 @@ class Schedule(unittest.TestCase):
         result = self.schedule(now + DAY)
         self.assertEqual([s['concept_id'] for s in result['due']], list('edcba'), 'tomorrow the cap starts again')
 
+    def test_the_course_sets_how_many_reviews_come_up_a_day(self):
+        for offset, concept in enumerate('gfedcba'):
+            self.assess(concept, T0 + offset * 60)
+        self.store.put('course', 'preferences', {'language': 'en', 'daily_reviews': 2})
+        result = self.schedule(T0 + 30 * DAY)
+        self.assertEqual(result['cap'], 2)
+        self.assertEqual([s['concept_id'] for s in result['due']], list('gf'))
+        self.assertEqual(result['waiting'], 5)
+
     def test_a_started_review_stays_listed_until_answered(self):
         self.assess('a', T0)
         self.store.put('practice_tasks', 'r1', {'id': 'r1', 'concept_id': 'a', 'origin': 'review', 'status': 'pending', 'history': []})

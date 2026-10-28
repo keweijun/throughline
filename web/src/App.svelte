@@ -39,6 +39,7 @@
   function onKey(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       if (app.routeOpen) app.routeOpen = false;
+      else if (app.libraryOpen && app.state && !(event.target as HTMLElement).closest('dialog')) app.libraryOpen = false;
       else if (app.panelOpen && panelCoversLesson()) app.panelOpen = false;
 
       return;
@@ -54,6 +55,8 @@
     else if (event.key === ']') step(1);
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
+    else if (event.key === 'm') app.panelOpen && app.panelTab === 'memory' ? (app.panelOpen = false) : app.openPanel('memory');
+    else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.shortcutsOpen = true;
   }
 </script>
@@ -147,23 +150,32 @@
     min-height: 0;
   }
 
+  /* The stable gutter keeps the centred layout from shifting when a page is too short to scroll. The rail folds to its
+     route markers when the stage is narrower than the rail and a reading column, so the lesson keeps its width. */
   .stage {
+    container: stage / inline-size;
     flex: 1;
     min-width: 0;
     overflow-x: hidden;
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
+  /* The rail sits beside the reading column, and the two are centred together rather than drifting apart. */
   .layout {
     display: grid;
     grid-template-columns: var(--rail) minmax(0, 1fr);
     align-items: start;
-    max-width: 84rem;
+    max-width: calc(var(--rail) + var(--measure) + 9rem);
     margin-inline: auto;
   }
 
-  .layout.with-panel {
-    max-width: none;
+  @media (min-width: 56.01rem) {
+    @container stage (max-width: 64rem) {
+      .layout {
+        grid-template-columns: var(--rail-folded) minmax(0, 1fr);
+      }
+    }
   }
 
   main {

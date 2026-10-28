@@ -55,7 +55,7 @@
   // The chapter being studied stays open; the learner can open or close any other.
   let toggled = $state<Record<string, boolean>>({});
   const expanded = (id: string) => toggled[id] ?? (id === currentChapter || id === app.chapterOf(app.viewingId)?.id || id === app.viewingChapter);
-  const studied = (ids: string[]) => ids.filter((id) => app.hasLesson(id)).length;
+  const studied = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
 </script>
 
 {#snippet section(id: string)}
@@ -65,6 +65,7 @@
   {@const count = exercises.get(id)}
   {@const waiting = saved.get(id)}
   {@const skipped = app.isSkipped(id)}
+  {@const step = status === 'current' ? app.stepProgress(id) : null}
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
     <span class="node" aria-hidden="true"></span>
     <button
@@ -76,10 +77,11 @@
       {#if status === 'current' || count || waiting || skipped || prepared.has(id)}
         <span class="meta">
           {#if status === 'current'}<span>{t("You are here")}</span>{/if}
+          {#if step}<span>{t("Step {number} of {total}", step)}</span>{/if}
           {#if skipped && status !== 'current'}<span class="skipped">{t("Skipped")}</span>{/if}
           {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
           {#if waiting}<span class="saved">{waiting === 1 ? t("1 saved question") : t("{count} saved questions", { count: waiting })}</span>{/if}
-          {#if prepared.has(id) && status !== 'current'}<span>{t("Prepared")}</span>{/if}
+          {#if prepared.has(id) && status !== 'current'}<span>{t("Lesson ready")}</span>{/if}
         </span>
       {/if}
       <span class="visually-hidden">{diagnostic(label[status])}</span>
@@ -144,7 +146,7 @@
       <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
       {#if course.needs_review}
         <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
-          {t('Review {count} locations in Codex', { count: course.needs_review })}
+          {t('Check {count} source locations in Codex', { count: course.needs_review })}
         </CodexLink>
       {/if}
     </section>
@@ -359,6 +361,37 @@
 
   .star {
     color: var(--mine);
+  }
+
+  /* Folded beside a narrow stage: only the route markers show, and the rail opens over the page on hover or focus.
+     Its content keeps the full width, so nothing reflows and the markers stay where they were. */
+  @media (min-width: 56.01rem) {
+    @container stage (max-width: 64rem) {
+      .rail {
+        z-index: 20;
+        width: var(--rail-folded);
+        overflow: hidden;
+        padding-left: 0.75rem;
+        transition: width var(--quick) var(--ease-out), box-shadow var(--quick) ease;
+      }
+
+      .rail > * {
+        width: calc(var(--rail) - 1.5rem);
+      }
+
+      .rail:not(:hover, :focus-within) :is(h2, button, .codex) {
+        opacity: 0;
+      }
+
+      .rail:hover,
+      .rail:focus-within {
+        width: var(--rail);
+        overflow-y: auto;
+        background: var(--sheet);
+        box-shadow: var(--shadow);
+        border-radius: 0 var(--radius) var(--radius) 0;
+      }
+    }
   }
 
   @media (max-width: 56rem) {

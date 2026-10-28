@@ -89,16 +89,20 @@ class CourseCLI(unittest.TestCase):
 class LearnerProfile(unittest.TestCase):
     def test_profile_is_validated_saved_and_reaches_the_teacher(self):
         from guided_learning.api import execute
-        from guided_learning.server.prompts import base
+        from guided_learning.server.prompts import instructions
         with tempfile.TemporaryDirectory() as tmp:
             call_cli(self, tmp, 'course.init', title='Quantum')
             call_cli(self, tmp, 'course.profile.save', error='invalid_profile', profile={'goal': 'Exam', 'depth': 'deep'})
             call_cli(self, tmp, 'course.profile.save', error='invalid_profile', profile={'goal': 'Exam', 'depth': 'standard', 'prerequisites': [{'topic': 'Calculus', 'level': 'expert'}]})
-            profile = {'goal': 'Pass the final', 'depth': 'rigorous', 'prerequisites': [{'topic': 'Fourier transforms', 'level': 'none'}], 'focus': 'Exam problems'}
-            self.assertEqual(call_cli(self, tmp, 'course.profile.save', profile=profile)['profile'], profile)
+            profile = {'goal': 'Pass the final', 'depth': 'rigorous', 'focus': 'Exam problems',
+                       'prerequisites': [{'topic': 'Fourier transforms', 'level': 'none'},
+                                         {'topic': 'Eigenvalues', 'level': 'some', 'check': 'Found eigenvalues of a 2x2 matrix; unsure about diagonalizing'}]}
+            blank = {**profile, 'notes': ' ', 'prerequisites': [{**p, 'check': ''} if p['level'] == 'none' else p for p in profile['prerequisites']]}
+            self.assertEqual(call_cli(self, tmp, 'course.profile.save', profile=blank)['profile'], profile)
             self.assertEqual(call_cli(self, tmp, 'course.status')['profile'], profile)
             execute(tmp, {'op': 'curriculum.save', 'concepts': [{'id': 'a', 'title': 'States'}], 'route': ['a'], 'coverage': []})
             turn = execute(tmp, {'op': 'stream.start', 'id': 'l1', 'channel': 'mainline', 'concept_id': 'a', 'prompt': 'Teach'})['turn']
-            prompt = base(turn)
+            prompt = instructions(turn)  # the profile is stable course data
             self.assertIn('Fourier transforms', prompt)
+            self.assertIn('unsure about diagonalizing', prompt)
             self.assertIn('learner_profile', prompt)

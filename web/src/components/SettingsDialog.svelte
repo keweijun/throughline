@@ -17,9 +17,14 @@
   let message = $state<MessageKey | null>(null);
   let busy = $state(false);
   let savingLanguage = $state(false);
+  let dailyReviews = $state(5);
+  let savingReviews = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
+  const confirmedPreferences = $derived(
+    app.state?.memory.filter((entry) => entry.kind === 'preference' && entry.status === 'confirmed').length ?? 0,
+  );
   // The tier Codex calls Fast for the chosen teacher model (or the Codex default model).
   const fastTier = $derived.by(() => {
     const chosen = models?.find((m) => (model ? m.id === model : m.default));
@@ -81,6 +86,7 @@
       void loadModels();
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
+      dailyReviews = app.state?.preferences.daily_reviews ?? 5;
       message = null;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
@@ -92,6 +98,23 @@
     await app.setLanguage(select.value as Language);
     select.value = locale.language;
     savingLanguage = false;
+  }
+
+  async function changeDailyReviews() {
+    const saved = app.state?.preferences.daily_reviews ?? 5;
+    if (!Number.isInteger(dailyReviews) || dailyReviews < 1 || dailyReviews > 20) {
+      dailyReviews = saved;
+      return;
+    }
+    if (dailyReviews === saved) return;
+    savingReviews = true;
+    dailyReviews = (await app.savePreferences({ daily_reviews: dailyReviews }))?.daily_reviews ?? saved;
+    savingReviews = false;
+  }
+
+  function openMemory() {
+    app.settingsOpen = false;
+    app.openPanel('memory');
   }
 
   function changeTheme() {
@@ -131,11 +154,11 @@
     <button class="btn btn-quiet btn-small" onclick={() => (app.settingsOpen = false)}>{t("Close")}</button>
   </header>
 
-  <section aria-labelledby="language-title">
-    <h3 id="language-title">{t("Language")}</h3>
+  <section aria-labelledby="course-title">
+    <h3 id="course-title">{t(app.state ? "Course" : "Language")}</h3>
     <label class="field">
-      <span class="visually-hidden">{t("Language")}</span>
-      <select aria-label={t("Language")} value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
+      <span class:visually-hidden={!app.state}>{t("Language")}</span>
+      <select value={locale.language} onchange={changeLanguage} disabled={savingLanguage}>
         <option value="en">English</option>
         <option value="zh-CN">简体中文</option>
       </select>
@@ -145,60 +168,57 @@
         ? t("For this course: the interface and new teaching content. Sources and saved lessons keep their language.")
         : t("For this page. Each course keeps its own language once it is open.")}
     </p>
-  </section>
-
-  <section aria-labelledby="theme-title">
-    <h3 id="theme-title">{t("Appearance")}</h3>
-    <label class="field">
-      <span class="visually-hidden">{t("Appearance")}</span>
-      <select aria-label={t("Appearance")} bind:value={theme} onchange={changeTheme}>
-        <option value="system">{t("Match the system")}</option>
-        <option value="light">{t("Light")}</option>
-        <option value="dark">{t("Dark")}</option>
-      </select>
-    </label>
+    {#if app.state}
+      <label class="field">
+        <span>{t("Daily reviews")}</span>
+        <input
+          class="count"
+          type="number"
+          min="1"
+          max="20"
+          step="1"
+          bind:value={dailyReviews}
+          onchange={changeDailyReviews}
+          disabled={savingReviews}
+        />
+      </label>
+      <p class="note">{t("At most this many sections come up for review each day; the rest wait for later days.")}</p>
+      <div class="field">
+        <span>{t("Teaching preferences")}</span>
+        <div class="row">
+          <span>{confirmedPreferences ? t("{count} confirmed", { count: confirmedPreferences }) : t("None yet")}</span>
+          <button type="button" class="btn btn-quiet btn-small" onclick={openMemory}>{t("Open course memory")}</button>
+        </div>
+      </div>
+      <p class="note">{t("Tell the teacher how you like to be taught; it asks before remembering it.")}</p>
+    {/if}
   </section>
 
   <section aria-labelledby="teacher-title">
     <h3 id="teacher-title">{t("Teacher")}</h3>
     {#if settings}
       <form onsubmit={save}>
-        <p class="note">{t("Lessons are taught by the Codex CLI on this computer, using your existing Codex sign-in. Text already written stays as it is.")}</p>
-        {#if models}
-          <label class="field">
-            <span>{t("Model")}</span>
+        <p class="note">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
+        <label class="field">
+          <span>{t("Model")}</span>
+          {#if models}
             <select bind:value={model}>
               <option value="">{t("Codex default")}</option>
               {#each choices(model) as option (option.id)}
                 <option value={option.id} title={option.description}>{option.name}</option>
               {/each}
             </select>
-          </label>
-          <label class="field">
-            <span>{t("Small model")}</span>
-            <select bind:value={smallModel}>
-              <option value="">{t("Same as the teacher model")}</option>
-              {#each choices(smallModel) as option (option.id)}
-                <option value={option.id} title={option.description}>{option.name}</option>
-              {/each}
-            </select>
-          </label>
-        {:else}
-          <label class="field">
-            <span>{t("Model")}</span>
+          {:else}
             <input type="text" bind:value={model} placeholder={t("Leave empty for your Codex default")} autocomplete="off" />
-          </label>
-          <label class="field">
-            <span>{t("Small model")}</span>
-            <input type="text" bind:value={smallModel} placeholder={t("Leave empty to use the teacher model")} autocomplete="off" />
-          </label>
+          {/if}
+        </label>
+        {#if !models}
           {#if modelsError}
             <p class="note">{t("Could not load models from Codex:")} {modelsError}</p>
           {:else}
             <p class="note" role="status">{t("Loading models from Codex…")}</p>
           {/if}
         {/if}
-        <p class="note">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
         <label class="field">
           <span>{t("Reasoning effort")}</span>
           <select bind:value={effort}>
@@ -206,16 +226,6 @@
               <option value={option.id}>{t(option.label)}</option>
             {/each}
           </select>
-        </label>
-        <label class="field">
-          <span>{t("Small model reasoning effort")}</span>
-          <select bind:value={smallEffort}>
-            <option value="">{t("Same as the teacher")}</option>
-            {#each smallEfforts as option (option.id)}
-              <option value={option.id}>{t(option.label)}</option>
-            {/each}
-          </select>
-
         </label>
         {#if fastId}
           <label class="check">
@@ -230,6 +240,35 @@
             {fastTier?.description ? `${fastTier.description}. ` : ''}{t("Applies to lessons, answers and feedback; background preparation keeps the standard speed.")}
           </p>
         {/if}
+        <!-- A saved small model or effort keeps the fold open, so a choice in effect is never hidden. -->
+        <details open={!!(settings.small_model || settings.small_effort)}>
+          <summary>{t("Advanced")}</summary>
+          <div class="advanced">
+            <p class="note">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
+            <label class="field">
+              <span>{t("Small model")}</span>
+              {#if models}
+                <select bind:value={smallModel}>
+                  <option value="">{t("Same as the teacher model")}</option>
+                  {#each choices(smallModel) as option (option.id)}
+                    <option value={option.id} title={option.description}>{option.name}</option>
+                  {/each}
+                </select>
+              {:else}
+                <input type="text" bind:value={smallModel} placeholder={t("Leave empty to use the teacher model")} autocomplete="off" />
+              {/if}
+            </label>
+            <label class="field">
+              <span>{t("Small model reasoning effort")}</span>
+              <select bind:value={smallEffort}>
+                <option value="">{t("Same as the teacher")}</option>
+                {#each smallEfforts as option (option.id)}
+                  <option value={option.id}>{t(option.label)}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+        </details>
         <div class="row">
           <button class="btn btn-primary" type="submit" disabled={busy}>{t("Save")}</button>
           {#if message}<span class="message" role="status">{t(message)}</span>{/if}
@@ -240,6 +279,18 @@
         <p class="note">{t("Saved for your user account in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
       </form>
     {/if}
+  </section>
+
+  <section aria-labelledby="theme-title">
+    <h3 id="theme-title">{t("Appearance")}</h3>
+    <label class="field">
+      <span class="visually-hidden">{t("Appearance")}</span>
+      <select aria-label={t("Appearance")} bind:value={theme} onchange={changeTheme}>
+        <option value="system">{t("Match the system")}</option>
+        <option value="light">{t("Light")}</option>
+        <option value="dark">{t("Dark")}</option>
+      </select>
+    </label>
   </section>
 </dialog>
 
@@ -308,6 +359,22 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .count {
+    width: 5rem;
+  }
+
+  summary {
+    cursor: pointer;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .advanced {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 0.75rem;
   }
 
   .message {

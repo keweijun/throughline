@@ -3,7 +3,7 @@ import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -209,6 +209,18 @@ class AppStore {
 
   hasLesson(conceptId: string | null) {
     return this.lessons(conceptId).some((t) => t.status === 'completed' || t.status === 'running');
+  }
+
+  /** Whether the section's lesson is finished: one completed, none being written, and no planned step left to teach. */
+  studied(conceptId: string | null) {
+    const lessons = this.lessons(conceptId);
+    return lessons.some((t) => t.status === 'completed') && !lessons.some((t) => t.status === 'running') && !this.openLesson(conceptId);
+  }
+
+  /** How far an unfinished stepped lesson has come: the steps taught so far, of those planned now. */
+  stepProgress(conceptId: string | null) {
+    const lesson = this.openLesson(conceptId);
+    return lesson ? { number: lesson.steps.filter((s) => s.turn_id).length, total: lesson.steps.length } : null;
   }
 
   get runningLesson() {
@@ -688,6 +700,11 @@ class AppStore {
     return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/skip`, { request_id: newId() }));
   }
 
+  /** Study a later section now; the unstudied sections passed over stay on the route as skipped (ADR 0006). */
+  jumpTo(conceptId: string) {
+    return this.#move(() => api.post('/api/sections/jump', { concept_id: conceptId, request_id: newId() }));
+  }
+
   studySkipped(conceptId: string) {
     return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId() }));
   }
@@ -713,12 +730,18 @@ class AppStore {
       locale.language = rememberLanguage(language) ?? language;
       return;
     }
-    const result = await this.act(() => api.put<{ preferences: { language: Language } }>('/api/preferences', { language }));
+    const result = await this.savePreferences({ language });
     if (result) {
-      locale.language = result.preferences.language;
+      locale.language = result.language;
       rememberLanguage(locale.language);
-      if (this.state) this.state.preferences = result.preferences;
     }
+  }
+
+  /** Saves some of the course's preferences; the others keep their value. */
+  async savePreferences(changes: Partial<Preferences>) {
+    const result = await this.act(() => api.put<{ preferences: Preferences }>('/api/preferences', changes));
+    if (result && this.state) this.state.preferences = result.preferences;
+    return result?.preferences ?? null;
   }
 
   pause(turnId: string) {

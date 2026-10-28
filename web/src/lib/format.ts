@@ -14,7 +14,7 @@ export const lessonStatus: Record<TurnStatus, { label: MessageKey; tone: Tone }>
 };
 
 export const verification = (value: string | undefined): { label: MessageKey; tone: Tone } =>
-  value === 'verified' ? { label: 'Verified', tone: 'good' } : { label: 'Pending verification', tone: 'caution' };
+  value === 'verified' ? { label: 'Checked', tone: 'good' } : { label: 'Not checked yet', tone: 'caution' };
 
 export const helpLabels: Record<PracticeAction, MessageKey> = {
   hint: 'Hint',
@@ -33,18 +33,6 @@ const evidenceLabels: Record<EvidenceKind, MessageKey> = {
 
 /** The learner-facing name of an evidence kind; an unknown kind from a newer host shows as is. */
 export const evidenceLabel = (kind: string) => (Object.hasOwn(evidenceLabels, kind) ? t(evidenceLabels[kind as EvidenceKind]) : kind);
-
-/** How the teacher placed a side question on the route. */
-const questionCategories: Record<string, MessageKey> = {
-  local: 'about this passage',
-  prerequisite: 'a missing foundation',
-  future: 'covered fully later',
-  repeated: 'a repeated difficulty',
-  extension: 'an extension',
-};
-
-export const questionCategory = (category: string) =>
-  Object.hasOwn(questionCategories, category) ? t(questionCategories[category]) : category;
 
 /** Each part's status after the latest assessment; an assessment from before parts gave its one part's status (ADR 0011). */
 export const partStatuses = (task: Task): PartStatus[] => {

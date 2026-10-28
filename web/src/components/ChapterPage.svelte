@@ -22,7 +22,10 @@
   function stateOf(id: string) {
     if (id === app.currentId) return { label: t("You are here"), tone: 'accent' };
     if (app.isSkipped(id)) return { label: t("Skipped"), tone: 'caution' };
-    if (app.hasLesson(id)) return { label: t("Studied"), tone: 'good' };
+    if (app.studied(id)) return { label: t("Studied"), tone: 'good' };
+    if (app.hasLesson(id)) return { label: t("In progress"), tone: 'plain' };
+    // The same word the route uses for a lesson written ahead in the background.
+    if ((app.state?.preparation.jobs ?? []).some((j) => j.concept_id === id && j.status === 'ready')) return { label: t("Lesson ready"), tone: 'plain' };
     return { label: t("Not started"), tone: 'plain' };
   }
 
@@ -110,14 +113,14 @@
       <section class="coverage" aria-labelledby="coverage-title">
         <h2 id="coverage-title">{t("Source coverage")}</h2>
         <p>
-          {t("Linked source locations: {linked}, of which checked against the original: {verified}.", coverage)}
+          {t("{verified} of {linked} linked source locations checked against the original.", coverage)}
           {#if coverage.deferred}{t("Set aside for later: {count}.", { count: coverage.deferred })}{/if}
-          {#if coverage.review}<strong>{t("Still to review: {count}.", { count: coverage.review })}</strong>{/if}
+          {#if coverage.review}<strong>{t("Still to check: {count}.", { count: coverage.review })}</strong>{/if}
         </p>
         <p class="note">{t("From the course plan. A linked location is not a promise that every formula on it was taught.")}</p>
         {#if coverage.review && course}
           <CodexLink prompt={t('$throughline review the pages that still need review in the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })}>
-            {t("Review this chapter's locations in Codex")}
+            {t("Check this chapter's source locations in Codex")}
           </CodexLink>
         {/if}
       </section>

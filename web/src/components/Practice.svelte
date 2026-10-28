@@ -2,7 +2,7 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { open } from '../lib/format';
+  import { open, solved } from '../lib/format';
   import Exercise from './Exercise.svelte';
 
   let { conceptId, isCurrent }: { conceptId: string; isCurrent: boolean } = $props();
@@ -12,6 +12,18 @@
   const practice = $derived(app.state?.practice ?? { tasks: [], jobs: [] });
   // The chapter quiz anchored to a last section is listed on the chapter page, not here.
   const tasks = $derived(app.tasks(conceptId));
+  // One line says where the section's practice stands, so the cards need not be read to find out.
+  const tally = $derived.by(() => {
+    const counted = tasks.filter((t) => t.status !== 'skipped');
+    const again = counted.filter((t) => !solved(t) && t.history.some((h) => h.action === 'assess')).length;
+    return { solved: counted.filter(solved).length, total: counted.length, again };
+  });
+  const standing = $derived(
+    [
+      t("{solved} of {total} solved", tally),
+      ...(tally.again ? [tally.again === 1 ? t("1 needs another try") : t("{count} need another try", { count: tally.again })] : []),
+    ].join(' · '),
+  );
   const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !t.chapter_id && open(t)) : []);
   const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && app.isRunning(j.id)));
 
@@ -23,7 +35,8 @@
       return turn && turn.status !== 'running' && turn.status !== 'completed';
     }),
   );
-  const hasLesson = $derived(app.hasLesson(conceptId));
+  // Exercises come after the lesson: a stepped lesson offers them once its last step is taught.
+  const studied = $derived(app.studied(conceptId));
 
   async function generate() {
     busy = true;
@@ -32,11 +45,13 @@
   }
 </script>
 
-{#if tasks.length || earlier.length || generating || (isCurrent && hasLesson)}
+{#if tasks.length || earlier.length || generating || (isCurrent && studied)}
   <section class="practice" id="practice" aria-labelledby="practice-title">
     <header>
       <h2 id="practice-title">{t("Practice")}</h2>
-      <p>{t("Answers you give on your own, with hints, or after seeing a solution are recorded separately. Practice is optional before moving on.")}</p>
+      <p>
+        {#if tally.total}<strong class="tally">{standing}</strong>{' · '}{/if}{t("Practice is optional before moving on.")}
+      </p>
     </header>
 
     {#if generating}
@@ -86,6 +101,11 @@
     margin-top: 0.35rem;
     color: var(--pencil);
     font-size: var(--step-0);
+  }
+
+  .tally {
+    color: var(--ink-soft);
+    font-weight: 600;
   }
 
   .earlier-tasks { display: grid; gap: 1rem; margin-top: 1rem; }

@@ -36,42 +36,72 @@ def welcome(root, launcher, language):
     if language == 'zh-CN':
         return f"""## 欢迎使用贯学（Throughline）
 
-贯学把你自己的 PDF、Markdown 笔记和习题集变成有引导的课程：分节讲解、针对任意段落提问、讲解旁边就是原文页面，还有练习。讲课由 Codex 在后台完成，学习时不需要打开 Codex。
+贯学把你自己的 PDF、Markdown 笔记和习题集变成一门有引导的课程，并在浏览器中讲授。讲课由 Codex 在后台完成，学习时不需要打开 Codex。
 
-**在 Codex 里用 `$throughline`**
-在任意 Codex 对话中以 `$throughline` 开头，就能创建或修改课程，例如：
+**学习是什么样的**
+- **学习路线**：材料被整理成章和节，每节回答一个核心问题，先修内容排在前面，多份文件按同一条主线讲。
+- **分步讲解**：每次讲一小步，可能附一道快速检查题；讲解旁边就是引用的原文页面。
+- **随时提问**：选中任意段落即可提问，回答完回到原来的位置。
+- **练习**：优先使用你自己的习题，按小问逐一批改；太简单或不相关的题可以跳过。
+- **复习**：学过的小节会按逐渐拉长的间隔出现复习题，每章还有可选的章节小测。
+- **记住你**：高亮、笔记和书签随课程保存；老师会记住你的学习偏好、已讲过的术语和反复出错的地方，你可以查看和修改。
+
+**在 Codex 里用 `$throughline` 建课**
+在任意 Codex 对话中以 `$throughline` 开头，例如：
 - `$throughline 用这些文件建一门课`（再附上文件，或写出它们所在的文件夹）
+- `$throughline 用 ~/Documents/量子力学 建一门课，1 月 15 日期末考试`
 - `$throughline 把这份习题加入 quantum`
 - `$throughline 打开 quantum`
 
-建课时，Codex 会先问几个问题（目标和截止时间、先修知识掌握情况、希望讲多细），再给出学习路线，说明哪些内容还需核对，然后在贯学中打开课程。
+**建课时 Codex 会做什么**
+Codex 先读你的文件，告诉你它看到了什么，然后问几个问题，每个问题都给出选项并标出推荐：你的目标和截止时间、各项先修知识掌握得怎样（可以做几道快速检查题来确认）、希望讲多细、哪些内容要侧重或跳过、你喜欢怎样学习。回一个词就行；回“好”表示都按推荐，回“直接建”就跳过剩下的问题。之后它给出学习路线供你调整，建好后在贯学中打开课程，并说明哪些页面还需核对。
+
+**准备什么材料**
+- 文字可选中的 PDF 或 Markdown 笔记效果最好；扫描页也能用，但会标记为待核对。
+- 有习题集和答案的话一起带上，练习会用到它们。
+- 不必一次带齐，之后随时可以加文件。
 
 **文件在哪里**
 贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
 
 **之后怎么学习**
-{hint}。课程库会列出所有课程，“在 Codex 中…”按钮会打开一段已经写好请求的 Codex 对话。界面顶部可以在 English 和简体中文之间切换。
+{hint}。课程库会列出所有课程，“在 Codex 中…”按钮会打开一段已经写好请求的 Codex 对话。界面顶部可以在 English 和简体中文之间切换。想更新贯学时，对 Codex 说 `Update https://github.com/keweijun/throughline`，课程会保留。
 
-想现在就建第一门课吗？在这里输入 `$throughline`，附上你的文件即可。"""
+想现在就建第一门课吗？在这里输入 `$throughline`，附上你的文件，说一句你想学到什么程度。"""
     return f"""## Welcome to Throughline
 
-Throughline turns your own PDFs, Markdown notes and problem sets into a guided course: lessons section by section, questions about any passage, the original page beside each explanation, and practice. Codex teaches in the background, so you don't need Codex open to study.
+Throughline turns your own PDFs, Markdown notes and problem sets into a guided course and teaches it in your browser. Codex teaches in the background, so you don't need Codex open to study.
 
-**Use `$throughline` in Codex**
-Start any Codex chat with `$throughline` to create or change a course, for example:
+**What studying looks like**
+- **A route** through your materials: chapters and sections, each answering one core question, prerequisites first, one line of teaching across all your files.
+- **Lessons in short steps**, sometimes with a quick check question, and the cited page of your source beside each explanation.
+- **Questions about any passage**: select it and ask, then pick up where you were.
+- **Practice** from your own problem sets where you have them, marked part by part; skip what is too easy or off topic.
+- **Reviews** of sections you've passed at growing intervals, and an optional quiz for each chapter.
+- **It remembers**: your highlights, notes and bookmarks, and a course memory of how you like to learn, the terms already explained and what keeps tripping you up, which you can see and edit.
+
+**Build a course in Codex with `$throughline`**
+Start any Codex chat with `$throughline`, for example:
 - `$throughline make a course from these files` (then attach them, or name the folder they're in)
+- `$throughline make a course from ~/Documents/quantum for my final on 15 January`
 - `$throughline add this problem set to quantum`
 - `$throughline open quantum`
 
-When building a course, Codex first asks a few questions (your goal and deadline, how well you know the prerequisites, how much detail you want), then proposes a route, says what still needs checking, and opens the course in Throughline.
+**What Codex does while building**
+Codex reads your files first and tells you what it found. Then it asks a few questions, each with options and a recommendation: your goal and deadline, how well you know each prerequisite (with an optional quick check), how much detail you want, what to emphasize or skip, and how you like to learn. Answer in a word, reply "ok" to take the recommendations, or "just build it" to skip the rest. It then proposes a route for you to adjust, builds it, opens the course in Throughline and says which pages still need checking.
+
+**What to bring**
+- PDFs with selectable text, or Markdown notes, work best; scanned pages work too but are flagged for review.
+- Problem sets, and their solutions if you have them: practice draws on them.
+- You don't need everything now; you can add files to a course later.
 
 **Where things are**
 Your Throughline folder: `{root}`. Each course is a folder inside it.
 
 **Study afterwards**
-To open Throughline, {hint}. The library lists every course; its "in Codex" buttons open a Codex chat with the request already written. Switch between English and Simplified Chinese at the top.
+To open Throughline, {hint}. The library lists every course; its "in Codex" buttons open a Codex chat with the request already written. Switch between English and Simplified Chinese at the top. To update Throughline, tell Codex `Update https://github.com/keweijun/throughline`; your courses are kept.
 
-Want to build your first course now? Type `$throughline` here and attach your files."""
+Want to build your first course now? Type `$throughline` here, attach your files and say in a sentence what you want to learn."""
 
 
 LIBRARY_AGENTS = LIBRARY_MARKER + '''
@@ -90,9 +120,9 @@ New learners often start with a bare request such as "help me create my first co
 
 1. Throughline turns their own documents (PDFs, Markdown notes, problem sets) into a guided course; Codex builds it here, and they study it in the Throughline app.
 2. To create a course, attach the files to this chat or give the folder they are in, and say in a sentence what they want to learn (for example "quantum mechanics up to perturbation theory, for my exam").
-3. Codex asks a few quick questions (goal and deadline, how well they know each prerequisite, how much detail they want), proposes a course name and route that fit the answers, shows what still needs checking, and opens the course in the app.
+3. Codex reads the files and says what it found, then asks a few quick questions with options and a recommendation (goal and deadline, how well they know each prerequisite, with an optional quick check, how much detail, what to emphasize or skip, how they like to learn); "ok" takes the recommendations. It proposes a course name and route that fit the answers, shows what still needs checking, and opens the course in the app.
 
-Then wait for the files and the goal. Do not start building until both are clear.
+If they are unsure what to learn, suggest goals that fit their files. Then wait for the files and the goal before building, and follow the `$throughline` skill's intake once both are clear.
 '''
 COMMANDS = ('setup', 'open', 'stop', 'courses')
 

@@ -102,3 +102,9 @@ _Avoid_: Glossary of the materials, coverage ledger.
 
 **Difficulty**: An idea the learner has repeatedly got wrong, recorded in course memory until a later check question or exercise on it is answered correctly.
 _Avoid_: Needs-work assessment (one result), misconception label, weakness score.
+
+**Teaching widget**: Part of a lesson's Markdown that the interface draws: LaTeX, highlighted code, a callout or a Mermaid diagram (the basics, always available), or an add-on (ADR 0013).
+_Avoid_: Plugin, interactive simulation, embed.
+
+**Add-on**: A teaching widget for particular subjects, such as function plots or chemical equations, from the library in this repository. Codex selects a course's add-ons; only their guides enter the teacher's instructions, while the interface draws every add-on in every course. Learners never see or manage them.
+_Avoid_: Plugin (third-party code), a Settings toggle, the basic widgets.

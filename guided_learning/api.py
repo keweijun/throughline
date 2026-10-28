@@ -4,14 +4,15 @@ from . import migrations
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
-MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons')
+MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons', 'widgets')
 
 # Operations that only read run without the write lock, beside a writer. One that writes after all is run again as a write.
 READS = {'annotations.list', 'background.view', 'branch.list', 'branch.read', 'chapter_build.list', 'course.status',
          'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage', 'curriculum.view',
          'deferred.list', 'evidence.unresolved', 'evidence.view', 'interaction.read', 'lesson.list', 'lesson.read',
          'memory.consolidations', 'memory.prompt', 'memory.view', 'practice.list', 'preferences.view', 'review.schedule',
-         'session.resume', 'source.read', 'source.units', 'stream.list', 'stream.read', 'stream.summaries'}
+         'session.resume', 'source.read', 'source.units', 'stream.list', 'stream.read', 'stream.summaries',
+         'widgets.list'}
 
 
 class _NeedsWrite(Exception):

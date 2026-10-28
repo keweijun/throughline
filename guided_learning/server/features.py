@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .. import lessons
 from .. import practice
+from .. import review
 from ..store import OperationError
 from .. import memory
 from ..streaming import BACKGROUND, PREPARED_STEP
@@ -713,9 +714,9 @@ class Practice(Feature):
         return result
 
     def skipped(self):
-        """Sections the learner skipped with their chapter and has not studied since."""
+        """Sections the learner skipped, with their chapter or by jumping past them, and has not studied since."""
         deferred = self.operation({'op': 'evidence.unresolved'})['deferred']
-        return [d for d in deferred if d['id'].startswith('chapter-skip:')]
+        return [d for d in deferred if d['id'].startswith(review.SKIP_PREFIXES)]
 
     def skip_chapter(self, chapter_id, request_id):
         """Move on to the next chapter; the skipped sections stay on the route as deferred."""
@@ -734,6 +735,34 @@ class Practice(Feature):
                 self.operation({'op': 'evidence.defer', 'id': f'chapter-skip:{chapter_id}:{cid}', 'concept_id': cid,
                                 'reason': 'Learner skipped the chapter', 'section_id': chapter_id, 'target_concept_id': target})
             return self._enter(target, request_id)
+
+    def jump(self, concept_id, request_id):
+        """Study a later section now. The sections passed over that have no finished lesson, the current one included, stay on
+        the route as skipped, like a skipped chapter's, deferred to the section jumped to (ADR 0006)."""
+        with self.host.lock:
+            position = self._guard_mainline()
+            model = self.operation({'op': 'curriculum.view'})
+            route = model['route']
+            current = position.get('concept_id') or next(iter(route), None)
+            if concept_id not in route:
+                raise OperationError('unknown_concept', 'That section is not on the route')
+            start, end = route.index(current), route.index(concept_id)
+            if end <= start:
+                # A retried jump finds the position already moved; any other earlier section is studied out of order
+                # only once skipped.
+                if concept_id == current:
+                    return self._enter(concept_id, request_id)
+                raise OperationError('not_ahead', 'Only a later section can be jumped to')
+            studied = {t['concept_id'] for t in self.host.brief_turns()
+                       if t['channel'] == 'mainline' and t['status'] == 'completed' and not t.get('chapter_id')}
+            chapters = {cid: c['id'] for c in model['chapters'] for cid in c['concept_ids']}
+            for cid in route[start:end]:
+                if cid in studied:
+                    continue
+                self.operation({'op': 'evidence.defer', 'id': f'route-skip:{request_id}:{cid}', 'concept_id': cid,
+                                'reason': 'Learner jumped to a later section', 'section_id': chapters.get(cid, cid),
+                                'target_concept_id': concept_id})
+            return self._enter(concept_id, request_id)
 
     def enter_skipped(self, concept_id, request_id):
         with self.host.lock:

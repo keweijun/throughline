@@ -55,6 +55,24 @@
     return last ? t("Review this section. It is the last one on the route.") : t("Enter the next section when you are ready.");
   });
 
+  // Jumping ahead marks the sections passed over that have no finished lesson as skipped, the current one included,
+  // exactly as the host does; a prerequisite not studied yet is named so the learner chooses knowingly.
+  function jump() {
+    const route = app.state?.curriculum.route ?? [];
+    const finished = (id: string) => app.lessons(id).some((l) => l.status === 'completed');
+    const passed = route.slice(app.routeIndex(app.currentId), index).filter((id) => !finished(id));
+    const missing = (concept?.prerequisites ?? []).filter((id) => !finished(id)).map((id) => app.concept(id)?.title ?? id);
+    const parts = [
+      ...(missing.length ? [t("{section} builds on {titles}, which you have not studied yet.", { section: concept!.title, titles: missing.join(', ') })] : []),
+      ...(passed.length
+        ? [t("Study it now? These sections will be marked skipped: {titles}. They stay on the route, and you can study them at any time.", {
+            titles: passed.map((id) => app.concept(id)?.title ?? id).join(', '),
+          })]
+        : []),
+    ];
+    if (!parts.length || confirm(parts.join(' '))) void app.jumpTo(conceptId!);
+  }
+
   function openQuestion(id: string) {
     app.focusThread = id.replace(/^web:/, '');
     app.openPanel('questions');
@@ -212,16 +230,21 @@
       </div>
     {:else if !isCurrent}
       {@const ahead = index - app.routeIndex(app.currentId)}
-      <!-- The route is studied in order (ADR 0006), so a later section says how far off it is; the note above leads back. -->
+      <!-- A later section says how far off it is and can be studied now, skipping the ones before it (ADR 0006). -->
       <div class="ahead">
         <p>
-          {#if ahead > 1}{t("No lesson yet. You'll reach this section after {count} more on the route.", { count: ahead - 1 })}
-          {:else if ahead === 1}{t("No lesson yet. This is the next section after the one you're on.")}
+          {#if ahead > 1}{t("No lesson yet. {count} sections come before it, starting with the one you're on.", { count: ahead })}
+          {:else if ahead === 1}{t("No lesson yet. It comes right after the section you're on.")}
           {:else}{t("No lesson yet.")}{/if}
         </p>
-        {#if chapter && chapter.id !== app.chapterOf(app.currentId)?.id}
-          <button class="btn btn-small" onclick={() => app.viewChapter(chapter.id)}>{t("Open its chapter")}</button>
-        {/if}
+        <div class="previewing-actions">
+          {#if ahead > 0 && !skipped}
+            <button class="btn btn-small btn-primary" onclick={jump}>{t("Study this section now")}</button>
+          {/if}
+          {#if chapter && chapter.id !== app.chapterOf(app.currentId)?.id}
+            <button class="btn btn-small" onclick={() => app.viewChapter(chapter.id)}>{t("Open its chapter")}</button>
+          {/if}
+        </div>
       </div>
     {/if}
 

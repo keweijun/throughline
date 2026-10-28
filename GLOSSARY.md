@@ -64,7 +64,7 @@ _Avoid_: Revision of the course plan, reviewing source locations in Codex, a tes
 **Retrieval question**: A question answered from memory that asks the learner to recall a key idea and apply it to a new situation, without new material or hints. A review asks one; a chapter quiz adds two or three new ones to the earlier exercises it asks again.
 _Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks earlier exercises again as such, not as new questions).
 
-**Skipped section**: A section deferred when the learner skipped the rest of its chapter; it stays on the route until a lesson there is studied.
+**Skipped section**: A section deferred when the learner skipped the rest of its chapter or jumped past it to a later section; it stays on the route until a lesson there is studied.
 _Avoid_: Excluded, completed, mastered.
 
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening. The view never edits a course; changes happen in Codex.

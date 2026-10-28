@@ -83,3 +83,30 @@ test('skipping a chapter marks its sections and lets the learner study them late
   await expect(page.getByText("You're previewing this section")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('a later section can be studied now, and the unstudied sections before it stay on the route as skipped', async ({ page, course }) => {
+  const { base, errors } = await course('chapters_browser_fixture');
+  await page.locator('#route').getByRole('button', { name: /Chapter 2 · Measurement/ }).click();
+  await page.locator('#route').getByRole('button', { name: /Possible outcomes/ }).click();
+  await expect(page.locator('.ahead')).toContainText("2 sections come before it, starting with the one you're on.");
+
+  let message = '';
+  page.once('dialog', (dialog) => ((message = dialog.message()), dialog.accept()));
+  // The move lands on the new section once the host replies, so wait for that before looking elsewhere.
+  const jumped = page.waitForResponse('**/api/sections/jump');
+  await page.getByRole('button', { name: 'Study this section now' }).click();
+  await jumped;
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
+  expect(message).toContain('Possible outcomes builds on Superposition, which you have not studied yet.');
+  expect(message).toContain('These sections will be marked skipped: What a state represents, Superposition.');
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+  // The chapter left behind folds in the route; opening it shows its sections marked skipped.
+  await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
+  await expect(page.locator('#route').getByRole('button', { name: /What a state represents/ })).toContainText('Skipped');
+  await expect(page.locator('#route').getByRole('button', { name: /Superposition/ })).toContainText('Skipped');
+
+  const state = await (await page.request.get(base + '/api/state')).json();
+  expect(state.position.concept_id).toBe('outcomes');
+  expect(state.skipped.map((s: { concept_id: string }) => s.concept_id).sort()).toEqual(['state', 'superposition']);
+  expect(errors).toEqual([]);
+});

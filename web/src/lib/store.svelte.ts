@@ -700,6 +700,11 @@ class AppStore {
     return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/skip`, { request_id: newId() }));
   }
 
+  /** Study a later section now; the unstudied sections passed over stay on the route as skipped (ADR 0006). */
+  jumpTo(conceptId: string) {
+    return this.#move(() => api.post('/api/sections/jump', { concept_id: conceptId, request_id: newId() }));
+  }
+
   studySkipped(conceptId: string) {
     return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId() }));
   }

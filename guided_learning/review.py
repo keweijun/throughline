@@ -77,9 +77,13 @@ def section_states(events):
     return states
 
 
+# A section is skipped by skipping the rest of its chapter or by jumping past it to a later section (ADR 0006).
+SKIP_PREFIXES = ('chapter-skip:', 'route-skip:')
+
+
 def skipped(store):
     resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
-    return {d['concept_id'] for d in store.list('evidence_deferred') if d['id'].startswith('chapter-skip:') and d['id'] not in resolved}
+    return {d['concept_id'] for d in store.list('evidence_deferred') if d['id'].startswith(SKIP_PREFIXES) and d['id'] not in resolved}
 
 
 def open_reviews(store):

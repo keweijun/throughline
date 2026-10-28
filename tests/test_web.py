@@ -154,6 +154,9 @@ class WebLearning(unittest.TestCase):
                 small = host.settings.runner(small=True)
                 self.assertEqual((small.model, small.effort), ('gpt-6.1-sol', 'high'))
                 self.assertEqual(client.put('/api/settings', json={'effort': 'extreme'}).status_code, 409)
+                for effort in ('xhigh', 'max', 'ultra'):
+                    saved = client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'effort': effort, 'small_effort': effort})
+                    self.assertEqual((saved.json()['effort'], saved.json()['small_effort']), (effort, effort))
                 self.assertEqual(client.put('/api/settings', json={'small_effort': 'extreme'}).status_code, 409)
                 self.assertEqual(client.put('/api/settings', json={'base_url': 'https://x'}).status_code, 400)
 

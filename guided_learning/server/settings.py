@@ -7,7 +7,8 @@ from pathlib import Path
 from ..codex import CodexRunner, list_models
 from ..store import OperationError
 
-EFFORTS = ('minimal', 'low', 'medium', 'high')
+# Every reasoning effort Codex knows, lowest first; each model offers its own subset (`model/list`).
+EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra')
 
 
 def default_path():
@@ -22,7 +23,7 @@ def _clean(model, effort, small_model='', service_tier='', small_effort=''):
     model, effort = str(model or '').strip(), str(effort or 'medium').strip()
     small_effort = str(small_effort or '').strip()
     if effort not in EFFORTS or small_effort not in ('', *EFFORTS):
-        raise OperationError('invalid_settings', 'Reasoning effort must be minimal, low, medium or high')
+        raise OperationError('invalid_settings', f"Reasoning effort must be one of {', '.join(EFFORTS)}")
     return {'model': model, 'small_model': str(small_model or '').strip(), 'effort': effort,
             'small_effort': small_effort, 'service_tier': str(service_tier or '').strip()}
 

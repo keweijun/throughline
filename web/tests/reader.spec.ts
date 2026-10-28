@@ -138,7 +138,7 @@ test('teacher settings save the Codex model and effort as they change', async ({
   await expect(page.getByText('Codex CLI not found')).toBeVisible();
   await page.getByRole('textbox', { name: 'Model', exact: true }).fill('gpt-6.1-sol');
   await page.getByRole('textbox', { name: 'Model', exact: true }).press('Tab');
-  await page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio', { name: 'High' }).check();
+  await page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio', { name: 'High', exact: true }).check();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await expect.poll(async () => {
     const settings = await (await page.request.get(base + '/api/settings')).json();
@@ -148,6 +148,20 @@ test('teacher settings save the Codex model and effort as they change', async ({
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   // The dialog reopens on the category last shown.
   await expect(page.getByRole('textbox', { name: 'Model', exact: true })).toHaveValue('gpt-6.1-sol');
+});
+
+test('reasoning effort offers every level the model lists, up to ultra', async ({ page, course }) => {
+  const { base } = await course('demo_course_fixture');
+  const models = [{ id: 'gpt-6.1-sol', name: 'GPT-6.1-Sol', description: '', default: true,
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], tiers: [] }];
+  await page.route('**/api/models', (route) => route.fulfill({ json: { models } }));
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
+  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort' });
+  await expect(effort.getByRole('radio')).toHaveCount(6);
+  await expect(effort.locator('label')).toHaveText(['Low', 'Medium', 'High', 'Extra high', 'Max', 'Ultra']);
+  await effort.getByRole('radio', { name: 'Ultra' }).check();
+  await expect.poll(async () => (await (await page.request.get(base + '/api/settings')).json()).effort).toBe('ultra');
 });
 
 test('teacher settings offer the models Codex lists, a small model and fast mode', async ({ page, course }) => {

@@ -90,6 +90,7 @@ class AppStore {
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
   settings = $state<Settings | null>(null);
+  #settingsWrites = 0;
 
   /** Concept shown in the reading column; null follows the formal position. */
   viewing = $state<string | null>(null);
@@ -246,11 +247,16 @@ class AppStore {
 
   /** Loads the course state, or only `parts` of it; sync() is the entry point, so two loads never race. */
   async #load(parts: StatePart[] | null): Promise<void> {
+    // Settings saved here while a load was in flight are newer than what it fetched; the next load brings them.
+    const written = this.#settingsWrites;
+    const take = (settings: Settings | undefined) => {
+      if (settings && written === this.#settingsWrites) this.settings = settings;
+    };
     if (parts && this.state) {
       try {
         const partial = await api.get<Partial<State>>(`/api/state?only=${parts.join(',')}`);
         if (this.state) Object.assign(this.state, partial);
-        if (partial.settings) this.settings = partial.settings;
+        take(partial.settings);
       } catch (e) {
         // A course closed meanwhile needs the whole state, which also reports why.
         if (e instanceof ApiError && e.code === 'no_course') return this.#load(null);
@@ -265,7 +271,7 @@ class AppStore {
       this.state = state;
       for (const delta of missed) this.#delta(delta);
       for (const change of this.#pending.values()) change(this.state.annotations);
-      this.settings = this.state.settings;
+      take(this.state.settings);
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
       this.error = null;
@@ -276,7 +282,8 @@ class AppStore {
         this.libraryOpen = true;
         locale.language = rememberLanguage() ?? locale.language;
         try {
-          [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+          const [settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+          take(settings);
         } catch (error) {
           this.error = (error as Error).message;
         }
@@ -776,6 +783,16 @@ class AppStore {
       locale.language = result.language;
       rememberLanguage(locale.language);
     }
+  }
+
+  /** Saves the learner's teacher settings; counted, so a state load that started earlier cannot put older ones back. */
+  async saveSettings(changes: Omit<Settings, 'overridden' | 'path'>) {
+    const result = await this.act(() => api.put<Settings>('/api/settings', changes));
+    if (result) {
+      this.#settingsWrites++;
+      this.settings = result;
+    }
+    return result;
   }
 
   /** Saves some of the course's preferences; the others keep their value. */

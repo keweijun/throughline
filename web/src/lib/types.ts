@@ -186,11 +186,14 @@ export type ChapterBuild = {
   discarded?: boolean;
 };
 
+/** Every reasoning effort Codex knows, lowest first; each model offers its own subset. */
+export type Effort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+
 export type Settings = {
   model: string;
   small_model: string;
-  effort: 'minimal' | 'low' | 'medium' | 'high';
-  small_effort: '' | 'minimal' | 'low' | 'medium' | 'high';
+  effort: Effort;
+  small_effort: '' | Effort;
   service_tier: string;
   overridden: boolean;
   path: string;

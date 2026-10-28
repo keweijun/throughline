@@ -28,7 +28,9 @@ class UpdateCheck(unittest.TestCase):
             course(Path(tmp) / 'course')
             client, _ = host_client(Path(tmp) / 'course')
             with client, mock.patch.dict(os.environ, {'GUIDED_LEARNING_UPDATE_URL': remote.as_uri()}), \
-                    mock.patch.object(updates, 'version', return_value='0.5.1'):
+                    mock.patch.object(updates, 'version', return_value='0.5.1'), \
+                    mock.patch('guided_learning.server.app.version', return_value='0.5.1'):
+                self.assertEqual(client.get('/api/about').json(), {'version': '0.5.1'})
                 result = client.get('/api/update').json()
                 self.assertEqual(result, {'version': '0.5.1', 'latest': '9.0.0', 'available': True})
                 remote.write_text('version = "0.5.1"\n', encoding='utf-8')

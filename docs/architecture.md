@@ -89,6 +89,7 @@ A teaching prompt (`prompts.Prompt`, from `Host.build_prompt`) has two parts. It
 | PUT/DELETE | `/api/annotations/{id}` | Edit an annotation's note, or delete it |
 | PUT/DELETE | `/api/memory/{id}` | Edit a course memory entry's `text`, or delete it (a dismissed suggestion is deleted too); `/api/state` lists entries under `memory` |
 | POST | `/api/memory/{id}/confirm` | Confirm a suggested preference so it enters prompts |
+| GET | `/api/about` | The installed version, for Settings' About tab |
 | GET | `/api/update` | The installed version, the version on GitHub `main` and whether it is newer; 502 when GitHub cannot be reached. Installing it is handed to Codex |
 | GET | `/api/health` | Process id and launch id; the cheap liveness probe `guided-learning open` and `stop` use |
 

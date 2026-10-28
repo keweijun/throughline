@@ -373,6 +373,17 @@ class SessionAndLanguage(unittest.TestCase):
             turn = execute(path, {'op': 'stream.start', 'id': 'lesson', 'concept_id': 'a', 'prompt': 'Teach'})['turn']
             self.assertNotIn('app_questions', turn['prompt_snapshot']['session'])
 
+    def test_lesson_snapshot_carries_its_section_once_and_keeps_token_usage(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            turn = execute(path, {'op': 'stream.start', 'id': 'lesson', 'concept_id': 'a', 'prompt': 'Teach'})['turn']
+            self.assertNotIn('context', turn['prompt_snapshot']['session'])
+            self.assertEqual(turn['prompt_snapshot']['context']['position']['concept_id'], 'a')
+            usage = {'inputTokens': 220, 'cachedInputTokens': 160, 'outputTokens': 14}
+            execute(path, {'op': 'stream.events', 'id': 'lesson', 'attempt': 1, 'events': [
+                {'sequence': 1, 'kind': 'final', 'text': 'Lesson.'}, {'sequence': 2, 'kind': 'complete', 'usage': usage}]})
+            self.assertEqual(execute(path, {'op': 'stream.read', 'id': 'lesson'})['turn']['metrics']['usage'], usage)
+
     def test_overview_fallback_follows_the_course_language(self):
         with tempfile.TemporaryDirectory() as path:
             course(path)

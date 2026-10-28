@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
+from .. import codex
 from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError, hold
@@ -229,7 +230,7 @@ class Host:
             addition = feature.prompt(turn, context)
             if addition:
                 prompt += '\n' + addition
-        return prompt
+        return prompts.Prompt(prompts.instructions(turn), prompt)
 
     def ensure_single_mainline(self, identifier, message):
         for other in self.brief_turns():
@@ -413,6 +414,7 @@ class Host:
             thread.join(max(0, deadline - time.monotonic()))
         self.preparation.join(2)
         self.builds.join(2)
+        codex.THREADS.close(self.workspace)
         try:
             self._persist()
         except Exception:

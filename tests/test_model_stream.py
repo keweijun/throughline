@@ -20,15 +20,18 @@ for line in sys.stdin:
    {'method':'turn/started','params':{'threadId':'t','turn':{'id':'u'}}},
    {'method':'item/started','params':{'threadId':'t','turnId':'u','item':{'id':'c','type':'agentMessage','phase':'commentary'}}},
    {'method':'item/agentMessage/delta','params':{'threadId':'t','turnId':'u','itemId':'c','delta':'Not a lesson'}},
+   {'method':'thread/tokenUsage/updated','params':{'threadId':'t','turnId':'u','tokenUsage':{'last':{'inputTokens':100,'cachedInputTokens':60,'outputTokens':5,'reasoningOutputTokens':1,'totalTokens':105},'total':{}}}},
    {'method':'item/started','params':{'threadId':'t','turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer'}}},
    {'method':'item/agentMessage/delta','params':{'threadId':'t','turnId':'u','itemId':'a','delta':'Hello lesson'}},
+   {'method':'thread/tokenUsage/updated','params':{'threadId':'t','turnId':'u','tokenUsage':{'last':{'inputTokens':120,'cachedInputTokens':100,'outputTokens':9,'reasoningOutputTokens':2,'totalTokens':129},'total':{}}}},
    {'method':'item/completed','params':{'threadId':'t','turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer','text':'Hello lesson.'}}},
    {'method':'turn/completed','params':{'threadId':'t','turn':{'id':'u','status':'completed'}}}]
   for e in events: print(json.dumps(e),flush=True)
 ''',encoding='utf-8')
             events=[]
             CodexRunner(command=[sys.executable,str(script)]).run('teach',tmp,events.append,threading.Event())
-            self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},{'kind':'complete'}])
+            self.assertEqual(events,[{'kind':'delta','text':'Hello lesson'},{'kind':'final','text':'Hello lesson.'},
+                                     {'kind':'complete','usage':{'inputTokens':220,'cachedInputTokens':160,'outputTokens':14,'reasoningOutputTokens':3,'totalTokens':234}}])
 
     def test_model_list_follows_pages_and_hides_hidden_models(self):
         from guided_learning.codex import list_models
@@ -122,3 +125,86 @@ class FindCodex(unittest.TestCase):
             with mock.patch.dict(codex.os.environ, {'LOCALAPPDATA': tmp}), mock.patch.object(codex.shutil, 'which', return_value=None):
                 codex.os.environ.pop('CODEX_CLI_PATH', None)
                 self.assertEqual(codex.find_codex(), str(bundled))
+
+
+SAVED_SERVER = '''import sys,json
+log=open(%r,'a'); mode=%r
+def out(v): print(json.dumps(v),flush=True)
+for line in sys.stdin:
+ r=json.loads(line); m=r.get('method'); i=r.get('id'); p=r.get('params',{})
+ if m: log.write(json.dumps([m,p])+'\\n'); log.flush()
+ if m=='initialize': out({'id':i,'result':{}})
+ if m=='thread/list': out({'id':i,'result':{'data':[]}})
+ if m=='thread/delete': out({'id':i,'result':{}})
+ if m=='thread/start': out({'id':i,'result':{'thread':{'id':'new'}}})
+ if m=='thread/resume':
+  out({'id':i,'error':{'code':-32600,'message':'no rollout'}} if mode=='lost' else {'id':i,'result':{'thread':{'id':p['threadId']}}})
+ if m=='thread/revert':
+  out({'id':i,'error':{'code':-32601,'message':'unknown method'}} if mode=='old' else {'id':i,'result':{}})
+ if m=='turn/start':
+  t=p['threadId']
+  for e in [{'id':i,'result':{'turn':{'id':'u'}}},
+   {'method':'item/started','params':{'threadId':t,'turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer'}}},
+   {'method':'item/completed','params':{'threadId':t,'turnId':'u','item':{'id':'a','type':'agentMessage','phase':'final_answer','text':'Lesson.'}}},
+   {'method':'turn/completed','params':{'threadId':t,'turn':{'id':'u','status':'completed'}}}]: out(e)
+'''
+
+
+class SavedThreads(unittest.TestCase):
+    """Teaching prompts run in saved threads lent for one turn and reverted after it, so the prompt cache is reused."""
+
+    def setUp(self):
+        from guided_learning import codex
+        self.codex = codex
+        self.addCleanup(setattr, codex, 'THREADS', codex.THREADS)
+        codex.THREADS = codex.SavedThreads()
+
+    def turns(self, tmp, prompts, mode='ok'):
+        log = Path(tmp)/'calls.jsonl'
+        script = Path(tmp)/'server.py'
+        script.write_text(SAVED_SERVER % (str(log), mode), encoding='utf-8')
+        runner = self.codex.CodexRunner(command=[sys.executable, str(script)], model='m')
+        for prompt in prompts:
+            events = []
+            runner.run(prompt, tmp, events.append, threading.Event())
+            self.assertEqual(events[-1], {'kind':'complete'})
+        return [json.loads(line) for line in log.read_text().splitlines()]
+
+    def teaching(self, request):
+        from guided_learning.server.prompts import Prompt
+        return Prompt('Teacher instructions and route', request)
+
+    def test_a_teaching_turn_is_reverted_and_the_next_one_resumes_its_thread(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = self.turns(tmp, [self.teaching('Teach step 1'), self.teaching('Teach step 2')])
+            threads = [p for m, p in calls if m in ('thread/start', 'thread/resume')]
+            self.assertEqual([m for m, _ in calls if m in ('thread/start', 'thread/resume', 'thread/revert')],
+                             ['thread/start', 'thread/revert', 'thread/resume', 'thread/revert'])
+            self.assertFalse(threads[0]['ephemeral'])
+            self.assertEqual((threads[1]['threadId'], threads[1]['excludeTurns']), ('new', True))
+            self.assertEqual({p['developerInstructions'] for p in threads}, {'Teacher instructions and route'})
+            self.assertEqual([p['input'][0]['text'] for m, p in calls if m == 'turn/start'], ['Teach step 1', 'Teach step 2'])
+            self.assertEqual([p['beforeTurnId'] for m, p in calls if m == 'thread/revert'], ['u', 'u'])
+
+    def test_a_lost_thread_is_replaced_and_plain_prompts_stay_ephemeral(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = self.turns(tmp, [self.teaching('one'), self.teaching('two'), 'Build the chapter'], mode='lost')
+            starts = [(m, p.get('ephemeral'), 'developerInstructions' in p) for m, p in calls if m in ('thread/start', 'thread/resume')]
+            self.assertEqual(starts, [('thread/start', False, True), ('thread/resume', None, True),
+                                      ('thread/start', False, True), ('thread/start', True, False)])
+            self.assertEqual(sum(m == 'thread/revert' for m, _ in calls), 2)
+
+    def test_a_codex_that_cannot_revert_gets_ephemeral_threads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = self.turns(tmp, [self.teaching('one'), self.teaching('two')], mode='old')
+            self.assertEqual([(m, p.get('ephemeral')) for m, p in calls if m in ('thread/start', 'thread/resume')],
+                             [('thread/start', False), ('thread/start', True)])
+            self.assertFalse(self.codex.THREADS.enabled)
+
+    def test_closing_a_course_deletes_its_idle_threads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.turns(tmp, [self.teaching('one')])
+            self.codex.THREADS.close(tmp, [sys.executable, str(Path(tmp)/'server.py')])
+            calls = [json.loads(line) for line in (Path(tmp)/'calls.jsonl').read_text().splitlines()]
+            self.assertIn(['thread/delete', {'threadId': 'new'}], calls)
+            self.assertEqual(self.codex.THREADS.idle, {})

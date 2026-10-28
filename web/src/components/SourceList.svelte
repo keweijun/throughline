@@ -68,7 +68,7 @@
               <span class="meta">
                 <span class="kind">{entry.kind}</span>
                 {#if entry.status === 'failed'}<span class="chip chip-danger">{t("Could not be read")}</span>
-                {:else if entry.status === 'needs_review'}<span class="chip chip-caution">{t("Some pages need review")}</span>{/if}
+                {:else if entry.status === 'needs_review'}<span class="chip chip-caution">{t("Some pages not checked yet")}</span>{/if}
                 {#if entry.sections.length}
                   <span>{entry.sections.length === 1 ? app.concept(entry.sections[0])?.title : t("{count} sections", { count: entry.sections.length })}</span>
                 {:else}

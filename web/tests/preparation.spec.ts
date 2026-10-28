@@ -5,7 +5,7 @@ test('next-section preparation is shown separately from learning progress', asyn
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body p').first()).toBeVisible();
   await expect(page.locator('#preparation-status')).toContainText('Prepared', { timeout: 15_000 });
-  await expect(page.locator('#route')).toContainText('Prepared');
+  await expect(page.locator('#route')).toContainText('Lesson ready');
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.position.concept_id).toBe('wave');
   expect(state.session.recent_interactions.some((i: { id: string }) => i.id.startsWith('stream:preparation'))).toBe(false);

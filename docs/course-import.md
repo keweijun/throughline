@@ -10,7 +10,7 @@ Ask Codex `$throughline create a course called <name> from these files: …`. Th
 
 ## Reviewing
 
-The library shows how many source locations still need review. Ask Codex to `review the pages that still need review in <name>`; review upcoming pages first. Submit `verification: verified` with a substantive `verification_note` only after the check was actually done. Source verification, taught content and independent answering are separate records.
+The library shows how many source locations are not checked yet. Ask Codex to `review the pages that still need review in <name>`; review upcoming pages first. Submit `verification: verified` with a substantive `verification_note` only after the check was actually done. Source verification, taught content and independent answering are separate records.
 
 ## Replaying and changing an import
 

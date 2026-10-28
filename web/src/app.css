@@ -47,6 +47,7 @@
   --radius: 6px;
   --topbar: 3.5rem;
   --rail: 15.5rem;
+  --rail-folded: 3.5rem;
   --panel: 25rem;
   --measure: 40rem;
 
@@ -124,8 +125,12 @@ a {
   background: var(--marker-wash);
 }
 
+/* A passage a side question was asked about is underlined, like its margin marker, so it reads apart from both the
+   selection and the learner's own (green) highlights. */
 ::highlight(asked) {
-  background-color: var(--marker-wash);
+  background-color: color-mix(in srgb, var(--marker-wash) 45%, transparent);
+  text-decoration: underline 2px var(--marker);
+  text-underline-offset: 0.22em;
 }
 
 ::highlight(mine) {

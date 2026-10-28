@@ -453,6 +453,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def enter_section(body: EnterSectionRequest):
         return host.practice.enter_skipped(body.concept_id, body.request_id)
 
+    @app.post('/api/sections/jump')
+    def jump_to_section(body: EnterSectionRequest):
+        return host.practice.jump(body.concept_id, body.request_id)
+
     @app.post('/api/chapters/{chapter_id}/skip')
     def skip_chapter(chapter_id: str, body: SkipChapterRequest):
         return host.practice.skip_chapter(chapter_id, body.request_id)

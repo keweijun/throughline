@@ -13,7 +13,7 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   }).toPass();
   await expect(peek).toContainText('lecture-2.pdf');
   await expect(peek).toContainText('The last term is the interference term.');
-  await expect(peek).toContainText('Pending verification');
+  await expect(peek).toContainText('Not checked yet');
 
   await citation.click();
   const cited = page.locator('.pdf-page.cited');

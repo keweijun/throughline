@@ -106,6 +106,28 @@ class Chapters(unittest.TestCase):
         self.assertEqual([d['concept_id'] for d in self.client.get('/api/state').json()['skipped']], ['a'])
         self.post('/api/chapters/two/skip', {'request_id': 'skip-2'}, status=409)
 
+    def test_jumping_to_a_later_section_skips_the_unstudied_ones_passed_over(self):
+        self.lesson()  # a is studied, so jumping past it does not mark it skipped
+        self.post('/api/sections/jump', {'concept_id': 'c', 'request_id': 'jump-1'})
+        state = self.client.get('/api/state').json()
+        self.assertEqual(state['position']['concept_id'], 'c')
+        self.assertEqual([(d['concept_id'], d['target_concept_id'], d['section_id']) for d in state['skipped']], [('b', 'c', 'one')])
+        # A retry of the same jump lands where the first did and skips nothing more.
+        self.post('/api/sections/jump', {'concept_id': 'c', 'request_id': 'jump-1'})
+        self.assertEqual(len(self.client.get('/api/state').json()['skipped']), 1)
+        self.assertEqual(self.post('/api/sections/jump', {'concept_id': 'a', 'request_id': 'jump-2'}, status=409)['code'], 'not_ahead')
+        self.post('/api/sections/jump', {'concept_id': 'nope', 'request_id': 'jump-3'}, status=404)
+        # A section jumped past is studied like one skipped with its chapter, which clears the mark.
+        self.post('/api/sections/enter', {'concept_id': 'b', 'request_id': 'enter-1'})
+        self.lesson()
+        self.assertEqual(self.client.get('/api/state').json()['skipped'], [])
+
+    def test_jumping_from_an_unstarted_section_skips_it_too(self):
+        self.post('/api/sections/jump', {'concept_id': 'b', 'request_id': 'jump-1'})
+        state = self.client.get('/api/state').json()
+        self.assertEqual(state['position']['concept_id'], 'b')
+        self.assertEqual([d['concept_id'] for d in state['skipped']], ['a'])
+
 
 if __name__ == '__main__':
     unittest.main()

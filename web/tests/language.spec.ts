@@ -74,6 +74,7 @@ test('source without a locator shows the Chinese fallback', async ({ page, cours
     await route.fulfill({ response, json: { ...source, locator: {} } });
   });
   await chooseLanguage(page, 'zh-CN');
+  await page.locator('details.overview summary').click();
   await page.getByRole('button', { name: 'source.md, 第 2 行', exact: true }).click();
   await expect(page.locator('.source-view')).toContainText('缺少精确定位');
   await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);

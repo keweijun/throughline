@@ -209,6 +209,9 @@ test('asking about a solved exercise shows the answer and keeps it solved', asyn
   await course('practice_continuity_browser_fixture');
   const task = page.locator('#practice article').nth(3);
   await expect(task).toContainText('Solved independently');
+  // A solved exercise folds its answer box away until the learner answers again.
+  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveCount(0);
+  await task.getByRole('button', { name: 'Answer again' }).click();
   await task.getByRole('textbox', { name: 'Exercise answer' }).fill('A draft answer');
   await task.getByRole('button', { name: 'Ask about this' }).click();
   await task.getByRole('textbox', { name: 'Question about this exercise' }).fill('What does it mean?');

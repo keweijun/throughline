@@ -36,13 +36,15 @@
           : t("The first lesson opens with an overview of the whole chapter, written by the teacher.")}
       {/if}
     </p>
-    <dl>
-      <div>
-        <dt>{t("Builds on")}</dt>
-        <dd>{preview.prerequisites.length ? preview.prerequisites.map((p) => p.title).join(', ') : t("No prerequisites listed")}</dd>
-      </div>
-      <div><dt>{t("Up next")}</dt><dd>{next?.title ?? t("This is the last section on the route")}</dd></div>
-    </dl>
+    <!-- Only what the plan says; an empty row would tell the learner nothing. -->
+    {#if preview.prerequisites.length || next}
+      <dl>
+        {#if preview.prerequisites.length}
+          <div><dt>{t("Builds on")}</dt><dd>{preview.prerequisites.map((p) => p.title).join(', ')}</dd></div>
+        {/if}
+        {#if next}<div><dt>{t("Up next")}</dt><dd>{next.title}</dd></div>{/if}
+      </dl>
+    {/if}
   {/if}
 
   <div class="sources">
@@ -60,7 +62,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="note">{t("No source location is linked to this section yet, so formulas and citations in its lessons still need checking.")}</p>
+      <p class="note">{t("No source pages are linked to this section yet.")}</p>
     {/if}
   </div>
 
@@ -74,7 +76,7 @@
             <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
               {sourceTitle(ref.source_id)}, {labelFor(ref)}
             </button>
-            <span class="chip chip-caution">{ref.disposition === 'deferred' ? t("Deferred") : t("Needs review")}</span>
+            <span class="chip chip-caution">{ref.disposition === 'deferred' ? t("Deferred") : t("Not checked yet")}</span>
             {#if ref.reason}<span class="reason">{ref.reason}</span>{/if}
           </li>
         {/each}

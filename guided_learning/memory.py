@@ -83,7 +83,8 @@ def _live(store, request):
 
 
 def save(store, request):
-    """The learner edits an entry's text; a new id with a kind adds an entry."""
+    """The learner edits an entry's text; a new id with a kind adds an entry. A preference may leave out `concept_id`: one
+    stated while the course was built belongs to no section."""
     identifier = require_text(request, 'id')
     text = _text(request.get('text'))
     if store.get('memory', identifier):
@@ -91,8 +92,9 @@ def save(store, request):
         return {'entry': store.put('memory', identifier, {**entry, 'text': text, 'updated_at': time.time()})}
     if request.get('kind') not in KINDS:
         raise OperationError('invalid_request', 'kind must be preference, taught_term or difficulty')
-    concept_id = require_text(request, 'concept_id')
-    validate_concept(store, concept_id)
+    concept_id = None if request['kind'] == 'preference' and not request.get('concept_id') else require_text(request, 'concept_id')
+    if concept_id:
+        validate_concept(store, concept_id)
     entry, recorded = _create(store, identifier, request['kind'], text, concept_id, _ids(store, request.get('interaction_ids', [])))
     if not recorded:
         raise OperationError('memory_exists', 'The course memory already has or deleted this entry')

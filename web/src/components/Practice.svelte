@@ -24,7 +24,11 @@
       ...(tally.again ? [tally.again === 1 ? t("1 needs another try") : t("{count} need another try", { count: tally.again })] : []),
     ].join(' · '),
   );
-  const earlier = $derived(isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !t.chapter_id && open(t)) : []);
+  // Open exercises from the chapter's other sections; an earlier chapter keeps its own on its chapter page.
+  const chapter = $derived(app.chapterOf(conceptId)?.id);
+  const earlier = $derived(
+    isCurrent ? practice.tasks.filter((t) => t.concept_id !== conceptId && !t.chapter_id && app.chapterOf(t.concept_id)?.id === chapter && open(t)) : [],
+  );
   const generating = $derived(practice.jobs.some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && app.isRunning(j.id)));
 
   const failed = $derived(practice.jobs.filter((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && j.error).at(-1));
@@ -71,7 +75,7 @@
 
     {#if earlier.length}
       <details class="earlier">
-      <summary>{t("Still open from earlier sections")} <span>({earlier.length})</span></summary>
+      <summary>{t("Still open in this chapter")} <span>({earlier.length})</span></summary>
       <div class="earlier-tasks">
       {#each earlier as task (task.id)}
         <Exercise {task} showSection />

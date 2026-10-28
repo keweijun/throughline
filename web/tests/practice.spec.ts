@@ -1,6 +1,6 @@
 import { test, expect } from './fixture';
 
-test('deferred and unfinished exercises follow the learner into the next section', async ({ page, course }) => {
+test('deferred and unfinished exercises follow the learner into the next section of the chapter', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const exercises = page.locator('#practice article');
   await expect(exercises).toHaveCount(4);
@@ -14,11 +14,11 @@ test('deferred and unfinished exercises follow the learner into the next section
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
 
-  await expect(page.getByText('Still open from earlier sections')).toBeVisible();
+  await expect(page.getByText('Still open in this chapter')).toBeVisible();
   const open = page.locator('#practice article');
   await expect(open).toHaveCount(3);
   await expect(open.first()).not.toBeVisible();
-  await page.getByText('Still open from earlier sections').click();
+  await page.getByText('Still open in this chapter').click();
   await expect(open.first()).toBeVisible();
   await expect(open.first()).toContainText('Original section');
   await expect(page.locator('#practice')).not.toContainText('Passed exercise');
@@ -53,7 +53,7 @@ test('a skipped exercise is closed and does not follow the learner', async ({ pa
 
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
-  await expect(page.getByText('Still open from earlier sections')).toContainText('(1)');
+  await expect(page.getByText('Still open in this chapter')).toContainText('(1)');
 });
 
 test('skipping two exercises for the same reason suggests a preference to confirm', async ({ page, course }) => {
@@ -224,4 +224,24 @@ test('asking about a solved exercise shows the answer and keeps it solved', asyn
   await expect(task).not.toContainText('solved with help');
   await expect(task.getByRole('textbox', { name: 'Question about this exercise' })).toHaveCount(0);
   await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('A draft answer');
+});
+
+test('open exercises stay with their chapter and are listed on its page', async ({ page, course }) => {
+  const { errors } = await course('chapter_exercises_browser_fixture');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Second section');
+  await page.getByText('Still open in this chapter').click();
+  await expect(page.locator('#practice .earlier article')).toContainText('First section exercise');
+  await expect(page.getByRole('region', { name: 'Next section' })).toContainText("1 exercise stays open on this chapter's page.");
+
+  await page.getByRole('button', { name: 'Enter next section' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Third section');
+  await expect(page.getByText('Still open in this chapter')).toHaveCount(0);
+
+  await page.locator('#route').getByRole('button', { name: /Chapter 1 · Chapter one/ }).click();
+  const listed = page.getByRole('region', { name: /Open exercises/ }).locator('article');
+  await expect(listed).toHaveCount(2);
+  await expect(listed.first()).toContainText('First section exercise');
+  await expect(listed.first()).toContainText('First section');
+  await expect(listed.last()).toContainText('Second section exercise');
+  expect(errors).toEqual([]);
 });

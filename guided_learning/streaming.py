@@ -7,6 +7,7 @@ from .teaching import resume as session_resume
 from .teaching import require_text, validate_concept, record_interaction
 from .preferences import view as preferences, validate_language
 from .memory import for_prompt as course_memory
+from .widgets import selected as selected_widgets
 
 
 # Turn channels, in one place for the host and its features; web/src/lib/types.ts mirrors CHANNELS.
@@ -70,6 +71,8 @@ def start(store, request):
     if profile: snapshot['learner_profile'] = profile
     memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
     if memory and identity['channel'] not in ('build','consolidation'): snapshot['course_memory'] = memory
+    widgets = selected_widgets(store)  # the course's add-ons, whose guides join the teacher instructions (ADR 0013)
+    if widgets and identity['channel'] not in ('build','consolidation'): snapshot['widgets'] = widgets
     if identity['channel'] == PREPARED_STEP:
         # The step it writes and the check repair it assumed, so Continue can tell whether its prompt still applies.
         step = request.get('lesson_step')

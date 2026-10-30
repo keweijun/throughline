@@ -23,6 +23,24 @@
     app.connect();
   });
 
+  // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a
+  // drawer on a phone. The stage is measured rather than queried in CSS so the rail, its capsule and the grid agree.
+  let stage = $state<HTMLElement>();
+  $effect(() => {
+    if (!stage) return;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const observer = new ResizeObserver(([entry]) => (app.stageNarrow = entry.contentRect.width < 66 * rem));
+    observer.observe(stage);
+    const phone = matchMedia('(max-width: 56rem)');
+    const update = () => (app.phone = phone.matches);
+    update();
+    phone.addEventListener('change', update);
+    return () => {
+      observer.disconnect();
+      phone.removeEventListener('change', update);
+    };
+  });
+
   $effect(() => {
     document.documentElement.lang = locale.language;
     document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Throughline')}` : t('Throughline');
@@ -55,6 +73,7 @@
     else if (event.key === ']') step(1);
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
+    else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.panelOpen && app.panelTab === 'memory' ? (app.panelOpen = false) : app.openPanel('memory');
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.shortcutsOpen = true;
@@ -88,8 +107,8 @@
 
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
-<div id="stage" class="stage">
-<div class="layout" class:with-panel={app.panelOpen}>
+<div id="stage" class="stage" bind:this={stage}>
+<div class="layout" class:with-panel={app.panelOpen} class:folded={app.folded && !app.libraryOpen}>
   {#if app.libraryOpen}
     <Library />
   {:else if app.state}
@@ -150,10 +169,8 @@
     min-height: 0;
   }
 
-  /* The stable gutter keeps the centred layout from shifting when a page is too short to scroll. The rail folds to its
-     route markers when the stage is narrower than the rail and a reading column, so the lesson keeps its width. */
+  /* The stable gutter keeps the centred layout from shifting when a page is too short to scroll. */
   .stage {
-    container: stage / inline-size;
     flex: 1;
     min-width: 0;
     overflow-x: hidden;
@@ -162,20 +179,31 @@
   }
 
   /* The rail sits beside the reading column, and the two are centred together rather than drifting apart. */
+  /* Folding and unfolding the route slides the reading column rather than jumping it. */
   .layout {
     display: grid;
     grid-template-columns: var(--rail) minmax(0, 1fr);
+    column-gap: clamp(1rem, 3vw, 3rem);
     align-items: start;
-    max-width: calc(var(--rail) + var(--measure) + 9rem);
+    max-width: calc(var(--rail) + var(--measure) + 12rem);
     margin-inline: auto;
+    transition:
+      grid-template-columns var(--settle) var(--ease-out),
+      column-gap var(--settle) var(--ease-out),
+      max-width var(--settle) var(--ease-out);
   }
 
-  @media (min-width: 56.01rem) {
-    @container stage (max-width: 64rem) {
-      .layout {
-        grid-template-columns: var(--rail-folded) minmax(0, 1fr);
-      }
+  @media (prefers-reduced-motion: reduce) {
+    .layout {
+      transition: none;
     }
+  }
+
+  /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
+  .layout.folded {
+    grid-template-columns: var(--rail-folded) minmax(0, 1fr);
+    column-gap: 0;
+    max-width: 100vw;
   }
 
   main {

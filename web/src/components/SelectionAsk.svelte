@@ -85,7 +85,7 @@
     // Which repeat of the passage was selected, counted in the element its highlight is painted in (a PDF page's text).
     const occurrence = (passage: string) =>
       area.dataset.sourceLabel
-        ? occurrenceOf(anchor?.closest<HTMLElement>('.textLayer') ?? area, passage, range, { loose: true, skip: '.number, .katex, .citation' })
+        ? occurrenceOf(anchor?.closest<HTMLElement>('.textLayer') ?? area, passage, range, { loose: true, skip: '.number, .katex, .citation, .widget' })
         : occurrenceOf(area, passage, range);
     if (area.dataset.exercise) {
       pending = { text: text.trim(), occurrence: occurrence(text), turnId: null, taskId: area.dataset.exercise };

@@ -33,6 +33,14 @@ function drop(annotations: Annotation[], id: string) {
   if (index >= 0) annotations.splice(index, 1);
 }
 
+function storedFold() {
+  try {
+    return localStorage.getItem('route-folded') === 'yes';
+  } catch {
+    return false;
+  }
+}
+
 function storedWidth() {
   try {
     return Number(localStorage.getItem('panel-width')) || DEFAULT_PANEL;
@@ -82,6 +90,7 @@ class AppStore {
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
   settings = $state<Settings | null>(null);
+  #settingsWrites = 0;
 
   /** Concept shown in the reading column; null follows the formal position. */
   viewing = $state<string | null>(null);
@@ -99,6 +108,11 @@ class AppStore {
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
   routeOpen = $state(false);
+  /** The learner folded the route to its capsule; a stage too narrow for it folds it regardless. */
+  routeFolded = $state(storedFold());
+  /** Set by the app: the reading column has no room beside the full route, and the window is a phone's. */
+  stageNarrow = $state(false);
+  phone = $state(false);
   shortcutsOpen = $state(false);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
@@ -233,11 +247,16 @@ class AppStore {
 
   /** Loads the course state, or only `parts` of it; sync() is the entry point, so two loads never race. */
   async #load(parts: StatePart[] | null): Promise<void> {
+    // Settings saved here while a load was in flight are newer than what it fetched; the next load brings them.
+    const written = this.#settingsWrites;
+    const take = (settings: Settings | undefined) => {
+      if (settings && written === this.#settingsWrites) this.settings = settings;
+    };
     if (parts && this.state) {
       try {
         const partial = await api.get<Partial<State>>(`/api/state?only=${parts.join(',')}`);
         if (this.state) Object.assign(this.state, partial);
-        if (partial.settings) this.settings = partial.settings;
+        take(partial.settings);
       } catch (e) {
         // A course closed meanwhile needs the whole state, which also reports why.
         if (e instanceof ApiError && e.code === 'no_course') return this.#load(null);
@@ -252,7 +271,7 @@ class AppStore {
       this.state = state;
       for (const delta of missed) this.#delta(delta);
       for (const change of this.#pending.values()) change(this.state.annotations);
-      this.settings = this.state.settings;
+      take(this.state.settings);
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
       this.error = null;
@@ -263,7 +282,8 @@ class AppStore {
         this.libraryOpen = true;
         locale.language = rememberLanguage() ?? locale.language;
         try {
-          [this.settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+          const [settings] = await Promise.all([api.get<Settings>('/api/settings'), this.loadLibrary()]);
+          take(settings);
         } catch (error) {
           this.error = (error as Error).message;
         }
@@ -582,7 +602,16 @@ class AppStore {
     else this.view(annotation.concept_id);
     if (annotation.task_id) {
       await tick();
-      requestAnimationFrame(() => document.getElementById(`exercise-${annotation.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      requestAnimationFrame(() => {
+        const exercise = document.getElementById(`exercise-${annotation.task_id}`);
+        if (!exercise) return;
+        // The passage may be in the question or the teacher's feedback; land on it, else on the exercise.
+        const range = annotation.passage
+          ? [...exercise.querySelectorAll<HTMLElement>('[data-exercise]')].map((block) => occurrences(block, annotation.passage)[annotation.occurrence ?? 0]).find(Boolean)
+          : undefined;
+        if (range) scrollStage(Math.max(0, stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3));
+        else exercise.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
       return;
     }
     if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0 });
@@ -609,6 +638,22 @@ class AppStore {
     if (!chosen) return;
     this.#widthChosen = true;
     if (save) this.savePanelWidth();
+  }
+
+  /** The route shows as its folded capsule; on a phone it is a drawer instead. */
+  get folded() {
+    return !this.phone && (this.stageNarrow || this.routeFolded);
+  }
+
+  /** Fold or unfold the route; only possible when the stage has room for it unfolded. */
+  toggleRoute() {
+    if (this.stageNarrow || this.phone) return;
+    this.routeFolded = !this.routeFolded;
+    try {
+      localStorage.setItem('route-folded', this.routeFolded ? 'yes' : '');
+    } catch {
+      // The choice still applies for this visit.
+    }
   }
 
   savePanelWidth() {
@@ -659,9 +704,12 @@ class AppStore {
     scrollStage(0);
   }
 
-  /** Moving the position always lands on the new section. */
+  /** Moving the position lands on the new section, unless the learner has gone elsewhere while it was being made. */
   async #move(action: () => Promise<unknown>) {
+    const before = [this.viewing, this.viewingChapter, this.reviewOpen];
     if (await this.act(action)) {
+      const after = [this.viewing, this.viewingChapter, this.reviewOpen];
+      if (after.some((value, i) => value !== before[i])) return;
       this.viewing = this.viewingChapter = null;
       this.reviewOpen = false;
       scrollStage(0);
@@ -735,6 +783,16 @@ class AppStore {
       locale.language = result.language;
       rememberLanguage(locale.language);
     }
+  }
+
+  /** Saves the learner's teacher settings; counted, so a state load that started earlier cannot put older ones back. */
+  async saveSettings(changes: Omit<Settings, 'overridden' | 'path'>) {
+    const result = await this.act(() => api.put<Settings>('/api/settings', changes));
+    if (result) {
+      this.#settingsWrites++;
+      this.settings = result;
+    }
+    return result;
   }
 
   /** Saves some of the course's preferences; the others keep their value. */

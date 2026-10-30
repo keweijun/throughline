@@ -1,5 +1,6 @@
 <script lang="ts">
   import { enterToSend } from '../lib/keys';
+  import PanelComposer from './PanelComposer.svelte';
   import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
@@ -8,16 +9,21 @@
   import type { Annotation, Chapter } from '../lib/types';
 
   let scope = $state<'section' | 'chapter' | 'all'>('section');
-  let draft = $state('');
+  let search = $state('');
   let editing = $state<string | null>(null);
   let edit = $state('');
   let flash = $state<string | null>(null);
 
   const viewing = $derived(app.viewingId);
+  // The note draft is kept per section, like the other writing boxes, so it survives a look elsewhere.
+  const draftKey = $derived(`note:${viewing}`);
+  const draft = $derived(app.drafts.get(draftKey));
+  const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
+  const matches = (a: Annotation) => words.every((w) => [a.passage, a.note, a.source?.label ?? ''].join(' ').toLowerCase().includes(w));
   const chapter = $derived(app.chapterOf(viewing));
   // Notes on a chapter recap or quiz question are grouped with their chapter, after its sections, not in the anchor section.
   const groups = $derived.by(() => {
-    const all = app.state?.annotations ?? [];
+    const all = (app.state?.annotations ?? []).filter(matches);
     const owner = new Map(all.map((a) => [a.id, app.ownerChapter(a)]));
     const route = app.state?.curriculum.route ?? [];
     const ids = scope === 'section' ? [viewing] : scope === 'chapter' ? (chapter?.concept_ids ?? []) : route;
@@ -27,7 +33,7 @@
       const home = app.chapterOf(id);
       if (!concept) continue;
       const items = all.filter((a) => a.concept_id === id && !owner.get(a.id));
-      if (items.length || scope === 'section') result.push({ key: concept.id, title: concept.title, chapter: home, items });
+      if (items.length || (scope === 'section' && !words.length)) result.push({ key: concept.id, title: concept.title, chapter: home, items });
       if (scope !== 'section' && home && home.concept_ids.at(-1) === id) {
         const chapterItems = all.filter((a) => owner.get(a.id) === home.id);
         if (chapterItems.length) result.push({ key: `chapter:${home.id}`, title: t("Chapter recap and quiz"), chapter: home, items: chapterItems });
@@ -66,10 +72,16 @@
   }
   const total = $derived(app.state?.annotations.length ?? 0);
 
-  async function add(event: SubmitEvent) {
-    event.preventDefault();
-    if (!viewing || !draft.trim()) return;
-    if (await app.annotate({ kind: 'note', concept_id: viewing, note: draft })) draft = '';
+  async function add() {
+    const section = viewing;
+    const text = draft;
+    const key = draftKey;
+    if (!section || !text.trim()) return;
+    if (!(await app.annotate({ kind: 'note', concept_id: section, note: text }))) return;
+    if (app.drafts.get(key) === text) app.drafts.set(key, '');
+    // The new note may land mid-list when several sections are shown; bring it into view.
+    const added = [...(app.state?.annotations ?? [])].reverse().find((a) => a.kind === 'note' && a.concept_id === section && a.note === text);
+    if (added) app.focusAnnotation = added.id;
   }
 
   function start(item: Annotation) {
@@ -98,6 +110,7 @@
     const id = app.focusAnnotation;
     if (!id || !app.panelOpen || app.panelTab !== 'notes') return;
     const item = app.state?.annotations.find((a) => a.id === id);
+    if (item && !matches(item)) search = '';
     if (item && (item.concept_id !== viewing || app.ownerChapter(item))) scope = 'all';
     app.focusAnnotation = null;
     flash = id;
@@ -107,34 +120,26 @@
   });
 </script>
 
-<section class="notes-panel" aria-labelledby="notes-title">
-  <h2 id="notes-title">{t("Your notes")}</h2>
-  <p class="intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+<section class="notes-panel panel-view" aria-labelledby="notes-title">
+  <header class="panel-head">
+    <div class="panel-bar">
+      <h2 id="notes-title">{t("Your notes")}</h2>
+      <div class="segmented" role="radiogroup" aria-label={t("Show notes from")}>
+        <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
+        {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
+        <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
+      </div>
+    </div>
+    <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+    {#if total > 4 || shown}
+      <div class="panel-tools">
+        {#if total > 4}<input type="search" bind:value={search} aria-label={t("Search notes")} placeholder={t("Search your notes…")} />{/if}
+        {#if shown}<button class="btn btn-quiet btn-small export" class:btn-flush={total <= 4} onclick={exportNotes}>{t("Export as Markdown")}</button>{/if}
+      </div>
+    {/if}
+  </header>
 
-  {#if viewing}
-    <form class="add" onsubmit={add}>
-      <label for="section-note" class="visually-hidden">{t("Add a note to this section")}</label>
-      <textarea
-        id="section-note"
-        rows="2"
-        bind:value={draft} use:autogrow={draft}
-        placeholder={t("Add a note to this section…")}
-        use:enterToSend
-      ></textarea>
-      <button class="btn btn-small" type="submit" disabled={!draft.trim()}>{t("Add note")}</button>
-    </form>
-  {/if}
-
-  <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
-    <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
-    {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
-    <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
-  </div>
-
-  {#if shown}
-    <button class="btn btn-quiet btn-small export" onclick={exportNotes}>{t("Export these notes as Markdown")}</button>
-  {/if}
-
+  <div class="panel-list">
   {#each groups as group, i (group.key)}
     {#if scope === 'all' && group.chapter && group.chapter.id !== groups[i - 1]?.chapter?.id}
       <h3 class="chapter">{group.chapter.title}</h3>
@@ -142,7 +147,7 @@
     <section class="group">
       <h3>{group.title}</h3>
       {#if !group.items.length}
-        <p class="empty">{t("Nothing saved for this section yet.")}</p>
+        <p class="panel-empty">{t("Nothing saved for this section yet.")}</p>
       {/if}
       <ul>
         {#each group.items as item (item.id)}
@@ -180,56 +185,53 @@
       </ul>
     </section>
   {:else}
-    <p class="empty">{t("No highlights, notes or bookmarks yet.")}</p>
+    <p class="panel-empty">{words.length ? t("No notes match your search.") : t("No highlights, notes or bookmarks yet.")}</p>
   {/each}
+  </div>
+
+  {#if viewing}
+    {#snippet target()}
+      {t("Note on:")} <strong>{app.concept(viewing)?.title}</strong>
+    {/snippet}
+    <PanelComposer
+      id="section-note"
+      value={draft}
+      onvalue={(value) => app.drafts.set(draftKey, value)}
+      label={t("Add a note to this section")}
+      placeholder={t("Add a note to this section…")}
+      submitLabel={t("Add note")}
+      onsubmit={add}
+      context={target}
+    />
+  {/if}
 </section>
 
 <style>
-  .notes-panel {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  h2 {
-    font-size: var(--step-1);
-    font-weight: 600;
-  }
-
-  .intro,
-  .empty {
-    font-size: var(--step--1);
-    color: var(--pencil);
-  }
-
-  .add {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  .add .btn {
-    justify-self: end;
-  }
-
-  .scope {
-    margin-top: 0.5rem;
-  }
-
-  .export {
-    justify-self: start;
-    padding-left: 0;
+  .panel-list {
+    gap: 0;
   }
 
   h3.chapter {
     margin-top: 1.4rem;
+    margin-bottom: 0;
     font-size: var(--step-0);
     color: var(--ink);
   }
 
   h3 {
-    margin: 1rem 0 0.5rem;
+    margin: 0 0 0.5rem;
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
+  }
+
+  .group + .group,
+  h3.chapter + .group {
+    margin-top: 1.2rem;
+  }
+
+  h3.chapter + .group {
+    margin-top: 0.5rem;
   }
 
   ul {

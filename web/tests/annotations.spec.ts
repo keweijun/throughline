@@ -76,6 +76,7 @@ test('highlight and note a side-question answer', async ({ page, course }) => {
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
   const thread = page.locator('#thread-q1');
+  await thread.getByRole('button', { name: 'Expand question' }).click();
   const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
   await expect(paragraph).toBeVisible();
 

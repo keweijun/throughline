@@ -48,7 +48,7 @@
 <section class="source-list" aria-labelledby="sources-title">
   <h2 id="sources-title">{t("Course sources")}</h2>
   {#if app.source}
-    <button class="btn btn-quiet btn-small back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
+    <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
   {/if}
   {#if !entries.length}
     <p class="muted">{t("No documents are registered in this course yet. Add files from Codex.")}</p>
@@ -106,7 +106,6 @@
 
   .back {
     justify-self: start;
-    padding-left: 0;
   }
 
   .muted {

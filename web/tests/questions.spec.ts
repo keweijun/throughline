@@ -86,6 +86,7 @@ test('newest questions sort by time and selected follow-ups stay in their thread
   await expect(threads).toHaveCount(2);
   const thread = threads.first();
   await expect(thread.locator('.title').first()).toHaveText('Newer question');
+  await thread.getByRole('button', { name: 'Expand question' }).click();
   const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
   const excerpt = await paragraph.evaluate((node) => {
     const range = document.createRange(); range.selectNodeContents(node);
@@ -101,6 +102,7 @@ test('newest questions sort by time and selected follow-ups stay in their thread
   await expect(threads).toHaveCount(2);
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  await page.locator('#thread-a-new').getByRole('button', { name: 'Expand question' }).click();
   await expect(page.locator('#thread-a-new .reply .title')).toHaveText('Explain this step more slowly.');
   await expect(page.locator('#thread-a-new .reply blockquote')).toHaveText(excerpt.trim());
 });
@@ -129,6 +131,7 @@ test('a follow-up saved before its stream started can be retried after reopening
   await course('question_reply_browser_fixture');
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
   const thread = page.locator('#thread-q');
+  await thread.getByRole('button', { name: 'Expand question' }).click();
   await expect(thread.locator('.reply')).toContainText('This reply did not start. Try again.');
   await thread.getByRole('button', { name: 'Answer again' }).click();
   await expect(thread.locator('.reply .answer')).toHaveText('Recovered answer');

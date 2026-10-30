@@ -161,7 +161,7 @@ test('a formula on its own is highlighted whole, and Go to lands on it from anot
 
   await page.locator('#route').getByRole('button', { name: /Operators and observables/ }).click();
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
-  await page.locator('#panel-notes').getByText(/All sections/).click();
+  await page.locator('#panel-notes').getByRole('radio', { name: /^All/ }).check();
   await page.locator('#panel-notes').getByRole('button', { name: 'Go to' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wave superposition');
   // Before formulas were matched, a formula-only passage was never found and Go to stopped at the top of the lesson.

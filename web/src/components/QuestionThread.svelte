@@ -59,7 +59,6 @@
   const noted = $derived(mine.filter((a) => a.note));
 
   // A long list stays scannable: each thread shows a one-line summary until it is opened.
-  const section = $derived(app.concept(question.anchor?.concept_id ?? question.restore_point?.concept_id));
   const summary = $derived.by((): { label: string; tone: string; live?: boolean } => {
     if (questionTurnIds(question).some((id) => app.isRunning(id))) return { label: t("Answering"), tone: 'accent', live: true };
     if (answer && answer.status !== 'completed') return { label: t(lessonStatus[answer.status].label), tone: lessonStatus[answer.status].tone };
@@ -103,7 +102,6 @@
       </div>
       <p class="meta">
         <span class="chip chip-{summary.tone}">{#if summary.live}<span class="live-dot"></span>{/if}{summary.label}</span>
-        {#if section && section.id !== app.viewingId}<span>{section.title}</span>{/if}
         {#if followUps}<span>{followUps === 1 ? t("1 follow-up") : t("{count} follow-ups", { count: followUps })}</span>{/if}
         {#if noted.length}
           <button class="your-notes" onclick={(e) => (e.stopPropagation(), app.showAnnotation(noted[0].id))}>

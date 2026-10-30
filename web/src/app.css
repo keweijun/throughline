@@ -1047,6 +1047,9 @@ dialog[open]::backdrop {
 .panel-head {
   display: grid;
   gap: 0.6rem;
+}
+
+.panel-view > .panel-head {
   margin-bottom: 1.1rem;
 }
 
@@ -1088,7 +1091,7 @@ dialog[open]::backdrop {
 .panel-list {
   display: grid;
   align-content: start;
-  gap: 1rem;
+  gap: 1.1rem;
   padding-bottom: 1.5rem;
 }
 

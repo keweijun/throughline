@@ -102,11 +102,90 @@ test('a later section can be studied now, and the unstudied sections before it s
   await expect(page.getByText("You're previewing this section")).toHaveCount(0);
   // The chapter left behind folds in the route; opening it shows its sections marked skipped.
   await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await expect(page.locator('#route').getByRole('button', { name: /What a state represents/ })).toContainText('Skipped');
   await expect(page.locator('#route').getByRole('button', { name: /Superposition/ })).toContainText('Skipped');
 
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.position.concept_id).toBe('outcomes');
   expect(state.skipped.map((s: { concept_id: string }) => s.concept_id).sort()).toEqual(['state', 'superposition']);
+  expect(errors).toEqual([]);
+});
+
+test('beside an open panel the route folds to a badge per chapter, whichever are collapsed, and opens the full route on hover', async ({ page, course }) => {
+  const { errors } = await course('chapters_browser_fixture');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  // Folding turns the full route straight into the hidden drawer; it never shows on its way out.
+  expect(await page.locator('#route .full').evaluate((node) => getComputedStyle(node).visibility)).toBe('hidden');
+  const mini = page.locator('#route .mini');
+  await expect(mini).toBeVisible();
+  await expect(mini.locator('.route-badge')).toHaveCount(3);
+  await expect(mini.locator('.route-dot')).toHaveCount(2);
+  await expect(mini.getByRole('button', { name: 'What a state represents, Current section' })).toBeVisible();
+  // Without room beside the reading column the route cannot be unfolded, only opened on hover.
+  await expect(page.getByRole('button', { name: 'Unfold the route' })).toHaveCount(0);
+
+  await mini.hover();
+  const full = page.locator('#route .full');
+  await expect(full).toBeVisible();
+  await full.getByRole('button', { name: 'Collapse chapter' }).first().click();
+  await page.mouse.move(900, 600);
+  await expect(full).toBeHidden();
+  await expect(mini.locator('.route-badge')).toHaveCount(3);
+
+  await mini.getByRole('button', { name: /^Superposition/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
+  // The chapter in view opens instead.
+  await mini.getByRole('button', { name: /^Chapter 2 · Measurement/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Measurement');
+  await expect(mini.locator('.route-dot')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test('the learner folds the route and unfolds it again, and the choice is remembered', async ({ page, course }) => {
+  const { errors } = await course('chapters_browser_fixture');
+  const full = page.locator('#route .full');
+  await expect(full.getByRole('button', { name: 'Collapse chapter' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fold the route' }).click();
+  const mini = page.locator('#route .mini');
+  await expect(mini).toBeVisible();
+  await page.mouse.move(900, 600);
+  await expect(full).toBeHidden();
+
+  await page.reload();
+  await expect(mini).toBeVisible();
+  await page.keyboard.press('r');
+  await expect(mini).toHaveCount(0);
+  await expect(full).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#route .mini')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('in a long course the folded route shows every chapter and a window of the open one', async ({ page, course }) => {
+  const { errors } = await course('long_course_browser_fixture');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  const mini = page.locator('#route .mini');
+  // Section 4 of the 30-section chapter: nine dots from its start, and the other 21 counted.
+  await expect(mini.locator('.route-badge')).toHaveCount(13);
+  await expect(mini.locator('.route-dot')).toHaveCount(9);
+  await expect(mini.locator('.more')).toHaveText(['+21']);
+  await expect(mini.locator('.route-badge.done')).toHaveCount(4);
+  const box = (await mini.boundingBox())!;
+  expect(box.height).toBeLessThan(800);
+
+  // In a short window the drawer opens scrolled to the current section, every time it opens.
+  await page.setViewportSize({ width: 1440, height: 600 });
+  const full = page.locator('#route .full');
+  const current = full.locator('.current .entry');
+  for (let opened = 0; opened < 2; opened++) {
+    await full.evaluate((node) => (node.scrollTop = 0));
+    await mini.hover({ position: { x: 18, y: 40 } });
+    await expect(full).toBeVisible();
+    await expect(current).toBeInViewport();
+    await page.mouse.move(1300, 500);
+    await expect(full).toBeHidden();
+  }
   expect(errors).toEqual([]);
 });

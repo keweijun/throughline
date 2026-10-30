@@ -144,6 +144,35 @@ test('a highlight running into a formula is still painted', async ({ page, cours
   expect(errors).toEqual([]);
 });
 
+test('a formula on its own is highlighted whole, and Go to lands on it from another section', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  const formula = page.locator('.lesson-body [data-tex]').filter({ has: page.locator('.katex-display') }).first();
+  await formula.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNode(node);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  // The whole formula carries the mark instead of KaTeX's glyph boxes being painted one by one.
+  await expect(formula).toHaveAttribute('data-highlight-mine', '');
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(0);
+
+  await page.locator('#route').getByRole('button', { name: /Operators and observables/ }).click();
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.locator('#panel-notes').getByText(/All sections/).click();
+  await page.locator('#panel-notes').getByRole('button', { name: 'Go to' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wave superposition');
+  // Before formulas were matched, a formula-only passage was never found and Go to stopped at the top of the lesson.
+  await expect.poll(async () => {
+    const box = (await formula.boundingBox())!;
+    const stage = (await page.locator('#stage').boundingBox())!;
+    return box.y > stage.y && box.y + box.height < stage.y + stage.height / 2;
+  }).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('highlights show before the host answers, preview on hover and can be noted or removed in place', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
@@ -186,6 +215,14 @@ test('highlights show before the host answers, preview on hover and can be noted
   await page.locator('#toggle-notes').click();
   await expect(page.locator('.notes-panel .item.highlight .kind')).toHaveText('Note');
   await page.locator('#toggle-notes').click();
+
+  // Closing the panel unfolds the route and slides the lesson back; aim at the highlight once it has settled.
+  await expect.poll(async () => {
+    const before = await spot();
+    await page.waitForTimeout(80);
+    const after = await spot();
+    return before.x === after.x && before.y === after.y;
+  }).toBe(true);
 
   // Removing it from the page asks first, since the note goes with it.
   page.once('dialog', (dialog) => dialog.accept());

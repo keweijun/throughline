@@ -76,6 +76,7 @@ test('highlight and note a side-question answer', async ({ page, course }) => {
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
   const thread = page.locator('#thread-q1');
+  await thread.getByRole('button', { name: 'Expand question' }).click();
   const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
   await expect(paragraph).toBeVisible();
 
@@ -197,4 +198,20 @@ test('highlights show before the host answers, preview on hover and can be noted
   await expect(page.locator('.lesson-body').first()).toBeVisible();
   expect(await painted()).toBe(0);
   expect(errors).toEqual([]);
+});
+
+test('a section note is written in the box at the bottom and lands at the end of the list', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  const box = page.getByRole('textbox', { name: 'Add a note to this section' });
+  await expect(page.locator('#panel-notes .composer')).toContainText('Note on: Wave superposition');
+  for (const note of ['First note', 'Second note']) {
+    await box.fill(note);
+    await box.press('Enter');
+    await expect(box).toHaveValue('');
+  }
+  await expect(page.locator('.notes-panel .item .text')).toHaveText(['First note', 'Second note']);
+  const list = (await page.locator('.notes-panel .item').last().boundingBox())!;
+  const composer = (await page.locator('#panel-notes .composer').boundingBox())!;
+  expect(list.y).toBeLessThan(composer.y);
 });

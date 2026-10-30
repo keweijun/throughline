@@ -54,7 +54,7 @@
         {#each preview.sources as ref}
           {@const v = verification(ref.verification)}
           <li>
-            <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
+            <button class="btn btn-quiet btn-small btn-flush" onclick={() => app.openSource(ref)}>
               {sourceTitle(ref.source_id)}, {labelFor(ref)}
             </button>
             <span class="chip chip-{v.tone}">{t(v.label)}</span>
@@ -73,7 +73,7 @@
       <ul>
         {#each preview.set_aside as ref}
           <li>
-            <button class="btn btn-quiet btn-small" onclick={() => app.openSource(ref)}>
+            <button class="btn btn-quiet btn-small btn-flush" onclick={() => app.openSource(ref)}>
               {sourceTitle(ref.source_id)}, {labelFor(ref)}
             </button>
             <span class="chip chip-caution">{ref.disposition === 'deferred' ? t("Deferred") : t("Not checked yet")}</span>
@@ -155,7 +155,6 @@
   }
 
   li .btn {
-    padding-left: 0;
     white-space: normal;
     text-align: left;
   }

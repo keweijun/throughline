@@ -107,7 +107,7 @@
     visible = false;
     window.getSelection()?.removeAllRanges();
     app.openPanel('questions');
-    requestAnimationFrame(() => document.getElementById(questionId ? `reply-input-${questionId}` : 'question-input')?.focus());
+    requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
   function close() {

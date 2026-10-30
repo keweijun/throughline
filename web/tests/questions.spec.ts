@@ -147,3 +147,35 @@ test('a follow-up saved before its stream started can be retried after reopening
   await panel.getByRole('button', { name: 'Send follow-up' }).click();
   await expect(thread.locator('.reply .answer')).toHaveCount(2);
 });
+
+test('threads start collapsed, one opens at a time, and the box switches between asking and following up', async ({ page, course }) => {
+  const { base } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  for (const [id, question] of [['q1', 'First question'], ['q2', 'Second question']]) {
+    await page.request.post(base + '/api/questions', { data: { id, question } });
+  }
+  await page.reload();
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  const first = page.locator('#thread-q1');
+  const second = page.locator('#thread-q2');
+  await expect(page.locator('#branch-panel .answer')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeVisible();
+
+  await first.getByRole('button', { name: 'Expand question' }).click();
+  await expect(first.locator('.answer')).toBeVisible();
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · First question');
+  await second.getByRole('button', { name: 'Expand question' }).click();
+  await expect(first.locator('.answer')).toHaveCount(0);
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · Second question');
+
+  // Clearing the target closes the thread and turns the box back into a new question.
+  await page.getByRole('button', { name: 'Ask a new question instead' }).click();
+  await expect(second.locator('.answer')).toHaveCount(0);
+  await page.getByRole('textbox', { name: 'Side question' }).fill('A third question');
+  await page.getByRole('button', { name: 'Ask', exact: true }).click();
+  const asked = page.locator('#branch-panel .thread').last();
+  await expect(asked.locator('.title').first()).toHaveText('A third question');
+  await expect(asked.locator('.answer')).toBeVisible();
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · A third question');
+});

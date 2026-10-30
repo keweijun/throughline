@@ -1,14 +1,18 @@
 <script lang="ts">
   import Composer from './Composer.svelte';
   import AttachedImages from './AttachedImages.svelte';
-  import { slide } from 'svelte/transition';
+  import PanelGroups from './PanelGroups.svelte';
+  import PanelScope from './PanelScope.svelte';
+  import { groupBySection, scopeCounts, type PanelScope as Scope } from '../lib/panel';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { noteGroups, noteLabel as label } from '../lib/notes';
+  import { noteLabel as label } from '../lib/notes';
   import type { Annotation } from '../lib/types';
 
-  let scope = $state<'section' | 'chapter' | 'all'>('section');
+  // Questions and Notes narrow and search their lists the same way.
+  let scope = $state<Scope>('section');
+  let scopeChosen = false;
   let search = $state('');
   let editing = $state<string | null>(null);
   // An edit is a draft like any other, so a look at another view does not lose it.
@@ -21,16 +25,18 @@
   const draft = $derived(app.drafts.get(draftKey));
   const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
   const matches = (a: Annotation) => words.every((w) => [a.passage, a.note, a.source?.label ?? ''].join(' ').toLowerCase().includes(w));
-  const chapter = $derived(app.chapterOf(viewing));
-  const groups = $derived.by(() => {
-    const ids = scope === 'section' ? (viewing ? [viewing] : []) : scope === 'chapter' ? (chapter?.concept_ids ?? []) : (app.state?.curriculum.route ?? []);
-    return noteGroups(ids, (app.state?.annotations ?? []).filter(matches), { single: scope === 'section', empty: scope === 'section' && !words.length });
-  });
-
-  // A section outside any chapter has no "This chapter" choice; fall back rather than show nothing.
+  // Notes on a chapter recap or quiz question belong to their chapter, not the section they were written from.
+  const ownerOf = (a: Annotation) => app.ownerChapter(a);
+  const sectionOf = (a: Annotation) => a.concept_id;
+  const all = $derived(app.state?.annotations ?? []);
+  const counts = $derived(scopeCounts(all, sectionOf, ownerOf));
+  // Until the learner picks a scope, show the narrowest one that has something in it.
   $effect(() => {
-    if (scope === 'chapter' && !chapter) scope = 'section';
+    if (!scopeChosen) scope = counts.section ? 'section' : counts.chapter ? 'chapter' : 'all';
   });
+  const groups = $derived(groupBySection(all.filter(matches), scope, sectionOf, ownerOf));
+  const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
+
 
   const total = $derived(app.state?.annotations.length ?? 0);
 
@@ -80,7 +86,10 @@
     if (!id || !app.panelOpen || app.panelTab !== 'notes') return;
     const item = app.state?.annotations.find((a) => a.id === id);
     if (item && !matches(item)) search = '';
-    if (item && (item.concept_id !== viewing || app.ownerChapter(item))) scope = 'all';
+    if (item && (item.concept_id !== viewing || app.ownerChapter(item))) {
+      scope = 'all';
+      scopeChosen = true;
+    }
     app.focusAnnotation = null;
     flash = id;
     requestAnimationFrame(() => document.getElementById(`annotation-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
@@ -93,15 +102,11 @@
 
 <section class="notes-panel panel-view" aria-labelledby="notes-title">
   <header class="panel-head">
-    <div class="panel-bar">
-      <h2 id="notes-title">{t("Your notes")}</h2>
-      <div class="segmented" role="radiogroup" aria-label={t("Show notes from")}>
-        <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
-        {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
-        <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
-      </div>
-    </div>
+    <div class="panel-bar"><h2 id="notes-title">{t("Your notes")}</h2></div>
     <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+    {#if total}
+      <PanelScope bind:scope {counts} label={t("Show notes from")} onchoose={() => (scopeChosen = true)} />
+    {/if}
     {#if total > 4}
       <div class="panel-tools">
         <input type="search" bind:value={search} aria-label={t("Search notes")} placeholder={t("Search your notes…")} />
@@ -110,59 +115,51 @@
   </header>
 
   <div class="panel-list">
-  {#each groups as group, i (group.key)}
-    {#if scope === 'all' && group.chapter && group.chapter.id !== groups[i - 1]?.chapter?.id}
-      <h3 class="chapter">{group.chapter.title}</h3>
-    {/if}
-    <section class="group">
-      <h3>{group.title}</h3>
-      {#if !group.items.length}
-        <p class="panel-empty">{t("Nothing saved for this section yet.")}</p>
-      {/if}
-      <ul>
-        {#each group.items as item (item.id)}
-          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id} transition:slide={{ duration: 200 }}>
-            <p class="kind">
-              {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
-            </p>
-            {#if item.passage}
-              <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
+    {#snippet note(item: Annotation)}
+      <article id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
+        <p class="kind">
+          {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
+        </p>
+        {#if item.passage}
+          <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
+        {/if}
+        {#if editing === item.id}
+          <Composer
+            id="note-edit-{item.id}"
+            value={app.drafts.get(editKey(item.id))}
+            onvalue={(value) => app.drafts.set(editKey(item.id), value)}
+            label={t("Note")}
+            placeholder={t("Write your note…")}
+            submitLabel={t("Save")}
+            onsubmit={() => void saveEdit(item)}
+            header={editingNote}
+            onclose={() => stopEditing(item)}
+            oncancel={() => stopEditing(item)}
+            closeLabel={t("Cancel")}
+            imagesKey={item.kind === 'bookmark' ? undefined : editKey(item.id)}
+            imagesAlone={item.kind === 'note'}
+            allowEmpty={item.kind !== 'note'}
+          />
+        {:else}
+          {#if item.note}<div class="text prose" use:markdown={{ language: locale.language, text: item.note, breaks: true }}></div>{/if}
+          <AttachedImages images={item.images ?? []} small />
+          <div class="actions">
+            {#if item.kind !== 'note'}
+              <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
             {/if}
-            {#if editing === item.id}
-              <Composer
-                id="note-edit-{item.id}"
-                value={app.drafts.get(editKey(item.id))}
-                onvalue={(value) => app.drafts.set(editKey(item.id), value)}
-                label={t("Note")}
-                placeholder={t("Write your note…")}
-                submitLabel={t("Save")}
-                onsubmit={() => void saveEdit(item)}
-                header={editingNote}
-                onclose={() => stopEditing(item)}
-                oncancel={() => stopEditing(item)}
-                closeLabel={t("Cancel")}
-                imagesKey={item.kind === 'bookmark' ? undefined : editKey(item.id)}
-                imagesAlone={item.kind === 'note'}
-                allowEmpty={item.kind !== 'note'}
-              />
-            {:else}
-              {#if item.note}<div class="text prose" use:markdown={{ language: locale.language, text: item.note, breaks: true }}></div>{/if}
-              <AttachedImages images={item.images ?? []} small />
-              <div class="actions">
-                {#if item.kind !== 'note'}
-                  <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
-                {/if}
-                <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
-                <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {:else}
-    <p class="panel-empty">{words.length ? t("No notes match your search.") : t("No highlights, notes or bookmarks yet.")}</p>
-  {/each}
+            <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
+            <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
+          </div>
+        {/if}
+      </article>
+    {/snippet}
+    <PanelGroups
+      {groups}
+      {scope}
+      key={(a) => a.id}
+      item={note}
+      empty={words.length ? t("No notes match your search.") : !total ? t("No highlights, notes or bookmarks yet.") : scope === 'chapter' ? t("No notes in this chapter yet.") : t("No notes in this section yet.")}
+    />
   </div>
 
   {#if viewing}
@@ -187,41 +184,6 @@
 </section>
 
 <style>
-  .panel-list {
-    gap: 0;
-  }
-
-  h3.chapter {
-    margin-top: 1.4rem;
-    margin-bottom: 0;
-    font-size: var(--step-0);
-    color: var(--ink);
-  }
-
-  h3 {
-    margin: 0 0 0.5rem;
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--pencil);
-  }
-
-  .group + .group,
-  h3.chapter + .group {
-    margin-top: 1.2rem;
-  }
-
-  h3.chapter + .group {
-    margin-top: 0.5rem;
-  }
-
-  ul {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
   .item {
     display: grid;
     gap: 0.35rem;

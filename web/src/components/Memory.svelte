@@ -36,8 +36,10 @@
 {#snippet editingEntry()}{t('Editing · the teacher uses this in every lesson')}{/snippet}
 
 <section class="memory-panel" aria-labelledby="memory-title">
-  <h2 id="memory-title">{t('Course memory')}</h2>
-  <p class="intro">{t('What the teacher keeps about you in this course and uses in every lesson. It is not a record of mastery, and your notes are never part of it.')}</p>
+  <header class="panel-head">
+    <div class="panel-bar"><h2 id="memory-title">{t('Course memory')}</h2></div>
+    <p class="panel-intro">{t('What the teacher keeps about you in this course and uses in every lesson. It is not a record of mastery, and your notes are never part of it.')}</p>
+  </header>
 
   {#each suggested as entry (entry.id)}
     <div class="suggested" role="group" aria-label={t('Suggested preference')}>
@@ -89,11 +91,6 @@
     gap: 0.75rem;
   }
 
-  h2 {
-    font-size: var(--step-1);
-    font-weight: 600;
-  }
-
   h3 {
     margin: 0.8rem 0 0.4rem;
     font-size: var(--step--1);
@@ -101,7 +98,6 @@
     color: var(--pencil);
   }
 
-  .intro,
   .empty,
   .meta {
     font-size: var(--step--1);

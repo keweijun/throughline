@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
@@ -7,8 +6,11 @@
   import { panelCoversLesson } from '../lib/media';
   import { stageScroll } from '../lib/stage';
   import { questionTurnIds } from '../lib/format';
+  import { groupBySection, scopeCounts, type PanelScope as Scope } from '../lib/panel';
 
   import Composer from './Composer.svelte';
+  import PanelGroups from './PanelGroups.svelte';
+  import PanelScope from './PanelScope.svelte';
   import QuestionThread from './QuestionThread.svelte';
   import type { Question } from '../lib/types';
 
@@ -19,17 +21,17 @@
   const questions = $derived([...(app.state?.questions ?? [])].sort((a, b) => (a.created_at ?? app.turn(a.turn_id)?.started_at ?? 0) - (b.created_at ?? app.turn(b.turn_id)?.started_at ?? 0)));
   const currentLesson = $derived(app.lessons(app.currentId).at(-1));
 
-  // Many questions: show this section's by default, searchable, collapsed to one line each.
-  let scope = $state<'section' | 'all'>('section');
+  // Questions and Notes narrow and search their lists the same way.
+  let scope = $state<Scope>('section');
   let scopeChosen = false;
   let search = $state('');
   // One thread is open at a time, so the list stays a list and the open question stays pinned above its answers.
   let openId = $state<string | null>(null);
   const sectionOf = (q: Question) => q.anchor?.concept_id ?? q.restore_point?.concept_id;
-  const inSection = $derived(questions.filter((q) => sectionOf(q) === app.viewingId));
-  // Until the learner picks a scope, follow what is useful: this section if it has questions, otherwise all.
+  const counts = $derived(scopeCounts(questions, sectionOf));
+  // Until the learner picks a scope, show the narrowest one that has something in it.
   $effect(() => {
-    if (!scopeChosen) scope = inSection.length ? 'section' : 'all';
+    if (!scopeChosen) scope = counts.section ? 'section' : counts.chapter ? 'chapter' : 'all';
   });
   const turnsOf = (q: Question) => questionTurnIds(q).map((id) => app.turn(id));
   // A question needs the learner while it is answered, waits on a choice, or has an unfinished foundation supplement, which blocks moving on.
@@ -46,15 +48,13 @@
       openId = q.id;
     }
   });
-  const shown = $derived.by(() => {
-    const words = search.toLowerCase().split(/\s+/).filter(Boolean);
-    const pool = scope === 'section' && !words.length ? inSection : questions;
-    if (!words.length) return pool;
-    return pool.filter((q) => {
-      const text = [q.question, q.selection, ...(q.replies ?? []).map((r) => r.question), ...turnsOf(q).map((x) => x?.text ?? '')].join(' ').toLowerCase();
-      return words.every((w) => text.includes(w));
-    });
-  });
+  const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
+  const matches = (q: Question) => {
+    const text = [q.question, q.selection, ...(q.replies ?? []).map((r) => r.question), ...turnsOf(q).map((x) => x?.text ?? '')].join(' ').toLowerCase();
+    return words.every((w) => text.includes(w));
+  };
+  const groups = $derived(groupBySection(questions.filter(matches), scope, sectionOf));
+  const shown = $derived(groups.flatMap((g) => g.items));
 
   // Opening a thread from elsewhere (a margin marker, a saved explanation) must find it whatever the filters say.
   $effect(() => {
@@ -147,16 +147,11 @@
 
 <section id="branch-panel" class="panel-view" aria-labelledby="questions-title">
   <header class="panel-head">
-    <div class="panel-bar">
-      <h2 id="questions-title">{t("Your questions")}</h2>
-      {#if questions.length}
-        <div class="segmented" role="radiogroup" aria-label={t("Show questions from")} onchange={() => (scopeChosen = true)}>
-          <label><input type="radio" bind:group={scope} value="section" />{t("This section ({count})", { count: inSection.length })}</label>
-          <label><input type="radio" bind:group={scope} value="all" />{t("All ({count})", { count: questions.length })}</label>
-        </div>
-      {/if}
-    </div>
+    <div class="panel-bar"><h2 id="questions-title">{t("Your questions")}</h2></div>
     <p class="panel-intro">{t("Select a sentence or formula in a lesson or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
+    {#if questions.length}
+      <PanelScope bind:scope {counts} label={t("Show questions from")} onchoose={() => (scopeChosen = true)} />
+    {/if}
     {#if questions.length > 4}
       <div class="panel-tools">
         <input type="search" bind:value={search} aria-label={t("Search questions")} placeholder={t("Search questions and answers…")} />
@@ -165,24 +160,23 @@
   </header>
 
   <div class="panel-list">
-    {#each shown as q (q.id)}
-      <div transition:slide={{ duration: 200 }}>
-        <QuestionThread question={q} bind:open={() => openId === q.id, (value) => setOpen(q, value)} />
-      </div>
-    {:else}
-      <p class="panel-empty">
-        {#if search.trim()}{t("No questions match your search.")}
-        {:else if questions.length}{t("No questions from this section yet.")}
-        {:else}{t("No questions yet.")}{/if}
-      </p>
-    {/each}
+    {#snippet thread_(q: Question)}
+      <QuestionThread question={q} bind:open={() => openId === q.id, (value) => setOpen(q, value)} />
+    {/snippet}
+    <PanelGroups
+      {groups}
+      {scope}
+      key={(q) => q.id}
+      item={thread_}
+      empty={words.length ? t("No questions match your search.") : !questions.length ? t("No questions yet.") : scope === 'chapter' ? t("No questions in this chapter yet.") : t("No questions in this section yet.")}
+    />
   </div>
 
   {#snippet target()}
     {#if thread}
       <span aria-hidden="true">↳</span> {t("Follow-up")} · <span class="target-title" use:markdown={{ language: locale.language, text: thread.question }}></span>
     {:else}
-      {t("New question")}{#if app.viewingId}{' · '}{app.concept(app.viewingId)?.title}{/if}
+      {t("New question")}{#if app.viewingId} · {app.concept(app.viewingId)?.title}{/if}
     {/if}
   {/snippet}
   {#snippet tools()}

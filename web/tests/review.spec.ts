@@ -22,7 +22,7 @@ test('due sections are reviewed from memory with a fresh question, or put off a 
   await expect(question.getByRole('button', { name: 'Do later' }), 'Not now replaces Do later for reviews').toHaveCount(0);
   await expect(question.getByRole('button', { name: 'Skip', exact: true }), 'a review question is not skipped').toHaveCount(0);
   await question.getByRole('textbox', { name: 'Exercise answer' }).fill('No: a global phase cancels in every probability.');
-  await question.getByRole('button', { name: 'Check my answer' }).click();
+  await question.getByRole('button', { name: 'Check answer' }).click();
 
   const done = page.getByRole('region', { name: 'Reviewed today' });
   await expect(done.getByRole('article')).toContainText('Remembered on your own');
@@ -42,7 +42,7 @@ test('the last section leads to the chapter quiz, which asks an earlier exercise
   const exercise = page.locator('#practice article');
   await expect(exercise).toHaveCount(1);
   await exercise.getByRole('textbox', { name: 'Exercise answer' }).fill('Divide by the square root of two.');
-  await exercise.getByRole('button', { name: 'Check my answer' }).click();
+  await exercise.getByRole('button', { name: 'Check answer' }).click();
   await expect(exercise).toContainText('Solved independently');
 
   await page.getByRole('button', { name: 'End of chapter: recap and quiz →' }).click();
@@ -61,7 +61,7 @@ test('the last section leads to the chapter quiz, which asks an earlier exercise
   await expect(questions.first().getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
 
   await questions.first().getByRole('textbox', { name: 'Exercise answer' }).fill('Divide each amplitude by the norm.');
-  await questions.first().getByRole('button', { name: 'Check my answer' }).click();
+  await questions.first().getByRole('button', { name: 'Check answer' }).click();
   await expect(questions.first()).toContainText('Remembered on your own');
   await expect(quiz).toContainText('1 of 3 answered, 1 passed');
 

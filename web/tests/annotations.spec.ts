@@ -32,15 +32,15 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await page.locator('.notes-panel .item').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.notes-panel')).toContainText('Edited note');
 
-  // Enter sends; Shift+Enter and Ctrl+Enter break the line.
+  // Enter breaks the line and Ctrl+Enter sends, as in every writing box.
   const sectionNote = page.getByRole('textbox', { name: 'Add a note to this section' });
   await sectionNote.fill('Overall:');
-  await sectionNote.press('Shift+Enter');
+  await sectionNote.press('Enter');
   await sectionNote.pressSequentially('revisit');
-  await sectionNote.press('Control+Enter');
+  await sectionNote.press('Enter');
   await sectionNote.pressSequentially('interference');
   await expect(sectionNote).toHaveValue('Overall:\nrevisit\ninterference');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Control+Enter');
   await expect(sectionNote).toHaveValue('');
   await expect(page.locator('.notes-panel .item.note')).toContainText('revisit');
 

@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import library, updates
+from .. import images as attached, library, updates
 from ..commands import version
 from ..preferences import MAX_DAILY_REVIEWS
 from ..store import OperationError
@@ -27,8 +27,8 @@ from .settings import TeacherSettings
 log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
 MAX_BODY = 1024 * 1024
-# An answer image is uploaded as its own raw body, so a phone photo fits; JSON bodies keep the small limit.
-IMAGE_UPLOAD = '/api/practice/images'
+# An attached image is uploaded as its own raw body, so a phone photo fits; JSON bodies keep the small limit.
+IMAGE_UPLOAD = '/api/images'
 MAX_IMAGE = 25 * 1024 * 1024
 
 
@@ -58,6 +58,7 @@ class QuestionRequest(Body):
     main_turn_id: Optional[str] = None
     anchor: Optional[dict] = None
     pause: bool = False
+    images: Optional[list[str]] = None
 
 
 class AnnotationRequest(Body):
@@ -68,6 +69,7 @@ class AnnotationRequest(Body):
     passage: Optional[str] = None
     occurrence: Optional[int] = None
     note: Optional[str] = None
+    images: Optional[list[str]] = None
     turn_id: Optional[str] = None
     task_id: Optional[str] = None
     source: Optional[dict] = None
@@ -75,6 +77,8 @@ class AnnotationRequest(Body):
 
 class NoteRequest(Body):
     note: str
+    # Omitted, the note keeps its images; an empty list removes them.
+    images: Optional[list[str]] = None
 
 
 class MemoryRequest(Body):
@@ -385,7 +389,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.put('/api/annotations/{identifier}')
     def edit_annotation(identifier: str, body: NoteRequest):
-        result = host.operation({'op': 'annotations.save', 'id': identifier, 'note': body.note})
+        result = host.operation({'op': 'annotations.save', 'id': identifier, **body.model_dump(exclude_none=True)})
         host.changed()
         return result
 
@@ -421,12 +425,12 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post(IMAGE_UPLOAD)
     async def upload_image(request: Request):
         data = await request.body()
-        return {'image': await asyncio.to_thread(host.practice.save_image, data)}
+        return {'image': await asyncio.to_thread(attached.save, host.workspace, data)}
 
     @app.get(IMAGE_UPLOAD + '/{name}')
-    def answer_image(name: str):
-        path, media_type = host.practice.image_file(name)
-        return FileResponse(path, media_type=media_type)
+    def image(name: str):
+        path = attached.path(host.workspace, name)
+        return FileResponse(path, media_type=attached.TYPES[path.suffix[1:]])
 
     @app.post('/api/practice/tasks/{task_id}/{action}')
     def practice_action(task_id: str, action: str, body: PracticeRequest):

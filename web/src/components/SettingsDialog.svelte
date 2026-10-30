@@ -3,6 +3,7 @@
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
+  import { exportNotes } from '../lib/notes';
   import type { CodexModel, Settings, UpdateCheck } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
 
@@ -151,6 +152,15 @@
     savingReviews = false;
   }
 
+  const notes = $derived(app.state?.annotations.length ?? 0);
+  let exporting = $state(false);
+
+  async function exportAll() {
+    exporting = true;
+    await exportNotes();
+    exporting = false;
+  }
+
   function openMemory() {
     app.settingsOpen = false;
     app.openPanel('memory');
@@ -292,6 +302,16 @@
             </p>
           </div>
           <button class="btn btn-small" onclick={openMemory}>{t("Open course memory")}</button>
+        </div>
+        <div class="setting">
+          <div class="text">
+            <span class="title">{t("Your notes")}</span>
+            <p>
+              {notes === 1 ? t("1 highlight, note or bookmark") : t("{count} highlights, notes and bookmarks", { count: notes })}.
+              {t("Export them as one Markdown file, by chapter and section; notes with images come as a ZIP with an images folder.")}
+            </p>
+          </div>
+          <button class="btn btn-small" disabled={!notes || exporting} onclick={exportAll}>{exporting ? t("Exporting…") : t("Export notes")}</button>
         </div>
       {:else if pane === 'teacher'}
         <h3>{t("Teacher")}</h3>

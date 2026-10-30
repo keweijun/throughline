@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .. import lessons
 from .. import practice
+from .. import images as attached
 from .. import review
 from ..store import OperationError
 from .. import memory
@@ -552,10 +553,24 @@ class Questions(Feature):
         main_text = self.operation({'op': 'stream.read', 'id': branch['main_turn_id']})['turn']['text'] if branch.get('main_turn_id') else None
         common = prompts.question_context(branch, main_text, in_snapshot=snapshot_branch is not None)
         if turn['id'].startswith('reply:'):
-            return common + prompts.QUESTION_FOLLOWUP
+            return common + prompts.QUESTION_FOLLOWUP + attached.described(len(self._asked(branch, turn).get('images', [])), 'this follow-up')
         if turn['id'] == branch.get('supplement_turn_id'):
             return common + prompts.SUPPLEMENT
-        return common + prompts.question_protocol(turn.get('language', 'en'))
+        return common + prompts.question_protocol(turn.get('language', 'en')) + attached.described(len(branch.get('images', [])), 'this question')
+
+    @staticmethod
+    def _asked(branch, turn):
+        """The question or follow-up a turn answers; a supplement answers neither."""
+        if turn['id'] == branch['turn_id']:
+            return branch
+        return next((r for r in branch.get('replies', []) if r['turn_id'] == turn['id']), {})
+
+    def images(self, turn):
+        if turn.get('channel') != 'sidequestion':
+            return []
+        branch = self._branch_for(turn)
+        names = self._asked(branch, turn).get('images', []) if branch else []
+        return [str(attached.path(self.host.workspace, name)) for name in names]
 
     def on_complete(self, turn):
         if not turn['id'].startswith('branch:'):
@@ -591,17 +606,9 @@ class Practice(Feature):
                     log.warning('Practice job %s cannot be recorded', job['id'], exc_info=True)
         return self.operation({'op': 'practice.list'})
 
-    def save_image(self, data):
-        """Store an image of the learner's work in the course workspace, to attach to an answer by the returned name."""
-        return practice.save_image(self.host.workspace, data)
-
-    def image_file(self, name):
-        path = practice.image_path(self.host.workspace, name)
-        return path, practice.IMAGE_TYPES[path.suffix[1:]]
-
     def images(self, turn):
         job = self.practice_job(turn['id'])
-        return [str(practice.image_path(self.host.workspace, name)) for name in (job or {}).get('images', [])]
+        return [str(attached.path(self.host.workspace, name)) for name in (job or {}).get('images', [])]
 
     def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, question=None, images=None):
         with self.host.lock:
@@ -630,6 +637,8 @@ class Practice(Feature):
                 if not isinstance(question, str) or not question.strip():
                     raise OperationError('empty_question', 'Enter your question first')
                 job['question'] = question
+                if images:
+                    job['images'] = list(images)
             self.operation({'op': 'practice.job', 'job': job})
             return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'practice',
                                          'record_user': False, 'prompt': prompts.PRACTICE_REQUEST})
@@ -670,7 +679,9 @@ class Practice(Feature):
                 self.host.changed()
                 return result
         if action != 'assess':
-            answer = images = None
+            answer = None
+        if action not in ('assess', 'ask'):
+            images = None
         return self._launch(self._assessed_section(task), action, task, answer,
                             question=question if action == 'ask' else None, images=images)
 
@@ -797,7 +808,7 @@ class Practice(Feature):
             return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
         if job['action'] == 'ask':
-            return prompts.practice_ask(task, self._sources(task['source_refs']), job['question'])
+            return prompts.practice_ask(task, self._sources(task['source_refs']), job['question'], len(job.get('images', [])))
         return prompts.practice_feedback(job['action'], task, self._sources(task['source_refs']), job.get('answer'), len(job.get('images', [])))
 
     def _retrieval_prompt(self, job, context, tasks):

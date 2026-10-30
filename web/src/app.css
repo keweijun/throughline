@@ -1104,3 +1104,24 @@ dialog[open]::backdrop {
   max-height: 8rem;
   overflow: auto;
 }
+
+/* The writing box Questions and Notes pin to the panel's bottom, so new items arrive just above where they were typed. */
+.panel-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding: 0.6rem 0 1rem;
+  background: var(--sheet);
+}
+
+/* The list fades into the pinned box instead of being cut by a rule. */
+.panel-foot::before {
+  content: '';
+  position: absolute;
+  inset: -1.25rem 0 100%;
+  background: linear-gradient(to bottom, transparent, var(--sheet));
+  pointer-events: none;
+}

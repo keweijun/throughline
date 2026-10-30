@@ -1,5 +1,6 @@
 """Learner annotations: highlights, notes and bookmarks. The learner's own records, never teaching data or evidence."""
 import time
+from . import images as attached
 from .store import OperationError
 from .teaching import require_text, validate_concept
 
@@ -32,6 +33,21 @@ def _source(request):
     return ref
 
 
+def _images(store, request, previous=None):
+    """Images attached to the note: those in the request, an empty list removing them all, or else the ones it had."""
+    if request.get('images') == []:
+        return []
+    if 'images' in request:
+        return attached.validate(store.workspace, request)
+    return (previous or {}).get('images', [])
+
+
+def _with_images(annotation, images):
+    """Only an annotation with images carries the field, so older records and image-free ones look the same."""
+    annotation = {key: value for key, value in annotation.items() if key != 'images'}
+    return {**annotation, 'images': images} if images else annotation
+
+
 def list_annotations(store, request):
     items = sorted(store.list('annotations'), key=lambda a: a['created_at'])
     if request.get('concept_id'):
@@ -43,11 +59,12 @@ def save(store, request):
     identifier = require_text(request, 'id')
     previous = store.get('annotations', identifier)
     note = _text(request, 'note', MAX_NOTE)
+    images = _images(store, request, previous)
     if previous:
-        # Only the note changes after creation; where an annotation points is fixed.
-        updated = {**previous, 'note': note, 'updated_at': time.time()}
-        if updated['kind'] == 'note' and not note:
-            raise OperationError('invalid_request', 'A note needs text')
+        # Only the note and its images change after creation; where an annotation points is fixed.
+        updated = _with_images({**previous, 'note': note, 'updated_at': time.time()}, images)
+        if updated['kind'] == 'note' and not note and not images:
+            raise OperationError('invalid_request', 'A note needs text or an image')
         return {'annotation': store.put('annotations', identifier, updated)}
     kind = request.get('kind')
     if kind not in KINDS:
@@ -74,8 +91,10 @@ def save(store, request):
         raise OperationError('invalid_request', 'A highlight needs a passage in one lesson, answer, exercise or source')
     if anchors > 1:
         raise OperationError('invalid_request', 'An annotation points to at most one place')
-    if kind == 'note' and not note:
-        raise OperationError('invalid_request', 'A note needs text')
+    if kind == 'note' and not note and not images:
+        raise OperationError('invalid_request', 'A note needs text or an image')
+    if kind == 'bookmark' and images:
+        raise OperationError('invalid_request', 'A bookmark has no images; add a note instead')
     if kind == 'bookmark' and passage:
         raise OperationError('invalid_request', 'A bookmark has no passage; highlight it instead')
     # A passage can repeat in its text; this says which repeat was marked. Records without it mean the first.
@@ -83,8 +102,8 @@ def save(store, request):
     if not isinstance(occurrence, int) or isinstance(occurrence, bool) or occurrence < 0 or (occurrence and not passage):
         raise OperationError('invalid_request', 'occurrence must be a non-negative integer, for a passage')
     now = time.time()
-    annotation = {'id': identifier, 'kind': kind, 'concept_id': concept_id, 'turn_id': turn_id, 'task_id': task_id, 'source': source,
-                  'passage': passage, 'occurrence': occurrence, 'note': note, 'created_at': now, 'updated_at': now}
+    annotation = _with_images({'id': identifier, 'kind': kind, 'concept_id': concept_id, 'turn_id': turn_id, 'task_id': task_id, 'source': source,
+                               'passage': passage, 'occurrence': occurrence, 'note': note, 'created_at': now, 'updated_at': now}, images)
     return {'annotation': store.put('annotations', identifier, annotation)}
 
 

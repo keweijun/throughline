@@ -7,7 +7,7 @@
   import type { Preview } from '../lib/types';
   import UnitOverview from './UnitOverview.svelte';
   import Lesson from './Lesson.svelte';
-  import Composer from './Composer.svelte';
+  import LessonRequest from './LessonRequest.svelte';
   import Practice from './Practice.svelte';
   import NextSection from './NextSection.svelte';
   import CodexLink from './CodexLink.svelte';
@@ -249,7 +249,7 @@
 
     <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
     {#if isCurrent && !app.openLesson(conceptId)}
-      <Composer conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} />
+      <LessonRequest conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} />
     {/if}
 
     <Practice conceptId={conceptId} {isCurrent} />

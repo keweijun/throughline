@@ -1,4 +1,4 @@
-"""One exercise, and a teacher that reports the images it was sent with the answer."""
+"""One exercise, and a teacher that reports the images it was sent with an answer or a question."""
 import json,tempfile
 from pathlib import Path
 from guided_learning.api import execute
@@ -17,6 +17,7 @@ execute(root,{'op':'practice.complete','id':job['id']})
 class Runner:
  def run(self,prompt,cwd,emit,cancel,images=()):
   seen=[Path(p) for p in images if Path(p).is_file() and Path(p).parent==root/'answer_images']
-  emit({'kind':'final','text':json.dumps({'feedback':f'I read {len(seen)} images in the course workspace.','outcome':'passed'})});emit({'kind':'complete'})
+  report=f'I read {len(seen)} images in the course workspace.'
+  emit({'kind':'final','text':json.dumps({'feedback':report,'outcome':'passed'}) if 'Practice only' in prompt else report});emit({'kind':'complete'})
 try:serve(root,port=0,runner=Runner(),settings=TeacherSettings(Path(root)/'settings.json'),on_ready=lambda port:print(port,flush=True))
 finally:scratch.cleanup()

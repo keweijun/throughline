@@ -2,8 +2,7 @@
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { autogrow } from '../lib/autogrow';
-  import { enterToSend } from '../lib/keys';
+  import Composer from './Composer.svelte';
   import type { MemoryEntry } from '../lib/types';
   import RememberPrompt from './RememberPrompt.svelte';
 
@@ -21,6 +20,7 @@
   function start(entry: MemoryEntry) {
     editing = entry.id;
     edit = entry.text;
+    requestAnimationFrame(() => document.getElementById(`memory-edit-${entry.id}`)?.focus());
   }
 
   async function save(entry: MemoryEntry) {
@@ -32,6 +32,8 @@
     if (confirm(t('Delete this from the course memory? The teacher will not add it back.'))) void app.removeMemory(entry.id);
   }
 </script>
+
+{#snippet editingEntry()}{t('Editing · the teacher uses this in every lesson')}{/snippet}
 
 <section class="memory-panel" aria-labelledby="memory-title">
   <h2 id="memory-title">{t('Course memory')}</h2>
@@ -51,17 +53,19 @@
         {#each group.items as entry (entry.id)}
           <li class="item" class:cleared={entry.status === 'cleared'}>
             {#if editing === entry.id}
-              <textarea
-                rows="2"
-                bind:value={edit} use:autogrow={edit}
-                aria-label={group.title}
-                use:enterToSend={() => void save(entry)}
-                onkeydown={(e) => e.key === 'Escape' && (editing = null)}
-              ></textarea>
-              <div class="actions">
-                <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t('Cancel')}</button>
-                <button class="btn btn-small" onclick={() => save(entry)}>{t('Save')}</button>
-              </div>
+              <Composer
+                id="memory-edit-{entry.id}"
+                value={edit}
+                onvalue={(value) => (edit = value)}
+                label={group.title}
+                placeholder={group.title}
+                submitLabel={t('Save')}
+                onsubmit={() => void save(entry)}
+                header={editingEntry}
+                onclose={() => (editing = null)}
+                oncancel={() => (editing = null)}
+                closeLabel={t('Cancel')}
+              />
             {:else}
               <div class="text prose" use:markdown={{ language: locale.language, text: entry.text }}></div>
               <div class="meta">
@@ -148,11 +152,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
   }
 
   .actions {

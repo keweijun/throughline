@@ -1,17 +1,18 @@
 <script lang="ts">
-  import { enterToSend } from '../lib/keys';
-  import PanelComposer from './PanelComposer.svelte';
+  import Composer from './Composer.svelte';
+  import AttachedImages from './AttachedImages.svelte';
   import { slide } from 'svelte/transition';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { autogrow } from '../lib/autogrow';
-  import type { Annotation, Chapter } from '../lib/types';
+  import { noteGroups, noteLabel as label } from '../lib/notes';
+  import type { Annotation } from '../lib/types';
 
   let scope = $state<'section' | 'chapter' | 'all'>('section');
   let search = $state('');
   let editing = $state<string | null>(null);
-  let edit = $state('');
+  // An edit is a draft like any other, so a look at another view does not lose it.
+  const editKey = (id: string) => `note-edit:${id}`;
   let flash = $state<string | null>(null);
 
   const viewing = $derived(app.viewingId);
@@ -21,89 +22,57 @@
   const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
   const matches = (a: Annotation) => words.every((w) => [a.passage, a.note, a.source?.label ?? ''].join(' ').toLowerCase().includes(w));
   const chapter = $derived(app.chapterOf(viewing));
-  // Notes on a chapter recap or quiz question are grouped with their chapter, after its sections, not in the anchor section.
   const groups = $derived.by(() => {
-    const all = (app.state?.annotations ?? []).filter(matches);
-    const owner = new Map(all.map((a) => [a.id, app.ownerChapter(a)]));
-    const route = app.state?.curriculum.route ?? [];
-    const ids = scope === 'section' ? [viewing] : scope === 'chapter' ? (chapter?.concept_ids ?? []) : route;
-    const result: { key: string; title: string; chapter?: Chapter; items: Annotation[] }[] = [];
-    for (const id of ids) {
-      const concept = app.concept(id);
-      const home = app.chapterOf(id);
-      if (!concept) continue;
-      const items = all.filter((a) => a.concept_id === id && !owner.get(a.id));
-      if (items.length || (scope === 'section' && !words.length)) result.push({ key: concept.id, title: concept.title, chapter: home, items });
-      if (scope !== 'section' && home && home.concept_ids.at(-1) === id) {
-        const chapterItems = all.filter((a) => owner.get(a.id) === home.id);
-        if (chapterItems.length) result.push({ key: `chapter:${home.id}`, title: t("Chapter recap and quiz"), chapter: home, items: chapterItems });
-      }
-    }
-    return result;
+    const ids = scope === 'section' ? (viewing ? [viewing] : []) : scope === 'chapter' ? (chapter?.concept_ids ?? []) : (app.state?.curriculum.route ?? []);
+    return noteGroups(ids, (app.state?.annotations ?? []).filter(matches), { single: scope === 'section', empty: scope === 'section' && !words.length });
   });
-  const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
 
   // A section outside any chapter has no "This chapter" choice; fall back rather than show nothing.
   $effect(() => {
     if (scope === 'chapter' && !chapter) scope = 'section';
   });
 
-
-  /** Your notes as a Markdown file, grouped by chapter and section, for keeping outside the app. */
-  function exportNotes() {
-    const lines = [`# ${app.state?.course.title ?? ''}`];
-    let heading: string | undefined;
-    for (const group of groups) {
-      if (group.chapter && group.chapter.title !== heading) lines.push('', `## ${(heading = group.chapter.title)}`);
-      lines.push('', `${group.chapter ? '###' : '##'} ${group.title}`);
-      for (const item of group.items) {
-        lines.push('', `- ${label(item)}${item.source?.label ? ` (${item.source.label})` : ''}`);
-        if (item.passage) lines.push(...item.passage.split('\n').map((line) => `  > ${line}`));
-        if (item.note) lines.push(...item.note.split('\n').map((line) => `  ${line}`));
-      }
-    }
-    const name = scope === 'chapter' ? chapter?.title : scope === 'section' ? groups[0]?.title : app.state?.course.title;
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/markdown' }));
-    link.download = `${(name ?? 'notes').replace(/[\\/:*?"<>|]+/g, '-')}.md`;
-    link.click();
-    // Revoking at once can cancel the download before the browser has read the file.
-    setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
-  }
   const total = $derived(app.state?.annotations.length ?? 0);
 
   async function add() {
     const section = viewing;
     const text = draft;
     const key = draftKey;
-    if (!section || !text.trim()) return;
-    if (!(await app.annotate({ kind: 'note', concept_id: section, note: text }))) return;
+    const images = app.drafts.images(key);
+    if (!section || (!text.trim() && !images.length)) return;
+    if (!(await app.annotate({ kind: 'note', concept_id: section, note: text, ...(images.length ? { images } : {}) }))) return;
     if (app.drafts.get(key) === text) app.drafts.set(key, '');
+    if (JSON.stringify(app.drafts.images(key)) === JSON.stringify(images)) app.drafts.setImages(key, []);
     // The new note may land mid-list when several sections are shown; bring it into view.
     const added = [...(app.state?.annotations ?? [])].reverse().find((a) => a.kind === 'note' && a.concept_id === section && a.note === text);
     if (added) app.focusAnnotation = added.id;
   }
 
   function start(item: Annotation) {
+    app.drafts.set(editKey(item.id), item.note);
+    app.drafts.setImages(editKey(item.id), item.images ?? []);
     editing = item.id;
-    edit = item.note;
+    requestAnimationFrame(() => document.getElementById(`note-edit-${item.id}`)?.focus());
+  }
+
+  function stopEditing(item: Annotation) {
+    app.drafts.set(editKey(item.id), '');
+    app.drafts.setImages(editKey(item.id), []);
+    if (editing === item.id) editing = null;
   }
 
   async function saveEdit(item: Annotation) {
-    if (item.kind === 'note' && !edit.trim()) return;
-    if (await app.editNote(item.id, edit)) editing = null;
+    const key = editKey(item.id);
+    const text = app.drafts.get(key);
+    // A bookmark's note has no images, so its edit leaves them out.
+    const images = item.kind === 'bookmark' ? undefined : app.drafts.images(key);
+    if (item.kind === 'note' && !text.trim() && !images?.length) return;
+    if (await app.editNote(item.id, text, images)) stopEditing(item);
   }
 
   function remove(item: Annotation) {
     if (item.note && !confirm(t("Delete this note?"))) return;
     void app.removeAnnotation(item.id);
-  }
-
-  function label(item: Annotation) {
-    if (item.kind === 'note') return t("Section note");
-    if (item.kind === 'bookmark') return t("Bookmark");
-    // A highlight the learner wrote on reads as a note on that passage.
-    return item.note ? t("Note") : t("Highlight");
   }
 
   $effect(() => {
@@ -120,6 +89,8 @@
   });
 </script>
 
+{#snippet editingNote()}{t("Editing note · only you see this")}{/snippet}
+
 <section class="notes-panel panel-view" aria-labelledby="notes-title">
   <header class="panel-head">
     <div class="panel-bar">
@@ -131,10 +102,9 @@
       </div>
     </div>
     <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
-    {#if total > 4 || shown}
+    {#if total > 4}
       <div class="panel-tools">
-        {#if total > 4}<input type="search" bind:value={search} aria-label={t("Search notes")} placeholder={t("Search your notes…")} />{/if}
-        {#if shown}<button class="btn btn-quiet btn-small export" class:btn-flush={total <= 4} onclick={exportNotes}>{t("Export as Markdown")}</button>{/if}
+        <input type="search" bind:value={search} aria-label={t("Search notes")} placeholder={t("Search your notes…")} />
       </div>
     {/if}
   </header>
@@ -159,19 +129,25 @@
               <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
             {/if}
             {#if editing === item.id}
-              <textarea
-                rows="3"
-                bind:value={edit} use:autogrow={edit}
-                aria-label={t("Note")}
-                use:enterToSend={() => void saveEdit(item)}
-                onkeydown={(e) => e.key === 'Escape' && (editing = null)}
-              ></textarea>
-              <div class="actions">
-                <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t("Cancel")}</button>
-                <button class="btn btn-small" onclick={() => saveEdit(item)}>{t("Save")}</button>
-              </div>
+              <Composer
+                id="note-edit-{item.id}"
+                value={app.drafts.get(editKey(item.id))}
+                onvalue={(value) => app.drafts.set(editKey(item.id), value)}
+                label={t("Note")}
+                placeholder={t("Write your note…")}
+                submitLabel={t("Save")}
+                onsubmit={() => void saveEdit(item)}
+                header={editingNote}
+                onclose={() => stopEditing(item)}
+                oncancel={() => stopEditing(item)}
+                closeLabel={t("Cancel")}
+                imagesKey={item.kind === 'bookmark' ? undefined : editKey(item.id)}
+                imagesAlone={item.kind === 'note'}
+                allowEmpty={item.kind !== 'note'}
+              />
             {:else}
-              {#if item.note}<p class="text">{item.note}</p>{/if}
+              {#if item.note}<div class="text prose" use:markdown={{ language: locale.language, text: item.note, breaks: true }}></div>{/if}
+              <AttachedImages images={item.images ?? []} small />
               <div class="actions">
                 {#if item.kind !== 'note'}
                   <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
@@ -191,18 +167,22 @@
 
   {#if viewing}
     {#snippet target()}
-      {t("Note on:")} <strong>{app.concept(viewing)?.title}</strong>
+      {t("Note on {section} · only you see this", { section: app.concept(viewing)?.title ?? '' })}
     {/snippet}
-    <PanelComposer
-      id="section-note"
-      value={draft}
-      onvalue={(value) => app.drafts.set(draftKey, value)}
-      label={t("Add a note to this section")}
-      placeholder={t("Add a note to this section…")}
-      submitLabel={t("Add note")}
-      onsubmit={add}
-      context={target}
-    />
+    <div class="panel-foot">
+      <Composer
+        id="section-note"
+        value={draft}
+        onvalue={(value) => app.drafts.set(draftKey, value)}
+        label={t("Add a note to this section")}
+        placeholder={t("Add a note to this section…")}
+        submitLabel={t("Add note")}
+        onsubmit={add}
+        header={target}
+        imagesKey={draftKey}
+        imagesAlone
+      />
+    </div>
   {/if}
 </section>
 
@@ -287,13 +267,7 @@
 
   .text {
     font-size: var(--step-0);
-    white-space: pre-wrap;
     overflow-wrap: anywhere;
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
   }
 
   .actions {

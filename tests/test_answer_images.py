@@ -5,6 +5,7 @@ import threading
 import unittest
 from pathlib import Path
 
+from guided_learning import images as attached
 from guided_learning.api import execute
 from support import host_client
 
@@ -38,12 +39,12 @@ class AnswerImages(unittest.TestCase):
                 self.assertEqual(runner.images, [], 'a turn without images passes none')
                 tid = host.practice.state()['tasks'][0]['id']
                 # A phone photo is larger than the JSON body limit, so images have their own upload route.
-                uploaded = client.post('/api/practice/images', content=PNG, headers={'Content-Type': 'image/png'})
+                uploaded = client.post('/api/images', content=PNG, headers={'Content-Type': 'image/png'})
                 self.assertEqual(uploaded.status_code, 200, uploaded.text)
                 name = uploaded.json()['image']
                 stored = Path(path) / 'answer_images' / name
                 self.assertEqual(stored.read_bytes(), PNG)
-                self.assertEqual(client.get('/api/practice/images/' + name).content, PNG)
+                self.assertEqual(client.get('/api/images/' + name).content, PNG)
 
                 runner.reply = '{"feedback":"Correct.","outcome":"passed"}'
                 answered = client.post(f'/api/practice/tasks/{tid}/assess', json={'answer': '', 'images': [name]})
@@ -64,11 +65,11 @@ class AnswerImages(unittest.TestCase):
             with client:
                 host.wait(client.post('/api/practice/generate', json={'concept_id': 'a'}).json()['turn']['id'], 5)
                 tid = host.practice.state()['tasks'][0]['id']
-                self.assertEqual(client.post('/api/practice/images', content=b'not a picture', headers={'Content-Type': 'image/png'}).status_code, 415)
-                self.assertEqual(client.post('/api/practice/images', content=b'<svg/>', headers={'Content-Type': 'image/svg+xml'}).status_code, 415)
-                huge = client.post('/api/practice/images', content=b'', headers={'Content-Type': 'image/png', 'Content-Length': str(64 * 1024 * 1024)})
+                self.assertEqual(client.post('/api/images', content=b'not a picture', headers={'Content-Type': 'image/png'}).status_code, 415)
+                self.assertEqual(client.post('/api/images', content=b'<svg/>', headers={'Content-Type': 'image/svg+xml'}).status_code, 415)
+                huge = client.post('/api/images', content=b'', headers={'Content-Type': 'image/png', 'Content-Length': str(64 * 1024 * 1024)})
                 self.assertEqual(huge.status_code, 413)
-                self.assertEqual(client.get('/api/practice/images/..%2Fcourse.sqlite3').status_code, 404)
+                self.assertEqual(client.get('/api/images/..%2Fcourse.sqlite3').status_code, 404)
                 missing = client.post(f'/api/practice/tasks/{tid}/assess', json={'answer': 'x', 'images': ['0' * 64 + '.png']})
                 self.assertEqual(missing.status_code, 404, missing.text)
                 empty = client.post(f'/api/practice/tasks/{tid}/assess', json={'answer': ' ', 'images': []})
@@ -82,12 +83,88 @@ class AnswerImages(unittest.TestCase):
             with client:
                 host.wait(client.post('/api/practice/generate', json={'concept_id': 'a'}).json()['turn']['id'], 5)
                 tid = host.practice.state()['tasks'][0]['id']
-                name = host.practice.save_image(PNG[:64])
+                name = attached.save(path, PNG[:64])
                 runner.reply = '{"feedback":"Check the constant.","outcome":"needs_work"}'
                 host.wait(host.practice.act(tid, 'assess', 'See my working', images=[name])['turn']['id'], 5)
             interactions = execute(path, {'op': 'session.resume'})['recent_interactions']
             answer = next(i for i in interactions if i['id'].startswith('practice-answer:'))
             self.assertEqual((answer['text'], answer['images']), ('See my working', [name]))
+
+
+class AttachedImages(unittest.TestCase):
+    """Side questions, their follow-ups, questions about an exercise and learner notes take images too."""
+
+    def test_side_question_and_follow_up_images_reach_the_teacher(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            execute(path, {'op': 'mainline.enter', 'concept_id': 'a', 'goal': 'A', 'next_step': 'Practice', 'request_id': 'p'})
+            runner = Runner()
+            runner.reply = 'Look at the sign.'
+            first, second = attached.save(path, PNG[:64]), attached.save(path, PNG[:65])
+            client, host = host_client(path, runner=runner)
+            with client:
+                asked = client.post('/api/questions', json={'id': 'q', 'question': 'Why this sign?', 'images': [first]})
+                self.assertEqual(asked.status_code, 200, asked.text)
+                host.wait('branch:q', 5)
+                self.assertEqual(runner.images, [str(attached.path(path, first))])
+                self.assertIn('1 image to this question', runner.prompt)
+                reply = client.post('/api/questions/q/replies', json={'id': 'r', 'question': 'And here?', 'images': [second, first]})
+                self.assertEqual(reply.status_code, 200, reply.text)
+                host.wait(reply.json()['reply']['turn_id'], 5)
+                self.assertEqual(runner.images, [str(attached.path(path, n)) for n in (second, first)])
+                self.assertIn('2 images to this follow-up', runner.prompt)
+                again = client.post('/api/questions/q/replies', json={'id': 'r', 'question': 'And here?', 'images': [first]})
+                self.assertEqual(again.status_code, 409, 'the same reply id with other images is a different reply')
+                plain = client.post('/api/questions/q/replies', json={'id': 'r2', 'question': 'No picture'})
+                host.wait(plain.json()['reply']['turn_id'], 5)
+                self.assertEqual(runner.images, [], 'a follow-up without images sends none, even in a thread that had some')
+                questions = client.get('/api/state').json()['questions']
+                self.assertEqual(questions[0]['images'], [first])
+                self.assertEqual(questions[0]['replies'][0]['images'], [second, first])
+                self.assertNotIn('images', questions[0]['replies'][1])
+                unknown = client.post('/api/questions', json={'id': 'u', 'question': 'Hm', 'images': ['0' * 64 + '.png']})
+                self.assertEqual(unknown.status_code, 404)
+
+    def test_question_about_an_exercise_sends_its_images(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            runner = Runner()
+            client, host = host_client(path, runner=runner)
+            with client:
+                host.wait(client.post('/api/practice/generate', json={'concept_id': 'a'}).json()['turn']['id'], 5)
+                tid = host.practice.state()['tasks'][0]['id']
+                name = attached.save(path, PNG[:64])
+                runner.reply = '{"feedback":"It means the area."}'
+                asked = client.post(f'/api/practice/tasks/{tid}/ask', json={'question': 'What is this figure?', 'images': [name]})
+                self.assertEqual(asked.status_code, 200, asked.text)
+                host.wait(asked.json()['turn']['id'], 5)
+                self.assertEqual(runner.images, [str(attached.path(path, name))])
+                self.assertIn('1 image to the question', runner.prompt)
+                entry = client.get('/api/state').json()['practice']['tasks'][0]['history'][-1]
+                self.assertEqual((entry['action'], entry['images']), ('ask', [name]))
+                hinted = client.post(f'/api/practice/tasks/{tid}/hint', json={'images': [name]})
+                host.wait(hinted.json()['turn']['id'], 5)
+                self.assertEqual(runner.images, [], 'a hint takes no images')
+
+    def test_learner_notes_keep_images(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            name, other = attached.save(path, PNG[:64]), attached.save(path, PNG[:65])
+            client, _ = host_client(path, runner=Runner())
+            with client:
+                only = client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'a', 'images': [name]})
+                self.assertEqual(only.status_code, 200, only.text)
+                note = only.json()['annotation']
+                self.assertEqual((note['note'], note['images']), ('', [name]))
+                edited = client.put(f"/api/annotations/{note['id']}", json={'note': 'My sketch'}).json()['annotation']
+                self.assertEqual(edited['images'], [name], 'editing the text keeps the images')
+                edited = client.put(f"/api/annotations/{note['id']}", json={'note': 'My sketch', 'images': [other, name]}).json()['annotation']
+                self.assertEqual(edited['images'], [other, name])
+                cleared = client.put(f"/api/annotations/{note['id']}", json={'note': 'My sketch', 'images': []}).json()['annotation']
+                self.assertNotIn('images', cleared)
+                self.assertEqual(client.put(f"/api/annotations/{note['id']}", json={'note': '', 'images': []}).status_code, 409)
+                bookmark = client.post('/api/annotations', json={'kind': 'bookmark', 'concept_id': 'a', 'images': [name]})
+                self.assertEqual(bookmark.status_code, 409)
 
 
 class RunnerInput(unittest.TestCase):

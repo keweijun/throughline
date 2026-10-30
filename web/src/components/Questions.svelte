@@ -8,7 +8,7 @@
   import { stageScroll } from '../lib/stage';
   import { questionTurnIds } from '../lib/format';
 
-  import PanelComposer from './PanelComposer.svelte';
+  import Composer from './Composer.svelte';
   import QuestionThread from './QuestionThread.svelte';
   import type { Question } from '../lib/types';
 
@@ -89,6 +89,7 @@
 
   const draftKey = $derived(thread ? `followup:${thread.id}` : 'question');
   const draft = $derived(app.drafts.get(draftKey));
+  const images = $derived(app.drafts.images(draftKey));
   // A follow-up waits until every earlier answer in its thread has finished.
   const canReply = $derived(!thread || (
     app.turn(thread.turn_id)?.status === 'completed'
@@ -99,14 +100,17 @@
     if (busy) return;
     busy = true;
     const text = draft;
+    const attached = images;
     const key = draftKey;
     const target = thread;
     const id = newId();
+    const withImages = attached.length ? { images: attached } : {};
     const result = await app.act(() => target
-      ? api.post(`/api/questions/${encodeURIComponent(target.id)}/replies`, { id, question: text, selection: quote?.text ?? '' })
+      ? api.post(`/api/questions/${encodeURIComponent(target.id)}/replies`, { id, question: text, selection: quote?.text ?? '', ...withImages })
       : api.post('/api/questions', {
           id,
           question: text,
+          ...withImages,
           selection: quote ? (quote.source ? `${quote.text}\n(${quote.source})` : quote.text) : '',
           selected_turn_id: quote?.turnId ?? null,
           main_turn_id: currentLesson?.id ?? null,
@@ -117,6 +121,7 @@
     busy = false;
     if (!result) return;
     if (app.drafts.get(key) === text) app.drafts.set(key, '');
+    if (JSON.stringify(app.drafts.images(key)) === JSON.stringify(attached)) app.drafts.setImages(key, []);
     if (quote) app.quote = null;
     if (!target) {
       pause = false;
@@ -173,48 +178,80 @@
     {/each}
   </div>
 
-  {#snippet following()}
-    {t("Following up on:")} <span class="target-title" use:markdown={{ language: locale.language, text: thread!.question }}></span>
-  {/snippet}
-  {#snippet options()}
+  {#snippet target()}
     {#if thread}
-      {#if canReturn}
-        <button type="button" class="btn btn-quiet btn-small btn-flush back" disabled={busy} onclick={backToLesson}>
-          ← {thread.selection && thread.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
-        </button>
-      {/if}
-    {:else if app.runningLesson}
-      <label class="check"><input type="checkbox" bind:checked={pause} /> {t("Pause the lesson while I ask")}</label>
+      <span aria-hidden="true">↳</span> {t("Follow-up")} · <span class="target-title" use:markdown={{ language: locale.language, text: thread.question }}></span>
+    {:else}
+      {t("New question")}{#if app.viewingId}{' · '}{app.concept(app.viewingId)?.title}{/if}
     {/if}
   {/snippet}
-  <PanelComposer
-    id="question-input"
-    value={draft}
-    onvalue={(value) => app.drafts.set(draftKey, value)}
-    label={thread ? t("Follow-up question") : t("Side question")}
-    placeholder={thread ? t("Ask a follow-up about this…") : quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
-    submitLabel={thread ? t("Send follow-up") : t("Ask")}
-    disabled={busy || !canReply}
-    onsubmit={send}
-    context={thread ? following : undefined}
-    onclear={() => thread && setOpen(thread, false)}
-    clearLabel={t("Ask a new question instead")}
-    quote={quote ? { text: quote.text, source: thread ? undefined : quote.source, id: thread ? undefined : 'branch-selection' } : null}
-    onremovequote={() => (app.quote = null)}
-    {options}
-  />
+  {#snippet tools()}
+    {#if !thread && app.runningLesson}
+      <button type="button" class="toggle" aria-pressed={pause} onclick={() => (pause = !pause)} title={t("Pause the lesson while I ask")}>
+        <span class="mark" aria-hidden="true">{pause ? '❚❚' : '▶'}</span>{pause ? t("Lesson pauses") : t("Lesson keeps going")}
+      </button>
+    {/if}
+  {/snippet}
+  <div class="panel-foot">
+    {#if thread && canReturn}
+      <button type="button" class="btn btn-quiet btn-small btn-flush back" disabled={busy} onclick={backToLesson}>
+        ← {thread.selection && thread.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
+      </button>
+    {/if}
+    <Composer
+      id="question-input"
+      value={draft}
+      onvalue={(value) => app.drafts.set(draftKey, value)}
+      label={thread ? t("Follow-up question") : t("Side question")}
+      placeholder={thread ? t("Ask a follow-up about this…") : quote ? t("What would you like explained about this passage?") : t("What would you like explained?")}
+      submitLabel={thread ? t("Send follow-up") : t("Ask")}
+      disabled={busy || !canReply}
+      onsubmit={send}
+      header={target}
+      onclose={thread ? () => setOpen(thread, false) : undefined}
+      closeLabel={t("Ask a new question instead")}
+      quote={quote ? { text: quote.text, source: thread ? undefined : quote.source, id: thread ? undefined : 'branch-selection' } : null}
+      onremovequote={() => (app.quote = null)}
+      imagesKey={draftKey}
+      {tools}
+    />
+  </div>
 </section>
 
 <style>
-  .check {
-    display: flex;
+  /* Whether the lesson keeps being written while the teacher answers: a switch on how the question is sent. */
+  .toggle {
+    display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
+    min-height: 1.9rem;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: none;
+    color: var(--pencil);
     font-size: var(--step--1);
-    color: var(--ink-soft);
+    cursor: pointer;
+  }
+
+  .toggle:hover {
+    border-color: var(--pencil);
+  }
+
+  .toggle[aria-pressed='true'] {
+    border-color: var(--caution);
+    background: var(--caution-wash);
+    color: var(--caution);
+    font-weight: 600;
+  }
+
+  .mark {
+    font-size: 0.6rem;
+    letter-spacing: -0.05em;
   }
 
   .back {
+    justify-self: start;
     color: var(--accent);
   }
 

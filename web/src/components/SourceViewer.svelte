@@ -45,7 +45,7 @@
   {:else if s}
     {#if app.sourceLoading}<p class="switching" role="status">{t("Opening the source…")}</p>{/if}
     <header>
-      <button class="btn btn-quiet btn-small all" onclick={() => (app.sourceList = true)}>{t("All sources ({count})", { count: app.state?.sources.length ?? 0 })}</button>
+      <button class="btn btn-quiet btn-small btn-flush all" onclick={() => (app.sourceList = true)}>{t("All sources ({count})", { count: app.state?.sources.length ?? 0 })}</button>
       <h2>{s.title}</h2>
       <p class="meta">
         <span>{where}</span>
@@ -127,7 +127,6 @@
 
   .all {
     justify-self: start;
-    padding-left: 0;
   }
 
   header {

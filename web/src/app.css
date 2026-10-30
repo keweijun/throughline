@@ -259,6 +259,15 @@ a {
   font-size: var(--step--1);
 }
 
+/* A quiet button whose text lines up with the content beside it: it keeps even padding, so its hover wash stays centred, and moves left by that padding instead. */
+.btn-quiet.btn-flush {
+  margin-inline-start: -0.55rem;
+}
+
+.btn-quiet.btn-small.btn-flush {
+  margin-inline-start: -0.6rem;
+}
+
 .field {
   display: grid;
   gap: 0.35rem;
@@ -1026,4 +1035,75 @@ dialog[open]::backdrop {
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Questions and Notes share one layout: a header, a list, and a writing box pinned to the panel's bottom. */
+.panel-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.panel-head {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.panel-view > .panel-head {
+  margin-bottom: 1.1rem;
+}
+
+/* The bar clears the panel's close button, which floats in its corner. */
+.panel-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  min-height: 2rem;
+  padding-right: 2.2rem;
+}
+
+.panel-bar h2 {
+  font-size: var(--step-1);
+  font-weight: 600;
+}
+
+.panel-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+
+.panel-tools input[type='search'] {
+  flex: 1;
+  min-width: 10rem;
+  font-size: var(--step--1);
+}
+
+.panel-intro,
+.panel-empty {
+  font-size: var(--step--1);
+  color: var(--pencil);
+}
+
+.panel-list {
+  display: grid;
+  align-content: start;
+  gap: 1.1rem;
+  padding-bottom: 1.5rem;
+}
+
+/* A passage the learner asked about, in a question, a follow-up or the box they are writing. */
+.asked-passage {
+  margin: 0;
+  padding: 0.3rem 0.6rem;
+  border-left: 3px solid var(--marker);
+  background: var(--marker-wash);
+  font-family: var(--serif);
+  font-size: var(--step--1);
+  color: var(--ink-soft);
+  max-height: 8rem;
+  overflow: auto;
 }

@@ -46,9 +46,11 @@
 </script>
 
 <section class="source-list" aria-labelledby="sources-title">
-  <h2 id="sources-title">{t("Course sources")}</h2>
+  <header class="panel-head">
+    <div class="panel-bar"><h2 id="sources-title">{t("Course sources")}</h2></div>
+  </header>
   {#if app.source}
-    <button class="btn btn-quiet btn-small back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
+    <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
   {/if}
   {#if !entries.length}
     <p class="muted">{t("No documents are registered in this course yet. Add files from Codex.")}</p>
@@ -92,11 +94,6 @@
     overflow: auto;
   }
 
-  h2 {
-    font-size: var(--step-1);
-    font-weight: 600;
-  }
-
   h3 {
     margin-top: 0.6rem;
     font-size: var(--step--1);
@@ -106,7 +103,6 @@
 
   .back {
     justify-self: start;
-    padding-left: 0;
   }
 
   .muted {

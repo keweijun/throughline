@@ -87,9 +87,9 @@
     <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
   </button>
   <div class="body" class:fill={app.panelTab === 'source'} bind:this={body}>
-    <div class="view" id="panel-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
+    <div class="view docked" id="panel-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
     <div class="view" id="panel-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
-    <div class="view" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
+    <div class="view docked" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
     <div class="view" id="panel-memory" hidden={app.panelTab !== 'memory'}><Memory /></div>
   </div>
 </aside>
@@ -157,6 +157,19 @@
 
   .view {
     padding: 1.1rem 0 3rem;
+  }
+
+  /* Questions and Notes pin their writing box to the panel's bottom edge, however short their list. */
+  .body:not(.fill) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .view.docked:not([hidden]) {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    padding-bottom: 0;
   }
 
   /* The reader scrolls inside itself, so the source tab fills the panel instead. */

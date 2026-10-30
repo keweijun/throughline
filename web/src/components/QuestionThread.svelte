@@ -1,16 +1,14 @@
 <script lang="ts">
-  import { enterToSend } from '../lib/keys';
-  import { panelCoversLesson } from '../lib/media';
+    import { panelCoversLesson } from '../lib/media';
   import { slide } from 'svelte/transition';
   import { highlights, annotationPassage } from '../lib/highlight';
   import { locale, t } from '../lib/i18n.svelte';
 
-  import { api, newId } from '../lib/api';
+  import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { autogrow } from '../lib/autogrow';
-  import { markdown } from '../lib/markdown';
+    import { markdown } from '../lib/markdown';
   import { lessonStatus, questionTurnIds } from '../lib/format';
-  import type { Question, QuestionReply } from '../lib/types';
+  import type { Question, QuestionReply, Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
 
   let { question, open = $bindable(false) }: { question: Question; open?: boolean } = $props();
@@ -20,17 +18,9 @@
   const decision = $derived(question.decision);
   const later = $derived(decision?.category === 'future' && decision.target_concept_id ? app.concept(decision.target_concept_id) : undefined);
   const scheduled = $derived(app.state?.deferred_explanations.find((e) => e.id === `web:${question.id}`));
-  // Returning restores reading inside the section the question was asked from; once the route moves on there is nothing to return to.
-  const canReturn = $derived(question.restore_point?.concept_id === app.currentId);
   let node: HTMLElement | undefined = $state();
   let flash = $state(false);
-  // The follow-up draft outlives this component, which is rebuilt whenever the thread list changes.
-  const draftKey = $derived(`followup:${question.id}`);
-  const replyText = $derived(app.drafts.get(draftKey));
-  const setReplyText = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
-  const quote = $derived(app.quote?.questionId === question.id ? app.quote : null);
-  const canReply = $derived(answer?.status === 'completed' && (!supplement || supplement.status === 'completed') && (question.replies ?? []).every((r) => app.turn(r.turn_id)?.status === 'completed'));
 
   async function retryMissing(item: QuestionReply) {
     busy = true;
@@ -39,23 +29,6 @@
     }));
     busy = false;
   }
-
-  async function reply(event: SubmitEvent) {
-    event.preventDefault();
-    if (!replyText.trim() || !canReply || busy) return;
-    busy = true;
-    const text = replyText;
-    const key = draftKey;
-    const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/replies`, {
-      id: newId(), question: text, selection: quote?.text ?? '',
-    }));
-    busy = false;
-    if (result) {
-      if (app.drafts.get(key) === text) app.drafts.set(key, '');
-      if (quote) app.quote = null;
-    }
-  }
-
 
   $effect(() => {
     if (app.focusThread !== question.id || !node || !app.panelOpen) return;
@@ -74,16 +47,6 @@
     busy = false;
   }
 
-  async function backToLesson() {
-    if (busy) return;
-    busy = true;
-    const result = await app.act(() => api.post(`/api/questions/${encodeURIComponent(question.id)}/return`));
-    busy = false;
-    if (!result) return;
-    if (panelCoversLesson()) app.panelOpen = false;
-    await app.returnTo(question);
-  }
-
   function previewLater() {
     if (panelCoversLesson()) app.panelOpen = false;
     app.view(later!.id);
@@ -96,10 +59,10 @@
   const noted = $derived(mine.filter((a) => a.note));
 
   // A long list stays scannable: each thread shows a one-line summary until it is opened.
-  const section = $derived(app.concept(question.anchor?.concept_id ?? question.restore_point?.concept_id));
   const summary = $derived.by((): { label: string; tone: string; live?: boolean } => {
     if (questionTurnIds(question).some((id) => app.isRunning(id))) return { label: t("Answering"), tone: 'accent', live: true };
     if (answer && answer.status !== 'completed') return { label: t(lessonStatus[answer.status].label), tone: lessonStatus[answer.status].tone };
+    if (supplement && supplement.status !== 'completed') return { label: t(lessonStatus[supplement.status].label), tone: lessonStatus[supplement.status].tone };
     if (question.status === 'suggested') return { label: t("Foundation suggested"), tone: 'caution' };
     if (scheduled?.status === 'pending') return { label: t("Explanation pending"), tone: 'accent' };
     if (scheduled?.status === 'resolved') return { label: t("Explained"), tone: 'good' };
@@ -107,6 +70,19 @@
   });
   const followUps = $derived(question.replies?.length ?? 0);
 </script>
+
+<!-- Every question the learner asks reads the same way, quote first, so a follow-up looks like the question that opened the thread. -->
+{#snippet answered(turn: Turn)}
+  {#if turn.text}
+    <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r), streaming: turn.status === 'running' }}></div>
+  {/if}
+  {#if turn.status !== 'completed'}
+    <div class="state">
+      {#if turn.status !== 'running'}<span class="chip chip-{lessonStatus[turn.status].tone}">{t(lessonStatus[turn.status].label)}</span>{/if}
+      <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
+    </div>
+  {/if}
+{/snippet}
 
 <article class="thread" class:flash class:open id="thread-{question.id}" bind:this={node} data-question-id={question.id}>
   <div class="head">
@@ -120,10 +96,12 @@
     <!-- The whole summary opens the thread; the toggle button is the keyboard-accessible control. -->
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="summary" onclick={() => (open = true)}>
-      <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
+      <div class="asked">
+        {#if open && question.selection}<blockquote class="prose asked-passage" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
+        <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
+      </div>
       <p class="meta">
         <span class="chip chip-{summary.tone}">{#if summary.live}<span class="live-dot"></span>{/if}{summary.label}</span>
-        {#if section}<span>{section.title}</span>{/if}
         {#if followUps}<span>{followUps === 1 ? t("1 follow-up") : t("{count} follow-ups", { count: followUps })}</span>{/if}
         {#if noted.length}
           <button class="your-notes" onclick={(e) => (e.stopPropagation(), app.showAnnotation(noted[0].id))}>
@@ -136,15 +114,7 @@
 
   {#if open}
   <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: 200 }}>
-  {#if question.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
-  {#if answer?.text}
-    <div class="prose answer" data-question-answer data-turn-id={answer.id} use:highlights={{ passages: passages(answer.id), text: answer.text }} use:markdown={{ language: locale.language, text: answer.text, refs: answer.source_refs, onSource: (r) => app.openSource(r), streaming: answer.status === 'running' }}></div>
-  {/if}
-  {#if answer && answer.status !== 'completed'}
-    <div class="state">
-      <TurnControls turn={answer} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
-    </div>
-  {/if}
+  {#if answer}{@render answered(answer)}{/if}
 
   <!-- How the teacher placed the question on the route is its own reasoning; the learner sees only what it changes. -->
   {#if later}
@@ -155,7 +125,7 @@
         {t("The full explanation is saved for {section}.", { section: later.title })}
       {/if}
       {#if later.id !== app.viewingId}
-        <button class="btn btn-quiet btn-small" onclick={previewLater}>{t("Look at that section")}</button>
+        <button class="btn btn-quiet btn-small btn-flush" onclick={previewLater}>{t("Look at that section")}</button>
       {/if}
     </p>
   {/if}
@@ -190,44 +160,20 @@
     {@const turn = app.turn(item.turn_id)}
     <section class="reply">
       <div class="asked">
-        <span class="who">{t("You")}</span>
-        {#if item.selection}<blockquote class="prose" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
+        {#if item.selection}<blockquote class="prose asked-passage" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
         <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
       </div>
       {#if turn}
-        <div class="prose answer" data-question-answer data-turn-id={turn.id} use:highlights={{ passages: passages(turn.id), text: turn.text }} use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (r) => app.openSource(r), streaming: turn.status === 'running' }}></div>
-        {#if turn.status !== 'completed'}
-          {#if turn.status !== 'running'}<span class="chip chip-{lessonStatus[turn.status].tone}">{t(lessonStatus[turn.status].label)}</span>{/if}
-          <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
-        {/if}
+        {@render answered(turn)}
       {:else}
-        <p class="decision">{t("This reply did not start. Try again.")}</p>
-        <button class="btn btn-small" disabled={busy} onclick={() => retryMissing(item)}>{t("Answer again")}</button>
+        <div class="state">
+          <p class="decision">{t("This reply did not start. Try again.")}</p>
+          <button class="btn btn-small" disabled={busy} onclick={() => retryMissing(item)}>{t("Answer again")}</button>
+        </div>
       {/if}
     </section>
   {/each}
 
-  <!-- The follow-up box stays in reach at the bottom of the panel while the thread is read. -->
-  <form class="followup" onsubmit={reply}>
-    {#if quote}
-      <div class="quoted">
-        <blockquote class="prose" use:markdown={{ language: locale.language, text: quote.text }}></blockquote>
-        <button type="button" class="btn btn-quiet btn-small" onclick={() => (app.quote = null)}>{t("Remove quote")}</button>
-      </div>
-    {/if}
-    <label class="field">
-      <span class="visually-hidden">{t("Follow up")}</span>
-      <textarea id="reply-input-{question.id}" rows="2" bind:value={() => replyText, setReplyText} use:autogrow={replyText} use:enterToSend aria-label={t("Follow-up question")} placeholder={t("Ask a follow-up about this…")}></textarea>
-    </label>
-    <div class="row">
-      {#if canReturn}
-        <button type="button" class="btn btn-quiet btn-small back" disabled={busy} onclick={backToLesson}>
-          ← {question.selection && question.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
-        </button>
-      {/if}
-      <button class="btn btn-small btn-primary send" disabled={busy || !canReply || !replyText.trim()}>{t("Send follow-up")}</button>
-    </div>
-  </form>
   </div>
   {/if}
 </article>
@@ -253,6 +199,12 @@
     display: grid;
     gap: 0.3rem;
     cursor: pointer;
+  }
+
+  /* Collapsed, a thread is one row of a list; open, its question reads like every follow-up below it. */
+  .thread:not(.open) .asked {
+    padding: 0;
+    background: none;
   }
 
   .thread:not(.open) .title {
@@ -294,68 +246,21 @@
   .reply {
     display: grid;
     gap: 0.6rem;
-    margin-top: 0.9rem;
+    margin-top: 1rem;
   }
 
   /* What the learner asked reads apart from the teacher's answers. */
   .asked {
     display: grid;
-    gap: 0.35rem;
-    justify-self: end;
-    max-width: 92%;
-    padding: 0.5rem 0.75rem 0.6rem;
-    border-radius: var(--radius) var(--radius) 2px var(--radius);
+    gap: 0.4rem;
+    padding: 0.55rem 0.75rem 0.6rem;
+    border-radius: var(--radius);
     background: var(--accent-wash);
   }
 
-  .who {
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--pencil);
-  }
-
-  .asked .title {
-    font-family: var(--sans);
-    font-weight: 500;
-  }
-
-  .followup {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    display: grid;
-    gap: 0.45rem;
-    margin-top: 0.75rem;
-    padding: 0.6rem 0;
-    background: var(--sheet);
-    box-shadow: 0 -1px 0 var(--rule);
-  }
-
-  .followup textarea {
-    min-height: 2.75rem;
-  }
-
-  .followup .row {
-    justify-content: space-between;
-  }
-
-  .followup .send {
-    margin-left: auto;
-  }
-
-  .back {
-    padding-left: 0;
-    color: var(--accent);
-  }
-
-  .quoted {
-    display: flex;
-    align-items: start;
-    gap: 0.4rem;
-  }
-
-  .quoted blockquote {
-    flex: 1;
+  /* Follow-ups keep the inset the open thread's sticky question leaves for the panel's close button, so every question box lines up. */
+  .reply .asked {
+    margin-right: 2.2rem;
   }
 
   .thread.flash {
@@ -378,21 +283,17 @@
     border-bottom: 1px solid var(--rule);
   }
 
-  blockquote {
-    margin: 0;
-    padding: 0.3rem 0.6rem;
-    border-left: 3px solid var(--marker);
-    background: var(--marker-wash);
-    font-family: var(--serif);
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-    max-height: 8rem;
-    overflow: auto;
+
+  /* An open thread's question stays in view, so its quote is kept short there; scroll it to read the rest. */
+  .head blockquote {
+    max-height: 4.6em;
   }
 
   .title {
+    font-family: var(--sans);
     font-size: var(--step-0);
     font-weight: 600;
+    line-height: 1.45;
   }
 
   .answer,
@@ -401,16 +302,27 @@
     line-height: 1.65;
   }
 
+  /* An answer's headings organise it; they should not outrank the question it answers. */
+  .answer :global(h1),
+  .answer :global(h2),
+  .supplement .prose :global(h1),
+  .supplement .prose :global(h2) {
+    font-size: var(--step-1);
+  }
+
+  .answer :global(h3),
+  .answer :global(h4),
+  .supplement .prose :global(h3),
+  .supplement .prose :global(h4) {
+    font-size: var(--step-0);
+  }
+
   .state,
   .row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
-  }
-
-  .end {
-    justify-content: flex-end;
   }
 
   .decision {
@@ -427,9 +339,6 @@
     color: var(--accent);
   }
 
-  .later .btn {
-    padding-left: 0;
-  }
 
   .suggest {
     display: grid;

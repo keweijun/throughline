@@ -1,46 +1,42 @@
 <script lang="ts">
   import { enterToSend } from '../lib/keys';
-  import { slide } from 'svelte/transition';
+  import PanelComposer from './PanelComposer.svelte';
+  import PanelGroups from './PanelGroups.svelte';
+  import PanelScope from './PanelScope.svelte';
+  import { groupBySection, scopeCounts, type PanelScope as Scope } from '../lib/panel';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { autogrow } from '../lib/autogrow';
-  import type { Annotation, Chapter } from '../lib/types';
+  import type { Annotation } from '../lib/types';
 
-  let scope = $state<'section' | 'chapter' | 'all'>('section');
-  let draft = $state('');
+  // Questions and Notes narrow and search their lists the same way.
+  let scope = $state<Scope>('section');
+  let scopeChosen = false;
+  let search = $state('');
   let editing = $state<string | null>(null);
   let edit = $state('');
   let flash = $state<string | null>(null);
 
   const viewing = $derived(app.viewingId);
+  // The note draft is kept per section, like the other writing boxes, so it survives a look elsewhere.
+  const draftKey = $derived(`note:${viewing}`);
+  const draft = $derived(app.drafts.get(draftKey));
+  const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
+  const matches = (a: Annotation) => words.every((w) => [a.passage, a.note, a.source?.label ?? ''].join(' ').toLowerCase().includes(w));
   const chapter = $derived(app.chapterOf(viewing));
-  // Notes on a chapter recap or quiz question are grouped with their chapter, after its sections, not in the anchor section.
-  const groups = $derived.by(() => {
-    const all = app.state?.annotations ?? [];
-    const owner = new Map(all.map((a) => [a.id, app.ownerChapter(a)]));
-    const route = app.state?.curriculum.route ?? [];
-    const ids = scope === 'section' ? [viewing] : scope === 'chapter' ? (chapter?.concept_ids ?? []) : route;
-    const result: { key: string; title: string; chapter?: Chapter; items: Annotation[] }[] = [];
-    for (const id of ids) {
-      const concept = app.concept(id);
-      const home = app.chapterOf(id);
-      if (!concept) continue;
-      const items = all.filter((a) => a.concept_id === id && !owner.get(a.id));
-      if (items.length || scope === 'section') result.push({ key: concept.id, title: concept.title, chapter: home, items });
-      if (scope !== 'section' && home && home.concept_ids.at(-1) === id) {
-        const chapterItems = all.filter((a) => owner.get(a.id) === home.id);
-        if (chapterItems.length) result.push({ key: `chapter:${home.id}`, title: t("Chapter recap and quiz"), chapter: home, items: chapterItems });
-      }
-    }
-    return result;
+  // Notes on a chapter recap or quiz question belong to their chapter, not the section they were written from.
+  const ownerOf = (a: Annotation) => app.ownerChapter(a);
+  const sectionOf = (a: Annotation) => a.concept_id;
+  const all = $derived(app.state?.annotations ?? []);
+  const counts = $derived(scopeCounts(all, sectionOf, ownerOf));
+  // Until the learner picks a scope, show the narrowest one that has something in it.
+  $effect(() => {
+    if (!scopeChosen) scope = counts.section ? 'section' : counts.chapter ? 'chapter' : 'all';
   });
+  const groups = $derived(groupBySection(all.filter(matches), scope, sectionOf, ownerOf));
   const shown = $derived(groups.reduce((n, g) => n + g.items.length, 0));
 
-  // A section outside any chapter has no "This chapter" choice; fall back rather than show nothing.
-  $effect(() => {
-    if (scope === 'chapter' && !chapter) scope = 'section';
-  });
 
 
   /** Your notes as a Markdown file, grouped by chapter and section, for keeping outside the app. */
@@ -66,10 +62,16 @@
   }
   const total = $derived(app.state?.annotations.length ?? 0);
 
-  async function add(event: SubmitEvent) {
-    event.preventDefault();
-    if (!viewing || !draft.trim()) return;
-    if (await app.annotate({ kind: 'note', concept_id: viewing, note: draft })) draft = '';
+  async function add() {
+    const section = viewing;
+    const text = draft;
+    const key = draftKey;
+    if (!section || !text.trim()) return;
+    if (!(await app.annotate({ kind: 'note', concept_id: section, note: text }))) return;
+    if (app.drafts.get(key) === text) app.drafts.set(key, '');
+    // The new note may land mid-list when several sections are shown; bring it into view.
+    const added = [...(app.state?.annotations ?? [])].reverse().find((a) => a.kind === 'note' && a.concept_id === section && a.note === text);
+    if (added) app.focusAnnotation = added.id;
   }
 
   function start(item: Annotation) {
@@ -98,7 +100,11 @@
     const id = app.focusAnnotation;
     if (!id || !app.panelOpen || app.panelTab !== 'notes') return;
     const item = app.state?.annotations.find((a) => a.id === id);
-    if (item && (item.concept_id !== viewing || app.ownerChapter(item))) scope = 'all';
+    if (item && !matches(item)) search = '';
+    if (item && (item.concept_id !== viewing || app.ownerChapter(item))) {
+      scope = 'all';
+      scopeChosen = true;
+    }
     app.focusAnnotation = null;
     flash = id;
     requestAnimationFrame(() => document.getElementById(`annotation-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
@@ -107,139 +113,81 @@
   });
 </script>
 
-<section class="notes-panel" aria-labelledby="notes-title">
-  <h2 id="notes-title">{t("Your notes")}</h2>
-  <p class="intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+<section class="notes-panel panel-view" aria-labelledby="notes-title">
+  <header class="panel-head">
+    <div class="panel-bar"><h2 id="notes-title">{t("Your notes")}</h2></div>
+    <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+    {#if total}
+      <PanelScope bind:scope {counts} label={t("Show notes from")} onchoose={() => (scopeChosen = true)} />
+    {/if}
+    {#if total > 4 || shown}
+      <div class="panel-tools">
+        {#if total > 4}<input type="search" bind:value={search} aria-label={t("Search notes")} placeholder={t("Search your notes…")} />{/if}
+        {#if shown}<button class="btn btn-quiet btn-small export" class:btn-flush={total <= 4} onclick={exportNotes}>{t("Export as Markdown")}</button>{/if}
+      </div>
+    {/if}
+  </header>
 
-  {#if viewing}
-    <form class="add" onsubmit={add}>
-      <label for="section-note" class="visually-hidden">{t("Add a note to this section")}</label>
-      <textarea
-        id="section-note"
-        rows="2"
-        bind:value={draft} use:autogrow={draft}
-        placeholder={t("Add a note to this section…")}
-        use:enterToSend
-      ></textarea>
-      <button class="btn btn-small" type="submit" disabled={!draft.trim()}>{t("Add note")}</button>
-    </form>
-  {/if}
-
-  <div class="scope segmented" role="radiogroup" aria-label={t("Show notes from")}>
-    <label><input type="radio" bind:group={scope} value="section" />{t("This section")}</label>
-    {#if chapter}<label><input type="radio" bind:group={scope} value="chapter" />{t("This chapter")}</label>{/if}
-    <label><input type="radio" bind:group={scope} value="all" />{t("All sections ({count})", { count: total })}</label>
+  <div class="panel-list">
+    {#snippet note(item: Annotation)}
+      <article id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
+        <p class="kind">
+          {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
+        </p>
+        {#if item.passage}
+          <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
+        {/if}
+        {#if editing === item.id}
+          <textarea
+            rows="3"
+            bind:value={edit} use:autogrow={edit}
+            aria-label={t("Note")}
+            use:enterToSend={() => void saveEdit(item)}
+            onkeydown={(e) => e.key === 'Escape' && (editing = null)}
+          ></textarea>
+          <div class="actions">
+            <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t("Cancel")}</button>
+            <button class="btn btn-small" onclick={() => saveEdit(item)}>{t("Save")}</button>
+          </div>
+        {:else}
+          {#if item.note}<p class="text">{item.note}</p>{/if}
+          <div class="actions">
+            {#if item.kind !== 'note'}
+              <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
+            {/if}
+            <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
+            <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
+          </div>
+        {/if}
+      </article>
+    {/snippet}
+    <PanelGroups
+      {groups}
+      {scope}
+      key={(a) => a.id}
+      item={note}
+      empty={words.length ? t("No notes match your search.") : !total ? t("No highlights, notes or bookmarks yet.") : scope === 'chapter' ? t("No notes in this chapter yet.") : t("No notes in this section yet.")}
+    />
   </div>
 
-  {#if shown}
-    <button class="btn btn-quiet btn-small export" onclick={exportNotes}>{t("Export these notes as Markdown")}</button>
+  {#if viewing}
+    {#snippet target()}
+      {t("Note on:")} <strong>{app.concept(viewing)?.title}</strong>
+    {/snippet}
+    <PanelComposer
+      id="section-note"
+      value={draft}
+      onvalue={(value) => app.drafts.set(draftKey, value)}
+      label={t("Add a note to this section")}
+      placeholder={t("Add a note to this section…")}
+      submitLabel={t("Add note")}
+      onsubmit={add}
+      context={target}
+    />
   {/if}
-
-  {#each groups as group, i (group.key)}
-    {#if scope === 'all' && group.chapter && group.chapter.id !== groups[i - 1]?.chapter?.id}
-      <h3 class="chapter">{group.chapter.title}</h3>
-    {/if}
-    <section class="group">
-      <h3>{group.title}</h3>
-      {#if !group.items.length}
-        <p class="empty">{t("Nothing saved for this section yet.")}</p>
-      {/if}
-      <ul>
-        {#each group.items as item (item.id)}
-          <li id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id} transition:slide={{ duration: 200 }}>
-            <p class="kind">
-              {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
-            </p>
-            {#if item.passage}
-              <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
-            {/if}
-            {#if editing === item.id}
-              <textarea
-                rows="3"
-                bind:value={edit} use:autogrow={edit}
-                aria-label={t("Note")}
-                use:enterToSend={() => void saveEdit(item)}
-                onkeydown={(e) => e.key === 'Escape' && (editing = null)}
-              ></textarea>
-              <div class="actions">
-                <button class="btn btn-quiet btn-small" onclick={() => (editing = null)}>{t("Cancel")}</button>
-                <button class="btn btn-small" onclick={() => saveEdit(item)}>{t("Save")}</button>
-              </div>
-            {:else}
-              {#if item.note}<p class="text">{item.note}</p>{/if}
-              <div class="actions">
-                {#if item.kind !== 'note'}
-                  <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
-                {/if}
-                <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
-                <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {:else}
-    <p class="empty">{t("No highlights, notes or bookmarks yet.")}</p>
-  {/each}
 </section>
 
 <style>
-  .notes-panel {
-    display: grid;
-    gap: 0.75rem;
-  }
-
-  h2 {
-    font-size: var(--step-1);
-    font-weight: 600;
-  }
-
-  .intro,
-  .empty {
-    font-size: var(--step--1);
-    color: var(--pencil);
-  }
-
-  .add {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  .add .btn {
-    justify-self: end;
-  }
-
-  .scope {
-    margin-top: 0.5rem;
-  }
-
-  .export {
-    justify-self: start;
-    padding-left: 0;
-  }
-
-  h3.chapter {
-    margin-top: 1.4rem;
-    font-size: var(--step-0);
-    color: var(--ink);
-  }
-
-  h3 {
-    margin: 1rem 0 0.5rem;
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--pencil);
-  }
-
-  ul {
-    display: grid;
-    gap: 0.75rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
   .item {
     display: grid;
     gap: 0.35rem;

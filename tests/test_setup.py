@@ -119,5 +119,16 @@ class MacLauncher(unittest.TestCase):
             self.assertTrue(stranger.is_dir())
 
 
+class Commands(unittest.TestCase):
+    def test_throughline_is_the_same_command_as_guided_learning(self):
+        try:
+            import tomllib
+        except ImportError:
+            self.skipTest('tomllib needs Python 3.11')
+        root = Path(__file__).resolve().parent.parent
+        scripts = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']['scripts']
+        self.assertEqual(scripts['throughline'], scripts['guided-learning'])
+
+
 if __name__ == '__main__':
     unittest.main()

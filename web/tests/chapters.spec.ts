@@ -115,7 +115,7 @@ test('a later section can be studied now, and the unstudied sections before it s
   expect(errors).toEqual([]);
 });
 
-test('beside an open panel the route folds to a badge per chapter, whichever are collapsed, and opens the full route on hover', async ({ page, course }) => {
+test('beside an open panel the route folds to a badge per chapter and opens the full route on hover', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
@@ -135,7 +135,11 @@ test('beside an open panel the route folds to a badge per chapter, whichever are
   await full.getByRole('button', { name: 'Collapse chapter' }).first().click();
   await page.mouse.move(900, 600);
   await expect(full).toBeHidden();
+  // The capsule shows the chapters the full route shows; picking its chapter opens it again.
   await expect(mini.locator('.route-badge')).toHaveCount(3);
+  await expect(mini.locator('.route-dot')).toHaveCount(0);
+  await mini.getByRole('button', { name: /^Chapter 1 · States/ }).click();
+  await expect(mini.locator('.route-dot')).toHaveCount(2);
 
   await mini.getByRole('button', { name: /^Superposition/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
@@ -190,5 +194,35 @@ test('in a long course the folded route shows every chapter and a window of the 
     await page.mouse.move(1300, 500);
     await expect(full).toBeHidden();
   }
+  expect(errors).toEqual([]);
+});
+
+test('in a long course the route opens at where the learner is, and folding keeps the same chapters open', async ({ page, course }) => {
+  await page.setViewportSize({ width: 1440, height: 500 });
+  const { errors } = await course('long_course_browser_fixture');
+  const rail = page.locator('#route');
+  // The current section is below the first screen of the route; the route scrolls to it.
+  await expect(rail.locator('.current .entry')).toBeInViewport();
+  const open = (selector: string) =>
+    rail.locator(selector).evaluateAll((chapters) => chapters.map((chapter, i) => (chapter.querySelector('.tray') ? i + 1 : 0)).filter(Boolean));
+  await expect.poll(() => open('.full .chapter')).toEqual([5]);
+
+  // Looking at another chapter opens it instead, and the route follows.
+  await rail.getByRole('button', { name: /Chapter 9 · Partial/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Partial differential equations');
+  await expect.poll(() => open('.full .chapter')).toEqual([9]);
+  await expect(rail.locator('[aria-current="page"]')).toBeInViewport();
+  // A chapter the learner opens stays open when the route folds, in the capsule too.
+  await rail.getByRole('button', { name: 'Expand chapter' }).nth(1).click();
+  await expect.poll(() => open('.full .chapter')).toEqual([2, 9]);
+  await page.keyboard.press('r');
+  await expect.poll(() => open('.mini .chapter')).toEqual([2, 9]);
+  await page.keyboard.press('r');
+  await expect.poll(() => open('.full .chapter')).toEqual([2, 9]);
+
+  // Going back to the current section opens its chapter alone, and the route scrolls back to it.
+  await page.getByRole('button', { name: 'Back to current section' }).click();
+  await expect.poll(() => open('.full .chapter')).toEqual([5]);
+  await expect(rail.locator('.current .entry')).toBeInViewport();
   expect(errors).toEqual([]);
 });

@@ -148,6 +148,8 @@ class AppStore {
   #inflight: DeltaEvent[] | null = null;
   /** Annotation changes shown before the host confirms them; reapplied to any snapshot loaded meanwhile. */
   #pending = new Map<string, (annotations: Annotation[]) => void>();
+  /** Chapters the learner opened or closed in the route, and the chapter in view when they did. */
+  #chapterToggles = $state<{ at: string | null; open: Record<string, boolean> }>({ at: null, open: {} });
 
   get currentId(): string | null {
     const s = this.state;
@@ -174,6 +176,28 @@ class AppStore {
 
   chapterOf(conceptId: string | null | undefined): Chapter | undefined {
     return this.chapters.find((c) => conceptId && c.concept_ids.includes(conceptId));
+  }
+
+  /** The chapter of what the reading column shows: a chapter page, else the section in view. */
+  get chapterInView(): string | null {
+    return this.viewingChapter ?? this.chapterOf(this.viewingId)?.id ?? null;
+  }
+
+  /**
+   * Whether a chapter shows its sections in the route, folded or not: the chapter in view, or the chapter being studied
+   * while the one in view has no sections yet, unless the learner opened or closed chapters since. Their choice lasts
+   * until the chapter in view changes or they pick something to read.
+   */
+  chapterOpen(chapterId: string) {
+    const toggles = this.#chapterToggles.at === this.chapterInView ? this.#chapterToggles.open : {};
+    const inView = this.chapters.find((c) => c.id === this.chapterInView);
+    return toggles[chapterId] ?? chapterId === (inView?.concept_ids.length ? inView.id : this.chapterOf(this.currentId)?.id);
+  }
+
+  toggleChapter(chapterId: string) {
+    const at = this.chapterInView;
+    const open = this.#chapterToggles.at === at ? this.#chapterToggles.open : {};
+    this.#chapterToggles = { at, open: { ...open, [chapterId]: !this.chapterOpen(chapterId) } };
   }
 
   buildOf(chapterId: string | null | undefined): ChapterBuild | undefined {
@@ -449,6 +473,7 @@ class AppStore {
     this.reviewOpen = false;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
+    this.#chapterToggles = { at: null, open: {} };
     scrollStage(0);
   }
 
@@ -718,6 +743,7 @@ class AppStore {
     this.viewingChapter = chapterId;
     this.reviewOpen = false;
     this.routeOpen = false;
+    this.#chapterToggles = { at: null, open: {} };
     scrollStage(0);
   }
 

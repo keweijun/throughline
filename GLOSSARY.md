@@ -82,7 +82,7 @@ _Avoid_: Excluded, completed, mastered.
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
 _Avoid_: Course manager, a second store of progress, Studio (where courses are changed).
 
-**Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0015).
+**Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
 _Avoid_: Chat, workshop, side question, teaching.
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.

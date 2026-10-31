@@ -17,9 +17,40 @@ ACTIONS=('generate','hint','steps','solution','assess','ask')
 PURPOSES=('review','chapter_quiz')
 # Earlier exercises a chapter quiz asks again, at most.
 QUIZ_EARLIER=3
+# A request for different exercises may carry the learner's note on what should change (ADR 0011), at most this long.
+MAX_NOTE=1000
 
 # An answer given only in attached images (images.py) is recorded with this text.
 IMAGE_ANSWER='(Answer given in the attached images)'
+
+def section_exercise(task):
+    return task.get('origin') in ('source','self_created')
+
+def replaceable(task):
+    """An exercise the teacher wrote that the learner has not touched: no answer, ask or help, not set aside or skipped.
+    Asking for different exercises replaces these; the course's own exercises are never replaced (ADR 0011)."""
+    return task.get('origin')=='self_created' and task.get('status')=='pending' and not task.get('history')
+
+def _check_request(store, value):
+    """A request for section exercises may replace untouched ones or ask for a variant of one, with an optional note."""
+    if not {'note','replaces','variant_of'}&set(value): return
+    if value['action']!='generate' or value.get('purpose'):
+        raise OperationError('invalid_request','note, replaces and variant_of go with a request for section exercises')
+    if 'note' in value and (not isinstance(value['note'],str) or len(value['note'])>MAX_NOTE):
+        raise OperationError('invalid_request',f'note must be text of at most {MAX_NOTE} characters')
+    if 'replaces' in value and 'variant_of' in value:
+        raise OperationError('invalid_request','A request replaces exercises or asks for a variant, not both')
+    if 'replaces' in value:
+        ids=value['replaces']
+        if not isinstance(ids,list) or not ids or len(set(ids))!=len(ids): raise OperationError('invalid_request','replaces must list exercise ids')
+        for i in ids:
+            task=store.get('practice_tasks',i) if isinstance(i,str) else None
+            if not task or task['concept_id']!=value['concept_id'] or not replaceable(task):
+                raise OperationError('not_replaceable','Only untouched exercises the teacher wrote for this section can be replaced')
+    if 'variant_of' in value:
+        task=store.get('practice_tasks',value['variant_of']) if isinstance(value['variant_of'],str) else None
+        if not task or task['concept_id']!=value['concept_id'] or not section_exercise(task):
+            raise OperationError('unknown_exercise','A variant is written from one of this section\'s exercises')
 
 class FormatError(ValueError):
     """The teacher's reply is not the JSON the practice prompt asked for; a model problem, not a course error."""
@@ -87,6 +118,7 @@ def job(store, request):
     if 'purpose' in value and (value['action']!='generate' or value['purpose'] not in PURPOSES):
         raise OperationError('invalid_request','purpose must be review or chapter_quiz, on a generate job')
     teaching.validate_concept(store,value['concept_id'])
+    _check_request(store,value)
     chapter=None
     if value.get('purpose')=='chapter_quiz':
         chapter=quiz_chapter(store,value)
@@ -107,6 +139,9 @@ def job(store, request):
         answer=teaching.record_interaction(store,{'id':'practice-answer:'+value['id'],'role':'user','concept_id':value['concept_id'],
                                                   'text':value['answer'] if value['answer'].strip() else IMAGE_ANSWER})['interaction']
         if value.get('images'): store.put('interactions',answer['id'],{**answer,'images':value['images']})
+    if value.get('note'):
+        # The note is the learner's words, which a memory note may cite when it suggests a preference (ADR 0010).
+        teaching.record_interaction(store,{'id':'practice-request:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['note']})
     if value['action']=='ask':
         question=teaching.record_interaction(store,{'id':'practice-question:'+value['id'],'role':'user','concept_id':value['concept_id'],'text':value['question']})['interaction']
         if value.get('images'): store.put('interactions',question['id'],{**question,'images':value['images']})
@@ -138,6 +173,8 @@ def _parse(store, value, text):
         elif value['action']=='generate':
             questions=result.get('questions')
             if not isinstance(questions,list) or not 1<=len(questions)<=4: raise FormatError('Expected one to four questions')
+            if value.get('variant_of') and (len(questions)!=1 or questions[0].get('origin')!='self_created'):
+                raise FormatError('A variant is exactly one question with origin self_created')
             context=curriculum.context(store,{'concept_id':value['concept_id']})
             allowed=context['concept'].get('exercises',[])+context['concept'].get('links',[])
             for q in questions:
@@ -194,10 +231,16 @@ def complete(store, request):
     elif value['action']=='generate':
         for index,q in enumerate(result['questions']):
             task={'id':value['id']+':'+str(index),'concept_id':value['concept_id'],'question':q['question'],'origin':value.get('purpose') or q['origin'],
-                  'source_refs':[] if value.get('purpose') else q.get('source_refs',[]),'status':'pending','history':[]}
+                  'source_refs':[] if value.get('purpose') else q.get('source_refs',[]),'status':'pending','history':[],'created_at':time.time()}
             if 'parts' in q: task['parts']=q['parts']
             if not value.get('purpose') and 'exercise' in q: task['exercise']=q['exercise']
+            if value.get('variant_of'): task['variant_of']=value['variant_of']
             store.put('practice_tasks',task['id'],task)
+        # Replaced only once the new exercises exist, and only those the learner still has not touched (ADR 0011).
+        for task_id in value.get('replaces',[]):
+            task=store.get('practice_tasks',task_id)
+            if task and replaceable(task):
+                store.put('practice_tasks',task_id,{**task,'status':'replaced','replaced_by':value['id'],'replaced_at':time.time()})
     else:
         task=store.get('practice_tasks',value['task_id'])
         if task is None: raise OperationError('unknown_exercise','Unknown exercise')

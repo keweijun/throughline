@@ -2,7 +2,10 @@ import json
 import tempfile
 import unittest
 from guided_learning.api import execute
+from guided_learning import practice
 from guided_learning.server import Host
+from guided_learning.server.state import build
+from guided_learning.store import OperationError
 
 
 def practice_call(app,endpoint,body):
@@ -349,3 +352,103 @@ class ExerciseOrigin(unittest.TestCase):
         state,_=self.generate([{'question':'7(a)'}],lambda ref:{'question':'Normalize.','origin':'source','source_refs':[ref],'exercise':'9'})
         self.assertEqual(state['tasks'],[])
         self.assertIn('exercise',state['jobs'][0]['error'])
+
+
+class DifferentExercises(unittest.TestCase):
+    """Ask for different exercises and Another like this (ADR 0011)."""
+
+    def setUp(self):
+        class Runner:
+            def __init__(self): self.prompts=[]; self.replies=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt)
+                emit({'kind':'final','text':self.replies.pop(0) if self.replies else '{"feedback":"Think about energy."}'}); emit({'kind':'complete'})
+        self.dir=tempfile.TemporaryDirectory(); self.path=self.dir.name
+        execute(self.path,{'op':'course.init','title':'Physics'})
+        execute(self.path,{'op':'curriculum.save','concepts':[{'id':'light','title':'Light'}],'route':['light'],'coverage':[]})
+        self.runner=Runner(); self.app=Host(self.path,runner=self.runner)
+        self.answer(['A','B'],lambda: self.app.practice.generate('light'))
+
+    def tearDown(self):
+        self.app.close(); self.dir.cleanup()
+
+    def answer(self,questions,start,memory=None):
+        """Start a generate request whose reply writes these self-created questions, and wait for it."""
+        reply={'questions':[{'question':q,'origin':'self_created','source_refs':[]} for q in questions]}
+        if memory: reply['memory']=memory
+        self.runner.replies.append(json.dumps(reply))
+        result=start()
+        self.app.wait(result['turn']['id'],5)
+        return result['turn']['id']
+
+    def statuses(self):
+        return {t['question']:t['status'] for t in self.app.practice.state()['tasks']}
+
+    def task(self,question):
+        return next(t for t in self.app.practice.state()['tasks'] if t['question']==question)
+
+    def hint(self,question):
+        self.app.wait(self.app.practice.act(self.task(question)['id'],'hint')['turn']['id'],5)
+
+    def test_replaces_only_untouched_exercises_the_teacher_wrote(self):
+        self.hint('A')
+        job=self.answer(['C'],lambda: self.app.practice.replace('light','Less arithmetic, please'),
+                        memory={'entries':[{'kind':'preference','text':'Keep the arithmetic in exercises light'}]})
+        self.assertEqual(self.statuses(),{'A':'pending','B':'replaced','C':'pending'})
+        self.assertEqual(self.task('B')['replaced_by'],job)
+        prompt=self.runner.prompts[-1]
+        self.assertIn('Less arithmetic, please',prompt)
+        self.assertIn('"B"',prompt.split('which the learner has not started')[1].split('\n')[0])
+        self.assertIn('"A"',prompt.split('the exercises the learner keeps')[1])
+        self.assertIn('objective',prompt)
+        self.assertIn('"memory"',prompt)
+        # A preference from the learner's note waits for confirmation and cites the note (ADR 0010).
+        entries=execute(self.path,{'op':'memory.view'})['entries']
+        self.assertEqual([(e['kind'],e['status']) for e in entries],[('preference','suggested')])
+        self.assertIn('practice-request:'+job,entries[0]['interaction_ids'])
+        # Replaced exercises are kept but never shown.
+        self.assertEqual(sorted(t['question'] for t in build(self.app,['practice'])['practice']['tasks']),['A','C'])
+
+    def test_a_request_without_a_note_asks_for_no_memory_note(self):
+        self.answer(['C'],lambda: self.app.practice.replace('light'))
+        self.assertNotIn('"memory"',self.runner.prompts[-1])
+        self.assertEqual(self.statuses(),{'A':'replaced','B':'replaced','C':'pending'})
+
+    def test_a_failed_request_replaces_nothing(self):
+        self.runner.replies.append('not json')
+        result=self.app.practice.replace('light')
+        self.app.wait(result['turn']['id'],5)
+        self.assertEqual(self.statuses(),{'A':'pending','B':'pending'})
+
+    def test_an_exercise_touched_while_the_request_runs_is_kept(self):
+        job={'id':'practice-x','concept_id':'light','action':'generate','replaces':[self.task('A')['id'],self.task('B')['id']]}
+        execute(self.path,{'op':'practice.job','job':job})
+        execute(self.path,{'op':'practice.defer','id':self.task('A')['id']})
+        execute(self.path,{'op':'stream.start','id':'practice-x','concept_id':'light','prompt':'Exercise service','channel':'practice','record_user':False})
+        execute(self.path,{'op':'stream.event','id':'practice-x','attempt':1,'sequence':1,'kind':'final',
+                           'text':json.dumps({'questions':[{'question':'C','origin':'self_created','source_refs':[]}]})})
+        execute(self.path,{'op':'stream.event','id':'practice-x','attempt':1,'sequence':2,'kind':'complete'})
+        execute(self.path,{'op':'practice.complete','id':'practice-x'})
+        self.assertEqual(self.statuses(),{'A':'deferred','B':'replaced','C':'pending'})
+
+    def test_course_exercises_and_touched_ones_cannot_be_replaced(self):
+        self.assertFalse(practice.replaceable({'origin':'source','status':'pending','history':[]}))
+        self.hint('A')
+        with self.assertRaises(OperationError) as caught:
+            execute(self.path,{'op':'practice.job','job':{'id':'practice-y','concept_id':'light','action':'generate','replaces':[self.task('A')['id']]}})
+        self.assertEqual(caught.exception.code,'not_replaceable')
+
+    def test_another_like_this_adds_one_variant_next_to_it(self):
+        original=self.task('A')
+        self.answer(['A2'],lambda: self.app.practice.act(original['id'],'variant'))
+        self.assertEqual(self.statuses(),{'A':'pending','B':'pending','A2':'pending'})
+        self.assertEqual(self.task('A2')['variant_of'],original['id'])
+        self.assertIn('"A"',self.runner.prompts[-1].split('another exercise like this one')[1])
+        # A variant is one exercise the teacher writes.
+        job=self.answer(['X','Y'],lambda: self.app.practice.act(original['id'],'variant'))
+        self.assertNotIn('X',self.statuses())
+        self.assertIn('variant',next(j for j in self.app.practice.state()['jobs'] if j['id']==job)['error'])
+
+    def test_generate_does_not_count_replaced_exercises(self):
+        self.answer(['C'],lambda: self.app.practice.replace('light'))
+        self.assertEqual([t['question'] for t in self.app.practice.generate('light')['tasks']],['C'])

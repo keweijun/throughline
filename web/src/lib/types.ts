@@ -148,6 +148,8 @@ export type Task = {
   from_task_id?: string;
   /** The `question` of the section's course exercise the task uses, when it uses one. */
   exercise?: string;
+  /** The exercise this one was written like, through Another like this (ADR 0011). */
+  variant_of?: string;
   created_at?: number;
   source_refs: Ref[];
   status: 'pending' | 'attempted' | 'deferred' | 'skipped';
@@ -167,6 +169,11 @@ export type PracticeJob = {
   task_id?: string;
   purpose?: 'review' | 'chapter_quiz';
   chapter_id?: string;
+  /** Asking for different exercises: what the learner said should change, and the exercises the new ones replace (ADR 0011). */
+  note?: string;
+  replaces?: string[];
+  /** Another like this: the exercise the new one is written like. */
+  variant_of?: string;
   processed?: boolean;
   error?: string;
 };

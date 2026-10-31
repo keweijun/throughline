@@ -93,11 +93,17 @@ class GenerateRequest(Body):
     concept_id: str
 
 
+class ReplaceRequest(Body):
+    concept_id: str
+    note: Optional[str] = None
+
+
 class PracticeRequest(Body):
     answer: Optional[str] = None
     images: Optional[list[str]] = None
     question: Optional[str] = None
     reason: Optional[str] = None
+    note: Optional[str] = None
 
 
 class NextSectionRequest(Body):
@@ -422,6 +428,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         result = host.practice.generate(body.concept_id)
         return {'tasks': result['tasks']} if 'tasks' in result else {**result, 'turn': turn_summary(result['turn'])}
 
+    @app.post('/api/practice/replace')
+    def replace_exercises(body: ReplaceRequest):
+        result = host.practice.replace(body.concept_id, body.note)
+        return {**result, 'turn': turn_summary(result['turn'])}
+
     @app.post(IMAGE_UPLOAD)
     async def upload_image(request: Request):
         data = await request.body()
@@ -434,7 +445,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/practice/tasks/{task_id}/{action}')
     def practice_action(task_id: str, action: str, body: PracticeRequest):
-        result = host.practice.act(task_id, action, body.answer, body.question, body.reason, body.images)
+        result = host.practice.act(task_id, action, body.answer, body.question, body.reason, body.images, body.note)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
     @app.get('/api/review')

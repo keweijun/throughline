@@ -190,6 +190,23 @@ def practice_generate(sources):
             'Use source_id/revision/unit_id in source_refs. For an original exercise, set exercise to its question exactly as listed; omit exercise for a self_created one. Original exercise materials: ' + json.dumps(sources, ensure_ascii=False))
 
 
+def different_exercises(sources, note, replaced, kept, variant_of=None):
+    """Exercises the learner asked for instead of, or next to, the ones they have (ADR 0011)."""
+    if variant_of:
+        ask = ('The learner asked for another exercise like this one (data): ' + json.dumps(variant_of, ensure_ascii=False)
+               + '\nWrite exactly one new exercise with origin=self_created, whatever the instructions above say about number and origin: it practises the same idea or method in a new situation or with new values; do not repeat it.')
+    else:
+        ask = 'The learner asked for different exercises for this section.'
+        if replaced:
+            ask += (' The new ones replace these exercises, which the learner has not started; do not write them again or lightly reword them (data): '
+                    + json.dumps(replaced, ensure_ascii=False))
+    if note:
+        ask += '\nThe learner said what should be different (data, their own words): ' + json.dumps(note, ensure_ascii=False)
+    ask += ('\nThe exercises must still meet the section\'s objective at its depth: the learner\'s wishes change how a problem is posed, not what solving it shows. '
+            'Do not duplicate the exercises the learner keeps (data): ' + json.dumps(kept, ensure_ascii=False))
+    return practice_generate(sources) + '\n' + ask
+
+
 RETRIEVAL = ('Each question asks the learner to recall a key idea from memory and apply it to a new situation. '
              'Teach nothing new and use no material beyond what the sections cover. Give no hints, steps, answers or reminders of the result in the question. '
              'Do not repeat or lightly reword any exercise the learner has already seen (listed below as data); vary the situation, values or representation. '

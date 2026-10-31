@@ -245,3 +245,32 @@ test('open exercises stay with their chapter and are listed on its page', async 
   await expect(listed.last()).toContainText('Second section exercise');
   expect(errors).toEqual([]);
 });
+
+test('asking for different exercises replaces only the untouched ones the teacher wrote', async ({ page, course }) => {
+  const { errors } = await course('different_exercises_browser_fixture');
+  const practice = page.locator('#practice');
+  const exercises = practice.locator('article');
+  await expect(exercises).toHaveCount(3);
+
+  await practice.getByRole('button', { name: 'Ask for different exercises' }).click();
+  await expect(practice).toContainText('replace the 2 written by the teacher that you have not started');
+  await practice.getByRole('textbox', { name: 'What should be different' }).fill('Less arithmetic, please');
+  await practice.getByRole('button', { name: 'Ask for different exercises' }).click();
+
+  await expect(exercises).toHaveCount(2);
+  await expect(exercises.first()).toContainText('Attempted exercise');
+  await expect(exercises.last()).toContainText('Fresh exercise with little arithmetic');
+  await expect(practice).not.toContainText('First exercise');
+  await expect(practice).toContainText('0 of 2 solved');
+  expect(errors).toEqual([]);
+});
+
+test('another like this adds one exercise right after the one it is like', async ({ page, course }) => {
+  const { errors } = await course('different_exercises_browser_fixture');
+  const exercises = page.locator('#practice article');
+  await exercises.first().getByRole('button', { name: 'Another like this' }).click();
+  await expect(exercises).toHaveCount(4);
+  await expect(exercises.nth(1)).toContainText('Another one like the first');
+  await expect(exercises.nth(2)).toContainText('Second exercise');
+  expect(errors).toEqual([]);
+});

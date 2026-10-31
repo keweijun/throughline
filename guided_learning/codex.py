@@ -119,9 +119,12 @@ def _tidy(command, cwd, delete=(), sweep_before=None, timeout=20):
         process.stdin.write(json.dumps({'method':'initialized','params':{}})+'\n'); process.stdin.flush()
         ids = list(delete)
         if sweep_before is not None:
-            listed = call(2,'thread/list',{'cwd':str(cwd),'limit':100}) or {}
-            ids += [t['id'] for t in listed.get('data',[]) if t.get('originator') == 'guided_learning' and not t.get('ephemeral')
-                    and (t.get('createdAt') or 0) < sweep_before and t['id'] not in ids]
+            for n, archived in enumerate((False, True)):  # idle threads are archived; one a crash interrupted is not
+                listed = call(2+n,'thread/list',{'cwd':str(cwd),'limit':100,'archived':archived}) or {}
+                for t in listed.get('data',[]):
+                    if t.get('originator') == 'guided_learning' and not t.get('ephemeral') \
+                            and (t.get('createdAt') or 0) < sweep_before and t['id'] not in ids:
+                        ids.append(t['id'])
         for n, thread in enumerate(ids):
             call(10+n,'thread/delete',{'threadId':thread})
     except (OSError,ValueError,KeyError,TypeError):
@@ -138,7 +141,8 @@ def _tidy(command, cwd, delete=(), sweep_before=None, timeout=20):
 class SavedThreads:
     """Saved Codex threads for teaching turns, kept per course folder, model and service tier. The model's prompt
     cache is keyed by thread, so turns that reuse a thread reuse the cached developer instructions of the turn before.
-    Every turn is reverted when it ends, so a thread lent out carries no history (ADR 0002). Idle threads are deleted
+    Every turn is reverted when it ends, so a thread lent out carries no history (ADR 0002), and archived, so idle
+    threads stay out of the learner's Codex session list. Idle threads are deleted
     once the cache has expired, beyond a few per key, and when the course closes; a restarted host deletes those a
     crash left behind."""
     IDLE = 900  # seconds; longer than the cache keeps a prefix
@@ -229,7 +233,8 @@ class CodexRunner:
         last_error = ''
         settled = False
         def settle():
-            """Revert the finished turn so the thread can be lent again, or have it deleted."""
+            """Revert the finished turn and archive the thread, which keeps it out of the learner's Codex session list,
+            so it can be lent again; or have it deleted."""
             send({'id':5,'method':'thread/revert','params':{'threadId':thread_id,'beforeTurnId':turn_id}})
             deadline = time.monotonic()+10
             while time.monotonic() < deadline:
@@ -238,10 +243,13 @@ class CodexRunner:
                 if event is None: break
                 if event.get('id') == 5 and 'method' not in event:
                     if 'result' in event:
-                        return THREADS.give(key, thread_id, command)
+                        send({'id':7,'method':'thread/archive','params':{'threadId':thread_id}})
+                        continue
                     if (event.get('error') or {}).get('code') == -32601:
                         THREADS.enabled = False  # this Codex cannot revert: lend no more threads
                     break
+                if event.get('id') == 7 and 'method' not in event:
+                    return THREADS.give(key, thread_id, command)  # an unarchived thread is still lent, only listed
             THREADS.drop(key, thread_id, command)
         try:
             send({'id':1,'method':'initialize','params':{'clientInfo':{'name':'guided_learning','version':'0.2.0'},'capabilities':{'experimentalApi':True}}})
@@ -273,9 +281,12 @@ class CodexRunner:
                     if self.service_tier: thread['serviceTier'] = self.service_tier
                     if instructions is not None: thread['developerInstructions'] = instructions
                     if saved:
-                        send({'id':2,'method':'thread/resume','params':{**thread,'threadId':saved,'excludeTurns':True}})
+                        # An idle thread is archived, and Codex resumes only unarchived ones.
+                        send({'id':6,'method':'thread/unarchive','params':{'threadId':saved}})
                     else:
                         send({'id':2,'method':'thread/start','params':{**thread,'ephemeral':not pooled}})
+                elif event.get('id') == 6 and 'method' not in event:
+                    send({'id':2,'method':'thread/resume','params':{**thread,'threadId':saved,'excludeTurns':True}})
                 elif event.get('id') == 2 and 'result' in event:
                     thread_id = event['result']['thread']['id']
                     params = {'threadId':thread_id,'effort':self.effort,'input':[{'type':'text','text':text}]+[{'type':'localImage','path':str(p)} for p in images]}

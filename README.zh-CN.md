@@ -120,7 +120,7 @@ echo '{"op":"course.status"}' | guided-learning --course quantum
 
 ```sh
 python -m venv .venv
-.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
+.venv/bin/python -m pip install -e ".[pdf,dev]"    # Windows: .venv\Scripts\python.exe
 .venv/bin/python -m unittest discover -s tests
 .venv/bin/guided-learning setup                     # 把当前检出的技能复制给 Codex；修改技能后需重新运行
 

@@ -120,7 +120,7 @@ The last form is the operation entry point the skill uses; it reads one JSON req
 
 ```sh
 python -m venv .venv
-.venv/bin/python -m pip install -e ".[pdf]"        # Windows: .venv\Scripts\python.exe
+.venv/bin/python -m pip install -e ".[pdf,dev]"    # Windows: .venv\Scripts\python.exe
 .venv/bin/python -m unittest discover -s tests
 .venv/bin/guided-learning setup                     # copy this checkout's skill to Codex; rerun after editing it
 

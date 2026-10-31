@@ -40,9 +40,16 @@ test('Codex actions copy their request, and an open course links back to Codex',
   const { base, errors } = await course('library_browser_fixture');
   const library = await (await page.request.get(base + '/api/library')).json();
 
+  const top = async () => (await page.locator('.workspace').boundingBox())?.y;
+  const before = await top();
   await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' }).click();
   expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$throughline add these files to the course quantum-v1:']);
-  await expect(page.getByRole('status').filter({ hasText: 'Request copied' })).toContainText('any Codex chat');
+  const toast = page.getByRole('status').filter({ hasText: 'Request copied' });
+  await expect(toast).toContainText('any Codex chat');
+  // The confirmation floats over the page rather than pushing it down.
+  expect(await top()).toBe(before);
+  await toast.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(toast).toBeHidden();
 
   await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
   const rail = page.getByRole('navigation', { name: 'Course route' });

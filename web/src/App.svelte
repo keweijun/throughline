@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { t, locale, diagnostic } from './lib/i18n.svelte';
+  import { t, locale } from './lib/i18n.svelte';
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
   import { app } from './lib/store.svelte';
   import { panelCoversLesson } from './lib/media';
   import { scrollStageByKey } from './lib/stage';
@@ -15,8 +14,8 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
+  import Toasts from './components/Toasts.svelte';
   import Library from './components/Library.svelte';
-  import RememberPrompt from './components/RememberPrompt.svelte';
 
   onMount(() => {
     void app.sync();
@@ -47,8 +46,6 @@
     document.documentElement.lang = locale.language;
     document.title = app.state && !app.libraryOpen ? `${app.state.course.title} · ${t('Throughline')}` : t('Throughline');
   });
-
-  const suggestion = $derived(app.libraryOpen ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'));
 
   function step(offset: number) {
     const route = app.state?.curriculum.route ?? [];
@@ -85,27 +82,6 @@
 <svelte:window onkeydown={onKey} />
 
 <TopBar />
-
-{#if app.error}
-  <div class="banner" role="alert" out:fade={{ duration: 160 }}>
-    <p>{diagnostic(app.error)}</p>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.error = null)}>{t("Dismiss")}</button>
-  </div>
-{/if}
-
-{#if app.notice}
-  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
-    <p>{app.notice}</p>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
-  </div>
-{/if}
-
-<!-- A preference the teacher suggested takes effect only once the learner confirms it (ADR 0010). -->
-{#if suggestion && !(app.panelOpen && app.panelTab === 'memory')}
-  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
-    <RememberPrompt entry={suggestion} />
-  </div>
-{/if}
 
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
@@ -145,26 +121,9 @@
 <SettingsDialog />
 <CitationPeek />
 <Shortcuts />
+<Toasts />
 
 <style>
-  .banner {
-    animation: enter-drop var(--settle) var(--ease-out);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.55rem clamp(1rem, 3vw, 2rem);
-    background: var(--danger-wash);
-    color: var(--danger);
-    border-bottom: 1px solid var(--rule);
-    font-size: var(--step-0);
-  }
-
-  .banner.notice {
-    background: var(--raised);
-    color: var(--ink-soft);
-  }
-
   .workspace {
     display: flex;
     flex: 1;

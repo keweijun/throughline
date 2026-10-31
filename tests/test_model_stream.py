@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -134,7 +135,10 @@ for line in sys.stdin:
  r=json.loads(line); m=r.get('method'); i=r.get('id'); p=r.get('params',{})
  if m: log.write(json.dumps([m,p])+'\\n'); log.flush()
  if m=='initialize': out({'id':i,'result':{}})
- if m=='thread/list': out({'id':i,'result':{'data':[]}})
+ if m=='thread/list': out({'id':i,'result':{'data':[{'id':'old','originator':'guided_learning','createdAt':0}]*2 if p.get('archived') else []}})
+ if m=='thread/archive': out({'id':i,'result':{}})
+ if m=='thread/unarchive':
+  out({'id':i,'error':{'code':-32600,'message':'no rollout'}} if mode=='lost' else {'id':i,'result':{}})
  if m=='thread/delete': out({'id':i,'result':{}})
  if m=='thread/start': out({'id':i,'result':{'thread':{'id':'new'}}})
  if m=='thread/resume':
@@ -151,7 +155,8 @@ for line in sys.stdin:
 
 
 class SavedThreads(unittest.TestCase):
-    """Teaching prompts run in saved threads lent for one turn and reverted after it, so the prompt cache is reused."""
+    """Teaching prompts run in saved threads lent for one turn and reverted and archived after it, so the prompt cache
+    is reused and idle threads stay out of the learner's Codex session list."""
 
     def setUp(self):
         from guided_learning import codex
@@ -178,8 +183,11 @@ class SavedThreads(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             calls = self.turns(tmp, [self.teaching('Teach step 1'), self.teaching('Teach step 2')])
             threads = [p for m, p in calls if m in ('thread/start', 'thread/resume')]
-            self.assertEqual([m for m, _ in calls if m in ('thread/start', 'thread/resume', 'thread/revert')],
-                             ['thread/start', 'thread/revert', 'thread/resume', 'thread/revert'])
+            lending = ('thread/start', 'thread/unarchive', 'thread/resume', 'thread/revert', 'thread/archive')
+            self.assertEqual([m for m, _ in calls if m in lending],
+                             ['thread/start', 'thread/revert', 'thread/archive',
+                              'thread/unarchive', 'thread/resume', 'thread/revert', 'thread/archive'])
+            self.assertEqual({p['threadId'] for m, p in calls if m in ('thread/archive', 'thread/unarchive')}, {'new'})
             self.assertFalse(threads[0]['ephemeral'])
             self.assertEqual((threads[1]['threadId'], threads[1]['excludeTurns']), ('new', True))
             self.assertEqual({p['developerInstructions'] for p in threads}, {'Teacher instructions and route'})
@@ -208,3 +216,14 @@ class SavedThreads(unittest.TestCase):
             calls = [json.loads(line) for line in (Path(tmp)/'calls.jsonl').read_text().splitlines()]
             self.assertIn(['thread/delete', {'threadId': 'new'}], calls)
             self.assertEqual(self.codex.THREADS.idle, {})
+
+    def test_the_first_turn_in_a_folder_deletes_threads_an_earlier_run_left_archived(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.turns(tmp, [self.teaching('one')])
+            log = Path(tmp)/'calls.jsonl'
+            for _ in range(50):
+                calls = [json.loads(line) for line in log.read_text().splitlines()]
+                if ['thread/delete', {'threadId': 'old'}] in calls: break
+                time.sleep(.1)
+            self.assertEqual([p.get('archived') for m, p in calls if m == 'thread/list'], [False, True])
+            self.assertEqual(calls.count(['thread/delete', {'threadId': 'old'}]), 1)

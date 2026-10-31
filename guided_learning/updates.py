@@ -1,6 +1,8 @@
 """Whether a newer Throughline is available. Installing it is Codex's job (README), so the interface hands it off."""
 import os
 import re
+import threading
+import time
 import urllib.request
 
 from .commands import version
@@ -9,6 +11,10 @@ from .store import OperationError
 # The install command fetches main, so main's declared version is the latest one.
 LATEST = 'https://raw.githubusercontent.com/keweijun/throughline/main/pyproject.toml'
 VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
+# The interface checks on every launch, so a found version is kept for a while rather than asked of GitHub each time.
+KEEP = 6 * 3600
+_found = {}
+_lock = threading.Lock()
 
 
 def _parts(text):
@@ -35,6 +41,11 @@ def latest_version(timeout=10):
     return match.group(1)
 
 
-def check():
-    current, latest = version(), latest_version()
+def check(fresh=False):
+    """Compares with main's version; a version found in the last few hours is reused unless `fresh`. Failures are not kept."""
+    with _lock:
+        if fresh or time.monotonic() - _found.get('at', -KEEP) >= KEEP:
+            _found.update(latest=latest_version(), at=time.monotonic())
+        latest = _found['latest']
+    current = version()
     return {'version': current, 'latest': latest, 'available': newer(latest, current)}

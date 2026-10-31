@@ -21,6 +21,8 @@
   onMount(() => {
     void app.sync();
     app.connect();
+    // A quiet check at launch: a newer version only marks Settings, and a failure shows nothing.
+    app.checkForUpdate().catch(() => {});
   });
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a

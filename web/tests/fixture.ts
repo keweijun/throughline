@@ -9,7 +9,9 @@ const python = process.env.TEST_PYTHON ?? path.join(root, '.venv', process.platf
 
 /** Starts a disposable course host from a Python fixture module and opens it. */
 async function open(page: Page, module: string, children: ChildProcess[]) {
-  const child = spawn(python, ['-m', `tests.${module}`], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'] });
+  // The launch update check never reaches GitHub from a test; tests that need an answer route /api/update themselves.
+  const env = { ...process.env, GUIDED_LEARNING_UPDATE_URL: 'file:///nonexistent/pyproject.toml' };
+  const child = spawn(python, ['-m', `tests.${module}`], { cwd: root, env, stdio: ['ignore', 'pipe', 'inherit'] });
   children.push(child);
   const [out] = (await once(child.stdout!, 'data')) as [Buffer];
   const base = `http://127.0.0.1:${out.toString().trim()}`;

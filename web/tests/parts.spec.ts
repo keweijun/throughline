@@ -4,7 +4,7 @@ test('a multi-part exercise is answered part by part and solved once every part 
   await course('parts_browser_fixture');
   const task = page.locator('#practice article').first();
   const parts = task.getByRole('list', { name: 'Parts' });
-  const answer = (text: string) => task.getByRole('textbox', { name: 'Exercise answer' }).fill(text).then(() => task.getByRole('button', { name: 'Check my answer' }).click());
+  const answer = (text: string) => task.getByRole('textbox', { name: 'Exercise answer' }).fill(text).then(() => task.getByRole('button', { name: 'Check answer' }).click());
   await expect(parts).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('2 exercises stay open');
 
@@ -28,7 +28,7 @@ test('parts show their own labels when the teacher gives them', async ({ page, c
   await course('parts_browser_fixture');
   const task = page.locator('#practice article').nth(2);
   await task.getByRole('textbox', { name: 'Exercise answer' }).fill('(a) the rule is linearity.');
-  await task.getByRole('button', { name: 'Check my answer' }).click();
+  await task.getByRole('button', { name: 'Check answer' }).click();
   await expect(task.getByRole('list', { name: 'Parts' }).locator('li')).toHaveText([/\(a\)\s*Correct/, /\(b\)\s*Not attempted/]);
 });
 

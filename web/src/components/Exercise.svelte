@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { modEnterToSend, sendKeys } from '../lib/keys';
   import { locale, t, diagnostic, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { autogrow } from '../lib/autogrow';
-  import { markdown, hasMath, labelFor } from '../lib/markdown';
+  import { markdown, labelFor } from '../lib/markdown';
   import { highlights, annotationPassage } from '../lib/highlight';
   import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
   import type { SkipReason, Task } from '../lib/types';
-  import AnswerImages from './AnswerImages.svelte';
+  import AttachedImages from './AttachedImages.svelte';
+  import Composer from './Composer.svelte';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
 
@@ -20,56 +19,27 @@
   const draftKey = $derived(`exercise:${task.id}`);
   const answer = $derived(app.drafts.get(draftKey));
   const setAnswer = (value: string) => app.drafts.set(draftKey, value);
-  // Attached images are uploaded at once and kept, by name, as part of the draft.
-  const imagesKey = $derived(`exercise-images:${task.id}`);
-  const readImages = (key: string): string[] => {
-    try {
-      return JSON.parse(app.drafts.get(key) || '[]');
-    } catch {
-      return [];
-    }
-  };
-  const images = $derived(readImages(imagesKey));
-  const setImages = (value: string[]) => app.drafts.set(imagesKey, value.length ? JSON.stringify(value) : '');
-  const IMAGE_TYPES = 'image/png,image/jpeg,image/gif,image/webp';
-  let uploading = $state(0);
-  let picker = $state<HTMLInputElement>();
-
-  async function attach(files: File[]) {
-    const key = imagesKey;
-    for (const file of files.filter((f) => f.type.startsWith('image/'))) {
-      uploading += 1;
-      const result = await app.act(() => api.upload<{ image: string }>('/api/practice/images', file));
-      uploading -= 1;
-      const current = readImages(key);
-      if (result && !current.includes(result.image)) app.drafts.set(key, JSON.stringify([...current, result.image]));
-    }
-  }
-
-  function pasteImages(event: ClipboardEvent) {
-    const files = [...(event.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-    if (!files.length) return;
-    event.preventDefault();
-    void attach(files);
-  }
+  // Attached images are uploaded at once and kept, by name, beside the draft (Composer).
+  const images = $derived(app.drafts.images(draftKey));
+  const setImages = (value: string[]) => app.drafts.setImages(draftKey, value);
 
   // A question about the exercise has its own draft: asking is never assessed (ADR 0011).
   const askKey = $derived(`exercise-ask:${task.id}`);
   const question = $derived(app.drafts.get(askKey));
+  const questionImages = $derived(app.drafts.images(askKey));
+  // The exercise has one writing box: it answers, or, after "Ask about this", asks about the exercise.
   let asking = $state(false);
   let busy = $state(false);
-  const canCheck = $derived(!busy && !uploading && (answer.trim() !== '' || images.length > 0));
   let confirmSolution = $state(false);
   // A solved exercise folds its answer box away until the learner chooses to answer again; a draft keeps it open.
   let reopened = $state(false);
   let confirmSkip = $state(false);
-  let preview = $state('');
+  const inputId = $derived(`exercise-input-${task.id}`);
 
-  $effect(() => {
-    const text = answer;
-    const timer = setTimeout(() => (preview = hasMath(text) ? text : ''), 150);
-    return () => clearTimeout(timer);
-  });
+  function toggleAsking() {
+    asking = !asking;
+    requestAnimationFrame(() => document.getElementById(inputId)?.focus());
+  }
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
   const working = $derived(jobs.some((j) => app.isRunning(j.id)));
@@ -77,7 +47,7 @@
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
   const submittedJob = $derived(latestJob?.action === 'assess' && (!latestJob.processed || latestJob.error) ? latestJob : undefined);
-  const submittedQuestion = $derived(latestJob?.action === 'ask' && (!latestJob.processed || latestJob.error) ? latestJob.question : undefined);
+  const submittedQuestion = $derived(latestJob?.action === 'ask' && (!latestJob.processed || latestJob.error) ? latestJob : undefined);
   const lastAssessment = $derived(task.history.filter((h) => h.action === 'assess').at(-1));
   const solved = $derived(isSolved(task));
   // Parts are assessed one by one and accumulate across answers (ADR 0011).
@@ -116,13 +86,12 @@
     const submitted = answer;
     const attached = images;
     const key = draftKey;
-    const imageKey = imagesKey;
     const sent = action !== 'assess' ? body : attached.length ? { answer: submitted, images: attached } : { answer: submitted };
     const result = await app.act(() => api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/${action}`, sent));
     busy = false;
     // Keep anything typed or attached while the answer was being sent.
     if (result && action === 'assess' && app.drafts.get(key) === submitted) app.drafts.set(key, '');
-    if (result && action === 'assess' && JSON.stringify(readImages(imageKey)) === JSON.stringify(attached)) app.drafts.set(imageKey, '');
+    if (result && action === 'assess' && JSON.stringify(app.drafts.images(key)) === JSON.stringify(attached)) app.drafts.setImages(key, []);
   }
 
   function restoreSubmitted() {
@@ -134,12 +103,15 @@
     if (busy || !question.trim()) return;
     busy = true;
     const submitted = question;
+    const attached = questionImages;
     const key = askKey;
-    const result = await app.act(() => api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/ask`, { question: submitted }));
+    const body = attached.length ? { question: submitted, images: attached } : { question: submitted };
+    const result = await app.act(() => api.post(`/api/practice/tasks/${encodeURIComponent(task.id)}/ask`, body));
     busy = false;
     if (!result) return;
     asking = false;
     if (app.drafts.get(key) === submitted) app.drafts.set(key, '');
+    if (JSON.stringify(app.drafts.images(key)) === JSON.stringify(attached)) app.drafts.setImages(key, []);
   }
 </script>
 
@@ -220,13 +192,14 @@
             <section class="your-answer" aria-label={t("Your question")}>
               <p class="answer-label">{t("Your question")}</p>
               <div class="prose" use:markdown={{ language: locale.language, text: entry.question, breaks: true }}></div>
+              <AttachedImages images={entry.images ?? []} />
             </section>
           {/if}
-          {#if entry.answer || entry.images?.length}
+          {#if entry.action !== 'ask' && (entry.answer || entry.images?.length)}
             <section class="your-answer" aria-label={t("Your answer")}>
               <p class="answer-label">{t("Your answer")}</p>
               {#if entry.answer}<div class="prose" use:markdown={{ language: locale.language, text: entry.answer, breaks: true }}></div>{/if}
-              <AnswerImages images={entry.images ?? []} />
+              <AttachedImages images={entry.images ?? []} />
             </section>
           {/if}
           <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
@@ -243,7 +216,7 @@
     <section class="your-answer submitted-answer" aria-label={t("Submitted answer")}>
       <p class="answer-label">{t("Submitted answer")}</p>
       {#if submittedJob.answer}<div class="prose" use:markdown={{ language: locale.language, text: submittedJob.answer, breaks: true }}></div>{/if}
-      <AnswerImages images={submittedJob.images ?? []} />
+      <AttachedImages images={submittedJob.images ?? []} />
       {#if failedJob}
         <button class="btn btn-small" onclick={restoreSubmitted}>{t("Restore submitted answer")}</button>
       {/if}
@@ -253,9 +226,10 @@
   {#if submittedQuestion}
     <section class="your-answer submitted-answer" aria-label={t("Your question")}>
       <p class="answer-label">{t("Your question")}</p>
-      <div class="prose" use:markdown={{ language: locale.language, text: submittedQuestion, breaks: true }}></div>
+      <div class="prose" use:markdown={{ language: locale.language, text: submittedQuestion.question ?? '', breaks: true }}></div>
+      <AttachedImages images={submittedQuestion.images ?? []} />
       {#if failedJob}
-        <button class="btn btn-small" onclick={() => { app.drafts.set(askKey, submittedQuestion ?? ''); asking = true; }}>{t("Restore question")}</button>
+        <button class="btn btn-small" onclick={() => { app.drafts.set(askKey, submittedQuestion.question ?? ''); app.drafts.setImages(askKey, submittedQuestion.images ?? []); asking = true; }}>{t("Restore question")}</button>
       {/if}
     </section>
   {/if}
@@ -266,54 +240,31 @@
     {#if failedJob}
       <p class="problem">{t("The last request did not finish:")} {diagnostic(failedJob.error ?? latestTurn?.error ?? t("The response was interrupted. Please try again."))}</p>
     {/if}
-    {#if !composing}
+    {#if !composing && !asking}
       <div class="solved-row">
         <button class="btn btn-small" onclick={() => (reopened = true)}>{t("Answer again")}</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={toggleAsking}>{t("Ask about this")}</button>
       </div>
     {:else}
-    <label class="field">
-      <span class="visually-hidden">{t("Exercise answer")}</span>
-      <textarea
-        rows="3"
-        bind:value={() => answer, setAnswer}
-        use:autogrow={answer}
-        use:modEnterToSend={() => canCheck && act('assess')}
-        onpaste={pasteImages}
-        placeholder={t("Write your reasoning and answer, or paste or attach images of your work. Use $…$ for math.")}
-        aria-label={t("Exercise answer")}
-        aria-describedby="exercise-keys-{task.id}"
-      ></textarea>
-    </label>
-    <AnswerImages {images} onremove={(name) => setImages(images.filter((n) => n !== name))} />
-    {#if preview && answer}
-      <section class="answer-preview" aria-label={t("Answer preview")}>
-        <p class="answer-label">{t("Preview")}</p>
-        <div class="prose" use:markdown={{ language: locale.language, text: preview, breaks: true }}></div>
-      </section>
-    {/if}
-    <div class="actions">
-      <button class="btn btn-primary" disabled={!canCheck} onclick={() => act('assess')}>{t("Check my answer")}</button>
-      <input
-        bind:this={picker}
-        class="visually-hidden"
-        type="file"
-        accept={IMAGE_TYPES}
-        multiple
-        tabindex="-1"
-        aria-label={t("Choose images of your work")}
-        onchange={(e) => {
-          const input = e.currentTarget;
-          void attach([...(input.files ?? [])]);
-          input.value = '';
-        }}
-      />
-      <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => picker?.click()}>
-        {uploading ? t("Attaching…") : t("Attach image")}
-      </button>
-      <span class="keys" id="exercise-keys-{task.id}">{t("{keys} to check · Enter for a new line", { keys: sendKeys })}</span>
-
-    </div>
+    {#snippet answering()}{t("Your answer · checked by the teacher")}{/snippet}
+    {#snippet askingAbout()}{t("Question about this exercise · never graded")}{/snippet}
+    <Composer
+      id={inputId}
+      value={asking ? question : answer}
+      onvalue={(value) => app.drafts.set(asking ? askKey : draftKey, value)}
+      label={asking ? t("Question about this exercise") : t("Exercise answer")}
+      placeholder={asking ? t("What does this exercise or one of its parts mean?") : t("Write your reasoning and answer, or paste or drop images of your work. Use $…$ for math.")}
+      submitLabel={asking ? t("Ask") : t("Check answer")}
+      disabled={busy}
+      onsubmit={() => (asking ? ask() : act('assess'))}
+      header={asking ? askingAbout : answering}
+      onclose={asking ? () => (asking = false) : undefined}
+      closeLabel={t("Back to answering")}
+      imagesKey={asking ? askKey : draftKey}
+      imagesAlone={!asking}
+      rows={3}
+    />
+    {#if composing}
     <!-- Help toward an answer comes first; setting the exercise aside is a different choice, so it sits apart. -->
     <div class="help-row">
       <span class="help" role="group" aria-label={t("Help with this exercise")}>
@@ -321,7 +272,7 @@
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSolution = true), (confirmSkip = false))}>{t("Full solution")}</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} aria-expanded={asking} onclick={() => (asking = !asking)}>{t("Ask about this")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} aria-pressed={asking} onclick={toggleAsking}>{t("Ask about this")}</button>
       </span>
       <span class="aside">
         {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
@@ -332,6 +283,7 @@
         {/if}
       </span>
     </div>
+    {/if}
     {/if}
     {#if confirmSolution}
       <div class="confirm" role="group" aria-label={t("Confirm full solution")}>
@@ -354,23 +306,6 @@
       </div>
     {:else if helped && !solved}
       <p class="note">{t("You've had help on this one, so a correct answer will count as solved with help.")}</p>
-    {/if}
-    {#if asking}
-      <div class="ask" role="group" aria-label={t("Ask about this")}>
-        <textarea
-          rows="2"
-          bind:value={() => question, (v: string) => app.drafts.set(askKey, v)}
-          use:autogrow={question}
-          use:modEnterToSend={ask}
-          placeholder={t("What does this exercise or one of its parts mean?")}
-          aria-label={t("Question about this exercise")}
-        ></textarea>
-        <div>
-          <button class="btn btn-primary btn-small" disabled={busy || !question.trim()} onclick={ask}>{t("Ask")}</button>
-          <button class="btn btn-quiet btn-small" onclick={() => (asking = false)}>{t("Cancel")}</button>
-          <span class="keys">{t("{keys} to ask", { keys: sendKeys })} · {t("Asking is never graded.")}</span>
-        </div>
-      </div>
     {/if}
   {/if}
 </article>
@@ -501,17 +436,7 @@
     border-radius: var(--radius);
   }
 
-  .answer-preview {
-    margin-top: -0.4rem;
-    padding: 0.6rem 1rem;
-    font-size: var(--step-0);
-    color: var(--ink-soft);
-    border: 1px dashed var(--rule);
-    border-radius: var(--radius);
-  }
-
   /* A long inline formula cannot wrap, so learner text scrolls within its block. */
-  .answer-preview .prose,
   .your-answer .prose {
     overflow-x: auto;
   }
@@ -531,18 +456,6 @@
   .feedback {
     margin-top: 0.4rem;
     font-size: var(--step-0);
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem 1rem;
-  }
-
-  .keys {
-    font-size: var(--step--1);
-    color: var(--pencil);
   }
 
   .help-row {
@@ -590,18 +503,6 @@
   .confirm div {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
-  }
-
-  .ask {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .ask div {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     gap: 0.4rem;
   }
 

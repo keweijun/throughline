@@ -88,7 +88,8 @@ export type Decision = {
   target_concept_id?: string;
 };
 
-export type QuestionReply = { id: string; question: string; selection: string; turn_id: string; created_at: number };
+/** `images` are attached images (served from /api/images/{name}), sent to the teacher with the question. */
+export type QuestionReply = { id: string; question: string; selection: string; images?: string[]; turn_id: string; created_at: number };
 
 export type Question = {
   created_at?: number;
@@ -96,6 +97,7 @@ export type Question = {
   id: string;
   question: string;
   selection: string;
+  images?: string[];
   anchor: { scroll_y?: number; concept_id?: string | null };
   restore_point: Position;
   main_turn_id: string | null;
@@ -122,7 +124,7 @@ export type PracticeHistory = {
   parts?: PartStatus[];
   kind?: EvidenceKind;
   answer?: string;
-  /** Names of images of the learner's work attached to the answer, served from /api/practice/images/{name}. */
+  /** Names of images attached to the answer or question, served from /api/images/{name}. */
   images?: string[];
   /** An ask: the learner's question, answered and never assessed (ADR 0011). */
   question?: string;
@@ -302,6 +304,8 @@ export type Annotation = {
   /** Which repeat of the passage in its lesson, answer or exercise; missing means the first. */
   occurrence?: number;
   note: string;
+  /** Images on a note; private like the note. */
+  images?: string[];
   created_at: number;
   updated_at: number;
 };

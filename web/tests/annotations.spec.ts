@@ -32,15 +32,15 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await page.locator('.notes-panel .item').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.notes-panel')).toContainText('Edited note');
 
-  // Enter sends; Shift+Enter and Ctrl+Enter break the line.
+  // Enter breaks the line and Ctrl+Enter sends, as in every writing box.
   const sectionNote = page.getByRole('textbox', { name: 'Add a note to this section' });
   await sectionNote.fill('Overall:');
-  await sectionNote.press('Shift+Enter');
+  await sectionNote.press('Enter');
   await sectionNote.pressSequentially('revisit');
-  await sectionNote.press('Control+Enter');
+  await sectionNote.press('Enter');
   await sectionNote.pressSequentially('interference');
   await expect(sectionNote).toHaveValue('Overall:\nrevisit\ninterference');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Control+Enter');
   await expect(sectionNote).toHaveValue('');
   await expect(page.locator('.notes-panel .item.note')).toContainText('revisit');
 
@@ -241,10 +241,10 @@ test('a section note is written in the box at the bottom and lands at the end of
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   const box = page.getByRole('textbox', { name: 'Add a note to this section' });
-  await expect(page.locator('#panel-notes .composer')).toContainText('Note on: Wave superposition');
+  await expect(page.locator('#panel-notes .composer')).toContainText('Note on Wave superposition · only you see this');
   for (const note of ['First note', 'Second note']) {
     await box.fill(note);
-    await box.press('Enter');
+    await box.press('Control+Enter');
     await expect(box).toHaveValue('');
   }
   await expect(page.locator('.notes-panel .item .text')).toHaveText(['First note', 'Second note']);

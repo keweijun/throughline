@@ -60,6 +60,20 @@ class Drafts {
     return this.#values[key] ?? '';
   }
 
+  /** The images attached to a draft, by name; kept beside its text under `images:<key>`. */
+  images(key: string): string[] {
+    try {
+      const names = JSON.parse(this.get(`images:${key}`) || '[]');
+      return Array.isArray(names) ? names : [];
+    } catch {
+      return [];
+    }
+  }
+
+  setImages(key: string, names: string[]) {
+    this.set(`images:${key}`, names.length ? JSON.stringify(names) : '');
+  }
+
   set(key: string, value: string) {
     if (value === this.get(key)) return;
     if (value) this.#values[key] = value;
@@ -517,7 +531,7 @@ class AppStore {
     }
   }
 
-  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'occurrence' | 'note' | 'turn_id' | 'task_id' | 'source'>>) {
+  annotate(annotation: Pick<Annotation, 'kind' | 'concept_id'> & Partial<Pick<Annotation, 'passage' | 'occurrence' | 'note' | 'images' | 'turn_id' | 'task_id' | 'source'>>) {
     const now = Date.now() / 1000;
     // Choosing the ID here keeps the shown annotation the same item once the host has saved it.
     const draft: Annotation = {
@@ -538,14 +552,17 @@ class AppStore {
     );
   }
 
-  editNote(id: string, note: string) {
+  /** Changes a note's text and, when `images` is given, its images. */
+  editNote(id: string, note: string, images?: string[]) {
     const text = note.trim();
     return this.#annotation(
       (list) => {
         const item = list.find((a) => a.id === id);
-        if (item) item.note = text;
+        if (!item) return;
+        item.note = text;
+        if (images) item.images = images.length ? images : undefined;
       },
-      () => api.put(`/api/annotations/${encodeURIComponent(id)}`, { note }),
+      () => api.put(`/api/annotations/${encodeURIComponent(id)}`, images ? { note, images } : { note }),
     );
   }
 

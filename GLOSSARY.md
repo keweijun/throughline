@@ -91,6 +91,9 @@ _Avoid_: Asked passage (a passage quoted in a side question).
 **Learner note**: Text the learner writes on a highlight or on a whole section.
 _Avoid_: Uncertainty notes in preparation material, progress note.
 
+**Attached image**: A picture the learner adds to an answer, a side question, a question about an exercise or a learner note, such as a photo of handwritten work. Those on answers and questions are sent to the teacher; those on notes stay private.
+_Avoid_: Answer image (it is no longer only for answers), upload.
+
 **Bookmark**: A learner annotation marking a section or a source location to come back to.
 _Avoid_: Deferred item, mainline restore point.
 

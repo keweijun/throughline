@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enterToSend } from '../lib/keys';
+  import { modEnterToSend } from '../lib/keys';
   import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -205,7 +205,7 @@
   <form bind:this={pop} class="pop writing" data-side={side} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
     <label for="quick-note">{target?.note ? t("Edit your note") : t("Note on this passage")}</label>
     <!-- svelte-ignore a11y_autofocus -->
-    <textarea id="quick-note" rows="3" bind:value={note} use:autogrow={note} use:enterToSend onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
+    <textarea id="quick-note" rows="3" bind:value={note} use:autogrow={note} use:modEnterToSend={() => (target || note.trim()) && save(true)} onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
     <div class="actions">
       <button type="button" class="btn btn-quiet btn-small" onclick={close}>{t("Cancel")}</button>
       <button type="submit" class="btn btn-small" disabled={!target && !note.trim()}>{t("Save note")}</button>

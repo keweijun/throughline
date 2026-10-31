@@ -31,6 +31,10 @@ export { expect };
 
 export async function dragSelect(page: Page, locator: ReturnType<Page['locator']>, width = 240) {
   await locator.scrollIntoViewIfNeeded();
+  // A drag at the window's bottom edge makes the browser scroll the page under the pointer, so bring it up first.
+  const viewport = page.viewportSize()!;
+  const near = (await locator.boundingBox())!;
+  if (near.y + near.height > viewport.height - 48) await locator.evaluate((node) => node.scrollIntoView({ block: 'center', behavior: 'instant' }));
   const box = (await locator.boundingBox())!;
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
   await page.mouse.down();

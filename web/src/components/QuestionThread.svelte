@@ -10,6 +10,7 @@
   import { lessonStatus, questionTurnIds } from '../lib/format';
   import type { Question, QuestionReply, Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
+  import AttachedImages from './AttachedImages.svelte';
 
   let { question, open = $bindable(false) }: { question: Question; open?: boolean } = $props();
 
@@ -99,9 +100,11 @@
       <div class="asked">
         {#if open && question.selection}<blockquote class="prose asked-passage" use:markdown={{ language: locale.language, text: question.selection }}></blockquote>{/if}
         <div class="prose title" role="heading" aria-level="4" aria-label={question.question} use:markdown={{ language: locale.language, text: question.question }}></div>
+        {#if open}<AttachedImages images={question.images ?? []} small />{/if}
       </div>
       <p class="meta">
         <span class="chip chip-{summary.tone}">{#if summary.live}<span class="live-dot"></span>{/if}{summary.label}</span>
+        {#if !open && question.images?.length}<span>{question.images.length === 1 ? t("1 image") : t("{count} images", { count: question.images.length })}</span>{/if}
         {#if followUps}<span>{followUps === 1 ? t("1 follow-up") : t("{count} follow-ups", { count: followUps })}</span>{/if}
         {#if noted.length}
           <button class="your-notes" onclick={(e) => (e.stopPropagation(), app.showAnnotation(noted[0].id))}>
@@ -162,6 +165,7 @@
       <div class="asked">
         {#if item.selection}<blockquote class="prose asked-passage" use:markdown={{ language: locale.language, text: item.selection }}></blockquote>{/if}
         <div class="prose title" use:markdown={{ language: locale.language, text: item.question }}></div>
+        <AttachedImages images={item.images ?? []} small />
       </div>
       {#if turn}
         {@render answered(turn)}

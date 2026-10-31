@@ -19,12 +19,12 @@ test('a question box grows with its text instead of offering a resize handle', a
   const before = (await box.boundingBox())!.height;
   for (const line of ['First line', 'Second line', 'Third line', 'Fourth line']) {
     await page.keyboard.type(line);
-    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.press('Enter');
   }
   await page.keyboard.type('Fifth line');
   await expect.poll(async () => (await box.boundingBox())!.height).toBeGreaterThan(before + 20);
   expect(await box.evaluate((node) => getComputedStyle(node).resize)).toBe('none');
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('Control+Enter');
   await expect(box).toHaveValue('');
   await expect.poll(async () => (await box.boundingBox())!.height).toBeLessThan(before + 2);
 });
@@ -49,10 +49,9 @@ test('ask about a selected passage, then return to that passage', async ({ page,
 
   await page.locator('#stage').evaluate((stage) => stage.scrollTo({ top: 0, behavior: 'instant' }));
   await expect(paragraph).not.toBeInViewport();
-  // The passage repeats in many paragraphs; returning picks the one the learner was reading.
-  // The box at the bottom follows up on the open thread, and offers the way back.
-  await expect(page.getByRole('textbox', { name: 'Follow-up question' })).toBeVisible();
-  await page.locator('#branch-panel').getByRole('button', { name: 'Back to the passage' }).click();
+  // The passage repeats in many paragraphs; returning picks the one the learner was reading. Going back is not part
+  // of what is sent, so it sits above the writing box rather than in it.
+  await page.locator('#branch-panel .panel-foot').getByRole('button', { name: 'Back to the passage' }).click();
   await expect(paragraph).toBeInViewport();
 });
 
@@ -76,7 +75,7 @@ test('a formula selection keeps its original TeX and the quote can be removed', 
 });
 
 
-test('newest questions sort by time and selected follow-ups stay in their thread', async ({ page, course }) => {
+test('questions sort oldest first, like a conversation, and selected follow-ups stay in their thread', async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.getByText('Ask for another pass')).toBeVisible();
@@ -86,7 +85,7 @@ test('newest questions sort by time and selected follow-ups stay in their thread
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
   const threads = page.locator('#branch-panel .thread');
   await expect(threads).toHaveCount(2);
-  // Oldest first, like a conversation, so the newest sits just above the box.
+  await expect(threads.first().locator('.title').first()).toHaveText('Older question');
   const thread = threads.last();
   await expect(thread.locator('.title').first()).toHaveText('Newer question');
   await thread.getByRole('button', { name: 'Expand question' }).click();
@@ -98,10 +97,11 @@ test('newest questions sort by time and selected follow-ups stay in their thread
     return window.getSelection()!.toString();
   });
   await page.getByRole('button', { name: 'Ask about this passage' }).click();
-  await expect(page.locator('#branch-panel .composer')).toContainText('Following up on: Newer question');
-  await expect(page.locator('#branch-panel .composer blockquote')).toHaveText(excerpt.trim());
-  await page.getByRole('textbox', { name: 'Follow-up question' }).fill('Explain this step more slowly.');
-  await page.getByRole('button', { name: 'Send follow-up' }).click();
+  // A passage chosen in an answer quotes into the follow-up box pinned to the panel's bottom.
+  const box = page.locator('#branch-panel .panel-foot');
+  await expect(box.locator('blockquote')).toHaveText(excerpt.trim());
+  await box.getByRole('textbox', { name: 'Follow-up question' }).fill('Explain this step more slowly.');
+  await box.getByRole('button', { name: 'Send follow-up' }).click();
   await expect(thread.locator('.reply .answer .katex').first()).toBeVisible();
   await expect(threads).toHaveCount(2);
   await page.reload();
@@ -140,9 +140,11 @@ test('a follow-up saved before its stream started can be retried after reopening
   await thread.getByRole('button', { name: 'Answer again' }).click();
   await expect(thread.locator('.reply .answer')).toHaveText('Recovered answer');
   await expect(thread.locator('.reply')).toHaveCount(1);
-  await page.getByRole('textbox', { name: 'Follow-up question' }).fill('One more question');
-  await expect(page.getByRole('button', { name: 'Send follow-up' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Send follow-up' }).click();
+  // The open thread's follow-up box is the one pinned to the panel's bottom.
+  const panel = page.locator('#branch-panel');
+  await panel.getByRole('textbox', { name: 'Follow-up question' }).fill('One more question');
+  await expect(panel.getByRole('button', { name: 'Send follow-up' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Send follow-up' }).click();
   await expect(thread.locator('.reply .answer')).toHaveCount(2);
 });
 
@@ -162,10 +164,10 @@ test('threads start collapsed, one opens at a time, and the box switches between
 
   await first.getByRole('button', { name: 'Expand question' }).click();
   await expect(first.locator('.answer')).toBeVisible();
-  await expect(page.locator('#branch-panel .composer')).toContainText('Following up on: First question');
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · First question');
   await second.getByRole('button', { name: 'Expand question' }).click();
   await expect(first.locator('.answer')).toHaveCount(0);
-  await expect(page.locator('#branch-panel .composer')).toContainText('Following up on: Second question');
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · Second question');
 
   // Clearing the target closes the thread and turns the box back into a new question.
   await page.getByRole('button', { name: 'Ask a new question instead' }).click();
@@ -175,5 +177,5 @@ test('threads start collapsed, one opens at a time, and the box switches between
   const asked = page.locator('#branch-panel .thread').last();
   await expect(asked.locator('.title').first()).toHaveText('A third question');
   await expect(asked.locator('.answer')).toBeVisible();
-  await expect(page.locator('#branch-panel .composer')).toContainText('Following up on: A third question');
+  await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · A third question');
 });

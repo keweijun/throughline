@@ -1,5 +1,6 @@
 """Durable side lanes: teacher decisions never mutate the course checkpoint."""
 import time
+from . import images as attached
 from .store import OperationError
 from .migrations import lecture_excerpt
 from .teaching import require_text, create_deferred
@@ -15,9 +16,11 @@ def read(store, request):
 def begin(store, request):
     identifier=require_text(request,'id')
     question=require_text(request,'question')
+    images=attached.validate(store.workspace,request)
     previous=store.get('web_branches',identifier)
     if previous:
-        if previous['question'] != question or previous['selection'] != request.get('selection','') or previous.get('selected_turn_id') != request.get('selected_turn_id'):
+        if (previous['question'] != question or previous['selection'] != request.get('selection','') or previous.get('selected_turn_id') != request.get('selected_turn_id')
+                or previous.get('images',[]) != images):
             raise OperationError('id_conflict',identifier)
         return {'branch':previous}
     position=store.get('course','position')
@@ -37,6 +40,7 @@ def begin(store, request):
             'restore_point':position,'main_turn_id':current_id,
             'selected_turn_id':selected_id,'selected_lecture':lecture_excerpt(selected) if selected else None, 'turn_id':'branch:'+identifier,
             'status':'unanswered','decision':None,'choice':None,'created_at':time.time(),'replies':[]}
+    if images: branch['images']=images
     store.put('web_branches',identifier,branch)
     return {'branch':branch}
 
@@ -113,10 +117,11 @@ def reply(store, request):
     selection = request.get('selection', '')
     if not isinstance(selection, str):
         raise OperationError('invalid_request', 'selection must be text')
+    images = attached.validate(store.workspace, request)
     replies = branch.setdefault('replies', [])
     previous = next((r for r in replies if r['id'] == identifier), None)
     if previous:
-        if previous['question'] != question or previous['selection'] != selection:
+        if previous['question'] != question or previous['selection'] != selection or previous.get('images', []) != images:
             raise OperationError('id_conflict', identifier)
         return {'branch': branch, 'reply': previous}
     turns = [branch['turn_id'], branch.get('supplement_turn_id')] + [r['turn_id'] for r in replies]
@@ -126,6 +131,8 @@ def reply(store, request):
             raise OperationError('incomplete_answer', 'Finish or regenerate the earlier reply before following up')
     item = {'id': identifier, 'question': question, 'selection': selection,
             'turn_id': 'reply:' + branch['id'] + ':' + identifier, 'created_at': time.time()}
+    if images:
+        item['images'] = images
     replies.append(item)
     store.put('web_branches', branch['id'], branch)
     return {'branch': branch, 'reply': item}

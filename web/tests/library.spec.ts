@@ -40,16 +40,15 @@ test('Codex actions copy their request, and an open course links back to Codex',
   const { base, errors } = await course('library_browser_fixture');
   const library = await (await page.request.get(base + '/api/library')).json();
 
-  const top = async () => (await page.locator('.workspace').boundingBox())?.y;
-  const before = await top();
-  await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' }).click();
+  const link = page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' });
+  const width = (await link.boundingBox())?.width;
+  await link.click();
   expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$throughline add these files to the course quantum-v1:']);
-  const toast = page.getByRole('status').filter({ hasText: 'Request copied' });
-  await expect(toast).toContainText('any Codex chat');
-  // The confirmation floats over the page rather than pushing it down.
-  expect(await top()).toBe(before);
-  await toast.getByRole('button', { name: 'Dismiss' }).click();
-  await expect(toast).toBeHidden();
+  // The link itself says the request was copied, in place of its label and without changing its width.
+  const copied = page.locator('.courses > li').filter({ hasText: 'Quantum' }).locator('a.codex-link.copied');
+  await expect(copied).toHaveAttribute('title', /any Codex chat/);
+  await expect(copied.getByRole('status')).toHaveText('Request copied');
+  expect((await copied.boundingBox())?.width).toBe(width);
 
   await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
   const rail = page.getByRole('navigation', { name: 'Course route' });

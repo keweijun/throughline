@@ -11,6 +11,7 @@
   import type { Question, QuestionReply, Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
   import AttachedImages from './AttachedImages.svelte';
+  import SuggestedMemory from './SuggestedMemory.svelte';
 
   let { question, open = $bindable(false) }: { question: Question; open?: boolean } = $props();
 
@@ -83,6 +84,7 @@
       <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={t("Answer again")} />
     </div>
   {/if}
+  <SuggestedMemory entries={app.suggestedBy([turn.id])} />
 {/snippet}
 
 <article class="thread" class:flash class:open id="thread-{question.id}" bind:this={node} data-question-id={question.id}>

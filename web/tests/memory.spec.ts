@@ -7,16 +7,12 @@ test('the teacher suggests a preference, and the learner confirms, edits and del
   await expect(page.locator('.lesson-body')).not.toContainText('course-memory');
   await expect(page.locator('.lesson-body')).not.toContainText('One step at a time');
 
-  // A suggested preference waits for the learner; the Memory toggle counts it.
-  const banner = page.getByRole('status').filter({ hasText: 'Remember: One step at a time?' });
-  await expect(banner).toBeVisible();
+  // A suggested preference is asked right after the lesson step that suggested it; the Memory toggle counts it.
+  const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested preference' });
+  await expect(suggestion).toContainText('Remember: One step at a time?');
   await expect(page.locator('#toggle-memory .count')).toHaveText('1');
-  // It floats over the lesson rather than pushing it down.
-  const top = async () => (await page.locator('.workspace').boundingBox())?.y;
-  const shown = await top();
-  await banner.getByRole('button', { name: 'Remember', exact: true }).click();
-  await expect(banner).toBeHidden();
-  expect(await top()).toBe(shown);
+  await suggestion.getByRole('button', { name: 'Remember', exact: true }).click();
+  await expect(suggestion).toHaveCount(0);
   await expect(page.locator('#toggle-memory .count')).toHaveCount(0);
 
   await page.locator('#toggle-memory').click();
@@ -38,5 +34,30 @@ test('the teacher suggests a preference, and the learner confirms, edits and del
   await page.locator('#toggle-memory').click();
   await expect(page.locator('.memory-panel #memory-taught_term')).toContainText('plane wave');
   await expect(page.locator('.memory-panel #memory-difficulty .item')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('the learner writes down a preference and a known term in the Memory tab', async ({ page, course }) => {
+  const { errors } = await course('memory_browser_fixture');
+  await page.locator('#toggle-memory').click();
+  const memory = page.locator('.memory-panel');
+  const box = memory.getByRole('textbox', { name: 'Add to the course memory' });
+
+  // A preference the learner writes needs no confirming.
+  await box.fill('Short answers first');
+  await memory.locator('.panel-foot').getByRole('button', { name: 'Remember', exact: true }).click();
+  await expect(memory.locator('#memory-preference .item')).toContainText('Short answers first');
+  await expect(box).not.toContainText('Short answers');
+
+  // A known term belongs to the section being read.
+  await memory.getByRole('radio', { name: 'Taught term' }).click();
+  await expect(memory.locator('.panel-foot')).toContainText('Wave superposition');
+  await box.fill('Dirac notation');
+  await memory.locator('.panel-foot').getByRole('button', { name: 'Remember', exact: true }).click();
+  await expect(memory.locator('#memory-taught_term .item').filter({ hasText: 'Dirac notation' })).toContainText('Wave superposition');
+
+  await page.reload();
+  await page.locator('#toggle-memory').click();
+  await expect(page.locator('.memory-panel #memory-preference')).toContainText('Short answers first');
   expect(errors).toEqual([]);
 });

@@ -107,6 +107,19 @@ class MemoryFlow(unittest.TestCase):
                 self.assertEqual(client.put(f'/api/memory/{preference["id"]}', json={'text': 'x', 'kind': 'difficulty'}).status_code, 400)
                 self.assertEqual([e['text'] for e in client.get('/api/state').json()['memory']], ['Give the tedious integrals'])
 
+    def test_the_learner_adds_memory_and_a_preference_needs_no_confirming(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            client, host = host_client(path, runner=Runner())
+            with client:
+                preference = client.post('/api/memory', json={'kind': 'preference', 'text': 'Short answers first'}).json()['entry']
+                self.assertEqual((preference['status'], preference['concept_id']), ('confirmed', None))
+                term = client.post('/api/memory', json={'kind': 'taught_term', 'text': 'ket', 'concept_id': 'state'}).json()['entry']
+                self.assertEqual((term['status'], term['concept_id']), ('active', 'state'))
+                self.assertEqual(client.post('/api/memory', json={'kind': 'taught_term', 'text': 'bra'}).status_code, 409)
+                self.assertEqual(client.post('/api/memory', json={'kind': 'preference', 'text': 'short answers first'}).status_code, 409)
+                self.assertEqual(client.post('/api/memory', json={'kind': 'note', 'text': 'x'}).status_code, 400)
+                self.assertEqual(execute(path, {'op': 'memory.prompt'})['memory']['preferences'], ['Short answers first'])
 
 class Consolidating:
     """Answers a consolidation turn with `reply` and records which turns ran on the small model."""

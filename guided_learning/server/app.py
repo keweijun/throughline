@@ -83,6 +83,13 @@ class MemoryRequest(Body):
     text: str
 
 
+class NewMemoryRequest(Body):
+    kind: Literal['preference', 'taught_term', 'difficulty']
+    text: str
+    # A taught term or difficulty belongs to a section; a preference may belong to none.
+    concept_id: Optional[str] = None
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -413,6 +420,16 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         result = host.operation({'op': 'annotations.delete', 'id': identifier})
         host.changed()
         return result
+
+    @app.post('/api/memory')
+    def add_memory(body: NewMemoryRequest):
+        # What the learner writes down themselves needs no confirming, so a preference is saved confirmed (ADR 0010).
+        request = {'op': 'memory.save', 'id': f'learner:{uuid.uuid4()}', **body.model_dump(exclude_none=True)}
+        entry = host.operation(request)['entry']
+        if entry['kind'] == 'preference':
+            entry = host.operation({'op': 'memory.confirm', 'id': entry['id']})['entry']
+        host.changed()
+        return {'entry': entry}
 
     @app.put('/api/memory/{identifier}')
     def edit_memory(identifier: str, body: MemoryRequest):

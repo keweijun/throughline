@@ -7,6 +7,7 @@
   import type { Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
   import CheckQuestion from './CheckQuestion.svelte';
+  import SuggestedMemory from './SuggestedMemory.svelte';
 
   let { turn }: { turn: Turn } = $props();
 
@@ -167,6 +168,8 @@
   {:else if turn.status === 'running'}
     <p class="waiting">{t("The teacher is reading the goal and sources. Text appears here as it is written.")}</p>
   {/if}
+
+  <SuggestedMemory entries={app.suggestedBy([turn.id])} />
 
   {#if check && step && entry}
     <CheckQuestion lessonId={step.lesson.id} turnId={turn.id} {check} answer={entry.answer} more={planned.length > 0} oncorrect={next} />

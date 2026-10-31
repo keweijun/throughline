@@ -3,7 +3,7 @@ import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, MemoryEntry, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -99,7 +99,6 @@ class AppStore {
   state = $state<State | null>(null);
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
-  notice = $state<{ title: string; detail?: string } | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
@@ -144,7 +143,6 @@ class AppStore {
   readonly drafts = new Drafts();
 
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  #noticeTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
   /** What the next load fetches: the whole state, some parts of it, or nothing (null). */
   #queued: Set<StatePart> | 'all' | null = null;
@@ -471,13 +469,6 @@ class AppStore {
     }
   }
 
-  /** A short confirmation that clears itself. */
-  notify(title: string, detail?: string) {
-    this.notice = { title, detail };
-    if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
-    this.#noticeTimer = setTimeout(() => (this.notice = null), 8000);
-  }
-
   view(conceptId: string) {
     this.viewingChapter = null;
     this.reviewOpen = false;
@@ -606,6 +597,16 @@ class AppStore {
       (list) => drop(list, id),
       () => api.delete(`/api/annotations/${encodeURIComponent(id)}`),
     );
+  }
+
+  /** Preferences the teacher suggested in these turns' memory notes, whose entries are named `<turn id>:<index>`. */
+  suggestedBy(turnIds: string[]) {
+    return (this.state?.memory ?? []).filter((e) => e.status === 'suggested' && turnIds.includes(e.id.slice(0, e.id.lastIndexOf(':'))));
+  }
+
+  /** An entry the learner writes down themselves; a preference is saved confirmed. */
+  addMemory(kind: MemoryEntry['kind'], text: string, conceptId?: string | null) {
+    return this.act(() => api.post('/api/memory', { kind, text, ...(conceptId ? { concept_id: conceptId } : {}) }));
   }
 
   editMemory(id: string, text: string) {

@@ -14,7 +14,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
-  import Toasts from './components/Toasts.svelte';
+  import ErrorToast from './components/ErrorToast.svelte';
   import Library from './components/Library.svelte';
 
   onMount(() => {
@@ -121,7 +121,7 @@
 <SettingsDialog />
 <CitationPeek />
 <Shortcuts />
-<Toasts />
+<ErrorToast />
 
 <style>
   .workspace {

@@ -50,6 +50,7 @@
       <p class="meta">
         <span>{where}</span>
         <span class="chip chip-{v.tone}">{t(v.label)}</span>
+        {#if s.converted_from}<span class="chip" title={t("Converted so it can be shown here. The original is kept in the course.")}>{t("From {name}", { name: s.converted_from })}</span>{/if}
         {#if s.stale}<span class="chip chip-caution">{t("Older revision of this file")}</span>{/if}
         {#if concept && pageRef}
           <button
@@ -62,7 +63,7 @@
           </button>
         {/if}
         {#if s.pdf_url}
-          <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">{t("Open original ↗")}</a>
+          <a class="btn btn-quiet btn-small original" href={s.pdf_url} target="_blank" rel="noopener">{s.converted_from ? t("Open PDF ↗") : t("Open original ↗")}</a>
         {/if}
       </p>
       {#if s.verification !== 'verified'}

@@ -23,7 +23,10 @@ write_pdf(lecture, [
     ['2.2 Phase', '', 'When the phases differ by pi the paths cancel.', 'Exercise 2.3: find P(phi) for equal amplitudes.'],
 ])
 md = execute(root, {'op': 'source.register', 'path': str(notes)})['source']
-pdf = execute(root, {'op': 'source.register', 'path': str(lecture)})['source']
+# The lecture PDF was exported from a slide deck (ADR 0015).
+deck = root / 'lecture-2.pptx'
+deck.write_bytes(b'PK\x03\x04 slides')
+pdf = execute(root, {'op': 'source.register', 'path': str(lecture), 'converted_from': str(deck)})['source']
 md_ref = {'source_id': md['id'], 'revision': md['revision'], 'unit_id': 'line-2'}
 pdf_ref = {'source_id': pdf['id'], 'revision': pdf['revision'], 'unit_id': 'page-2'}
 exercise_ref = {'source_id': pdf['id'], 'revision': pdf['revision'], 'unit_id': 'page-3'}

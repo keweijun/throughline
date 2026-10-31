@@ -9,7 +9,7 @@
 
 ![A lesson in Throughline: the course route on the left, the current section with its goal, next step and a streamed lesson with citations](docs/images/lesson-en.png)
 
-Throughline organizes several PDFs and Markdown documents into one source-linked route, then teaches it in your browser: chapter overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
+Throughline organizes several PDFs, slide decks, Word documents and text notes into one source-linked route, then teaches it in your browser: chapter overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
 
 The teacher makes instructional judgments from your materials. The program validates state and references; it never decides on its own that you have understood something. Everything runs on your computer, with your own Codex as the teacher.
 

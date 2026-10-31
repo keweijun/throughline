@@ -7,6 +7,7 @@
     id: string;
     name: string;
     kind: string;
+    original?: string;
     status: string;
     sections: string[];
     target: Ref | null;
@@ -24,7 +25,8 @@
       const linked = (id: string) => [...(app.concept(id)?.links ?? []), ...(app.concept(id)?.exercises ?? [])].some((r) => r.source_id === source.id);
       const sections = route.filter((id) => units.some((u) => u.concept_ids?.includes(id)) || linked(id));
       const name = source.path.split(/[\\/]/).pop() ?? source.path;
-      const kind = name.toLowerCase().endsWith('.pdf') ? 'PDF' : name.split('.').pop()?.toUpperCase() ?? '';
+      const original = source.converted_from?.path.split(/[\\/]/).pop();
+      const kind = name.toLowerCase().endsWith('.pdf') ? 'PDF' : name.includes('.') ? name.split('.').pop()!.toUpperCase() : 'TEXT';
       const link = app.concept(app.viewingId)?.links?.find((r) => r.source_id === source.id && r.revision === source.revision);
       const here = units.find((u) => u.concept_ids?.includes(app.viewingId ?? '')) ?? link ?? units[0];
       const unit = here?.unit_id ?? (kind === 'PDF' ? 'page-1' : 'line-1');
@@ -32,6 +34,7 @@
         id: source.id,
         name,
         kind,
+        original,
         status: source.status,
         sections,
         target: source.revision ? { source_id: source.id, revision: source.revision, unit_id: unit } : null,
@@ -69,6 +72,7 @@
               <span class="name">{entry.name}</span>
               <span class="meta">
                 <span class="kind">{entry.kind}</span>
+                {#if entry.original}<span>{t("From {name}", { name: entry.original })}</span>{/if}
                 {#if entry.status === 'failed'}<span class="chip chip-danger">{t("Could not be read")}</span>
                 {:else if entry.status === 'needs_review'}<span class="chip chip-caution">{t("Some pages not checked yet")}</span>{/if}
                 {#if entry.sections.length}

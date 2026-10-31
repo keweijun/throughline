@@ -251,7 +251,7 @@ export type State = {
   preferences: Preferences;
   course:{ id: string; title: string };
   position: Position | null;
-  sources: { id: string; path: string; revision: string; status: string }[];
+  sources: { id: string; path: string; revision: string; status: string; converted_from?: { path: string; revision: string } }[];
   /** `version` changes with any part of the course plan, including fields left out here. */
   curriculum: { version: string; concepts: Concept[]; route: string[]; coverage?: Coverage[]; chapters?: Chapter[] };
   session: { recent_interactions: Interaction[] };
@@ -355,6 +355,8 @@ export type Preview = {
 export type SourceView = Ref & {
   title: string;
   kind: string;
+  /** The file name of the document this one was converted from, such as a slide deck exported to PDF. */
+  converted_from: string | null;
   text?: string;
   locator?: { page?: number; line?: number };
   verification: string;

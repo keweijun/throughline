@@ -230,7 +230,7 @@ def answer(store, request):
 
 def warm_ups(store, request):
     """Sections whose lesson has not started and that build on a studied prerequisite not practised for a while, with
-    those prerequisites; offered once each (ADR 0014)."""
+    those prerequisites; offered once each (ADR 0014). `reviewable` counts the sections a review may test."""
     now = request.get('now', time.time())
     model = curriculum.model(store)
     allowed = set(reviewable(store))
@@ -245,7 +245,7 @@ def warm_ups(store, request):
         stale = [p for p in concept.get('prerequisites', []) if p in allowed and now - practised.get(p, 0) >= WARM_UP_AFTER]
         if stale:
             offers[cid] = stale
-    return {'warm_ups': offers}
+    return {'warm_ups': offers, 'reviewable': len(allowed)}
 
 
 def dismiss_warm_up(store, request):

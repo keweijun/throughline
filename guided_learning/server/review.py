@@ -21,11 +21,11 @@ class Review:
         practice = practice or self.host.practice.state()
         listed = self.operation({'op': 'review.sets'})['sets']
         hidden = {s['id'] for s in listed if s.get('prepared')}
+        offers = self.operation({'op': 'review.warm_ups', 'now': self.clock()})
         return {'sets': [s for s in listed if s['id'] not in hidden],
                 'tasks': [t for t in practice['tasks'] if t['origin'] == 'review' and t.get('set_id') not in hidden],
                 'jobs': [j for j in practice['jobs'] if j.get('purpose') == 'review' and j.get('set_id') not in hidden],
-                'reviewable': len(self.operation({'op': 'review.context', 'now': self.clock()})['sections']),
-                'warm_ups': self.operation({'op': 'review.warm_ups', 'now': self.clock()})['warm_ups']}
+                'reviewable': offers['reviewable'], 'warm_ups': offers['warm_ups']}
 
     def _prepared(self):
         """The prepared set and whether its questions are still usable: written, or being written."""

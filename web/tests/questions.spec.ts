@@ -1,4 +1,4 @@
-import { test, expect, dragSelect } from './fixture';
+import { test, expect, dragSelect, editorText } from './fixture';
 
 test('a question being answered shows one Answering status, not two', async ({ page, course }) => {
   await course('demo_course_fixture');
@@ -25,7 +25,7 @@ test('a question box grows with its text instead of offering a resize handle', a
   await expect.poll(async () => (await box.boundingBox())!.height).toBeGreaterThan(before + 20);
   expect(await box.evaluate((node) => getComputedStyle(node).resize)).toBe('none');
   await page.keyboard.press('Control+Enter');
-  await expect(box).toHaveValue('');
+  await expect.poll(() => editorText(box)).toBe('');
   await expect.poll(async () => (await box.boundingBox())!.height).toBeLessThan(before + 2);
 });
 

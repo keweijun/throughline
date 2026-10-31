@@ -199,7 +199,8 @@
   onkeydown={(e) => e.key === 'Escape' && visible && !writing && close()}
   onselectionchange={onSelectionChange}
 />
-<svelte:window onscrollcapture={() => !writing && (visible = false)} />
+<!-- Scrolling moves the passage away from the toolbar, but a writing box scrolling its own text does not. -->
+<svelte:window onscrollcapture={(e) => !writing && !(e.target instanceof Element && e.target.closest('.cm-editor')) && (visible = false)} />
 
 {#if visible && writing}
   <form bind:this={pop} class="pop writing" data-side={side} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px" onsubmit={(e) => (e.preventDefault(), save(true))}>

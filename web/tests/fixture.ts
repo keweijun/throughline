@@ -49,3 +49,19 @@ export async function chooseLanguage(page: Page, language: 'en' | 'zh-CN') {
   await page.getByRole('radio', { name: language === 'en' ? 'English' : '简体中文' }).check();
   await page.getByRole('button', { name: /^(Close|关闭)$/ }).click();
 }
+
+/**
+ * The text in a writing box. The composer is a CodeMirror editor, not a text area, so it has no value: its lines are
+ * read from the page, leaving out the placeholder shown while it is empty.
+ */
+export function editorText(box: ReturnType<Page['locator']>) {
+  return box.evaluate((node) =>
+    [...node.querySelectorAll('.cm-line')]
+      .map((line) => {
+        const copy = line.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll('.cm-placeholder').forEach((p) => p.remove());
+        return copy.textContent ?? '';
+      })
+      .join('\n'),
+  );
+}

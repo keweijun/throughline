@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "vocabulary": "node scripts/latex-vocabulary.mjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {
@@ -19,6 +20,11 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@fontsource-variable/source-serif-4": "^5.3.1",
     "@fontsource/ibm-plex-sans": "^5.3.0",
     "dompurify": "^3.4.17",

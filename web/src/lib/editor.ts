@@ -163,6 +163,71 @@ export type EditorOptions = {
   onpaste?: (event: ClipboardEvent) => boolean;
 };
 
+/**
+ * The editor in the app's own look, from the design tokens in app.css: the field is bare inside the composer's frame,
+ * and the suggestion list, its rendered sample and the formula check's message are popovers like the selection
+ * toolbar (SelectionAsk): raised, rounded, shadowed, rows that wash with the accent. A theme outranks CodeMirror's own
+ * base styles, so nothing here needs !important.
+ */
+const popover = {
+  border: '1px solid var(--rule-strong)',
+  borderRadius: '8px',
+  background: 'var(--raised)',
+  color: 'var(--ink)',
+  boxShadow: 'var(--shadow)',
+  fontFamily: 'var(--sans)',
+  animation: 'enter-pop var(--quick) var(--ease-out)',
+};
+
+const look = EditorView.theme({
+  '&': { fontSize: 'var(--step-0)', lineHeight: '1.5', color: 'var(--ink)', backgroundColor: 'transparent' },
+  '&.cm-focused': { outline: 'none' },
+  // It grows with the text, then scrolls, like the text areas it replaced.
+  '.cm-scroller': { maxHeight: '18rem', overflowY: 'auto', fontFamily: 'var(--sans)', lineHeight: 'inherit' },
+  '.cm-content': { padding: '0.6rem 0.8rem 0.3rem', caretColor: 'var(--ink)' },
+  '.cm-line': { padding: '0' },
+  '.cm-placeholder': { color: 'var(--pencil)', opacity: '0.75' },
+
+  // A snippet's fields: where Tab goes next.
+  '.cm-snippetField': { backgroundColor: 'var(--accent-wash)', borderRadius: '3px', boxShadow: '0 0 0 1px var(--accent-wash)' },
+  '.cm-snippetFieldPosition': { borderLeft: '1.5px solid var(--accent)', margin: '0 -0.75px -0.2em' },
+
+  '.cm-tooltip': { ...popover },
+
+  // The suggestion list: a command in the code face, what it takes beside it, the row in reach washed with the accent.
+  '.cm-tooltip.cm-tooltip-autocomplete': { padding: '0.25rem' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--sans)', maxHeight: '15rem', minWidth: '11rem' },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.6rem',
+    padding: '0.3rem 0.55rem',
+    borderRadius: '6px',
+    color: 'var(--ink)',
+    lineHeight: '1.3',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: 'var(--accent-wash)', color: 'var(--accent)' },
+  '.cm-completionLabel': { fontFamily: 'var(--mono)', fontSize: 'var(--step--1)' },
+  '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '700' },
+  '.cm-completionDetail': { marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: '0.75rem', fontStyle: 'normal', color: 'var(--pencil)' },
+
+  // The rendered sample of the suggestion in reach, a card of its own beside the list.
+  '.cm-tooltip.cm-completionInfo': { padding: '0.6rem 0.85rem', margin: '0 0.35rem', maxWidth: '20rem' },
+  '.cm-completionInfo .latex-sample': { fontSize: '1.15rem' },
+
+  // The formula check's message: what KaTeX could not render, marked like the app's other errors.
+  '.cm-lintRange-error': {
+    backgroundImage: 'none',
+    textDecoration: 'underline wavy var(--danger)',
+    textDecorationSkipInk: 'none',
+    textUnderlineOffset: '3px',
+  },
+  '.cm-tooltip.cm-tooltip-lint': { padding: '0.25rem' },
+  '.cm-diagnostic': { padding: '0.35rem 0.6rem', borderLeft: 'none', borderRadius: '6px', fontSize: 'var(--step--1)', whiteSpace: 'normal' },
+  '.cm-diagnostic-error': { borderLeft: 'none', backgroundColor: 'var(--danger-wash)', color: 'var(--danger)' },
+  '.cm-diagnosticSource': { display: 'block', marginTop: '0.15rem', fontSize: '0.75rem', color: 'var(--pencil)', opacity: '1' },
+});
+
 function extensions(options: () => EditorOptions, placeholder: Compartment): Extension[] {
   const initial = options();
   return [
@@ -190,6 +255,7 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
     EditorView.updateListener.of((update) => {
       if (update.docChanged) options().onchange(update.state.doc.toString());
     }),
+    look,
     EditorView.theme({ '.cm-content': { minHeight: `${(initial.rows ?? 2) * 1.5}em` } }),
   ];
 }

@@ -8,7 +8,7 @@ So course work moves into the app. **Studio** is where the learner creates and r
 
 ## Name and place
 
-The name says what Studio is for: big requests that change a course, not questions about its content, which stay in **Questions** with the teacher. Its empty state and composer placeholder give examples of course work ("Make a course from these files", "Add this problem set", "Make chapter 3 more rigorous") rather than an invitation to ask anything.
+Its label is **Studio**, with "Create and change courses with Codex" under it: the name is a place in the app, and the line says what runs it. The name says what Studio is for: big requests that change a course, not questions about its content, which stay in **Questions** with the teacher. Its empty state and composer placeholder give examples of course work ("Make a course from these files", "Add this problem set", "Make chapter 3 more rigorous") rather than an invitation to ask anything.
 
 - **No course yet**: Studio fills the library page. It is the way into the app.
 - **Library with courses**: Studio stays at the top of the library page, above the course list; **New course** starts a Studio thread.

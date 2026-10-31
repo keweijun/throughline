@@ -118,7 +118,8 @@ class Migrations(unittest.TestCase):
         self.assertEqual(turns['lesson-1'], lesson)
         self.assertEqual(jobs['practice-1'], {**job, 'purpose': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1', 'earlier': []})
         for task in tasks:
-            self.assertEqual(migrated[task['id']], {**task, 'origin': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1'})
+            self.assertEqual(migrated[task['id']], {**task, 'origin': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1', 'set_id': 'practice-1'},
+                             'and, from version 6, a question of the review set the quiz became')
         self.assertEqual(migrated[orphan['id']], {**orphan, 'origin': 'chapter_quiz'})
         self.assertEqual(migrated[exercise['id']], exercise)
         store = Store(self.workspace)
@@ -127,6 +128,55 @@ class Migrations(unittest.TestCase):
             self.assertEqual({t['id']: t for t in store.list('practice_tasks')}, migrated)
             self.assertEqual({t['id']: t for t in store.list('streams')}, turns)
             self.assertEqual({j['id']: j for j in store.list('practice_jobs')}, jobs)
+        finally:
+            store.db.close()
+
+    def test_scheduled_reviews_and_quizzes_become_review_sets_from_a_version_5_course(self):
+        import json
+        from datetime import datetime
+        from guided_learning.store import Store
+        execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
+        execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
+        self.put('course', 'schema', {'version': 5})
+        self.put('course', 'preferences', {'language': 'zh-CN', 'daily_reviews': 8})
+        self.put('review_postponements', 'a', {'concept_id': 'a', 'at': 1})
+        noon = datetime(2026, 10, 1, 12).timestamp()
+        # Two reviews started the same day, one the next day still being written when the old Throughline closed.
+        for name, started in (('r1', noon), ('r2', noon + 3600), ('r3', noon + 86400)):
+            self.put('streams', name, {'id': name, 'channel': 'practice', 'status': 'completed', 'started_at': started})
+            self.put('practice_jobs', name, {'id': name, 'concept_id': 'a', 'action': 'generate', 'purpose': 'review', 'processed': name != 'r3'})
+        for name in ('r1', 'r2'):
+            self.put('practice_tasks', name + ':0', {'id': name + ':0', 'concept_id': 'a', 'question': name, 'origin': 'review', 'source_refs': [],
+                                                    'status': 'attempted', 'history': [{'action': 'assess', 'outcome': 'passed'}]})
+        quiz = {'id': 'q:0', 'concept_id': 'b', 'question': 'Q', 'origin': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'q',
+                'tests_concept_ids': ['a'], 'source_refs': [], 'status': 'pending', 'history': [], 'created_at': 5}
+        self.put('practice_tasks', quiz['id'], quiz)
+        evidence = {'id': 'e', 'concept_id': 'a', 'kind': 'retest_passed', 'outcome': 'passed', 'assessment_id': 'i', 'assessed_at': noon}
+        self.put('evidence', 'e', evidence)
+
+        execute(self.workspace, {'op': 'course.status'})
+
+        self.assertEqual(self.stored_version(), migrations.VERSION)
+        stored = lambda ns: {json.loads(v)['id'] if 'id' in json.loads(v) else k: json.loads(v)
+                             for (k, v) in self.raw('SELECT key, value FROM documents WHERE namespace=?', ns)}
+        sets, tasks, jobs = stored('review_sets'), stored('practice_tasks'), stored('practice_jobs')
+        first, second = 'migrated-review:2026-10-01', 'migrated-review:2026-10-02'
+        self.assertEqual(sets[first], {'id': first, 'kind': 'for_me', 'created_at': noon}, 'one set per day, dated by its first review')
+        self.assertEqual(sets[second]['created_at'], noon + 86400)
+        self.assertEqual(sets['q'], {'id': 'q', 'kind': 'chapter_quiz', 'chapter_id': 'one', 'scope': {'chapter_ids': ['one']}, 'created_at': 5})
+        self.assertEqual({t['id']: t['set_id'] for t in tasks.values()}, {'r1:0': first, 'r2:0': first, 'q:0': 'q'})
+        self.assertEqual((tasks['r1:0']['tests_concept_ids'], tasks['r1:0']['kind']), (['a'], 'apply'))
+        self.assertEqual(jobs['r3']['set_id'], second, 'a review still being written finishes into its set')
+        self.assertEqual(stored('review_postponements'), {})
+        self.assertEqual(stored('course')['preferences'], {'language': 'zh-CN'})
+        self.assertEqual(stored('evidence')['e'], evidence)
+        listed = execute(self.workspace, {'op': 'review.sets'})['sets']
+        self.assertEqual({s['id']: (s['answered'], s['open']) for s in listed}, {first: (2, False), second: (0, False), 'q': (0, True)})
+        store = Store(self.workspace)
+        try:
+            migrations.review_sets(store)  # idempotent on an already migrated course
+            self.assertEqual({t['id']: t for t in store.list('practice_tasks')}, tasks)
+            self.assertEqual({s['id']: s for s in store.list('review_sets')}, sets)
         finally:
             store.db.close()
 

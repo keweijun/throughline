@@ -12,8 +12,9 @@ def validate_concept(store, concept_id):
     if concept_id not in curriculum.model(store)['route']:
         raise OperationError('unknown_concept', str(concept_id))
 
-# Optional kinds an interaction may name, for records the host makes itself (a check answer, ADR 0009).
-INTERACTION_KINDS = ('check_answer',)
+# Optional kinds an interaction may name, for records the host makes itself (a check answer, ADR 0009; a recall answer
+# in review, ADR 0014).
+INTERACTION_KINDS = ('check_answer', 'review_answer')
 
 def order(interaction):
     return [interaction['sequence'], interaction['id']]

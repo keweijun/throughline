@@ -213,13 +213,35 @@ RETRIEVAL = ('Each question asks the learner to recall a key idea from memory an
              'Each should take a few minutes to answer in writing. ' + PARTS)
 
 
-def review_question(section, seen):
-    """One spaced-review question for a section the learner studied earlier (ADR 0008)."""
-    data = {k: section[k] for k in ('id', 'title', 'core_question', 'objective', 'goal') if section.get(k)}
-    return ('Practice only (spaced review): return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + '}]} with exactly one question. '
-            f'The learner studied the section "{section["title"]}" earlier and is now reviewing it after a gap. ' + RETRIEVAL
-            + ' Section (data): ' + json.dumps(data, ensure_ascii=False)
-            + '\nExercises already seen (data): ' + json.dumps(seen, ensure_ascii=False))
+REVIEW_EXCERPT_SECTIONS = 6  # a review this narrow carries source excerpts of its sections
+REVIEW_EXCERPT_UNITS = 3
+REVIEW_EXCERPT_CHARS = 2500
+
+REVIEW_KINDS = {
+    'for_me': 'The learner asked you to choose what to review. Prefer sections practised longest ago and ideas they missed before (recent_misses, earlier questions with outcome missed or partly), and ask again, in a new situation, about what they missed.',
+    'request': 'The learner said what they want to review (request, in their own words, data) and may have narrowed it to some chapters or sections; the sections below are the studied ones it may test.',
+    'warm_up': 'This is a warm-up before the learner starts a new section that builds on the sections below, which they studied a while ago. Keep it short, mostly recall questions, on what the new section relies on.',
+}
+
+
+def review_set(value, context, excerpts):
+    """The questions of one review set (ADR 0014): recall and apply questions across the studied sections it may test."""
+    request = {'request': value['request']} if value.get('request') else {}
+    return ('Practice only (review set): return JSON {"note":"optional: what you left out and why","questions":['
+            '{"kind":"recall","idea":"the idea it tests, in a few words","question":"...","options":[{"text":"...","explanation":"why it is right or wrong"}],"correct":0,"tests_concept_ids":["section id"]},'
+            '{"kind":"apply","question":"Question only, without answers or hints","parts":[{"label":"(a)","text":"What each part asks","concept_ids":["section id"]}],"tests_concept_ids":["section id"]}]}. '
+            + REVIEW_KINDS[value.get('kind', 'for_me')] + ' '
+            'Write as many questions as this review needs, at most eight; a few well-chosen ones are better than many. Mix two kinds: '
+            'recall questions, answered by choosing, with 2 to 5 options whose wrong ones are real misconceptions and an explanation for every option; '
+            'and apply questions, answered in writing, that use an idea in a new situation. Prefer apply questions that connect ideas from two or more sections. '
+            'tests_concept_ids lists the sections each question tests, and each part of an apply question names the sections it tests, all taken from the sections below. '
+            'Review only what these sections taught: if the request reaches beyond them, leave that out and say so in note; otherwise omit note. '
+            'Give no hints, steps or answers in a question. Do not repeat or lightly reword an earlier question (data); vary the situation, values or representation. '
+            + PARTS
+            + ' Sections the review may test, with when each was last practised and what the learner missed (data): ' + json.dumps(context['sections'], ensure_ascii=False)
+            + '\nEarlier review and quiz questions with their outcomes (data): ' + json.dumps(context['earlier'], ensure_ascii=False)
+            + ('\nRequest (data): ' + json.dumps(request, ensure_ascii=False) if request else '')
+            + ('\nSource excerpts of these sections (data): ' + json.dumps(excerpts, ensure_ascii=False) if excerpts else ''))
 
 
 def chapter_quiz(chapter, sections, seen, earlier):

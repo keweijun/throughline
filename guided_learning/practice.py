@@ -3,7 +3,7 @@ import json
 import re
 import time
 from collections import Counter
-from . import curriculum, images as attached, evidence, memory, review, streaming, teaching
+from . import curriculum, images as attached, evidence, lessons, memory, review, teaching
 from .store import OperationError
 
 def listing(store, request):
@@ -11,9 +11,9 @@ def listing(store, request):
 
 ACTIONS=('generate','hint','steps','solution','assess','ask')
 # An ask answers the learner's question about an exercise; it is never assessed and records no evidence (ADR 0011).
-# A generate job may ask for retrieval questions instead of a section's exercises (ADR 0008): one question for a spaced
-# review of the section, or a chapter quiz: two or three new questions spanning the chapter, asked together with a few
-# earlier exercises from its sections.
+# A generate job may ask for retrieval questions instead of a section's exercises: a review set the learner asked for
+# (ADR 0014), whose questions span studied sections, or a chapter quiz: two or three new questions spanning the
+# chapter, asked together with a few earlier exercises from its sections.
 PURPOSES=('review','chapter_quiz')
 # Earlier exercises a chapter quiz asks again, at most.
 QUIZ_EARLIER=3
@@ -71,10 +71,12 @@ def part_statuses(task):
 MAX_PART_LABEL = 40
 
 def _part(p):
-    """A part is the text of what it asks, or {label?, text} with a short label such as "(a)"."""
+    """A part is the text of what it asks, or {label?, text, concept_ids?} with a short label such as "(a)" and, in a
+    review question, the sections the part tests (ADR 0014)."""
     if isinstance(p,str): return bool(p.strip())
-    return (isinstance(p,dict) and not set(p)-{'label','text'} and isinstance(p.get('text'),str) and bool(p['text'].strip())
-            and ('label' not in p or isinstance(p['label'],str) and 0<len(p['label'].strip())<=MAX_PART_LABEL))
+    return (isinstance(p,dict) and not set(p)-{'label','text','concept_ids'} and isinstance(p.get('text'),str) and bool(p['text'].strip())
+            and ('label' not in p or isinstance(p['label'],str) and 0<len(p['label'].strip())<=MAX_PART_LABEL)
+            and ('concept_ids' not in p or isinstance(p['concept_ids'],list) and all(isinstance(c,str) for c in p['concept_ids'])))
 
 # Subquestion markers in an exercise written before exercises carried parts: （1） or （a） anywhere; (1) or (a) at a line
 # start or after whitespace or punctuation, so that f(1) is not one; or "1." at a line start.
@@ -124,11 +126,14 @@ def job(store, request):
         chapter=quiz_chapter(store,value)
         if not chapter or chapter['concept_ids'][-1]!=value['concept_id']:
             raise OperationError('invalid_request','A chapter quiz is anchored to the last section of its chapter')
+    if value.get('purpose')=='review' and not store.get('review_sets',value.get('set_id') if isinstance(value.get('set_id'),str) else ''):
+        raise OperationError('unknown_review_set','A review job writes the questions of a review set')
     previous=store.get('practice_jobs',value['id'])
     if previous: return {'job':previous}
     if chapter:
         # The earlier exercises are chosen once, when the quiz is requested, so a replay asks the same ones.
         value={**value,'quiz_id':value['id'],'earlier':quiz_earlier(store,chapter)}
+        review.chapter_quiz_set(store,value['id'],chapter['id'])
     if value.get('task_id') and not store.get('practice_tasks',value['task_id']):
         raise OperationError('unknown_exercise','Unknown exercise')
     if value['action']=='assess':
@@ -155,21 +160,21 @@ def _parse(store, value, text):
         if raw.startswith('```'): raw=raw.split('\n',1)[1].rsplit('```',1)[0]
         result=json.loads(raw)
         if not isinstance(result,dict): raise FormatError('Expected a JSON object')
-        if value['action']=='generate' and value.get('purpose'):
+        if value['action']=='generate' and value.get('purpose')=='review':
+            result['questions']=_review_questions(store,value,result)
+            note=result.get('note')
+            if note is not None and (not isinstance(note,str) or len(note)>review.MAX_NOTE): raise FormatError(f'note must be text of at most {review.MAX_NOTE} characters')
+        elif value['action']=='generate' and value.get('purpose'):
             questions=result.get('questions')
-            low,high=(1,1) if value['purpose']=='review' else (2,3)
-            if not isinstance(questions,list) or not low<=len(questions)<=high: raise FormatError(f'Expected {low} to {high} questions' if low!=high else 'Expected exactly one question')
-            sections=None
-            if value['purpose']=='chapter_quiz':
-                chapter=quiz_chapter(store,value)
-                if not chapter: raise FormatError('The chapter of this quiz is no longer in the course')
-                sections=quiz_sections(store,chapter)
+            if not isinstance(questions,list) or not 2<=len(questions)<=3: raise FormatError('Expected 2 to 3 questions')
+            chapter=quiz_chapter(store,value)
+            if not chapter: raise FormatError('The chapter of this quiz is no longer in the course')
+            sections=quiz_sections(store,chapter)
             for q in questions:
                 if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
                 _check_parts(q)
-                if sections is not None:
-                    tested=q.get('tests_concept_ids')
-                    if not isinstance(tested,list) or not tested or any(c not in sections for c in tested): raise FormatError('tests_concept_ids must list studied sections of this chapter')
+                tested=q.get('tests_concept_ids')
+                if not isinstance(tested,list) or not tested or any(c not in sections for c in tested): raise FormatError('tests_concept_ids must list studied sections of this chapter')
         elif value['action']=='generate':
             questions=result.get('questions')
             if not isinstance(questions,list) or not 1<=len(questions)<=4: raise FormatError('Expected one to four questions')
@@ -213,6 +218,34 @@ def _parse(store, value, text):
 def _same_unit(ref, other):
     return all(ref.get(k)==other.get(k) for k in ('source_id','revision','unit_id'))
 
+def _review_questions(store, value, result):
+    """A review set's questions (ADR 0014): each tests sections the set may test and is an apply question, answered in
+    writing and assessed by part, or a recall question with its options. A recall question that is malformed is dropped,
+    so one bad question does not lose the set."""
+    questions=result.get('questions')
+    if not isinstance(questions,list) or not questions: raise FormatError('Expected a list of questions')
+    allowed=review.scope_sections(store,store.get('review_sets',value['set_id']) or {})
+    kept=[]
+    for index,q in enumerate(questions[:review.MAX_QUESTIONS]):
+        if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
+        tested=q.get('tests_concept_ids')
+        if not isinstance(tested,list) or not tested or any(c not in allowed for c in tested):
+            raise FormatError('tests_concept_ids must list sections this review may test: '+', '.join(allowed))
+        tested=list(dict.fromkeys(tested))
+        if q.get('kind','apply')=='recall':
+            try: check=lessons._check({**q,'idea':q.get('idea') or q['question'][:200]},value['id']+':'+str(index))
+            except OperationError: continue
+            kept.append({'kind':'recall','question':check['question'],'idea':check['idea'],'options':check['options'],'correct':check['correct'],'tests_concept_ids':tested})
+            continue
+        if q.get('kind','apply')!='apply': raise FormatError('kind must be apply or recall')
+        _check_parts(q)
+        parts=q.get('parts')
+        if parts and any(isinstance(p,dict) and any(c not in tested for c in p.get('concept_ids',[])) for p in parts):
+            raise FormatError('A part may test only sections its question tests')
+        kept.append({'kind':'apply','question':q['question'],'tests_concept_ids':tested,**({'parts':parts} if parts else {})})
+    if not kept: raise FormatError('No usable question')
+    return kept
+
 def complete(store, request):
     value=store.get('practice_jobs',teaching.require_text(request,'id'))
     if not value or value.get('processed'): return {}
@@ -228,12 +261,14 @@ def complete(store, request):
     # Course errors from here on propagate, so the whole operation rolls back and nothing is half-recorded.
     if value['action']=='generate' and value.get('purpose')=='chapter_quiz':
         quiz_tasks(store,value,result['questions'])
+    elif value['action']=='generate' and value.get('purpose')=='review':
+        review_tasks(store,value,result)
     elif value['action']=='generate':
         for index,q in enumerate(result['questions']):
-            task={'id':value['id']+':'+str(index),'concept_id':value['concept_id'],'question':q['question'],'origin':value.get('purpose') or q['origin'],
-                  'source_refs':[] if value.get('purpose') else q.get('source_refs',[]),'status':'pending','history':[],'created_at':time.time()}
+            task={'id':value['id']+':'+str(index),'concept_id':value['concept_id'],'question':q['question'],'origin':q['origin'],
+                  'source_refs':q.get('source_refs',[]),'status':'pending','history':[],'created_at':time.time()}
             if 'parts' in q: task['parts']=q['parts']
-            if not value.get('purpose') and 'exercise' in q: task['exercise']=q['exercise']
+            if 'exercise' in q: task['exercise']=q['exercise']
             if value.get('variant_of'): task['variant_of']=value['variant_of']
             store.put('practice_tasks',task['id'],task)
         # Replaced only once the new exercises exist, and only those the learner still has not touched (ADR 0011).
@@ -281,14 +316,8 @@ def quiz_chapter(store, value):
 
 def quiz_sections(store, chapter):
     """The chapter's sections a quiz may test: studied ones not skipped with the chapter."""
-    allowed=studied_sections(store)-review.skipped(store)
+    allowed=set(review.reviewable(store))
     return [c for c in chapter['concept_ids'] if c in allowed]
-
-def studied_sections(store):
-    """Sections with a completed lesson of their own (a chapter recap is not one) or any learning evidence, such as
-    sections taught in Codex chat before the app."""
-    return ({t['concept_id'] for t in store.digest('streams',streaming.brief) if t['channel']=='mainline' and t['status']=='completed' and not t.get('chapter_id')}
-            | {e['concept_id'] for e in store.list('evidence')})
 
 def quiz_tier(task):
     """Which earlier exercises a chapter quiz asks first: ones solved with help or needing another try, then ones set
@@ -322,9 +351,10 @@ def quiz_earlier(store, chapter):
 
 def quiz_tasks(store, value, questions):
     """The quiz: earlier exercises asked again as new tasks (the originals keep their history), then the new questions.
-    Every task belongs to the chapter; concept_id is its last section, the anchor section-scoped records need."""
+    Every task belongs to the chapter; concept_id is its last section, the anchor section-scoped records need. The quiz
+    is a review set (ADR 0014), so every task names it in set_id."""
     common={'concept_id':value['concept_id'],'chapter_id':value['chapter_id'],'quiz_id':value.get('quiz_id',value['id']),
-            'origin':'chapter_quiz','status':'pending','history':[],'created_at':time.time()}
+            'set_id':value.get('quiz_id',value['id']),'origin':'chapter_quiz','status':'pending','history':[],'created_at':time.time()}
     items=[]
     for task_id in value.get('earlier',[]):
         original=store.get('practice_tasks',task_id)
@@ -336,6 +366,17 @@ def quiz_tasks(store, value, questions):
     for index,item in enumerate(items):
         identifier=value['id']+':'+str(index)
         store.put('practice_tasks',identifier,{'id':identifier,**common,**item})
+
+def review_tasks(store, value, result):
+    """A review set's questions as practice tasks (origin review). Each is recorded for the first section it tests, where
+    its help and assessment land; the set keeps the teacher's note on what it left out."""
+    for index,q in enumerate(result['questions']):
+        identifier=value['id']+':'+str(index)
+        store.put('practice_tasks',identifier,{'id':identifier,'concept_id':q['tests_concept_ids'][0],'origin':'review','set_id':value['set_id'],
+                                               'status':'pending','history':[],'source_refs':[],'created_at':time.time(),**q})
+    if (result.get('note') or '').strip():
+        found=store.get('review_sets',value['set_id'])
+        if found: store.put('review_sets',found['id'],{**found,'note':result['note'].strip()})
 
 def retest_target(store, task, cid):
     """The section's latest independent pass from another session, so an unaided review pass is a retest (evidence.assess)."""
@@ -357,7 +398,7 @@ SKIP_REASONS=tuple(memory.SKIP_PREFERENCES['en'])  # each reason has the prefere
 
 def require_skippable(task):
     if task.get('origin') not in ('source','self_created'):
-        raise OperationError('invalid_action','Only a section exercise can be skipped; a review question waits with Not now and a quiz question can stay unanswered')
+        raise OperationError('invalid_action','Only a section exercise can be skipped; a review or quiz question can simply stay unanswered')
 
 def skip(store, request):
     """Close a section exercise for good, with an optional reason (ADR 0011). It records no outcome, evidence or deferral;

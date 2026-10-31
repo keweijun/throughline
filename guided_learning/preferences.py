@@ -3,10 +3,7 @@ from .store import OperationError
 
 
 LANGUAGES = {'en': 'English', 'zh-CN': 'Simplified Chinese'}
-# At most this many reviews a day (ADR 0008); a course saved before the setting existed reads the default.
-DAILY_REVIEWS = 5
-MAX_DAILY_REVIEWS = 20
-DEFAULTS = {'language': 'en', 'daily_reviews': DAILY_REVIEWS}
+DEFAULTS = {'language': 'en'}
 
 
 def validate_language(value):
@@ -15,14 +12,10 @@ def validate_language(value):
     return value
 
 
-def validate_daily_reviews(value):
-    if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= MAX_DAILY_REVIEWS:
-        raise OperationError('invalid_daily_reviews', f'Daily reviews must be a whole number from 1 to {MAX_DAILY_REVIEWS}')
-    return value
-
-
 def view(store, request):
-    return {'preferences': {**DEFAULTS, **store.get('course', 'preferences', {})}}
+    # A course saved while review had a daily limit may still store it (ADR 0014); it is no longer a preference.
+    stored = {k: v for k, v in store.get('course', 'preferences', {}).items() if k in DEFAULTS}
+    return {'preferences': {**DEFAULTS, **stored}}
 
 
 def save(store, request):
@@ -30,10 +23,8 @@ def save(store, request):
     changes = {}
     if 'language' in request:
         changes['language'] = validate_language(request['language'])
-    if 'daily_reviews' in request:
-        changes['daily_reviews'] = validate_daily_reviews(request['daily_reviews'])
     if not changes:
-        raise OperationError('invalid_request', 'Give language or daily_reviews')
+        raise OperationError('invalid_request', 'Give language')
     store.put('course', 'preferences', {**view(store, request)['preferences'], **changes})
     return view(store, request)
 

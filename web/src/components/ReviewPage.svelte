@@ -1,132 +1,107 @@
 <script lang="ts">
-  import { t, locale, diagnostic } from '../lib/i18n.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import Exercise from './Exercise.svelte';
-  import type { ReviewSection } from '../lib/types';
+  import Composer from './Composer.svelte';
+  import ReviewSet from './ReviewSet.svelte';
 
+  // Review on request (ADR 0014): nothing comes due; the learner asks for a set of questions whenever they like.
   const review = $derived(app.state?.review);
-  const tasks = $derived(review?.tasks ?? []);
   const jobs = $derived(review?.jobs ?? []);
-  let busy = $state<string | null>(null);
-
-  const date = (seconds: number) => new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(seconds * 1000));
-  const midnight = $derived.by(() => {
-    const day = new Date((review?.now ?? Date.now() / 1000) * 1000);
-    day.setHours(0, 0, 0, 0);
-    return day.getTime() / 1000;
-  });
-
-  const preparing = (id: string) => jobs.some((j) => j.concept_id === id && app.isRunning(j.id));
-  // The newest request for a section's question, when it ended without one.
-  function problem(id: string) {
-    const last = jobs.filter((j) => j.concept_id === id).sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1);
-    if (!last) return null;
-    const turn = app.turn(last.id);
-    if (last.error) return diagnostic(last.error);
-    if (!last.processed && turn && turn.status !== 'running' && turn.status !== 'completed') return t("Preparing the question stopped before it finished.");
-    return null;
-  }
-
-  // Review questions answered today stay on the page so their feedback can be read and a retry made.
-  const answeredToday = $derived(
-    tasks.filter(
-      (task) =>
-        task.history.some((h) => h.action === 'assess') &&
-        !review?.due.some((s) => s.task_id === task.id) &&
-        (app.turn(task.id.split(':')[0])?.started_at ?? 0) >= midnight,
-    ),
+  // A set with no questions is shown while they are written or after writing failed, until it is closed.
+  const shown = $derived(
+    (review?.sets ?? []).filter((s) => s.task_ids.length || (!s.closed_at && jobs.some((j) => j.set_id === s.id))),
   );
+  // A set stays current, so its last feedback can be read, until it is closed or a day old once answered.
+  const now = Date.now() / 1000;
+  const current = $derived(shown.filter((s) => !s.closed_at && (s.open || !s.task_ids.length || now - s.created_at < 86400)));
+  const earlier = $derived(shown.filter((s) => !current.includes(s)));
 
-  function chapterTitle(id: string) {
-    return app.chapterOf(id)?.title;
-  }
+  // Chapters with something studied can narrow a request.
+  const chapters = $derived((app.state?.curriculum.chapters ?? []).filter((c) => c.concept_ids.some((id) => app.studied(id))));
+  let scope = $state<string[]>([]);
+  const draftKey = 'review-request';
+  const request = $derived(app.drafts.get(draftKey));
+  let busy = $state(false);
 
-  function when(section: ReviewSection) {
-    return t("Due since {date}", { date: date(section.due_at) });
-  }
-
-  async function run(id: string, action: (id: string) => Promise<unknown>) {
+  async function ask(body: Parameters<typeof app.askReview>[0] = {}) {
     if (busy) return;
-    busy = id;
-    await action(id);
-    busy = null;
+    busy = true;
+    const result = await app.askReview(body);
+    busy = false;
+    return result;
   }
+
+  async function askFor() {
+    const sent = request;
+    const body = { ...(sent.trim() ? { request: sent } : {}), ...(scope.length ? { scope: { chapter_ids: scope } } : {}) };
+    if (!(await ask(body))) return;
+    if (app.drafts.get(draftKey) === sent) app.drafts.set(draftKey, '');
+    scope = [];
+  }
+
+  const toggle = (id: string) => (scope = scope.includes(id) ? scope.filter((x) => x !== id) : [...scope, id]);
 </script>
 
 {#if review}
   <article class="page" aria-labelledby="review-title">
     <header class="head">
-      <p class="eyebrow">{t("Spaced review")}</p>
       <h1 id="review-title">{t("Review")}</h1>
-      <p class="intro">{t("Answer from memory, without looking back. Each section returns after 1, 3, 7, 21 and then 60 days; answering on your own moves it to the next interval, and a review that needs another try starts it over.")}</p>
+      <p class="intro">{t("Answer from memory, without looking back. Ask for questions whenever you like: the teacher picks what you have gone longest without practising and what you missed before, or you say what to review.")}</p>
       {#if app.currentId}
         <button class="btn btn-small back" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
       {/if}
     </header>
 
-    {#if !review.reviewable && !tasks.length}
+    {#if !review.reviewable && !shown.length}
       <section class="empty">
         <h2>{t("Nothing to review yet")}</h2>
-        <p>{t("A section becomes reviewable once you solve one of its exercises, on your own or with help. It comes back here a day later with a fresh question.")}</p>
+        <p>{t("Once you have studied a section, you can review it here.")}</p>
       </section>
     {:else}
-      {#if review.due.length}
-        <section aria-labelledby="due-title">
-          <h2 id="due-title">{t("Due today")}</h2>
-          <ol class="due">
-            {#each review.due as section (section.concept_id)}
-              {@const task = tasks.find((x) => x.id === section.task_id)}
-              <li class="item" aria-label={app.concept(section.concept_id)?.title ?? section.concept_id}>
-                <div class="item-head">
-                  <div>
-                    <p class="title">{app.concept(section.concept_id)?.title ?? section.concept_id}</p>
-                    <p class="meta">
-                      {#if chapterTitle(section.concept_id)}<span>{chapterTitle(section.concept_id)}</span>{/if}
-                      <span>{when(section)}</span>
-                    </p>
-                  </div>
-                  {#if !task && !preparing(section.concept_id)}
-                    <div class="item-actions">
-                      <button class="btn btn-primary btn-small" disabled={!!busy} onclick={() => run(section.concept_id, (id) => app.startReview(id))}>{t("Start review")}</button>
-                      <button class="btn btn-quiet btn-small" disabled={!!busy} onclick={() => run(section.concept_id, (id) => app.postponeReview(id))}>{t("Not now")}</button>
-                    </div>
-                  {/if}
-                </div>
-                {#if task}
-                  <Exercise {task} />
-                {:else if preparing(section.concept_id)}
-                  <p class="status"><span class="chip"><span class="live-dot"></span>{t("Preparing a review question")}</span></p>
-                {:else if problem(section.concept_id)}
-                  <p class="problem">{t("The review question could not be prepared:")} {problem(section.concept_id)}</p>
-                {/if}
-              </li>
-            {/each}
-          </ol>
-        </section>
-      {:else}
-        <section class="caught-up">
-          <h2>{t("Nothing due today")}</h2>
-          {#if review.next_due_at}
-            <p>{t("Next review: {date}.", { date: date(review.next_due_at) })}</p>
+      <section class="ask" aria-labelledby="ask-title">
+        <h2 id="ask-title" class="visually-hidden">{t("Ask for review questions")}</h2>
+        <button class="btn btn-primary" disabled={busy || !review.reviewable} onclick={() => ask()}>{t("Review for me")}</button>
+        {#snippet header()}{t("Or say what to review · the teacher writes questions on what you have studied")}{/snippet}
+        {#snippet tools()}
+          {#if chapters.length > 1}
+            <span class="scope" role="group" aria-label={t("Only these chapters")}>
+              {#each chapters as chapter (chapter.id)}
+                <button class="chip-toggle" aria-pressed={scope.includes(chapter.id)} onclick={() => toggle(chapter.id)}>{chapter.title}</button>
+              {/each}
+            </span>
           {/if}
+        {/snippet}
+        <Composer
+          id="review-request"
+          value={request}
+          onvalue={(value) => app.drafts.set(draftKey, value)}
+          label={t("What to review")}
+          placeholder={t("For example: the variational method, but not the derivations")}
+          submitLabel={t("Ask for questions")}
+          disabled={busy}
+          allowEmpty={scope.length > 0}
+          onsubmit={askFor}
+          {header}
+          {tools}
+          preview={false}
+        />
+      </section>
+
+      {#if current.length}
+        <section class="sets" aria-labelledby="open-title">
+          <h2 id="open-title">{t("Current")}</h2>
+          {#each current as value (value.id)}
+            <ReviewSet {value} />
+          {/each}
         </section>
       {/if}
 
-      {#if review.waiting || review.upcoming}
-        <div class="summary">
-          {#if review.waiting}<p>{t("{count} more due, waiting for later days: at most {cap} reviews a day, so a break does not pile up.", { count: review.waiting, cap: review.cap })}</p>{/if}
-          {#if review.upcoming}<p>{review.upcoming === 1 ? t("1 section is scheduled for a later review.") : t("{count} sections are scheduled for a later review.", { count: review.upcoming })}</p>{/if}
-        </div>
-      {/if}
-
-      {#if answeredToday.length}
-        <section aria-labelledby="done-title">
-          <h2 id="done-title">{t("Reviewed today")}</h2>
-          <div class="done">
-            {#each answeredToday as task (task.id)}
-              <Exercise {task} showSection />
-            {/each}
-          </div>
+      {#if earlier.length}
+        <section class="sets" aria-labelledby="earlier-title">
+          <h2 id="earlier-title">{t("Earlier")}</h2>
+          {#each earlier as value (value.id)}
+            <ReviewSet {value} collapsed />
+          {/each}
         </section>
       {/if}
     {/if}
@@ -141,13 +116,7 @@
     gap: 2rem;
   }
 
-  .eyebrow {
-    font-size: var(--step--1);
-    color: var(--pencil);
-  }
-
   h1 {
-    margin-top: 0.35rem;
     font-family: var(--serif);
     font-size: clamp(var(--step-3), 4.2vw, 2.75rem);
     font-weight: 600;
@@ -169,77 +138,52 @@
   h2 {
     font-size: var(--step-0);
     font-weight: 600;
-    margin-bottom: 0.6rem;
-  }
-
-  .due {
-    display: grid;
-    gap: 1rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .item {
-    display: grid;
-    gap: 0.85rem;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--raised);
-  }
-
-  .item-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1rem;
-  }
-
-  .title {
-    font-size: var(--step-0);
-    font-weight: 600;
-  }
-
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.2rem 0.7rem;
-    font-size: var(--step--1);
     color: var(--pencil);
   }
 
-  .item-actions {
-    display: flex;
-    gap: 0.4rem;
+  .ask {
+    display: grid;
+    gap: 0.9rem;
   }
 
-  .empty,
-  .caught-up {
+  .ask > .btn {
+    justify-self: start;
+  }
+
+  .scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .chip-toggle {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+
+  .chip-toggle[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+
+  .sets {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .empty {
     display: grid;
     justify-items: start;
     gap: 0.5rem;
     padding: 1.25rem 1.35rem;
     border: 1px dashed var(--rule-strong);
     border-radius: var(--radius);
-    font-size: var(--step-0);
-  }
-
-  .summary {
-    display: grid;
-    gap: 0.25rem;
-    font-size: var(--step--1);
-    color: var(--pencil);
-  }
-
-  .done {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .problem {
-    color: var(--danger);
     font-size: var(--step-0);
   }
 </style>

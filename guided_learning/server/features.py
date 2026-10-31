@@ -617,7 +617,8 @@ class Practice(Feature):
             for job in jobs:
                 if job['id'] not in running:
                     continue
-                if (job.get('task_id') == task['id']) if task else (job['concept_id'] == concept_id and job['action'] == 'generate' and job.get('purpose') == purpose):
+                # Review sets are independent of each other, so one being written never holds up another.
+                if (job.get('task_id') == task['id']) if task else (job['concept_id'] == concept_id and job['action'] == 'generate' and job.get('purpose') == purpose and purpose != 'review'):
                     raise OperationError('practice_busy', 'Wait for the current practice request to finish')
             identifier = 'practice-' + str(uuid.uuid4())
             job = {'id': identifier, 'concept_id': concept_id, 'action': action, **(request or {})}
@@ -677,8 +678,10 @@ class Practice(Feature):
             return self.variant(task, note)
         if action not in self.ACTIONS:
             raise OperationError('invalid_action', 'Unknown practice action')
+        if task.get('kind') == 'recall':
+            raise OperationError('invalid_action', 'A recall question is answered by choosing an option')
         if action == 'defer' and task['origin'] == 'review':
-            raise OperationError('invalid_action', 'A review question is not set aside; choose Not now on the review page')
+            raise OperationError('invalid_action', 'A review question is not set aside; it can simply stay unanswered')
         if action == 'defer' and task['origin'] == 'chapter_quiz':
             raise OperationError('invalid_action', 'A chapter quiz question is optional; leave it unanswered instead of setting it aside')
         if action == 'skip':
@@ -842,8 +845,18 @@ class Practice(Feature):
     def _retrieval_prompt(self, job, context, tasks):
         titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}
         if job['purpose'] == 'review':
-            seen = [t['question'] for t in tasks if job['concept_id'] in {t['concept_id'], *t.get('tests_concept_ids', [])}]
-            return prompts.review_question(context['concept'], seen)
+            value = next((s for s in self.operation({'op': 'review.sets'})['sets'] if s['id'] == job.get('set_id')), {})
+            found = self.operation({'op': 'review.context', 'set_id': job.get('set_id')})
+            # Source excerpts keep a narrow review close to what was taught; a wide one relies on the lesson plans.
+            excerpts = []
+            if len(found['sections']) <= prompts.REVIEW_EXCERPT_SECTIONS:
+                concepts = {c['id']: c for c in self.operation({'op': 'curriculum.view'})['concepts']}
+                for section in found['sections']:
+                    refs = concepts.get(section['id'], {}).get('links', [])[:prompts.REVIEW_EXCERPT_UNITS]
+                    text = '\n'.join((s['unit'].get('text') or '') for s in self._sources(refs)) if refs else ''
+                    if text.strip():
+                        excerpts.append({'section': section['id'], 'text': text[:prompts.REVIEW_EXCERPT_CHARS]})
+            return prompts.review_set(value, found, excerpts)
         chapter = next((c for c in self.operation({'op': 'curriculum.view'})['chapters'] if c['id'] == job.get('chapter_id')), None) or context['chapter']
         tested = set(chapter['concept_ids'])
         earlier = {t['id']: t for t in tasks if t['id'] in job.get('earlier', [])}
@@ -1033,7 +1046,10 @@ class Preparation(Feature):
             if self._stop.is_set() or self.host.closing:
                 return
             try:
-                self.schedule()
+                result = self.schedule()
+                # With nothing to prepare and nothing running, write the Review for me set ahead (ADR 0014).
+                if result.get('reason') in ('no_next_section', 'ready', 'failed', 'existing') and self.host.review.ahead:
+                    self.host.review.prepare()
                 summary = [(j['id'], j['status']) for j in self.state()['jobs']]
                 if summary != self._last:
                     self._last = summary

@@ -10,7 +10,6 @@
   type Theme = 'system' | 'light' | 'dark';
   type Pane = 'course' | 'teacher' | 'appearance' | 'about';
 
-  const MAX_DAILY_REVIEWS = 20;
 
   let dialog: HTMLDialogElement | undefined = $state();
   let pane = $state<Pane>('course');
@@ -24,8 +23,6 @@
   let teacherSaved = $state(false);
   let savingTeacher = $state(false);
   let savingLanguage = $state(false);
-  let dailyReviews = $state(5);
-  let savingReviews = $state(false);
   let about = $state<{ version: string } | null>(null);
   let updateError = $state('');
   let checking = $state(false);
@@ -124,7 +121,6 @@
       void loadAbout();
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
-      dailyReviews = app.state?.preferences.daily_reviews ?? 5;
       teacherSaved = false;
       const asked = panes.find((p) => p.id === app.settingsPane);
       app.settingsPane = null;
@@ -138,19 +134,6 @@
     savingLanguage = true;
     await app.setLanguage(language);
     savingLanguage = false;
-  }
-
-  async function saveDailyReviews(value: number) {
-    const saved = app.state?.preferences.daily_reviews ?? 5;
-    if (!Number.isInteger(value) || value < 1 || value > MAX_DAILY_REVIEWS) {
-      dailyReviews = saved;
-      return;
-    }
-    dailyReviews = value;
-    if (value === saved) return;
-    savingReviews = true;
-    dailyReviews = (await app.savePreferences({ daily_reviews: value }))?.daily_reviews ?? saved;
-    savingReviews = false;
   }
 
   const notes = $derived(app.state?.annotations.length ?? 0);
@@ -276,26 +259,6 @@
             <p>{t("The interface and new teaching content. Sources and saved lessons keep their language.")}</p>
           </div>
           {@render languageChoice()}
-        </div>
-        <div class="setting">
-          <div class="text">
-            <label class="title" for="daily-reviews">{t("Daily reviews")}</label>
-            <p>{t("At most this many sections come up for review each day; the rest wait for later days.")}</p>
-          </div>
-          <div class="stepper">
-            <button class="btn btn-quiet" aria-label={t("Fewer")} disabled={savingReviews || dailyReviews <= 1} onclick={() => saveDailyReviews(dailyReviews - 1)}>−</button>
-            <input
-              id="daily-reviews"
-              type="number"
-              min="1"
-              max={MAX_DAILY_REVIEWS}
-              step="1"
-              bind:value={dailyReviews}
-              onchange={() => saveDailyReviews(dailyReviews)}
-              disabled={savingReviews}
-            />
-            <button class="btn btn-quiet" aria-label={t("More")} disabled={savingReviews || dailyReviews >= MAX_DAILY_REVIEWS} onclick={() => saveDailyReviews(dailyReviews + 1)}>+</button>
-          </div>
         </div>
         <div class="setting">
           <div class="text">
@@ -681,38 +644,6 @@
     font-size: var(--step--1);
     color: var(--pencil);
     overflow-wrap: anywhere;
-  }
-
-  .stepper {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid var(--rule-strong);
-    border-radius: var(--radius);
-    background: var(--raised);
-  }
-
-  .stepper .btn {
-    width: 2rem;
-    padding: 0.35rem 0;
-    justify-content: center;
-    border-radius: 0;
-  }
-
-  .stepper input {
-    width: 3rem;
-    padding: 0.35rem 0;
-    border: 0;
-    border-inline: 1px solid var(--rule);
-    border-radius: 0;
-    text-align: center;
-    appearance: textfield;
-    -moz-appearance: textfield;
-  }
-
-  .stepper input::-webkit-inner-spin-button,
-  .stepper input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
   }
 
   .switch {

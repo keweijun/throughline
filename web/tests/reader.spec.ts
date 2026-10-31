@@ -201,17 +201,10 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
 });
 
-test('course settings set the daily review limit and lead to teaching preferences', async ({ page, course }) => {
-  const { base } = await course('demo_course_fixture');
+test('course settings lead to teaching preferences, with no review schedule to set', async ({ page, course }) => {
+  await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const limit = page.getByRole('spinbutton', { name: 'Daily reviews' });
-  await expect(limit).toHaveValue('5');
-  await limit.fill('3');
-  await limit.press('Tab');
-  await expect.poll(async () => (await (await page.request.get(base + '/api/state')).json()).preferences.daily_reviews).toBe(3);
-  await page.getByRole('button', { name: 'More', exact: true }).click();
-  await expect(limit).toHaveValue('4');
-  await expect.poll(async () => (await (await page.request.get(base + '/api/state')).json()).preferences.daily_reviews).toBe(4);
+  await expect(page.getByRole('spinbutton', { name: 'Daily reviews' })).toHaveCount(0);
   await expect(page.getByText('None yet', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Open course memory' }).click();
   await expect(page.getByRole('dialog')).toBeHidden();

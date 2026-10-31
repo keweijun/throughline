@@ -21,7 +21,7 @@ class LanguagePreferences(unittest.TestCase):
         return execute(self.path,request)
 
     def test_default_persistence_validation_and_evidence_isolation(self):
-        self.assertEqual(self.op(op='preferences.view')['preferences'],{'language':'en','daily_reviews':5})
+        self.assertEqual(self.op(op='preferences.view')['preferences'],{'language':'en'})
         before=self.op(op='session.resume')
         self.op(op='preferences.save',language='zh-CN')
         self.assertEqual(execute(self.path,{'op':'preferences.view'})['preferences']['language'],'zh-CN')
@@ -31,19 +31,15 @@ class LanguagePreferences(unittest.TestCase):
         self.assertEqual(self.op(op='session.resume'),before)
         self.assertFalse(self.op(op='evidence.view',concept_id='a')['independently_verified'])
 
-    def test_daily_reviews_save_alone_and_courses_saved_before_read_the_default(self):
-        # A course saved before the setting existed stores the language only.
+    def test_a_daily_review_limit_saved_before_review_was_asked_for_is_not_a_preference(self):
+        # Review had a daily limit before ADR 0014; a course still storing one reads the language only.
         store=Store(self.path)
         with store.db:
-            store.put('course','preferences',{'language':'zh-CN'})
+            store.put('course','preferences',{'language':'zh-CN','daily_reviews':8})
         store.db.close()
-        self.assertEqual(self.op(op='preferences.view')['preferences'],{'language':'zh-CN','daily_reviews':5})
-        self.assertEqual(self.op(op='preferences.save',daily_reviews=8)['preferences'],{'language':'zh-CN','daily_reviews':8})
-        self.assertEqual(self.op(op='preferences.save',language='en')['preferences'],{'language':'en','daily_reviews':8})
-        for invalid in (0,21,2.5,'5',True,None):
-            with self.assertRaises(OperationError):self.op(op='preferences.save',daily_reviews=invalid)
+        self.assertEqual(self.op(op='preferences.view')['preferences'],{'language':'zh-CN'})
+        with self.assertRaises(OperationError):self.op(op='preferences.save',daily_reviews=5)
         with self.assertRaises(OperationError):self.op(op='preferences.save')
-        self.assertEqual(self.op(op='review.schedule')['cap'],8)
 
     def test_running_turns_are_frozen_and_retries_do_not_change_language(self):
         request={'op':'stream.start','id':'one','concept_id':'a','prompt':'Explain','channel':'sidequestion'}
@@ -92,8 +88,7 @@ class LanguagePreferences(unittest.TestCase):
             self.assertEqual(client.get('/api/state').json()['preferences']['language'],'en')
             self.assertEqual(client.put('/api/preferences',json={'language':'zh-CN'}).status_code,200)
             self.assertEqual(client.put('/api/preferences',json={'language':'xx'}).status_code,400)
-            self.assertEqual(client.put('/api/preferences',json={'daily_reviews':3}).json()['preferences'],{'language':'zh-CN','daily_reviews':3})
-            self.assertEqual(client.put('/api/preferences',json={'daily_reviews':0}).status_code,400)
+            self.assertEqual(client.put('/api/preferences',json={'daily_reviews':3}).status_code,400)
             turn=client.post('/api/lessons',json={'id':'lesson'}).json()['turn']
             self.assertTrue(runner.received.wait(2))
             self.assertEqual(turn['language'],'zh-CN')

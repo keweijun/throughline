@@ -8,17 +8,16 @@ import threading
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from .. import images as attached, library, updates
 from ..commands import version
-from ..preferences import MAX_DAILY_REVIEWS
 from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
@@ -43,7 +42,6 @@ class LessonRequest(Body):
 
 class PreferencesRequest(Body):
     language: Optional[Literal['en', 'zh-CN']] = None
-    daily_reviews: Optional[Annotated[int, Field(ge=1, le=MAX_DAILY_REVIEWS)]] = None
 
 
 class ResumeRequest(Body):
@@ -120,8 +118,19 @@ class SkipChapterRequest(Body):
     request_id: str
 
 
-class ReviewRequest(Body):
-    concept_id: str
+class ReviewScope(Body):
+    chapter_ids: list[str] = []
+    concept_ids: list[str] = []
+
+
+class ReviewSetRequest(Body):
+    request: Optional[str] = None
+    scope: Optional[ReviewScope] = None
+    warm_up_for: Optional[str] = None
+
+
+class RecallAnswer(Body):
+    choice: Union[int, Literal['unsure']]
 
 
 class RecapRequest(Body):
@@ -449,17 +458,26 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
     @app.get('/api/review')
-    def review_schedule():
+    def review_state():
         return host.review.state()
 
-    @app.post('/api/review/start')
-    def start_review(body: ReviewRequest):
-        result = host.review.start(body.concept_id)
+    @app.post('/api/review/sets')
+    def ask_for_review(body: ReviewSetRequest):
+        scope = {k: v for k, v in body.scope.model_dump().items() if v} if body.scope else None
+        result = host.review.ask(body.request, scope or None, body.warm_up_for)
         return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
 
-    @app.post('/api/review/postpone')
-    def postpone_review(body: ReviewRequest):
-        return host.review.postpone(body.concept_id)
+    @app.post('/api/review/sets/{set_id}/close')
+    def close_review_set(set_id: str):
+        return host.review.close(set_id)
+
+    @app.post('/api/review/tasks/{task_id}/answer')
+    def answer_recall(task_id: str, body: RecallAnswer):
+        return host.review.answer(task_id, body.choice)
+
+    @app.post('/api/review/warm-ups/{concept_id}/dismiss')
+    def dismiss_warm_up(concept_id: str):
+        return host.review.dismiss_warm_up(concept_id)
 
     @app.post('/api/sections/next')
     def next_section(body: NextSectionRequest):

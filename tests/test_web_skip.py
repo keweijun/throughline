@@ -1,13 +1,12 @@
 """Skipping a section exercise (ADR 0011): it is closed, records nothing, and no quiz or reminder brings it back."""
 import json
 import tempfile
-import time
 import unittest
 from pathlib import Path
 
 from guided_learning.api import execute
 from support import host_client, settle
-from test_web_review import DAY, Runner
+from test_web_review import Runner
 
 
 class SkipCourse(unittest.TestCase):
@@ -81,8 +80,8 @@ class SkipFlow(SkipCourse):
         self.runner.outcome = 'passed'
         self.post(f'/api/practice/tasks/{task["id"]}/assess', {'answer': 'My reasoning.'})
         self.settle()
-        self.host.review.clock = lambda: time.time() + 2 * DAY
-        self.post('/api/review/start', {'concept_id': 'a'})
+        self.host.review.ahead = False
+        self.post('/api/review/sets', {})
         self.settle()
         review = next(t for t in self.host.practice.state()['tasks'] if t['origin'] == 'review')
         self.post(f'/api/practice/tasks/{review["id"]}/skip', {}, status=409)

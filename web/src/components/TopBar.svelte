@@ -49,7 +49,20 @@
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
-    <span class="course">{studying ? app.state!.course.title : t("Throughline")}</span>
+    {#if studying}
+      <!-- The course title opens the Course page: the course as a whole, with Studio and the teacher's memory (ADR 0017). -->
+      <button
+        id="open-course"
+        class="course course-button"
+        aria-pressed={app.courseOpen}
+        title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
+        onclick={() => (app.courseOpen ? (app.courseOpen = false) : app.showCourse())}
+      >
+        {app.state!.course.title}{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+      </button>
+    {:else}
+      <span class="course">{t("Throughline")}</span>
+    {/if}
   </div>
 
   {#if route.length && index >= 0 && studying}
@@ -96,14 +109,6 @@
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Notes")}</span>
       </button>
-      <button id="toggle-memory" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('memory')} aria-label={t("Memory")} title={t("What the teacher remembers about this course")} onclick={() => toggle('memory')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3.5a5 5 0 0 0-3 9v2.5h6V12.5a5 5 0 0 0-3-9zM8 17h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Memory")}</span>{#if suggested}<span class="count">{suggested}</span>{/if}
-      </button>
-      <button id="toggle-studio" class="btn btn-quiet studio-toggle" aria-controls="auxiliary" aria-pressed={showing('studio')} aria-label={t("Studio")} title={t("Studio: create and change courses with Codex (d)")} onclick={() => toggle('studio')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Studio")}</span>
-      </button>
       </div>
     {/if}
     {#if studying && !app.studioShown && (studio.waiting.length || studio.working.length)}
@@ -132,7 +137,7 @@
         <span class="wide-only">{t("Update available")}</span>
       </button>
     {/if}
-    <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: course, teacher, appearance and about")}>
+    <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: teacher, appearance and about")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.02 8.14L18.08 8.61L18.08 11.39L16.02 11.86L15.57 12.94L16.70 14.73L14.73 16.70L12.94 15.57L11.86 16.02L11.39 18.08L8.61 18.08L8.14 16.02L7.06 15.57L5.27 16.70L3.30 14.73L4.43 12.94L3.98 11.86L1.92 11.39L1.92 8.61L3.98 8.14L4.43 7.06L3.30 5.27L5.27 3.30L7.06 4.43L8.14 3.98L8.61 1.92L11.39 1.92L11.86 3.98L12.94 4.43L14.73 3.30L16.70 5.27L15.57 7.06Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
     </button>
     <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>
@@ -178,6 +183,37 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* The title reads as the course's name, with a quiet hover that says it opens something. */
+  .course-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    margin: 0 -0.45rem;
+    padding: 0.2rem 0.45rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--step-0);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .course-button:hover,
+  .course-button[aria-pressed='true'] {
+    background: var(--accent-wash);
+  }
+
+  .dot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--marker);
   }
 
   .progress {
@@ -338,10 +374,8 @@
       display: none;
     }
 
-    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due.
-       Studio is reached there from the course's own hand-offs (Add files in Studio, …). */
-    .review,
-    .studio-toggle {
+    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due. */
+    .review {
       display: none;
     }
   }

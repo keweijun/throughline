@@ -9,6 +9,7 @@
   import ConceptPage from './components/ConceptPage.svelte';
   import ChapterPage from './components/ChapterPage.svelte';
   import ReviewPage from './components/ReviewPage.svelte';
+  import CoursePage from './components/CoursePage.svelte';
   import SidePanel from './components/SidePanel.svelte';
   import SelectionAsk from './components/SelectionAsk.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
@@ -73,8 +74,8 @@
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
-    else if (event.key === 'm') app.panelOpen && app.panelTab === 'memory' ? (app.panelOpen = false) : app.openPanel('memory');
-    else if (event.key === 'd') app.studioShown ? (app.panelOpen = false) : app.showStudio();
+    else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse('memory');
+    else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio();
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.shortcutsOpen = true;
   }
@@ -94,7 +95,9 @@
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
     <RouteRail />
     <main id="main">
-      {#if app.reviewOpen}
+      {#if app.courseOpen}
+        <CoursePage />
+      {:else if app.reviewOpen}
         <ReviewPage />
       {:else if app.viewingChapter}
         {#key app.viewingChapter}

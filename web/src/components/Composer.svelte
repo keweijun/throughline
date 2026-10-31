@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { modEnterToSend, sendKeys } from '../lib/keys';
-  import { autogrow } from '../lib/autogrow';
+  import { sendKeys } from '../lib/keys';
+  import { editor } from '../lib/editor';
   import { markdown, hasMath } from '../lib/markdown';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
@@ -109,9 +109,10 @@
 
   function paste(event: ClipboardEvent) {
     const files = imagesKey ? imageFiles(event.clipboardData) : [];
-    if (!files.length) return;
+    if (!files.length) return false;
     event.preventDefault();
     void attach(files);
+    return true;
   }
 
   function dragover(event: DragEvent) {
@@ -164,24 +165,10 @@
       </p>
     </div>
   {/if}
-  <textarea
-    {id}
-    {rows}
-    {value}
-    oninput={(event) => onvalue(event.currentTarget.value)}
-    onpaste={paste}
-    onkeydown={(event) => {
-      if (event.key === 'Escape' && oncancel) {
-        event.preventDefault();
-        oncancel();
-      }
-    }}
-    use:autogrow={value}
-    use:modEnterToSend={send}
-    aria-label={label}
-    aria-describedby={hintId}
-    {placeholder}
-  ></textarea>
+  <div
+    class="field"
+    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, onchange: onvalue, onsend: send, oncancel, onpaste: paste }}
+  ></div>
   {#if math && showPreview && rendered}
     <section class="preview" aria-label={t("Preview")}>
       <div class="prose" use:markdown={{ language: locale.language, text: rendered, breaks: true }}></div>
@@ -314,17 +301,6 @@
 
   .link:hover {
     text-decoration: underline;
-  }
-
-  /* The frame draws the field, so the text area itself is bare. */
-  textarea,
-  textarea:hover,
-  textarea:focus {
-    min-height: 2.75rem;
-    padding: 0.6rem 0.8rem 0.3rem;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
   }
 
   .preview {

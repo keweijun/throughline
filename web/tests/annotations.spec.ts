@@ -1,4 +1,4 @@
-import { test, expect, dragSelect } from './fixture';
+import { test, expect, dragSelect, editorText } from './fixture';
 
 test('highlight and note a lesson passage, bookmark the section, and find them in Notes', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
@@ -28,7 +28,7 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await expect(page.locator('.notes-panel .item')).toHaveCount(3);
 
   await page.locator('.notes-panel .item.highlight').filter({ hasText: 'Check this' }).getByRole('button', { name: 'Edit' }).click();
-  await page.locator('.notes-panel .item textarea').fill('Edited note');
+  await page.locator('.notes-panel .item').getByRole('textbox', { name: 'Note' }).fill('Edited note');
   await page.locator('.notes-panel .item').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.notes-panel')).toContainText('Edited note');
 
@@ -39,9 +39,9 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await sectionNote.pressSequentially('revisit');
   await sectionNote.press('Enter');
   await sectionNote.pressSequentially('interference');
-  await expect(sectionNote).toHaveValue('Overall:\nrevisit\ninterference');
+  await expect.poll(() => editorText(sectionNote)).toBe('Overall:\nrevisit\ninterference');
   await sectionNote.press('Control+Enter');
-  await expect(sectionNote).toHaveValue('');
+  await expect.poll(() => editorText(sectionNote)).toBe('');
   await expect(page.locator('.notes-panel .item.note')).toContainText('revisit');
 
   await page.locator('.notes-panel .item.bookmark').getByRole('button', { name: 'Delete' }).click();
@@ -245,7 +245,7 @@ test('a section note is written in the box at the bottom and lands at the end of
   for (const note of ['First note', 'Second note']) {
     await box.fill(note);
     await box.press('Control+Enter');
-    await expect(box).toHaveValue('');
+    await expect.poll(() => editorText(box)).toBe('');
   }
   await expect(page.locator('.notes-panel .item .text')).toHaveText(['First note', 'Second note']);
   const list = (await page.locator('.notes-panel .item').last().boundingBox())!;

@@ -22,7 +22,7 @@ test('the teacher suggests a preference, and the learner confirms, edits and del
   await expect(memory.locator('#memory-difficulty')).toContainText('Adding probabilities instead of amplitudes');
 
   await memory.locator('#memory-taught_term .item').getByRole('button', { name: 'Edit' }).click();
-  await memory.locator('#memory-taught_term textarea').fill('plane wave $e^{ikx}$');
+  await memory.locator('#memory-taught_term').getByRole('textbox').fill('plane wave $e^{ikx}$');
   await memory.locator('#memory-taught_term').getByRole('button', { name: 'Save', exact: true }).click();
   await expect(memory.locator('#memory-taught_term .katex')).toBeVisible();
 

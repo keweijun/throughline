@@ -55,9 +55,6 @@
   const chapters = $derived(app.chapters);
   const currentChapter = $derived(app.chapterOf(app.currentId)?.id);
 
-  // The chapter being studied stays open; the learner can open or close any other.
-  let toggled = $state<Record<string, boolean>>({});
-  const expanded = (id: string) => toggled[id] ?? (id === currentChapter || id === app.chapterOf(app.viewingId)?.id || id === app.viewingChapter);
   const studied = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
   // Folding needs room to unfold into; without it the route stays folded and opens on hover.
   const foldable = $derived(!app.stageNarrow && !app.phone);
@@ -93,19 +90,31 @@
     foldedBefore = folded;
   });
 
-  // When the full route opens beside the capsule, it shows the section being read.
+  // The route keeps what the learner is looking at in view: when it opens, folds or unfolds, and whenever they move
+  // or look elsewhere. Folded, the drawer scrolls instead of the rail, and is checked again each time it opens, since
+  // the learner may have scrolled it away. Opening and closing chapters slides the trays, so look again once they settle.
   let full = $state<HTMLElement>();
   function reveal() {
-    if (!full || !app.folded) return;
     requestAnimationFrame(() => {
-      // The current section, else whatever is open on the page. Positions come from the screen, since each row is
-      // positioned and offsetTop would count from the row instead of the drawer.
-      const item = full!.querySelector<HTMLElement>('.current .entry') ?? full!.querySelector<HTMLElement>('[aria-current="page"]');
+      const box = app.folded ? full : nav;
+      if (!box) return;
+      // What is open on the page, else the current section, else the chapter being studied. Positions come from the
+      // screen, since each row is positioned and offsetTop would count from the row instead of the scrolling box.
+      const item =
+        box.querySelector<HTMLElement>('[aria-current="page"]') ??
+        box.querySelector<HTMLElement>('.current .entry') ??
+        box.querySelector<HTMLElement>('.chapter.here .chapter-name');
       if (!item) return;
-      const top = item.getBoundingClientRect().top - full!.getBoundingClientRect().top + full!.scrollTop;
-      if (top < full!.scrollTop || top + item.offsetHeight > full!.scrollTop + full!.clientHeight) full!.scrollTop = top - full!.clientHeight / 3;
+      const top = item.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+      if (top < box.scrollTop || top + item.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top - box.clientHeight / 3;
     });
   }
+  $effect(() => {
+    void [app.viewingId, app.viewingChapter, app.reviewOpen, app.currentId, app.folded, app.routeOpen, nav, full];
+    reveal();
+    const settled = setTimeout(reveal, 260);
+    return () => clearTimeout(settled);
+  });
 </script>
 
 {#snippet section(id: string)}
@@ -136,7 +145,7 @@
   </li>
 {/snippet}
 
-<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} class:resting class:entering aria-label={t("Course route")} onpointerenter={reveal} bind:this={nav}>
+<nav id="route" class="rail" class:open={app.routeOpen} class:folded={app.folded} class:resting class:entering aria-label={t("Course route")} onpointerenter={() => app.folded && reveal()} bind:this={nav}>
   {#if app.folded}<FoldedRoute />{/if}
   <div class="full" bind:this={full}>
     <div class="head">
@@ -155,7 +164,7 @@
     {#if chapters.length}
       <ol class="chapters">
         {#each chapters as chapter, number (chapter.id)}
-          {@const open = expanded(chapter.id)}
+          {@const open = app.chapterOpen(chapter.id)}
           {@const total = chapter.concept_ids.length}
           {@const done = studied(chapter.concept_ids)}
           <li class="chapter" class:here={chapter.id === currentChapter}>
@@ -173,7 +182,7 @@
                 aria-label={open ? t("Collapse chapter") : t("Expand chapter")}
                 title={t("Chapter {number}", { number: number + 1 }) + ' · ' + chapter.title}
                 disabled={!total}
-                onclick={() => (toggled[chapter.id] = !open)}
+                onclick={() => app.toggleChapter(chapter.id)}
               ><span aria-hidden="true">{number + 1}</span></button>
               <button
                 class="entry chapter-name"

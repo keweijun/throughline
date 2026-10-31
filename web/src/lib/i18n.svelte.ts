@@ -3,6 +3,11 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Tip": "提示",
+  "Got it": "知道了",
+  "Select any passage in the lesson to ask about it, highlight it or add a note.": "选中讲解中的任意一段，即可就它提问、高亮或添加笔记。",
+  "Point at a citation to see the text it cites; click it to open the page beside the lesson.": "把鼠标指向引用可查看所引原文；点击即可在讲解旁打开那一页。",
+  "Hints, key steps and the full solution are always here. Using one is recorded, so a correct answer after it counts as solved with help.": "提示、关键步骤和完整解答随时可用。使用后会被记录，之后答对算作“有帮助完成”。",
   "Help": "帮助",
   "Help and keyboard shortcuts (?)": "帮助和键盘快捷键（?）",
   "What you can do, from the whole app down to the section you are reading.": "你能做的事，从整个应用到你正在读的小节。",

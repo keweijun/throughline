@@ -20,6 +20,7 @@
 
   onMount(() => {
     void app.sync();
+    void app.loadSeen();
     app.connect();
     // A quiet check at launch: a newer version only marks Settings, and a failure shows nothing.
     app.checkForUpdate().catch(() => {});

@@ -81,3 +81,33 @@ class TeacherSettings:
 
     def models(self):
         return {'models': list_models()}
+
+
+class Seen:
+    """What this learner has dismissed for good, such as the library's launcher card; saved per user beside the settings."""
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.lock = threading.Lock()
+
+    def _saved(self):
+        try:
+            data = json.loads(self.path.read_text(encoding='utf-8'))
+            return [str(item) for item in data.get('seen', [])]
+        except (OSError, ValueError, AttributeError, TypeError):
+            return []  # unreadable means nothing dismissed yet: the card shows again, which is harmless
+
+    def all(self):
+        with self.lock:
+            return self._saved()
+
+    def add(self, item):
+        with self.lock:
+            seen = self._saved()
+            if item not in seen:
+                seen.append(item)
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self.path.with_suffix('.tmp')
+                temporary.write_text(json.dumps({'seen': seen}, indent=2), encoding='utf-8')
+                os.replace(temporary, self.path)
+            return seen

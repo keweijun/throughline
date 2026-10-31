@@ -138,6 +138,10 @@ class AppStore {
   phone = $state(false);
   /** Help: what the learner can do by level, with the keyboard shortcuts (ADR 0017). */
   helpOpen = $state(false);
+  /** One-time hints the learner has seen, saved per user (ADR 0017); null until loaded, so none flashes up. */
+  seen = $state<string[] | null>(null);
+  /** The hint on screen: hints show one at a time, and `owner` is the copy that claimed the place. */
+  hint = $state.raw<{ key: string; owner: object } | null>(null);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
   /** Annotation to scroll to and flash in the Notes tab. */
@@ -353,6 +357,22 @@ class AppStore {
     } catch (e) {
       if (!quiet) this.error = (e as Error).message;
     }
+  }
+
+  async loadSeen() {
+    try {
+      this.seen = (await api.get<{ seen: string[] }>('/api/seen')).seen;
+    } catch {
+      // Without the list no hint shows; nothing else depends on it.
+    }
+  }
+
+  /** Marks a hint seen, when it is dismissed or the learner does what it describes. */
+  markSeen(key: string) {
+    if (!this.seen || this.seen.includes(key)) return;
+    this.seen = [...this.seen, key];
+    if (this.hint?.key === key) this.hint = null;
+    api.post('/api/seen', { id: key }).catch(() => {});
   }
 
   showLibrary() {

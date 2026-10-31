@@ -49,33 +49,35 @@ class CourseLibrary(unittest.TestCase):
             old = Path(home) / '.skills' / 'guided-learning'
             old.mkdir(parents=True)
             (old / 'SKILL.md').write_text('---\nname: guided-learning\n---\n', encoding='utf-8')
-            result = cli(home, 'setup')
+            result = cli(home, 'setup', '--no-open')
             self.assertFalse(old.exists(), 'the skill under its old name is removed')
             self.assertEqual(result.returncode, 0, result.stderr)
             skill = Path(home) / '.skills' / 'throughline'
             self.assertIn('name: throughline', (skill / 'SKILL.md').read_text(encoding='utf-8'))
             self.assertTrue((skill / 'references' / 'course-operations.md').is_file())
             self.assertTrue((skill / 'agents' / 'openai.yaml').is_file())
-            self.assertEqual(cli(home, 'setup').returncode, 0, 'setup is repeatable for updates')
+            self.assertEqual(cli(home, 'setup', '--no-open').returncode, 0, 'setup is repeatable for updates')
             for child in skill.rglob('*'):
                 if child.is_file():
                     child.unlink()
             (skill / 'SKILL.md').write_text('---\nname: something-else\n---\n', encoding='utf-8')
-            self.assertEqual(cli(home, 'setup').returncode, 1)
+            self.assertEqual(cli(home, 'setup', '--no-open').returncode, 1)
             self.assertIn('something-else', (skill / 'SKILL.md').read_text(encoding='utf-8'))
 
     def test_setup_prepares_the_library_launcher_and_welcome_guide(self):
         with tempfile.TemporaryDirectory() as home:
-            result = cli(home, 'setup')
+            result = cli(home, 'setup', '--no-open')
             self.assertEqual(result.returncode, 0, result.stderr)
             agents = Path(home) / 'AGENTS.md'
             self.assertIn('$throughline', agents.read_text(encoding='utf-8'))
-            self.assertIn('## Welcome to Throughline', result.stdout)
-            self.assertIn('$throughline make a course from these files', result.stdout)
-            self.assertIn('What Codex does while building', result.stdout)
+            self.assertIn('## Throughline ', result.stdout)
+            self.assertIn(f'Your Throughline folder: `{Path(home)}`', result.stdout)
+            self.assertIn('New course', result.stdout)
+            self.assertNotIn('growing intervals', result.stdout, 'review has no schedule (ADR 0014)')
             self.assertNotIn('codex://', result.stdout)
-            chinese = cli(home, 'setup', '--no-launcher', '--language', 'zh-CN')
-            self.assertIn('欢迎使用贯学', chinese.stdout)
+            self.assertNotIn('Throughline is open at', result.stdout, '--no-open leaves the app closed')
+            chinese = cli(home, 'setup', '--no-open', '--no-launcher', '--language', 'zh-CN')
+            self.assertIn('已安装', chinese.stdout)
             self.assertIn('When the learner has not said what to do', agents.read_text(encoding='utf-8'))
             if os.name == 'nt':
                 launcher = Path(home) / '.appdata' / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Throughline.lnk'
@@ -87,7 +89,7 @@ class CourseLibrary(unittest.TestCase):
                 self.assertTrue(Path(icon).is_file(), icon)
             self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'library files are not courses')
             agents.write_text('# My own notes\n', encoding='utf-8')
-            again = cli(home, 'setup', '--no-launcher')
+            again = cli(home, 'setup', '--no-open', '--no-launcher')
             self.assertEqual(again.returncode, 0, again.stderr)
             self.assertEqual(agents.read_text(encoding='utf-8'), '# My own notes\n')
             self.assertIn('Kept your own', again.stdout)
@@ -210,7 +212,7 @@ class Migration(unittest.TestCase):
             env = {**os.environ, 'HOME': home, 'USERPROFILE': home, 'XDG_DATA_HOME': str(Path(home) / '.xdg'),
                    'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills')}
             env.pop('GUIDED_LEARNING_HOME', None)
-            result = subprocess.run([sys.executable, '-m', 'guided_learning', 'setup', '--no-launcher'], text=True, capture_output=True,
+            result = subprocess.run([sys.executable, '-m', 'guided_learning', 'setup', '--no-open', '--no-launcher'], text=True, capture_output=True,
                                     cwd=ROOT, env=env, timeout=60)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('Moved 1 course(s)', result.stdout)

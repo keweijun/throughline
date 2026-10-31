@@ -5,7 +5,7 @@ import time
 import unicodedata
 from .store import OperationError
 from .preferences import view as course_preferences
-from .teaching import require_text, validate_concept
+from .teaching import require_text, validate_concept, record_interaction
 
 KINDS = ('preference', 'taught_term', 'difficulty')
 IN_EFFECT = ('active', 'suggested', 'confirmed')  # what a new entry saying the same thing merges into
@@ -281,6 +281,66 @@ def consolidations(store, request):
     return {'consolidations': sorted(store.list('memory_consolidations'), key=lambda c: c['created_at'])}
 
 
+def request(store, request):
+    """The learner says, in their own words, what the teacher should remember about how they like to be taught. The
+    message is an interaction, so the preferences it leads to cite it; the reply comes from a `memory` turn."""
+    identifier = require_text(request, 'id')
+    concept_id = require_text(request, 'concept_id')
+    validate_concept(store, concept_id)
+    text = require_text(request, 'text').strip()
+    existing = store.get('memory_requests', identifier)
+    if existing:
+        return {'request': existing, 'created': False}
+    record_interaction(store, {'id': 'memory-request:' + identifier, 'role': 'user', 'text': text, 'concept_id': concept_id})
+    return {'request': store.put('memory_requests', identifier, {'id': identifier, 'text': text, 'concept_id': concept_id,
+                                                                 'turn_id': 'memory-' + identifier, 'created_at': time.time()}),
+            'created': True}
+
+
+def requests(store, request):
+    return {'requests': sorted(store.list('memory_requests'), key=lambda r: r['created_at'])}
+
+
+def answer(store, request):
+    """Applies the reply to a memory request once: `remember` adds preferences, confirmed since the learner asked for
+    them, and `forget` deletes listed preferences (final, as when the learner deletes one). A malformed reply changes no
+    entry; the request keeps why it was refused."""
+    identifier = require_text(request, 'id')
+    record = store.get('memory_requests', identifier)
+    if not record:
+        raise OperationError('unknown_memory_request', identifier)
+    if 'reply' in record:
+        return {'request': record, 'replayed': True}
+    reply = request.get('reply')
+    live = {e['id']: e for e in _entries(store) if e['kind'] == 'preference' and e['status'] in IN_EFFECT}
+    try:
+        if not isinstance(reply, dict) or set(reply) - {'reply', 'remember', 'forget'} or not isinstance(reply.get('reply'), str) or not reply['reply'].strip():
+            raise OperationError('invalid_memory_reply', 'A memory reply is an object with reply, remember and forget')
+        remember = [_text(t) for t in _list(reply.get('remember', []))]
+        forget = _list(reply.get('forget', []))
+        if any(i not in live for i in forget):
+            raise OperationError('invalid_memory_reply', 'forget names only listed preferences')
+    except OperationError as error:
+        return {'request': store.put('memory_requests', identifier, {**record, 'error': str(error)}), 'refused': True}
+    cited = ['memory-request:' + identifier]
+    remembered = []
+    for index, text in enumerate(remember):
+        entry, _ = _create(store, f"{record['turn_id']}:{index}", 'preference', text, None, cited)
+        if entry['status'] != 'deleted':
+            entry = store.put('memory', entry['id'], {**entry, 'status': 'confirmed', 'updated_at': time.time()})
+            remembered.append(entry['id'])
+    for entry_id in forget:
+        store.put('memory', entry_id, {**live[entry_id], 'status': 'deleted', 'updated_at': time.time()})
+    return {'request': store.put('memory_requests', identifier, {**record, 'reply': reply['reply'].strip(), 'remembered': remembered,
+                                                                 'forgotten': forget, 'answered_at': time.time()})}
+
+
+def _list(value):
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise OperationError('invalid_memory_reply', 'remember and forget are lists of strings')
+    return list(dict.fromkeys(value))
+
+
 OPERATIONS = {'memory.consolidate': consolidate, 'memory.consolidations': consolidations,
               'memory.view': view, 'memory.save': save, 'memory.delete': delete, 'memory.confirm': confirm, 'memory.note': note,
-              'memory.prompt': prompt}
+              'memory.prompt': prompt, 'memory.request': request, 'memory.requests': requests, 'memory.answer': answer}

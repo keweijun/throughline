@@ -15,8 +15,9 @@ LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')  # the learner's own
 # A lesson step written ahead while the learner reads the current one: hidden, and no teaching interaction, until
 # lesson.step reveals it as a mainline turn (ADR 0009).
 PREPARED_STEP = 'prepared_step'
-BACKGROUND = ('preparation', 'build', 'consolidation')  # channels whose turns are not teaching interactions
-SMALL_MODEL = ('preparation', 'consolidation')  # channels the small model serves
+# A `memory` turn answers what the learner asked to be remembered; their message is recorded by memory.request.
+BACKGROUND = ('preparation', 'build', 'consolidation', 'memory')  # channels whose turns are not teaching interactions
+SMALL_MODEL = ('preparation', 'consolidation', 'memory')  # channels the small model serves
 CHANNELS = LEARNER_CHANNELS + (PREPARED_STEP,) + BACKGROUND
 
 
@@ -70,9 +71,9 @@ def start(store, request):
     profile = store.get('course','profile')
     if profile: snapshot['learner_profile'] = profile
     memory = course_memory(store)  # confirmed preferences, taught terms and current difficulties (ADR 0010)
-    if memory and identity['channel'] not in ('build','consolidation'): snapshot['course_memory'] = memory
+    if memory and identity['channel'] not in ('build','consolidation','memory'): snapshot['course_memory'] = memory
     widgets = selected_widgets(store)  # the course's add-ons, whose guides join the teacher instructions (ADR 0013)
-    if widgets and identity['channel'] not in ('build','consolidation'): snapshot['widgets'] = widgets
+    if widgets and identity['channel'] not in ('build','consolidation','memory'): snapshot['widgets'] = widgets
     if identity['channel'] == PREPARED_STEP:
         # The step it writes and the check repair it assumed, so Continue can tell whether its prompt still applies.
         step = request.get('lesson_step')

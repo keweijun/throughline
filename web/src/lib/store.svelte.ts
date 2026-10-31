@@ -3,7 +3,7 @@ import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, MemoryEntry, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -604,9 +604,9 @@ class AppStore {
     return (this.state?.memory ?? []).filter((e) => e.status === 'suggested' && turnIds.includes(e.id.slice(0, e.id.lastIndexOf(':'))));
   }
 
-  /** An entry the learner writes down themselves; a preference is saved confirmed. */
-  addMemory(kind: MemoryEntry['kind'], text: string, conceptId?: string | null) {
-    return this.act(() => api.post('/api/memory', { kind, text, ...(conceptId ? { concept_id: conceptId } : {}) }));
+  /** The learner tells the teacher in their own words what to remember; a small-model turn answers. */
+  askMemory(text: string, conceptId: string) {
+    return this.act(() => api.post('/api/memory', { id: newId(), text, concept_id: conceptId }));
   }
 
   editMemory(id: string, text: string) {

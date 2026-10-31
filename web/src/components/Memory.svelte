@@ -1,43 +1,17 @@
 <script lang="ts">
   import { markdown } from '../lib/markdown';
-  import { locale, t } from '../lib/i18n.svelte';
+  import { diagnostic, locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import Composer from './Composer.svelte';
-  import type { MemoryEntry } from '../lib/types';
-  import SuggestedMemory from './SuggestedMemory.svelte';
+  import type { MemoryEntry, MemoryRequest } from '../lib/types';
+
+  // The tab shows the learner's preferences; taught terms and difficulties stay the teacher's working notes (ADR 0010).
+  // A suggested preference is asked only where it was suggested, so it is left out here until confirmed.
+  const preferences = $derived((app.state?.memory ?? []).filter((e) => e.kind === 'preference' && e.status === 'confirmed'));
+  const requests = $derived(app.state?.memory_requests ?? []);
 
   let editing = $state<string | null>(null);
   let edit = $state('');
-
-  // The learner writes an entry down themselves. A taught term or difficulty belongs to the section being read; a
-  // preference to the whole course, and needs no confirming.
-  type Kind = MemoryEntry['kind'];
-  let kind = $state<Kind>('preference');
-  const viewing = $derived(app.viewingId);
-  const draftKey = 'memory:new';
-  const draft = $derived(app.drafts.get(draftKey));
-  const kinds = $derived<{ kind: Kind; label: string; placeholder: string }[]>([
-    { kind: 'preference', label: t('Preference'), placeholder: t('How you like to be taught, such as “short answers first”…') },
-    { kind: 'taught_term', label: t('Taught term'), placeholder: t('A term or notation you already know…') },
-    { kind: 'difficulty', label: t('Difficulty'), placeholder: t('An idea you keep getting wrong…') },
-  ]);
-  const chosen = $derived(kinds.find((k) => k.kind === kind)!);
-
-  async function add() {
-    const text = draft.trim();
-    const section = kind === 'preference' ? null : viewing;
-    if (!text || (kind !== 'preference' && !section)) return;
-    if (!(await app.addMemory(kind, text, section))) return;
-    if (app.drafts.get(draftKey).trim() === text) app.drafts.set(draftKey, '');
-  }
-
-  const entries = $derived(app.state?.memory ?? []);
-  const suggested = $derived(entries.filter((e) => e.status === 'suggested'));
-  const groups = $derived([
-    { kind: 'preference', title: t('Preferences'), empty: t('No preferences yet. When you say how you like to be taught, the teacher asks before remembering it.') },
-    { kind: 'taught_term', title: t('Taught terms'), empty: t('No terms recorded yet.') },
-    { kind: 'difficulty', title: t('Difficulties'), empty: t('No difficulties recorded.') },
-  ].map((g) => ({ ...g, items: entries.filter((e) => e.kind === g.kind && e.status !== 'suggested') })));
 
   function start(entry: MemoryEntry) {
     editing = entry.id;
@@ -53,54 +27,50 @@
   function remove(entry: MemoryEntry) {
     if (confirm(t('Delete this from the course memory? The teacher will not add it back.'))) void app.removeMemory(entry.id);
   }
+
+  // The learner says what to remember in their own words; the teacher answers and turns it into preferences.
+  const viewing = $derived(app.viewingId);
+  const draftKey = 'memory:ask';
+  const draft = $derived(app.drafts.get(draftKey));
+
+  async function ask(text = draft) {
+    const message = text.trim();
+    if (!message || !viewing) return;
+    if (!(await app.askMemory(message, viewing))) return;
+    if (app.drafts.get(draftKey).trim() === message) app.drafts.set(draftKey, '');
+  }
+
+  function progress(request: MemoryRequest) {
+    if (request.reply) return 'answered';
+    if (request.error) return 'refused';
+    const status = app.turn(request.turn_id)?.status;
+    return status && status !== 'running' && status !== 'completed' ? 'failed' : 'working';
+  }
 </script>
 
 {#snippet editingEntry()}{t('Editing · the teacher uses this in every lesson')}{/snippet}
-
-{#snippet target()}
-  <span class="target">
-    <span>{t('Remember as')}</span>
-    <span class="kinds" role="radiogroup" aria-label={t('Kind of entry')}>
-      {#each kinds as option (option.kind)}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={kind === option.kind}
-          class="kind"
-          class:active={kind === option.kind}
-          disabled={option.kind !== 'preference' && !viewing}
-          onclick={() => (kind = option.kind)}
-        >{option.label}</button>
-      {/each}
-    </span>
-    {#if kind !== 'preference' && viewing}<span class="where">· {app.concept(viewing)?.title ?? ''}</span>{/if}
-  </span>
-{/snippet}
+{#snippet target()}{t('To the teacher · say how you like to be taught')}{/snippet}
 
 <section class="memory-panel panel-view" aria-labelledby="memory-title">
   <header class="panel-head">
     <div class="panel-bar"><h2 id="memory-title">{t('Course memory')}</h2></div>
-    <p class="panel-intro">{t('What the teacher keeps about you in this course and uses in every lesson. It is not a record of mastery, and your notes are never part of it.')}</p>
+    <p class="panel-intro">{t('How you like to be taught in this course. The teacher follows these in every lesson; tell it below what to remember or change.')}</p>
   </header>
 
   <div class="panel-list">
-
-  {#if suggested.length}<div class="suggestions"><SuggestedMemory entries={suggested} /></div>{/if}
-
-  {#each groups as group (group.kind)}
-    <section class="group" id="memory-{group.kind}">
-      <h3>{group.title}</h3>
-      {#if !group.items.length}<p class="empty">{group.empty}</p>{/if}
+    <section class="group" id="memory-preference">
+      <h3>{t('Preferences')}</h3>
+      {#if !preferences.length}<p class="empty">{t('No preferences yet. Tell the teacher below how you like to be taught, or confirm one it suggests during a lesson.')}</p>{/if}
       <ul>
-        {#each group.items as entry (entry.id)}
-          <li class="item" class:cleared={entry.status === 'cleared'}>
+        {#each preferences as entry (entry.id)}
+          <li class="item">
             {#if editing === entry.id}
               <Composer
                 id="memory-edit-{entry.id}"
                 value={edit}
                 onvalue={(value) => (edit = value)}
-                label={group.title}
-                placeholder={group.title}
+                label={t('Preferences')}
+                placeholder={t('Preferences')}
                 submitLabel={t('Save')}
                 onsubmit={() => void save(entry)}
                 header={editingEntry}
@@ -111,7 +81,6 @@
             {:else}
               <div class="text prose" use:markdown={{ language: locale.language, text: entry.text }}></div>
               <div class="meta">
-                <span>{app.concept(entry.concept_id)?.title ?? ''}{#if entry.status === 'cleared'} · {t('Cleared')}{/if}</span>
                 <span class="actions">
                   <button class="btn btn-quiet btn-small" onclick={() => start(entry)}>{t('Edit')}</button>
                   <button class="btn btn-quiet btn-small" onclick={() => remove(entry)}>{t('Delete')}</button>
@@ -122,84 +91,60 @@
         {/each}
       </ul>
     </section>
-  {/each}
+
+    {#if requests.length}
+      <section class="group conversation" aria-label={t('What you asked the teacher to remember')}>
+        <h3>{t('What you asked')}</h3>
+        {#each requests as request (request.id)}
+          {@const status = progress(request)}
+          <article class="exchange" id="memory-request-{request.id}">
+            <p class="asked">{request.text}</p>
+            {#if status === 'answered'}
+              <p class="reply">{request.reply}</p>
+            {:else if status === 'working'}
+              <p class="working"><span class="chip"><span class="live-dot"></span>{t('The teacher is responding')}</span></p>
+            {:else}
+              <p class="problem">
+                {status === 'refused' ? t("The teacher's reply could not be read, so nothing changed.") : diagnostic(app.turn(request.turn_id)?.error ?? t('The response was interrupted. Please try again.'))}
+                <button class="btn btn-quiet btn-small" disabled={!viewing} onclick={() => void ask(request.text)}>{t('Send again')}</button>
+              </p>
+            {/if}
+          </article>
+        {/each}
+      </section>
+    {/if}
   </div>
 
   <div class="panel-foot">
     <Composer
-      id="memory-new"
+      id="memory-ask"
       value={draft}
       onvalue={(value) => app.drafts.set(draftKey, value)}
-      label={t('Add to the course memory')}
-      placeholder={chosen.placeholder}
-      submitLabel={t('Remember')}
-      onsubmit={() => void add()}
+      label={t('Tell the teacher what to remember')}
+      placeholder={t('Such as “keep answers short” or “stop giving hints when I am right”…')}
+      submitLabel={t('Send')}
+      onsubmit={() => void ask()}
       header={target}
+      disabled={!viewing}
     />
   </div>
 </section>
 
 <style>
   .panel-list {
-    gap: 0.75rem;
-  }
-
-  .target {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.3rem 0.45rem;
-  }
-
-  .kinds {
-    display: inline-flex;
-    gap: 0.15rem;
-  }
-
-  .kind {
-    padding: 0.05rem 0.5rem;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: none;
-    color: var(--pencil);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .kind:hover:not(:disabled) {
-    color: var(--ink);
-  }
-
-  .kind.active {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--rule));
-    background: var(--accent-wash);
-    color: var(--accent);
-  }
-
-  .kind:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .where {
-    color: var(--pencil);
+    gap: 1rem;
   }
 
   h3 {
-    margin: 0.8rem 0 0.4rem;
+    margin: 0 0 0.4rem;
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
   }
 
-  .empty,
-  .meta {
+  .empty {
     font-size: var(--step--1);
     color: var(--pencil);
-  }
-
-  .suggestions :global(.suggested-memory:first-child) {
-    margin-top: 0;
   }
 
   ul {
@@ -219,10 +164,6 @@
     background: var(--raised);
   }
 
-  .item.cleared .text {
-    color: var(--pencil);
-  }
-
   .text {
     font-size: var(--step-0);
     overflow-wrap: anywhere;
@@ -234,15 +175,57 @@
 
   .meta {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    justify-content: flex-end;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
     gap: 0.2rem;
+  }
+
+  .conversation {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .exchange {
+    display: grid;
+    gap: 0.35rem;
+    font-size: var(--step-0);
+  }
+
+  .exchange p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The learner's words read like a question they asked; the teacher's answer follows plainly. */
+  .asked {
+    justify-self: end;
+    max-width: 85%;
+    padding: 0.4rem 0.65rem;
+    border-radius: var(--radius);
+    background: var(--accent-wash);
+    color: var(--ink);
+    white-space: pre-wrap;
+  }
+
+  .reply {
+    color: var(--ink-soft);
+  }
+
+  .working,
+  .problem {
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .problem {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.5rem;
+    color: var(--danger);
   }
 </style>

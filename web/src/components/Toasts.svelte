@@ -3,35 +3,42 @@
   import { app } from '../lib/store.svelte';
   import RememberPrompt from './RememberPrompt.svelte';
 
-  // Messages float over the page rather than pushing it down: an error and a suggested preference stay until the
-  // learner answers them, and a confirmation clears itself.
+  // Messages float over the page rather than pushing it down. An error and a suggested preference need the learner,
+  // so they sit at the top and stay until answered; a confirmation is safe to ignore, sits at the bottom and clears
+  // itself.
   const suggestion = $derived(
     app.libraryOpen || (app.panelOpen && app.panelTab === 'memory') ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'),
   );
 
-  let stack = $state<HTMLElement>();
+  let top = $state<HTMLElement>();
+  let bottom = $state<HTMLElement>();
 
-  // A manual popover sits in the top layer, so the stack also shows above the Settings dialog. Reopening it when a
+  // A manual popover sits in the top layer, so a stack also shows above the Settings dialog. Reopening it when a
   // new message arrives puts it back above anything shown since, such as a dialog opened after the last message.
-  let shown: unknown[] = [];
-  $effect(() => {
-    if (!stack) return;
-    const messages = [app.error, suggestion?.id, app.notice];
-    const arrived = messages.some((message, i) => message && message !== shown[i]);
-    shown = messages;
-    const open = stack.matches(':popover-open');
-    if (!messages.some(Boolean)) {
-      if (open) stack.hidePopover();
-    } else if (arrived) {
-      if (open) stack.hidePopover();
-      stack.showPopover();
-    }
-  });
+  function float(stack: () => HTMLElement | undefined, current: () => unknown[]) {
+    let shown: unknown[] = [];
+    $effect(() => {
+      const element = stack();
+      if (!element) return;
+      const messages = current();
+      const arrived = messages.some((message, i) => message && message !== shown[i]);
+      shown = messages;
+      const open = element.matches(':popover-open');
+      if (!messages.some(Boolean)) {
+        if (open) element.hidePopover();
+      } else if (arrived) {
+        if (open) element.hidePopover();
+        element.showPopover();
+      }
+    });
+  }
+  float(() => top, () => [app.error, suggestion?.id]);
+  float(() => bottom, () => [app.notice]);
 
   const close = '<path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />';
 </script>
 
-<div class="toasts" popover="manual" bind:this={stack}>
+<div class="toasts top" popover="manual" bind:this={top}>
   {#if app.error}
     <div class="toast error" role="alert">
       <span class="mark" aria-hidden="true">
@@ -53,7 +60,9 @@
       <div class="text"><RememberPrompt entry={suggestion} /></div>
     </div>
   {/if}
+</div>
 
+<div class="toasts bottom" popover="manual" bind:this={bottom}>
   {#if app.notice}
     <div class="toast" role="status">
       <span class="mark" aria-hidden="true">
@@ -74,7 +83,7 @@
   /* The stack itself is invisible and lets clicks through; only its cards take them. */
   .toasts {
     position: fixed;
-    inset: auto 0 1.5rem;
+    inset-inline: 0;
     margin: 0 auto;
     display: none;
     flex-direction: column;
@@ -92,12 +101,21 @@
     display: flex;
   }
 
+  /* Just below the top bar, where the learner looks first. */
+  .top {
+    inset-block: calc(var(--topbar) + 0.75rem) auto;
+  }
+
+  .bottom {
+    inset-block: auto 1.5rem;
+  }
+
   .toast {
     pointer-events: auto;
     display: flex;
     align-items: flex-start;
     gap: 0.7rem;
-    animation: enter-rise var(--settle) var(--ease-out);
+    animation: enter-drop var(--settle) var(--ease-out);
     padding: 0.7rem 0.6rem 0.7rem 0.85rem;
     background: var(--raised);
     color: var(--ink);
@@ -117,8 +135,26 @@
     border-color: color-mix(in srgb, var(--danger) 35%, var(--rule));
   }
 
+  .bottom .toast {
+    animation-name: enter-rise;
+  }
+
+  /* The suggestion waits on the learner's answer, so it carries the accent. */
   .toast.suggestion {
     padding-right: 0.85rem;
+    background: color-mix(in srgb, var(--accent-wash) 55%, var(--raised));
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+  }
+
+  .suggestion .text :global(.btn:not(.btn-quiet)) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .suggestion .text :global(.btn:not(.btn-quiet):hover) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
   }
 
   .mark {

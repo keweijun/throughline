@@ -245,12 +245,14 @@
     font-size: var(--step-1);
   }
 
+  /* The same quiet intro the memory view brings with it, so the parts read alike. */
   .lead {
-    color: var(--ink-soft);
+    font-size: var(--step--1);
+    color: var(--pencil);
   }
 
   .studio-frame {
-    height: min(72vh, 46rem);
+    max-height: min(72vh, 46rem);
     overflow-y: auto;
     padding: 0 0.75rem;
     border: 1px solid var(--rule);

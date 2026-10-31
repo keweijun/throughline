@@ -13,6 +13,41 @@ const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
 // The teacher's course memory note (ADR 0010), wherever it is and while it is still streaming.
 const MEMORY = /\s*<course-memory>[\s\S]*?(<\/course-memory>|$)/g;
 
+// Delimiters, by the group of MATH that holds a formula's TeX: $$…$$, \[…\], \(…\) and $…$.
+const DELIMITER = { 3: 2, 4: 2, 5: 2, 6: 1 } as const;
+
+/** The closed formulas in a text, as the renderer finds them: each one's TeX, where it sits, and whether it is display math. */
+export function mathSpans(text: string) {
+  const spans: { from: number; tex: string; display: boolean }[] = [];
+  for (const m of text.matchAll(MATH)) {
+    if (m[1] !== undefined) continue;
+    const group = ([3, 4, 5, 6] as const).find((g) => m[g] !== undefined)!;
+    spans.push({ from: m.index + DELIMITER[group], tex: m[group]!, display: group === 3 || group === 4 });
+  }
+  return spans;
+}
+
+/** Whether `pos` is inside a formula: a closed one, or one opened before it and not closed yet (as while it is typed). */
+export function inMath(text: string, pos: number) {
+  let last = 0;
+  for (const m of text.matchAll(MATH)) {
+    const end = m.index + m[0].length;
+    if (m.index >= pos) break;
+    if (end > pos) {
+      if (m[1] !== undefined) return false;
+      const group = ([3, 4, 5, 6] as const).find((g) => m[g] !== undefined)!;
+      return pos >= m.index + DELIMITER[group] && pos <= end - DELIMITER[group];
+    }
+    last = end;
+  }
+  // Nothing after the last closed span is closed, so its first opener decides: code, or math still being written. An
+  // inline $ only reaches to the end of its line.
+  const tail = text.slice(last, pos);
+  const opener = /`|\$\$|\\\[|\\\(|\$/.exec(tail);
+  if (!opener || opener[0] === '`') return false;
+  return opener[0] !== '$' || !tail.slice(opener.index).includes('\n');
+}
+
 function parse(text: string, breaks = false): DocumentFragment {
   const math: { tex: string; display: boolean }[] = [];
   const token = 'MATH' + crypto.randomUUID().replaceAll('-', '');

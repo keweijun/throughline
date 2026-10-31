@@ -383,6 +383,31 @@
     box-shadow: var(--shadow);
   }
 
+  /* What KaTeX cannot render, underlined where it fails; hovering shows why. */
+  .field :global(.cm-lintRange-error) {
+    background-image: none;
+    text-decoration: underline wavy var(--danger);
+    text-decoration-skip-ink: none;
+    text-underline-offset: 3px;
+  }
+
+  :global(.cm-tooltip.cm-tooltip-lint) {
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--raised);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+    font-size: var(--step--1);
+  }
+
+  :global(.cm-diagnostic-error) {
+    border-left-color: var(--danger) !important;
+  }
+
+  :global(.cm-diagnosticSource) {
+    color: var(--pencil);
+  }
+
   :global(.latex-sample) {
     font-size: 1.15rem;
   }

@@ -8,16 +8,20 @@ import {
   closeBrackets,
   closeBracketsKeymap,
   snippet,
-  snippetCompletion,
   type Completion,
   type CompletionContext,
 } from '@codemirror/autocomplete';
+import { linter, type Diagnostic } from '@codemirror/lint';
+import { inMath, mathSpans } from './markdown';
+import { chemistryReady } from './widgets';
 import vocabulary from './latex-vocabulary.json';
 
 /**
  * The text field of every writing box: CodeMirror with LaTeX completion. Typing `\` suggests the commands KaTeX renders
  * (lib/latex-vocabulary.json, built from KaTeX by scripts/latex-vocabulary.mjs); Tab or Enter takes one, and a command
- * with arguments leaves its braces as fields that Tab moves through. `\begin{` suggests environments.
+ * with arguments leaves its braces as fields that Tab moves through. `\begin{` suggests environments. A suggestion taken
+ * outside math is wrapped in `$…$` (`$$…$$` for an environment) so it renders, and what KaTeX cannot render in a formula
+ * is underlined with KaTeX's message.
  */
 
 // Ranked above the rest when they match equally well; the vocabulary itself is alphabetical.
@@ -48,16 +52,26 @@ function sample(tex: string, display = false) {
 // snippet then throws on the next keystroke.
 const braces = (count: number) => Array.from({ length: count }, (_, i) => `{\${${i + 1}}}`).join('');
 
+type Apply = Exclude<Completion['apply'], string | undefined>;
+
+/**
+ * Takes a suggestion in math as it is, and outside math wraps it so it renders: `$…$` for a command, `$$…$$` for an
+ * environment. Inside the wrapping the cursor stays in the formula, so it can go on; one more Tab leaves it.
+ */
+function wrapped(inside: string, outside: string): Apply {
+  const plain = snippet(inside);
+  const wrap = snippet(outside);
+  return (view, completion, from, to) => (inMath(view.state.doc.toString(), from) ? plain : wrap)(view, completion, from, to);
+}
+
 const commands: Completion[] = [
-  ...(vocabulary.commands as [string, number][]).map(([name, arity]) => {
-    const option: Completion = {
-      label: `\\${name}`,
-      detail: '{}'.repeat(arity),
-      boost: COMMON.has(name) ? 2 : 0,
-      info: sample(`\\${name}${ARGS.slice(0, arity).map((a) => `{${a}}`).join('')}`),
-    };
-    return arity ? snippetCompletion(`\\${name}${braces(arity)}\${0}`, option) : option;
-  }),
+  ...(vocabulary.commands as [string, number][]).map(([name, arity]): Completion => ({
+    label: `\\${name}`,
+    detail: '{}'.repeat(arity),
+    boost: COMMON.has(name) ? 2 : 0,
+    info: sample(`\\${name}${ARGS.slice(0, arity).map((a) => `{${a}}`).join('')}`),
+    apply: wrapped(`\\${name}${braces(arity)}\${0}`, `$\\${name}${braces(arity)}\${${arity + 1}}$\${0}`),
+  })),
   // `\left\{` has a literal escaped brace, which a snippet template cannot hold reliably (see above); the cursor
   // simply lands between the delimiters.
   ...[['(', ')'], ['[', ']'], ['\\{', '\\}'], ['|', '|']].map(([open, close]): Completion => ({
@@ -66,30 +80,40 @@ const commands: Completion[] = [
     boost: 1,
     info: sample(`\\left${open} \\frac{a}{b} \\right${close}`),
     apply: (view, _completion, from, to) => {
-      const head = `\\left${open} `;
+      const dollar = inMath(view.state.doc.toString(), from) ? '' : '$';
+      const head = `${dollar}\\left${open} `;
       view.dispatch({
-        changes: { from, to, insert: `${head} \\right${close}` },
+        changes: { from, to, insert: `${head} \\right${close}${dollar}` },
         selection: { anchor: from + head.length },
         userEvent: 'input.complete',
       });
     },
   })),
-  snippetCompletion('\\begin{${1:matrix}}\n\t${2}\n\\end{${1:matrix}}${0}', {
+  {
     label: '\\begin',
     detail: '{…}',
     boost: 1,
     info: sample(`\\begin{matrix}${SAMPLE_ROWS}\\end{matrix}`, true),
-  }),
+    apply: wrapped('\\begin{${1:matrix}}\n\t${2}\n\\end{${1:matrix}}${0}', '$$\\begin{${1:matrix}}\n\t${2}\n\\end{${1:matrix}}$$${0}'),
+  },
 ];
 
 const environments: Completion[] = vocabulary.environments.map((name) => {
   const head = name.startsWith('array') || name.startsWith('darray') || name.startsWith('subarray') ? '{cc}' : name.startsWith('alignat') || name === 'alignedat' ? '{2}' : '';
-  const insert = snippet(`${name}}${head}\n\t\${1}\n\\end{${name}}\${0}`);
+  const inside = snippet(`${name}}${head}\n\t\${1}\n\\end{${name}}\${0}`);
+  const outside = snippet(`${name}}${head}\n\t\${1}\n\\end{${name}}$$\${0}`);
   return {
     label: name,
-    // Typing `\begin{` closes its brace; the environment's own `}` replaces that one.
-    apply: (view, completion, from, to) => insert(view, completion, from, view.state.sliceDoc(to, to + 1) === '}' ? to + 1 : to),
     info: sample(`\\begin{${name}}${head}${SAMPLE_ROWS}\\end{${name}}`, true),
+    apply: (view, completion, from, to) => {
+      // Typing `\begin{` closes its brace; the environment's own `}` replaces that one.
+      const end = view.state.sliceDoc(to, to + 1) === '}' ? to + 1 : to;
+      const begin = from - '\\begin{'.length;
+      if (inMath(view.state.doc.toString(), begin)) return inside(view, completion, from, end);
+      // Outside math the environment becomes display math: `$$` before `\begin`, and after `\end` with the rest.
+      view.dispatch({ changes: { from: begin, insert: '$$' } });
+      outside(view, completion, from + 2, end + 2);
+    },
   };
 });
 
@@ -101,6 +125,28 @@ function latex(context: CompletionContext) {
   if (!word || context.state.sliceDoc(word.from - 1, word.from) === '\\') return null;
   return { from: word.from, options: commands, validFor: /^\\[A-Za-z]*$/ };
 }
+
+/** Underlines what KaTeX cannot render in each closed formula, where it fails, with KaTeX's own message. */
+const formulaCheck = linter(
+  (view) => {
+    const found: Diagnostic[] = [];
+    for (const span of mathSpans(view.state.doc.toString())) {
+      // Chemistry renders once mhchem has loaded; until then it is not an error.
+      if (!chemistryReady(span.tex)) continue;
+      try {
+        katex.renderToString(span.tex, { displayMode: span.display, throwOnError: true, trust: false, maxExpand: 1000, maxSize: 20 });
+      } catch (error) {
+        if (!(error instanceof katex.ParseError)) continue;
+        const end = span.from + span.tex.length;
+        // An error at the very end (an unclosed brace) marks the last character, so there is something to underline.
+        const from = Math.min(span.from + (error.position ?? 0), end - 1);
+        found.push({ from, to: Math.min(Math.max(from + (error.length || 1), from + 1), end), severity: 'error', source: 'KaTeX', message: error.rawMessage || error.message });
+      }
+    }
+    return found;
+  },
+  { delay: 500 },
+);
 
 export type EditorOptions = {
   value: string;
@@ -127,6 +173,7 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
     EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{'] } }]),
     closeBrackets(),
     autocompletion({ override: [latex], icons: false, maxRenderedOptions: 60 }),
+    formulaCheck,
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', run: () => (options().onsend(), true) },

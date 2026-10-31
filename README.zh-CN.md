@@ -15,13 +15,25 @@
 
 ## 安装
 
-你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可）以及 Python 3.10 或更高版本。然后把这句话粘贴到 Codex：
+你需要已登录的 Codex（桌面应用或 [CLI](https://learn.chatgpt.com/docs/codex/cli) 均可）。然后把这句话粘贴到 Codex：
 
 ```text
 安装 https://github.com/keweijun/throughline
 ```
 
-Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throughline` 技能，创建贯学文件夹，在应用菜单中添加 **Throughline** 启动器，并显示一份简短的欢迎指南。**更新**时粘贴 `更新 https://github.com/keweijun/throughline` 即可，已有课程不受影响。在 **设置 → 检查更新** 中可以查看是否有新版本，并直接在 Codex 中打开这条请求。
+也可以在终端中运行安装脚本。没有 [uv](https://docs.astral.sh/uv/) 时它会先安装 uv，uv 自带 Python：
+
+```sh
+# macOS 和 Linux
+curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/main/install.sh | THROUGHLINE_LANGUAGE=zh-CN sh
+```
+
+```powershell
+# Windows（PowerShell）
+$env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/keweijun/throughline/main/install.ps1 | iex
+```
+
+两种方式都会安装应用（不需要 Node.js），添加 `$throughline` 技能，创建贯学文件夹，在应用菜单中添加 **Throughline** 启动器，然后在浏览器中打开贯学，并在对话或终端中显示一份简短的欢迎指南。**更新**时把 `更新 https://github.com/keweijun/throughline` 粘贴到 Codex，或再运行一次脚本即可，已有课程不受影响。在 **设置 → 检查更新** 中可以查看是否有新版本，并直接在 Codex 中打开这条请求。
 
 ### 给 Codex 的说明：安装或更新贯学
 
@@ -35,9 +47,13 @@ Codex 会按下面的步骤安装应用（不需要 Node.js），添加 `$throug
    - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
+   如果这些工具都没有（或者缺少 Python 3.10 或更高版本），用 uv 的[官方安装程序](https://docs.astral.sh/uv/getting-started/installation/)安装 uv，再用第一行。
+
    如果之后找不到 `guided-learning` 命令，运行 `uv tool update-shell`（或 `pipx ensurepath`），并在下一步使用安装程序输出的完整路径。
-3. 运行 `guided-learning setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程。
+3. 运行 `guided-learning setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程，完成后会在浏览器中打开贯学。
 4. 把 setup 输出的欢迎指南原样展示给用户。如果是更新，只需告诉用户当前版本（`guided-learning --version`）。
+
+`install.sh` 和 `install.ps1` 用 uv 执行同样的步骤；修改这里的步骤时请同步修改它们。
 
 ### 手动安装或更新
 
@@ -57,7 +73,7 @@ guided-learning setup --language zh-CN
 
 ## 创建第一门课程
 
-安装完成后，Codex 会显示一份简短的欢迎指南。之后在任意 Codex 对话中以 **`$throughline`** 开头，就能处理你的课程。
+安装完成后，贯学会在浏览器中打开。之后在任意 Codex 对话中以 **`$throughline`** 开头，就能处理你的课程。
 
 1. 输入 `$throughline 用这些文件建一门课`，附上你的 PDF 或笔记（也可以写出它们所在的文件夹），再用一句话说明想学什么，例如“量子力学，学到微扰理论，为了期末考试”。
 2. Codex 会先问几个简单的问题：你的目标和截止时间、对资料所需的各项先修知识掌握得如何、希望讲到多细。然后它会建议课程名，把文件复制进贯学文件夹，生成跨资料的学习路线，并告诉你哪些内容仍需核对。

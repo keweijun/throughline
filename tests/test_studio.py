@@ -1,4 +1,4 @@
-"""Studio (ADR 0015): course work as a Codex chat over the App Server, tested against a scripted server."""
+"""Studio (ADR 0016): course work as a Codex chat over the App Server, tested against a scripted server."""
 import json
 import sys
 import tempfile
@@ -160,6 +160,21 @@ class StudioTest(unittest.TestCase):
 
     def test_an_empty_message_is_refused(self):
         self.assertEqual(self.client.post('/api/studio/messages', json={'text': '  '}).status_code, 409)
+
+    def test_a_hand_offs_context_goes_to_codex_as_its_own_input(self):
+        thread = self.send('$throughline check this page', context='Chapter "Interference", source s1 page 4')['thread']
+        self.history(thread, lambda h: self.replies(h))
+        sent = self.received('turn/start')[0]['input']
+        self.assertEqual(sent[1], {'type': 'text', 'text': 'Context from Throughline: Chapter "Interference", source s1 page 4', 'text_elements': []})
+
+    def test_activity_names_the_threads_codex_works_in_or_waits_on_without_starting_codex(self):
+        self.assertEqual(self.client.get('/api/studio/activity').json(), {'running': [], 'waiting': []})
+        self.assertFalse(self.log.exists())  # asking did not start the App Server
+        thread = self.send('please approve this')['thread']
+        self.history(thread, lambda h: h['pending'])
+        activity = self.client.get('/api/studio/activity').json()
+        self.assertEqual(activity['running'], [thread])
+        self.assertEqual([w['method'] for w in activity['waiting']], ['item/commandExecution/requestApproval'])
 
     def test_a_codex_without_the_methods_studio_needs_leaves_it_unavailable(self):
         other = self.tmp / 'library' / 'optics'

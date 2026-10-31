@@ -1,4 +1,4 @@
-"""Studio: course work in the app, as a Codex chat over one long-lived App Server (ADR 0015).
+"""Studio: course work in the app, as a Codex chat over one long-lived App Server (ADR 0016).
 
 The host keeps no transcript. Codex saves Studio threads in the learner's Codex home; the host only records which
 threads belong to which course (`studio.json` beside the teacher settings), forwards the notifications of the
@@ -135,15 +135,20 @@ def _summary(thread, running):
             'updated_at': thread.get('updatedAt'), 'running': running}
 
 
-def message_input(text, elements=(), skills=(), mentions=(), images=()):
+CONTEXT = 'Context from Throughline: '  # how a hand-off's context reaches Codex, and how the transcript finds it again
+
+
+def message_input(text, elements=(), skills=(), mentions=(), images=(), context=None):
     """The App Server input for one message, as Codex's own composer sends it: the text with the spans its chips
-    cover (`elements`, as character offsets, which Codex counts in UTF-8 bytes), then the skills and files it names
-    and the images attached to it (local paths)."""
+    cover (`elements`, as character offsets, which Codex counts in UTF-8 bytes), then where a hand-off came from
+    (`context`, its own text input), the skills and files it names and the images attached to it (local paths)."""
     def byte(offset):
         return len(text[:offset].encode('utf-8'))
     spans = [{'byteRange': {'start': byte(e['start']), 'end': byte(e['end'])}, 'placeholder': text[e['start']:e['end']]}
              for e in elements if 0 <= e['start'] < e['end'] <= len(text)]
     items = [{'type': 'text', 'text': text, 'text_elements': spans}] if text.strip() else []
+    if context and context.strip():
+        items.append({'type': 'text', 'text': CONTEXT + context.strip(), 'text_elements': []})
     items += [{'type': 'skill', 'name': s['name'], 'path': s['path']} for s in skills]
     items += [{'type': 'mention', 'name': m['name'], 'path': m['path']} for m in mentions]
     items += [{'type': 'localImage', 'path': str(p)} for p in images]
@@ -277,7 +282,7 @@ class Studio:
         """Start the App Server, checking that this Codex has what Studio needs."""
         self._server()
 
-    # Access (ADR 0015): the library writable without asking, or Full access.
+    # Access (ADR 0016): the library writable without asking, or Full access.
 
     def access(self):
         saved = self._config()['full_access']
@@ -338,6 +343,13 @@ class Studio:
         server.call('thread/resume', {**self._thread_settings(course), 'threadId': thread, 'excludeTurns': True})
         self.owned.add(thread)
         return server
+
+    def activity(self, course):
+        """The course's threads Codex is working in or waiting on, from what this host saw; never starts Codex, so
+        every page can ask."""
+        ids = set(self._ids(course))
+        return {'running': [t for t in self.active if t in ids],
+                'waiting': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') in ids]}
 
     def threads(self, course):
         ids = self._ids(course)

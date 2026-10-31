@@ -178,6 +178,8 @@ class StudioMessage(Body):
     skills: list[StudioReference] = []
     mentions: list[StudioReference] = []
     images: list[str] = []
+    # Where a hand-off came from (a chapter, section or source location), sent to Codex with the message.
+    context: Optional[str] = None
 
 
 class StudioAnswer(Body):
@@ -588,7 +590,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         """A cheap liveness probe for `guided-learning open` and `stop`."""
         return {'pid': os.getpid(), 'launch_id': os.environ.get('GUIDED_LEARNING_LAUNCH_ID')}
 
-    # Studio (ADR 0015): course work as a Codex chat, for the open course.
+    # Studio (ADR 0016): course work as a Codex chat, for the open course.
     studio = courses.studio
 
     def course_folder():
@@ -604,6 +606,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             if exc.code != 'studio_unavailable':
                 raise
             return {'available': False, 'error': str(exc), 'access': studio.access(), 'threads': []}
+
+    @app.get('/api/studio/activity')
+    def studio_activity():
+        return studio.activity(course_folder())
 
     @app.get('/api/studio/skills')
     def studio_skills():
@@ -634,7 +640,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         course = course_folder()
         images = [attached.path(course, name) for name in body.images]
         items = message_input(body.text, [e.model_dump() for e in body.elements], [s.model_dump() for s in body.skills],
-                              [m.model_dump() for m in body.mentions], images)
+                              [m.model_dump() for m in body.mentions], images, body.context)
         if not items:
             raise OperationError('empty_studio_message', 'Write a message or attach something')
         return studio.send(course, body.thread_id, items)

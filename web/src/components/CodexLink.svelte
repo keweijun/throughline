@@ -2,13 +2,20 @@
   import type { Snippet } from 'svelte';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import { studio } from '../lib/studio.svelte';
+  import { studio, type StudioOrigin } from '../lib/studio.svelte';
 
   /**
-   * A hand-off of course work. In an open course it opens Studio with the request filled in (ADR 0015); where Studio
-   * cannot run, and with `chat`, it opens a new Codex chat instead.
+   * A hand-off of course work. In an open course it opens Studio with the request filled in (ADR 0016) and, when it
+   * points somewhere, a chip naming where (`origin`); where Studio cannot run, and with `chat`, it opens a new Codex
+   * chat instead.
    */
-  let { prompt, class: className = '', chat = false, children }: { prompt: string; class?: string; chat?: boolean; children: Snippet } = $props();
+  let {
+    prompt,
+    class: className = '',
+    chat = false,
+    origin = null,
+    children,
+  }: { prompt: string; class?: string; chat?: boolean; origin?: StudioOrigin | null; children: Snippet } = $props();
 
   const root = $derived(app.library?.root ?? '');
   /** A new Codex chat (working in the library folder) with the request typed in but not sent, so files can be attached. */
@@ -30,10 +37,8 @@
     event.preventDefault();
     await studio.load();
     if (studio.available) {
-      studio.newThread();
-      app.drafts.set('studio:new', `${prompt.trim()} `);
-      app.openPanel('studio');
-      requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
+      app.drafts.set('studio:new', studio.handoff(prompt, origin));
+      app.showStudio({ focus: true });
       return;
     }
     void copy();

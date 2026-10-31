@@ -11,9 +11,13 @@
   import CodexLink from './CodexLink.svelte';
 
   /**
-   * Studio (ADR 0015): course work as a Codex chat. `$` suggests skills and `@` the course's files, both left in the
+   * Studio (ADR 0016): course work as a Codex chat. `$` suggests skills and `@` the course's files, both left in the
    * text as chips; images and files can be pasted, dropped or chosen; a message sent while Codex works steers it.
+   * It is self-contained, so it can sit wherever it is mounted: `active` says it is on screen, and it scrolls whatever
+   * scrolls it, keeping its writing box at that container's bottom.
    */
+  let { active = true }: { active?: boolean } = $props();
+
   let busy = $state(false);
   let attaching = $state(0);
   let view: EditorView | undefined;
@@ -21,9 +25,8 @@
   let recalled = 0;
   let list = $state<HTMLElement>();
 
-  const shown = $derived(app.panelOpen && app.panelTab === 'studio');
   $effect(() => {
-    if (shown) void studio.load();
+    if (active) void studio.load();
   });
 
   const course = $derived(app.libraryCourse?.name ?? app.state?.course?.title ?? '');
@@ -139,11 +142,19 @@
     requestAnimationFrame(() => view?.focus());
   }
 
+  /** The nearest ancestor that scrolls: the side panel's body today, the reading column on a page. */
+  function scrollParent(node: HTMLElement | undefined) {
+    for (let at = node?.parentElement; at; at = at.parentElement) {
+      if (/(auto|scroll)/.test(getComputedStyle(at).overflowY) && at.scrollHeight > at.clientHeight) return at;
+    }
+    return null;
+  }
+
   // The transcript follows new output while the learner is at its end, as a chat does.
   $effect(() => {
     const last = studio.turns.at(-1);
     void [studio.turns.length, last?.items.length, last?.status, JSON.stringify(last?.items.at(-1) ?? '').length, studio.pending.length];
-    const scroller = list?.closest('.body') as HTMLElement | null;
+    const scroller = scrollParent(list);
     if (!scroller) return;
     const near = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
     if (near) requestAnimationFrame(() => (scroller.scrollTop = scroller.scrollHeight));
@@ -206,13 +217,21 @@
       {/each}
     {/if}
     {#each studio.pending as request, i (request.id)}
-      <StudioRequest {request} focus={shown && i === 0} />
+      <StudioRequest {request} focus={active && i === 0} />
     {/each}
     {#if studio.error && studio.available}<p class="error" role="alert">{studio.error}</p>{/if}
   </div>
 
   {#snippet target()}
-    {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if course}{' · '}{course}{/if}
+    <span class="target">
+      {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if course}{' · '}{course}{/if}
+      {#if studio.origin}
+        <span class="origin" title={studio.origin.text}>
+          <span class="origin-label">{studio.origin.label}</span>
+          <button type="button" onclick={() => (studio.origin = null)} aria-label={t("Remove where this came from")} title={t("Remove where this came from")}>×</button>
+        </span>
+      {/if}
+    </span>
   {/snippet}
   {#snippet tools()}
     {#if studio.running}
@@ -334,5 +353,34 @@
   .context {
     font-size: 0.75rem;
     color: var(--pencil);
+  }
+
+  /* Where a hand-off came from, a chip in the box's header that the learner can take off before sending. */
+  .origin {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    max-width: 14rem;
+    margin-left: 0.4rem;
+    padding: 0 0.15rem 0 0.45rem;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent);
+    vertical-align: middle;
+  }
+
+  .origin-label {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .origin button {
+    padding: 0 0.3rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
   }
 </style>

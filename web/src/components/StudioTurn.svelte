@@ -1,7 +1,7 @@
 <script lang="ts">
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
-  import type { CommandAction, StudioItem, StudioTurn, StudioUserInput } from '../lib/studio.svelte';
+  import { CONTEXT, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
 
   /** One Studio turn as Codex draws it: the learner's message, then what Codex said and did, in order. */
   let { turn, last = false }: { turn: StudioTurn; last?: boolean } = $props();
@@ -67,7 +67,9 @@
       {@const content = (item as Extract<StudioItem, { type: 'userMessage' }>).content}
       <div class="user">
         {#each content as input, i (i)}
-          {#if input.type === 'text'}
+          {#if input.type === 'text' && input.text.startsWith(CONTEXT)}
+            <span class="origin" title={input.text.slice(CONTEXT.length)}>{input.text.slice(CONTEXT.length)}</span>
+          {:else if input.type === 'text'}
             <p class="said">{#each segments(input) as part, j (j)}{#if part.chip}<span class="chip">{part.text}</span>{:else}{part.text}{/if}{/each}</p>
           {:else if input.type === 'localImage'}
             <span class="attachment">🖼 {base(input.path)}</span>
@@ -182,6 +184,17 @@
     justify-self: end;
     font-size: 0.8rem;
     color: var(--ink-soft);
+  }
+
+  /* Where a hand-off came from, sent with the message. */
+  .origin {
+    justify-self: end;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    color: var(--accent);
   }
 
   .said-by-codex {

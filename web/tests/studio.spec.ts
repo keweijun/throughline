@@ -1,6 +1,6 @@
 import { test, expect, editorText } from './fixture';
 
-/** Studio (ADR 0015) against the scripted App Server in tests/fake_studio_server.py. */
+/** Studio (ADR 0016) against the scripted App Server in tests/fake_studio_server.py. */
 
 test('Studio sends a message with a skill chip and shows Codex reply', async ({ page, course }) => {
   const { errors } = await course('studio_browser_fixture');
@@ -40,7 +40,6 @@ test('an approval and a question wait in the transcript for the learner', async 
   await page.keyboard.press('Control+Enter');
   const request = panel.getByRole('group', { name: 'Codex wants to run a command' });
   await expect(request).toContainText('touch ../outside');
-  await expect(page.locator('#toggle-studio .count')).toBeVisible();
   // The approve button takes focus, so Escape declines at once, as in Codex.
   await expect(request.getByRole('button', { name: 'Approve', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
@@ -79,13 +78,48 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await expect(panel.locator('.ended')).toHaveText('Stopped');
 });
 
-test('course hand-offs open Studio with the request filled in, and attached files become chips', async ({ page, course }) => {
+test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('link', { name: 'Add files in Studio' }).click();
   const box = page.locator('#studio-input');
   await expect(box).toBeVisible();
   expect(await editorText(box)).toContain('$throughline add these files to the course waves');
+  const panel = page.locator('#panel-studio');
+  await expect(panel.locator('form .origin')).toContainText('Section: Wave superposition');
 
   await page.locator('#panel-studio input[type=file]:not([accept])').setInputFiles({ name: 'problem set.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await expect(box.locator('.cm-chip-mention')).toHaveText('@inputs/problem set.pdf');
+
+  // The context goes with the message, shown under it, and the chip is gone from the box.
+  await page.keyboard.press('Control+Enter');
+  await expect(panel.locator('.user .origin')).toHaveText('section "Wave superposition" (wave)');
+  await expect(panel.locator('form .origin')).toHaveCount(0);
+});
+
+test('the top bar shows that Studio is working or needs the learner, and leads back to it', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.keyboard.press('d');
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('wait for me');
+  await page.keyboard.press('Control+Enter');
+  const status = page.locator('.studio-status');
+  // While Studio is on screen the transcript says it; elsewhere the top bar does.
+  await expect(page.locator('#panel-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(status).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await expect(status).toHaveText('Studio working…');
+  await status.click();
+  await expect(page.locator('#panel-studio')).toBeVisible();
+  await page.locator('#panel-studio').getByRole('button', { name: 'Stop' }).click();
+
+  await page.getByRole('button', { name: 'New chat' }).click();
+  await box.click();
+  await box.pressSequentially('please approve this');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('#panel-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await expect(status).toHaveText('Studio needs you');
+  await status.click();
+  await expect(page.locator('#panel-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
 });

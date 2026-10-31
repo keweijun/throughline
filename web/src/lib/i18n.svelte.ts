@@ -708,6 +708,13 @@ const messages = {
   "Check this chapter's source locations in Studio": "在课程工坊中核对本章的来源位置",
   "Build the route in Studio": "在课程工坊中构建路线",
   "Build this chapter in Studio": "在课程工坊中构建本章",
+  "Remove where this came from": "移除来源",
+  "Chapter: {chapter}": "章节：{chapter}",
+  "Section: {section}": "小节：{section}",
+  "Studio needs you": "课程工坊需要你",
+  "Studio working…": "课程工坊工作中…",
+  "Codex is waiting for your answer in Studio": "Codex 正在课程工坊里等待你的回答",
+  "Codex is working on your course in Studio": "Codex 正在课程工坊里处理你的课程",
 } as const;
 export type MessageKey
  = keyof typeof messages;

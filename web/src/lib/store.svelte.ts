@@ -698,6 +698,19 @@ class AppStore {
     this.panelOpen = true;
   }
 
+  /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
+  get studioShown() {
+    return this.panelOpen && this.panelTab === 'studio';
+  }
+
+  /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
+   * the box focused when `focus`. */
+  showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
+    this.openPanel('studio');
+    if (thread && studio.threadId !== thread) void studio.open(thread);
+    if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
+  }
+
   /** Sets the panel width; a width the learner chose is kept for later visits unless `save` defers that. */
   resizePanel(width: number, chosen = true, save = chosen) {
     this.panelWidth = Math.round(Math.min(Math.max(width, 320), window.innerWidth * 0.62));

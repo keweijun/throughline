@@ -2,7 +2,7 @@ import { api, ApiError } from './api';
 import { t } from './i18n.svelte';
 
 /**
- * Studio (ADR 0015): course work as a Codex chat. The host forwards the App Server's notifications for the threads it
+ * Studio (ADR 0016): course work as a Codex chat. The host forwards the App Server's notifications for the threads it
  * has open; this keeps the open thread's turns as Codex sends them and applies those notifications, then reads the
  * thread again when a turn ends, so a dropped event never leaves the transcript out of step.
  *
@@ -64,9 +64,18 @@ export type StudioMessage = {
   skills: { name: string; path: string }[];
   mentions: { name: string; path: string }[];
   images: string[];
+  /** Where a hand-off came from, sent to Codex as context. */
+  context?: string;
 };
 
+/** Where a hand-off came from: a chapter, section or source location. The chip shows `label`; Codex gets `text`. */
+export type StudioOrigin = { label: string; text: string };
+
+/** How Codex marks a hand-off's context in a message (`CONTEXT` in server/studio.py). */
+export const CONTEXT = 'Context from Throughline: ';
+
 type History = { id: string; turns: StudioTurn[]; active_turn: string | null; pending: StudioRequest[] };
+type Activity = { running: string[]; waiting: StudioRequest[] };
 
 class StudioStore {
   /** Null until asked; false when this Codex cannot run Studio, which then hands off to a Codex chat instead. */
@@ -79,6 +88,11 @@ class StudioStore {
   turns = $state<StudioTurn[]>([]);
   activeTurn = $state<string | null>(null);
   pending = $state<StudioRequest[]>([]);
+  /** The course's threads Codex is working in, and what it waits on in any of them, for the top bar. */
+  working = $state<string[]>([]);
+  waiting = $state<StudioRequest[]>([]);
+  /** The hand-off the next message comes from, until it is sent or removed. */
+  origin = $state<StudioOrigin | null>(null);
   skills = $state<StudioSkill[]>([]);
   /** Share of the model's context window the thread's last request used. */
   context = $state<number | null>(null);
@@ -129,6 +143,29 @@ class StudioStore {
     }
   }
 
+  /** What Codex is doing in the course, for the top bar; cheap, so every page asks when a course opens. */
+  async loadActivity() {
+    try {
+      const activity = await api.get<Activity>('/api/studio/activity');
+      this.working = activity.running;
+      this.waiting = activity.waiting;
+    } catch {
+      // The events that follow keep it up to date.
+    }
+  }
+
+  /** A hand-off: a new chat with the request filled in and, when it points somewhere, a chip saying where. */
+  handoff(prompt: string, origin: StudioOrigin | null = null) {
+    this.newThread();
+    this.origin = origin;
+    return `${prompt.trim()} `;
+  }
+
+  /** The thread to show when the learner follows the top bar's indicator: one Codex waits on, else one it works in. */
+  get attention() {
+    return this.waiting[0]?.params.threadId ?? this.working[0] ?? null;
+  }
+
   async refreshThreads() {
     try {
       const view = await api.get<{ threads: StudioThread[] }>('/api/studio');
@@ -166,6 +203,9 @@ class StudioStore {
       this.turns = history.turns;
       this.activeTurn = history.active_turn;
       this.pending = history.pending;
+      // The host's copy also corrects the top bar for this thread, whose first events may have come before its name.
+      this.working = [...this.working.filter((t) => t !== id), ...(history.active_turn ? [id] : [])];
+      this.waiting = [...this.waiting.filter((p) => p.params.threadId !== id), ...history.pending];
     } catch (e) {
       if (reading === this.#reading) this.error = e instanceof Error ? e.message : String(e);
     }
@@ -182,10 +222,13 @@ class StudioStore {
 
   /** Sends a message: a new turn, or while Codex works, more for the running turn (Codex calls it steering). */
   async send(message: StudioMessage) {
+    const origin = this.origin;
     const result = await api.post<{ thread: string; turn: string; steered: boolean }>('/api/studio/messages', {
       thread_id: this.threadId,
       ...message,
+      ...(origin ? { context: origin.text } : {}),
     });
+    if (this.origin === origin) this.origin = null;
     if (message.text.trim()) this.sent = [...this.sent.filter((s) => s !== message.text), message.text].slice(-50);
     if (this.threadId !== result.thread) {
       // A new thread's first events can arrive before this reply names it, and were not taken for this chat: read it.
@@ -213,6 +256,7 @@ class StudioStore {
       if (!(e instanceof ApiError) || e.status !== 404) throw e;
     }
     this.pending = this.pending.filter((p) => p.id !== request.id);
+    this.waiting = this.waiting.filter((p) => p.id !== request.id);
   }
 
   async rename(id: string, name: string) {
@@ -252,20 +296,30 @@ class StudioStore {
     if (method === 'studio/closed') {
       this.activeTurn = null;
       this.pending = [];
+      this.working = [];
+      this.waiting = [];
       this.error = t('Codex stopped. Send a message to start it again.');
       return;
     }
     if (method === 'studio/threads') return void this.refreshThreads();
     if (method === 'studio/request') {
       const request = params as StudioRequest;
+      if (!this.waiting.some((p) => p.id === request.id)) this.waiting.push(request);
       if (request.params.threadId === this.threadId && !this.pending.some((p) => p.id === request.id)) this.pending.push(request);
       return;
     }
     if (method === 'studio/resolved') {
       this.pending = this.pending.filter((p) => p.id !== params.id);
+      this.waiting = this.waiting.filter((p) => p.id !== params.id);
       return;
     }
     const thread = params.threadId ?? params.thread?.id;
+    // The top bar follows every thread of the course, not only the open one.
+    if (method === 'turn/started' && !this.working.includes(thread)) this.working.push(thread);
+    if (method === 'turn/completed') {
+      this.working = this.working.filter((t) => t !== thread);
+      this.waiting = this.waiting.filter((p) => p.params.turnId !== params.turn.id);
+    }
     if (thread !== this.threadId) {
       if (method === 'turn/started' || method === 'turn/completed') void this.refreshThreads();
       return;

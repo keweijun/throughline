@@ -44,6 +44,15 @@ class Navigation(unittest.TestCase):
             self.assertIn(self.client.get(path).status_code,(400,404,409),path)
         # A browser-supplied file path is never read; the registered revision is returned instead.
         self.assertEqual(self.get(source_path(self.ref)+'?path='+str(self.path))['text'],source['text'])
+    def test_a_text_file_shows_its_lines_and_a_conversion_names_its_original(self):
+        self.assertIsNone(self.get(source_path(self.ref))['converted_from'])
+        script=self.root/'solver.py'; script.write_text('def f():\n    return 1\n',encoding='utf-8')
+        deck=self.root/'lecture.pptx'; deck.write_bytes(b'PK\x03\x04 slides')
+        source=execute(self.root,{'op':'source.register','path':str(script),'converted_from':str(deck)})['source']
+        view=self.get(source_path({'source_id':source['id'],'revision':source['revision'],'unit_id':'line-2'}))
+        self.assertEqual((view['title'],view['kind'],view['converted_from']),('solver.py','.py','lecture.pptx'))
+        self.assertEqual([u['text'] for u in view['document']],['def f():','    return 1'])
+        self.assertIsNone(view['pdf_url'])
     def test_pdf_link_reads_original_revision_bytes_after_source_update(self):
         from pypdf import PdfWriter
         path=self.root/'lecture.pdf'; writer=PdfWriter();writer.add_blank_page(width=300,height=400)

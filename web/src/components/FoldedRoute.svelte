@@ -11,11 +11,11 @@
   const currentIndex = $derived(app.routeIndex(app.currentId));
   // A course always has a chapter once it has a route (ADR 0006); the fallback keeps an unchaptered state drawable.
   const chapters = $derived<Chapter[]>(app.chapters.length ? app.chapters : [{ id: '', title: '', concept_ids: route }]);
+  // The chapters open in the full route open here too, so folding and unfolding never changes what shows.
+  const isOpen = (chapter: Chapter) => !app.chapters.length || app.chapterOpen(chapter.id);
   const currentChapter = $derived(app.chapterOf(app.currentId)?.id);
   // The section looked at away from the current one, if any.
   const viewing = $derived(app.viewingChapter || app.reviewOpen || app.viewingId === app.currentId ? null : app.viewingId);
-  // The chapter in view opens: the one being looked at, else the one being studied.
-  const openChapter = $derived(app.viewingChapter ?? app.chapterOf(app.viewingId)?.id ?? currentChapter);
 
   const name = (chapter: Chapter, index: number) => t('Chapter {number}', { number: index + 1 }) + ' · ' + chapter.title;
   const studiedIn = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
@@ -39,15 +39,18 @@
     return { ids: ids.slice(start, start + WINDOW), before: start, after: ids.length - start - WINDOW };
   }
 
-  // Keep where the learner is in view when the capsule scrolls.
+  // Keep what the learner is looking at in view when the capsule scrolls: the section looked at, else the current one,
+  // else the chapter in view, else the chapter being studied.
   $effect(() => {
-    void app.viewingId;
-    void app.currentId;
+    void [app.viewingId, app.viewingChapter, app.currentId, app.chapterInView];
     requestAnimationFrame(() => {
-      const item = box?.querySelector<HTMLElement>('.route-dot.current, .route-badge.here');
-      if (!box || !item || box.scrollHeight <= box.clientHeight) return;
+      if (!box || box.scrollHeight <= box.clientHeight) return;
+      const item = ['.route-dot.viewing', '.route-dot.current', '.route-badge.open', '.route-badge.here']
+        .map((selector) => box!.querySelector<HTMLElement>(selector))
+        .find(Boolean);
+      if (!item) return;
       const top = item.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-      if (top < box.scrollTop || top > box.scrollTop + box.clientHeight) box.scrollTop = top - box.clientHeight / 3;
+      if (top < box.scrollTop || top + item.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top - box.clientHeight / 3;
     });
   });
 </script>
@@ -63,7 +66,7 @@
     {#each chapters as chapter, index (chapter.id)}
       {@const total = chapter.concept_ids.length}
       {@const done = studiedIn(chapter.concept_ids)}
-      {@const open = chapter.id === openChapter}
+      {@const open = isOpen(chapter)}
       <li class="chapter">
         {#if chapters.length > 1}
           <button

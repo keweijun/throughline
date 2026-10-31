@@ -12,8 +12,8 @@ test('Studio sends a message with a skill chip and shows Codex reply', async ({ 
   const box = page.locator('#studio-input');
   await box.click();
   await box.pressSequentially('$thr');
-  await expect(page.locator('.cm-tooltip-autocomplete')).toContainText('$throughline');
-  await page.keyboard.press('Tab');
+  // CodeMirror ignores Tab for a moment after the list opens, which a test reaches and a person does not; click instead.
+  await page.locator('.cm-tooltip-autocomplete li').filter({ hasText: '$throughline' }).click();
   await expect(box.locator('.cm-chip-skill')).toHaveText('$throughline');
   await box.pressSequentially('add the solutions');
   await page.keyboard.press('Control+Enter');

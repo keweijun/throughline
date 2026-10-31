@@ -659,9 +659,18 @@ class AppStore {
     if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0 });
   }
 
-  /** A section's own exercises; chapter quiz questions anchored to it are listed on the chapter page. */
+  /** A section's own exercises, oldest first, each variant right after the exercise it was written like; chapter quiz
+   * questions anchored to the section are listed on the chapter page. */
   tasks(conceptId: string | null): Task[] {
-    return (this.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId && !t.chapter_id);
+    const own = (this.state?.practice.tasks ?? []).filter((t) => t.concept_id === conceptId && !t.chapter_id).sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
+    const ids = new Set(own.map((t) => t.id));
+    const ordered: Task[] = [];
+    const place = (task: Task) => {
+      ordered.push(task);
+      own.filter((t) => t.variant_of === task.id).forEach(place);
+    };
+    own.filter((t) => !t.variant_of || !ids.has(t.variant_of)).forEach(place);
+    return ordered;
   }
 
   /** The chapter's quiz questions, oldest quiz first. */

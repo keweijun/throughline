@@ -610,7 +610,7 @@ class Practice(Feature):
         job = self.practice_job(turn['id'])
         return [str(attached.path(self.host.workspace, name)) for name in (job or {}).get('images', [])]
 
-    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, question=None, images=None):
+    def _launch(self, concept_id, action, task=None, answer=None, purpose=None, chapter_id=None, question=None, images=None, request=None):
         with self.host.lock:
             jobs = self.state()['jobs']
             running = {t['id'] for t in self.host.brief_turns() if t['status'] == 'running'}
@@ -620,7 +620,7 @@ class Practice(Feature):
                 if (job.get('task_id') == task['id']) if task else (job['concept_id'] == concept_id and job['action'] == 'generate' and job.get('purpose') == purpose):
                     raise OperationError('practice_busy', 'Wait for the current practice request to finish')
             identifier = 'practice-' + str(uuid.uuid4())
-            job = {'id': identifier, 'concept_id': concept_id, 'action': action}
+            job = {'id': identifier, 'concept_id': concept_id, 'action': action, **(request or {})}
             if purpose:
                 job['purpose'] = purpose
             if chapter_id:
@@ -645,15 +645,36 @@ class Practice(Feature):
 
     def generate(self, concept_id):
         # Retrieval questions (ADR 0008) and a chapter's quiz anchored here are not the section's own exercises.
-        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS and not chapter_owned(t)]
+        existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS
+                    and not chapter_owned(t) and t['status'] != 'replaced']
         if existing:
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
 
-    def act(self, task_id, action, answer=None, question=None, reason=None, images=None):
+    def replace(self, concept_id, note=None):
+        """Ask for different exercises (ADR 0011): new ones replace the section's untouched exercises the teacher wrote,
+        once they are written. With none to replace, the new ones are added."""
+        replaces = [t['id'] for t in self.state()['tasks'] if t['concept_id'] == concept_id and practice.replaceable(t) and not chapter_owned(t)]
+        return self._launch(concept_id, 'generate', request={**({'replaces': replaces} if replaces else {}), **self._note(note)})
+
+    def variant(self, task, note=None):
+        """Another like this: one more exercise of the same kind next to it, replacing nothing (ADR 0011)."""
+        if not practice.section_exercise(task):
+            raise OperationError('invalid_action', 'Only a section exercise has variants')
+        return self._launch(task['concept_id'], 'generate', request={'variant_of': task['id'], **self._note(note)})
+
+    @staticmethod
+    def _note(note):
+        if note is not None and not isinstance(note, str):
+            raise OperationError('invalid_request', 'note must be text')
+        return {'note': note.strip()} if note and note.strip() else {}
+
+    def act(self, task_id, action, answer=None, question=None, reason=None, images=None, note=None):
         task = next((t for t in self.state()['tasks'] if t['id'] == task_id), None)
         if not task:
             raise OperationError('unknown_exercise', 'Unknown exercise')
+        if action == 'variant':
+            return self.variant(task, note)
         if action not in self.ACTIONS:
             raise OperationError('invalid_action', 'Unknown practice action')
         if action == 'defer' and task['origin'] == 'review':
@@ -805,7 +826,14 @@ class Practice(Feature):
             return self._retrieval_prompt(job, context, state['tasks'])
         if job['action'] == 'generate':
             # Exercise refs need not be included in the lesson links.
-            return prompts.practice_generate(self._sources(context['concept'].get('exercises', [])))
+            sources = self._sources(context['concept'].get('exercises', []))
+            if not {'note', 'replaces', 'variant_of'} & set(job):
+                return prompts.practice_generate(sources)
+            tasks = {t['id']: t for t in state['tasks']}
+            kept = [t['question'] for t in state['tasks'] if t['concept_id'] == job['concept_id'] and practice.section_exercise(t)
+                    and t['status'] not in ('replaced', 'skipped') and t['id'] not in job.get('replaces', [])]
+            return prompts.different_exercises(sources, job.get('note'), [tasks[i]['question'] for i in job.get('replaces', []) if i in tasks],
+                                               kept, tasks.get(job.get('variant_of'), {}).get('question'))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
         if job['action'] == 'ask':
             return prompts.practice_ask(task, self._sources(task['source_refs']), job['question'], len(job.get('images', [])))
@@ -875,7 +903,8 @@ class Memory(Feature):
         if turn['channel'] in ('mainline', PREPARED_STEP, 'sidequestion'):
             return prompts.memory_note(json_reply=False)
         job = self._job(turn)
-        if job and job['action'] != 'generate':
+        # A request for different exercises with the learner's note may suggest how they like to practise (ADR 0011).
+        if job and (job['action'] != 'generate' or job.get('note')):
             return prompts.memory_note(json_reply=True)
         return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
 
@@ -891,9 +920,9 @@ class Memory(Feature):
             note = tagged_json(memory.NOTE, turn['final_text'])
         else:
             job = self._job(turn)
-            if not job or job['action'] == 'generate' or job.get('error'):
+            if not job or (job['action'] == 'generate' and not job.get('note')) or job.get('error'):
                 return
-            own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:')]
+            own = [p + job['id'] for p in ('practice-question:', 'practice-answer:', 'practice-feedback:', 'practice-request:')]
             try:
                 note = parse_json(turn['final_text']).get('memory')
             except (ValueError, AttributeError):

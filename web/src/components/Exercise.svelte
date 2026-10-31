@@ -62,6 +62,11 @@
   const helped = $derived(task.history.some((h) => h.action !== 'assess' && h.action !== 'ask'));
   // Only a section's own exercises are skipped (ADR 0011); review and quiz questions are not.
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
+  // Another like this writes one more exercise of the same kind next to a section exercise (ADR 0011).
+  const variantable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped');
+  const writingExercises = $derived(
+    (app.state?.practice.jobs ?? []).some((j) => j.concept_id === task.concept_id && j.action === 'generate' && !j.purpose && app.isRunning(j.id)),
+  );
   const skipReasons: Record<SkipReason, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
   // A part split from a homework question shows the question and where its other parts are taught (ADR 0012).
   const homework = $derived(task.exercise ? app.concept(task.concept_id)?.exercises?.find((e) => e.question === task.exercise && e.part_of) : undefined);
@@ -244,6 +249,9 @@
       <div class="solved-row">
         <button class="btn btn-small" onclick={() => (reopened = true)}>{t("Answer again")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={toggleAsking}>{t("Ask about this")}</button>
+        {#if variantable}
+          <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>
+        {/if}
       </div>
     {:else}
     {#snippet answering()}{t("Your answer · checked by the teacher")}{/snippet}
@@ -275,6 +283,9 @@
         <button class="btn btn-quiet btn-small" disabled={busy} aria-pressed={asking} onclick={toggleAsking}>{t("Ask about this")}</button>
       </span>
       <span class="aside">
+        {#if variantable}
+          <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>
+        {/if}
         {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
           <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
         {/if}

@@ -70,7 +70,8 @@ def _practice(host):
     practice = host.practice.state()
     # Review questions and their requests live on the review page, not among a section's exercises (ADR 0008).
     # Chapter recaps and quiz questions carry chapter_id; the chapter page lists them, section views leave them out.
-    return {'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review'],
+    # Replaced exercises are kept for the record only (ADR 0011).
+    return {'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review' and t['status'] != 'replaced'],
                          'jobs': [j for j in practice['jobs'] if j.get('purpose') != 'review']},
             'review': host.review.state(practice)}
 

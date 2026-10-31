@@ -11,8 +11,12 @@ test('the teacher suggests a preference, and the learner confirms, edits and del
   const banner = page.getByRole('status').filter({ hasText: 'Remember: One step at a time?' });
   await expect(banner).toBeVisible();
   await expect(page.locator('#toggle-memory .count')).toHaveText('1');
+  // It floats over the lesson rather than pushing it down.
+  const top = async () => (await page.locator('.workspace').boundingBox())?.y;
+  const shown = await top();
   await banner.getByRole('button', { name: 'Remember', exact: true }).click();
   await expect(banner).toBeHidden();
+  expect(await top()).toBe(shown);
   await expect(page.locator('#toggle-memory .count')).toHaveCount(0);
 
   await page.locator('#toggle-memory').click();

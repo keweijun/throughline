@@ -14,14 +14,15 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from .. import images as attached, library, updates
+from .. import checks as codex_checks, images as attached, library, updates
+from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
-from .settings import TeacherSettings
+from .settings import Seen, TeacherSettings
 
 log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
@@ -157,6 +158,10 @@ class OpenCourseRequest(Body):
     name: str
 
 
+class SeenRequest(Body):
+    id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')
+
+
 class Courses:
     """The course library this host serves and the one course it owns at a time."""
 
@@ -246,8 +251,13 @@ class ActiveHost:
         return getattr(self._courses.require(), name)
 
 
-def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5):
+def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, launcher=None,
+               checks=None):
+    """`launcher` and `checks` stand in for this computer's launcher and the Codex checks in tests."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval)
+    seen = Seen(courses.settings.path.with_name('seen.json'))
+    launcher = launcher or Launcher()
+    checks = checks or codex_checks.codex_checks
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -543,6 +553,27 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         except OperationError as exc:
             return JSONResponse({'error': str(exc), 'code': exc.code}, 502)
 
+    @app.get('/api/launcher')
+    def launcher_view():
+        return {**launcher.status(), 'dismissed': 'launcher' in seen.all()}
+
+    @app.post('/api/launcher/desktop')
+    def launcher_to_desktop():
+        return launcher.add_to_desktop()
+
+    @app.post('/api/launcher/show')
+    def show_launcher():
+        return launcher.show()
+
+    @app.get('/api/checks')
+    def checks_view():
+        """Whether Codex can run Throughline; the library shows the ones that fail (ADR 0017)."""
+        return {'checks': checks()}
+
+    @app.post('/api/seen')
+    def mark_seen(body: SeenRequest):
+        return {'seen': seen.add(body.id)}
+
     @app.get('/api/health')
     def health():
         """A cheap liveness probe for `guided-learning open` and `stop`."""
@@ -580,7 +611,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     return app
 
 
-def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None):
+def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, launcher=None, checks=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -588,7 +619,8 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
-    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root)
+    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root, launcher=launcher,
+                     checks=checks)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

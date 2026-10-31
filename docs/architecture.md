@@ -66,6 +66,11 @@ A teaching prompt (`prompts.Prompt`, from `Host.build_prompt`) has two parts. It
 | GET | `/api/state` | Course, position, curriculum (with chapters), session, pending explanations, turns, stepped lessons (`lessons`), questions, practice, preparation, settings, annotations, course memory, skipped sections, chapter builds, review (sets, review questions and their requests, warm-ups and how many sections can be reviewed; `practice` leaves review questions out), projected to what the interface reads (see below); `?only=preparation,memory,builds,settings` returns just those parts; 409 `no_course` before a course is open |
 | GET | `/api/library` | Library root, open course and a summary of each course |
 | POST | `/api/library/open` | Open a library course by name (publishes `changed` with scope `course`) |
+| GET | `/api/launcher` | This computer's launcher for the library's **Opening Throughline next time** card and Settings → About: `platform` (`nt`, `darwin`, `darwin-home` for `~/Applications`, `linux`), `path`, `exists`, and whether the learner `dismissed` the card |
+| POST | `/api/launcher/desktop` | Put the launcher on the desktop: a copy of the `.lnk` or `.desktop` file, or on macOS a symbolic link to the app (a copied bundle would be a second app for Spotlight). 409 `launcher_missing` without a launcher |
+| POST | `/api/launcher/show` | Reveal the launcher in Explorer or Finder, or open its folder on Linux, where the learner can pin it. 409 `launcher_missing` without a launcher |
+| GET | `/api/checks` | `{checks}`: whether Codex is found and signed in (`guided_learning/checks.py`, shared with `guided-learning doctor`). The library shows the failing ones with their fix; Studio appends its App Server methods check to `CODEX_CHECKS` |
+| POST | `/api/seen` | `{id}`: remember for good that the learner dismissed something (`launcher` for the card), in `seen.json` beside the per-user settings |
 | POST | `/api/shutdown` | Stop a host started by `guided-learning open` |
 | PUT | `/api/preferences` | Save the course language; a new language invalidates stale preparation |
 | GET | `/api/events` | SSE: `delta`, `turn`, `changed` |

@@ -13,7 +13,7 @@
   async function copy() {
     try {
       await navigator.clipboard.writeText(prompt.trim());
-      app.notify(t('Request copied. If Codex did not open, paste it into any Codex chat.'));
+      app.notify(t('Request copied'), t('If Codex did not open, paste it into any Codex chat.'));
     } catch {
       // Where the link is handled, Codex opens with the request anyway.
     }

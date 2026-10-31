@@ -15,6 +15,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Shortcuts from './components/Shortcuts.svelte';
+  import Toast from './components/Toast.svelte';
   import Library from './components/Library.svelte';
   import RememberPrompt from './components/RememberPrompt.svelte';
 
@@ -93,13 +94,6 @@
   </div>
 {/if}
 
-{#if app.notice}
-  <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
-    <p>{app.notice}</p>
-    <button class="btn btn-quiet btn-small" onclick={() => (app.notice = null)}>{t("Dismiss")}</button>
-  </div>
-{/if}
-
 <!-- A preference the teacher suggested takes effect only once the learner confirms it (ADR 0010). -->
 {#if suggestion && !(app.panelOpen && app.panelTab === 'memory')}
   <div class="banner notice" role="status" out:fade={{ duration: 160 }}>
@@ -145,6 +139,7 @@
 <SettingsDialog />
 <CitationPeek />
 <Shortcuts />
+<Toast />
 
 <style>
   .banner {

@@ -99,7 +99,7 @@ class AppStore {
   state = $state<State | null>(null);
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
-  notice = $state<string | null>(null);
+  notice = $state<{ title: string; detail?: string } | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
@@ -472,8 +472,8 @@ class AppStore {
   }
 
   /** A short confirmation that clears itself. */
-  notify(text: string) {
-    this.notice = text;
+  notify(title: string, detail?: string) {
+    this.notice = { title, detail };
     if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
     this.#noticeTimer = setTimeout(() => (this.notice = null), 8000);
   }

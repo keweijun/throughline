@@ -1128,3 +1128,28 @@ dialog[open]::backdrop {
   background: linear-gradient(to bottom, transparent, var(--sheet));
   pointer-events: none;
 }
+
+/* Help's "Show me": a marker-yellow ring that pulses three times around the real control, then fades. */
+.spotlit {
+  position: relative;
+  z-index: 60;
+  outline: 2px solid var(--marker);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+  animation: spotlight 0.9s ease-out 3;
+}
+
+@keyframes spotlight {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--marker) 70%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlit {
+    animation: none;
+  }
+}

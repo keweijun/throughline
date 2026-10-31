@@ -31,7 +31,7 @@ The teacher is the Codex CLI on this computer. In **Settings**, under Teacher, c
 
 ## Keyboard shortcuts
 
-`c` continue the lesson · `/` ask a side question · `[` and `]` previous and next section · `s` show or hide the source reader · `n` show or hide your notes · `m` show or hide the Course page · `r` fold or unfold the route · `?` list the shortcuts · `Esc` close the route drawer, the side panel when it covers the lesson, or **Your courses** back to the open course.
+`c` continue the lesson · `/` ask a side question · `[` and `]` previous and next section · `s` show or hide the source reader · `n` show or hide your notes · `m` show or hide the Course page · `r` fold or unfold the route · `?` open Help: what you can do by level, with "Show me" to point at each control, and these shortcuts · `Esc` close the route drawer, the side panel when it covers the lesson, or **Your courses** back to the open course.
 
 ## Pause, close and reopen
 

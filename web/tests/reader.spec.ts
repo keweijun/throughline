@@ -126,7 +126,29 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wave superposition');
   await page.locator('h1').click();
   await page.keyboard.press('?');
-  await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Help' })).toBeVisible();
+});
+
+test('help maps what the learner can do by level and shows where each thing is', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.locator('#open-help').click();
+  const help = page.getByRole('dialog', { name: 'Help' });
+  await expect(help.getByRole('heading', { level: 3 })).toHaveText(['Throughline', 'This course', 'The section you are reading']);
+  await help.getByText('Keyboard shortcuts').click();
+  await expect(help.locator('kbd', { hasText: 'm' }).first()).toBeVisible();
+
+  // "Show me" closes Help and rings the real control where it is, without opening it.
+  const notes = help.getByRole('listitem').filter({ hasText: 'Only you see them' });
+  await notes.getByRole('button', { name: 'Show me' }).click();
+  await expect(help).toBeHidden();
+  await expect(page.locator('#toggle-notes')).toHaveClass(/spotlit/);
+  await expect(page.locator('#auxiliary')).toBeHidden();
+  await expect(page.locator('#toggle-notes')).not.toHaveClass(/spotlit/, { timeout: 5000 });
+
+  // Studio has no control of its own to point at; Help opens it on the Course page.
+  await page.keyboard.press('?');
+  await help.getByRole('listitem').filter({ hasText: 'Change the course with Codex' }).getByRole('button', { name: 'Open' }).click();
+  await expect(page.locator('#course-studio')).toBeVisible();
 });
 
 test('teacher settings save the Codex model and effort as they change', async ({ page, course }) => {

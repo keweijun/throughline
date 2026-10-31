@@ -79,7 +79,7 @@
       </span>
     {/if}
     <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
-    <button class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
+    <button id="open-courses" class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
       <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
       <span class="wide-only">{t("Courses")}</span>
     </button>
@@ -137,11 +137,11 @@
         <span class="wide-only">{t("Update available")}</span>
       </button>
     {/if}
-    <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: teacher, appearance and about")}>
+    <button id="open-settings" class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: teacher, appearance and about")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.02 8.14L18.08 8.61L18.08 11.39L16.02 11.86L15.57 12.94L16.70 14.73L14.73 16.70L12.94 15.57L11.86 16.02L11.39 18.08L8.61 18.08L8.14 16.02L7.06 15.57L5.27 16.70L3.30 14.73L4.43 12.94L3.98 11.86L1.92 11.39L1.92 8.61L3.98 8.14L4.43 7.06L3.30 5.27L5.27 3.30L7.06 4.43L8.14 3.98L8.61 1.92L11.39 1.92L11.86 3.98L12.94 4.43L14.73 3.30L16.70 5.27L15.57 7.06Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
     </button>
-    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>
-      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="1.75" y="4.5" width="16.5" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M5 8h.01M8 8h.01M11 8h.01M14.5 8h.5M6.5 10.5h.01M9.5 10.5h.01M12.5 10.5h.01M6.5 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    <button id="open-help" class="btn btn-quiet icon shortcuts" onclick={() => (app.helpOpen = true)} aria-label={t("Help")} title={t("Help and keyboard shortcuts (?)")}>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="7.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M7.8 7.9a2.3 2.3 0 1 1 3.3 2.1c-.7.3-1.1.9-1.1 1.6v.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><circle cx="10" cy="14.4" r=".95" fill="currentColor" /></svg>
     </button>
   </div>
 </header>

@@ -1,3 +1,5 @@
+import type { StudioEvent } from './studio.svelte';
+
 export type Ref = { source_id: string; revision: string; unit_id: string; detail?: string };
 
 export type Concept = {
@@ -368,7 +370,7 @@ export type DeltaEvent = { type: 'delta'; id: string; attempt: number; sequence:
 
 export type ChangeScope = 'state' | 'course' | 'library' | 'settings' | 'preferences' | 'preparation' | 'builds' | 'memory';
 
-export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope };
+export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope } | StudioEvent;
 
 
 export type LibraryCourse = {

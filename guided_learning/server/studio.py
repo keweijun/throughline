@@ -19,7 +19,7 @@ from .settings import default_path
 
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
 # Notifications about a thread that the interface draws; moderation, predictions and read state it ignores.
-FORWARDED = re.compile(r'^(thread|turn|item)/')
+FORWARDED = re.compile(r'^((thread|turn|item)/|error$)')
 IGNORED = {'turn/moderationMetadata', 'thread/prediction/updated', 'thread/readState/changed'}
 HISTORY = 200  # turns of a thread the interface shows, most recent last
 MAX_UPLOAD = 200 * 1024 * 1024
@@ -282,6 +282,16 @@ class Studio:
     def access(self):
         saved = self._config()['full_access']
         return {'full_access': saved or bool(self.forced), 'saved': saved, 'forced': bool(self.forced)}
+
+    def checked_access(self):
+        """Access as Settings shows it. On Windows, whether Codex's sandbox is ready is only known from Codex, so
+        this starts the App Server once if nothing has yet."""
+        if os.name == 'nt' and self.forced is None:
+            try:
+                self._server()
+            except StudioError:
+                pass
+        return self.access()
 
     def set_full_access(self, on):
         with self.lock:

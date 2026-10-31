@@ -643,6 +643,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def studio_answer(request_id: str, body: StudioAnswer):
         return studio.answer(request_id, body.model_dump(exclude_none=True))
 
+    @app.get('/api/studio/access')
+    def studio_access_view():
+        return studio.checked_access()
+
     @app.put('/api/studio/access')
     def studio_access(body: StudioAccess):
         result = studio.set_full_access(body.full_access)
@@ -691,7 +695,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     return app
 
 
-def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None):
+def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -699,7 +703,7 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
-    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root)
+    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root, studio_command=studio_command)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

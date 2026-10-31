@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app, type PanelTab } from '../lib/store.svelte';
+  import { studio } from '../lib/studio.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
@@ -89,6 +90,10 @@
       <button id="toggle-memory" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('memory')} aria-label={t("Memory")} title={t("What the teacher remembers about this course")} onclick={() => toggle('memory')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3.5a5 5 0 0 0-3 9v2.5h6V12.5a5 5 0 0 0-3-9zM8 17h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Memory")}</span>{#if suggested}<span class="count">{suggested}</span>{/if}
+      </button>
+      <button id="toggle-studio" class="btn btn-quiet studio-toggle" aria-controls="auxiliary" aria-pressed={showing('studio')} aria-label={t("Studio")} title={t("Studio: create and change courses with Codex (d)")} onclick={() => toggle('studio')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Studio")}</span>{#if studio.running}<span class="count" aria-label={t("Codex is working")}>●</span>{:else if studio.pending.length}<span class="count">{studio.pending.length}</span>{/if}
       </button>
       </div>
     {/if}
@@ -279,8 +284,10 @@
       display: none;
     }
 
-    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due. */
-    .review {
+    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due.
+       Studio is reached there from the course's own hand-offs (Add files in Studio, …). */
+    .review,
+    .studio-toggle {
       display: none;
     }
   }

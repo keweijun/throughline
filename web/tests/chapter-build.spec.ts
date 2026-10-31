@@ -21,13 +21,13 @@ test('the app builds an outlined chapter while the learner keeps studying', asyn
   expect(errors).toEqual([]);
 });
 
-test('a failed build shows the error and the Codex fallback', async ({ page, course }) => {
+test('a failed build shows the error and the Studio fallback', async ({ page, course }) => {
   const { errors } = await course('chapter_build_browser_fixture');
   await page.locator('#route').getByRole('button', { name: /Chapter 3 · Time evolution/ }).click();
   await page.getByRole('button', { name: 'Build this chapter' }).click();
   await expect(page.getByText('Building this chapter failed.')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.build .error')).toContainText('nonempty concepts array');
-  await expect(page.getByRole('link', { name: 'Build this chapter in Codex' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Build this chapter in Studio' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Try building again' })).toBeEnabled();
   expect(errors).toEqual([]);
 });

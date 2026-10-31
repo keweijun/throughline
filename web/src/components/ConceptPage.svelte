@@ -121,7 +121,7 @@
     <p>{t("Codex builds the route from your files. This page updates by itself when it is done.")}</p>
     {#if app.libraryCourse}
       <CodexLink class="btn btn-primary" prompt={t('$throughline build the route for the course {course}', { course: app.libraryCourse.name })}>
-        {t('Build the route in Codex')}
+        {t('Build the route in Studio')}
       </CodexLink>
     {/if}
   </section>

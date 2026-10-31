@@ -229,7 +229,7 @@ a {
   text-underline-offset: 3px;
 }
 
-.codex-link::after {
+.codex-link:not(.studio-link)::after {
   content: '↗';
   margin-left: 0.25em;
   font-size: 0.9em;

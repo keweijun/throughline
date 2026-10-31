@@ -51,7 +51,7 @@
       </button>
       {#if (status === 'failed' || status === 'interrupted') && course}
         <CodexLink prompt={t('$throughline build the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })}>
-          {t("Build this chapter in Codex")}
+          {t("Build this chapter in Studio")}
         </CodexLink>
       {/if}
     </div>

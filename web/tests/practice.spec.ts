@@ -1,4 +1,4 @@
-import { test, expect } from './fixture';
+import { test, expect, editorText } from './fixture';
 
 test('deferred and unfinished exercises follow the learner into the next section of the chapter', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
@@ -102,7 +102,7 @@ test('failed assessment keeps the submitted answer recoverable even with older f
   await expect(task.locator('.submitted-answer')).toContainText('First line');
   await expect(task.locator('.submitted-answer br')).toHaveCount(1);
   await task.getByRole('button', { name: 'Restore submitted answer' }).click();
-  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('First line\nSecond line');
+  await expect.poll(() => editorText(task.getByRole('textbox', { name: 'Exercise answer' }))).toBe('First line\nSecond line');
 });
 
 test('copying rendered teacher output gives the TeX source of its formulas', async ({ page, course }) => {
@@ -176,7 +176,7 @@ test('Enter starts a new line in an answer and Ctrl+Enter checks it', async ({ p
   await box.fill('First line');
   await box.press('Enter');
   await box.pressSequentially('Second line');
-  await expect(box).toHaveValue('First line\nSecond line');
+  await expect.poll(() => editorText(box)).toBe('First line\nSecond line');
   await expect(task.locator('.submitted-answer')).toHaveCount(0);
   await box.press('Control+Enter');
   await expect(task.locator('.submitted-answer')).toContainText('Second line');
@@ -199,10 +199,10 @@ test('an unsent answer survives looking at another section',async ({ page, cours
   await page.locator('#route').getByRole('button', { name: /Next section/ }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
   await page.getByRole('button', { name: 'Back to current section' }).click();
-  await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
+  await expect.poll(() => editorText(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' }))).toBe('Half-written reasoning');
   // It also survives a reload of the tab.
   await page.reload();
-  await expect(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('Half-written reasoning');
+  await expect.poll(() => editorText(page.locator('#practice article').first().getByRole('textbox', { name: 'Exercise answer' }))).toBe('Half-written reasoning');
 });
 
 test('asking about a solved exercise shows the answer and keeps it solved', async ({ page, course }) => {
@@ -223,7 +223,7 @@ test('asking about a solved exercise shows the answer and keeps it solved', asyn
   await expect(task.locator('header .chip')).toHaveText('Solved independently');
   await expect(task).not.toContainText('solved with help');
   await expect(task.getByRole('textbox', { name: 'Question about this exercise' })).toHaveCount(0);
-  await expect(task.getByRole('textbox', { name: 'Exercise answer' })).toHaveValue('A draft answer');
+  await expect.poll(() => editorText(task.getByRole('textbox', { name: 'Exercise answer' }))).toBe('A draft answer');
 });
 
 test('open exercises stay with their chapter and are listed on its page', async ({ page, course }) => {

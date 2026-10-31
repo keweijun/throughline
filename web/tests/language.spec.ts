@@ -1,4 +1,4 @@
-import { test, expect, chooseLanguage } from './fixture';
+import { test, expect, chooseLanguage, editorText } from './fixture';
 test('language persists without rewriting history and remains available on mobile', async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson', exact: true }).click();
@@ -29,12 +29,12 @@ test('switching during generation preserves the turn and drafts but applies to t
   await page.getByRole('button', { name: 'Questions', exact: true }).click();
   await page.getByRole('textbox', { name: 'Side question', exact: true }).fill('My unfinished question 草稿');
   await chooseLanguage(page, 'zh-CN');
-  await expect(page.getByRole('textbox', { name: '旁支问题', exact: true })).toHaveValue('My unfinished question 草稿');
+  await expect.poll(() => editorText(page.getByRole('textbox', { name: '旁支问题', exact: true }))).toBe('My unfinished question 草稿');
   await expect(page.locator('.lesson-body')).toContainText('Lesson complete.');
   await page.getByRole('button', { name: '关闭侧栏' }).click();
   await page.getByRole('textbox').first().fill('A lesson draft');
   await chooseLanguage(page, 'en');
-  await expect(page.getByRole('textbox').first()).toHaveValue('A lesson draft');
+  await expect.poll(() => editorText(page.getByRole('textbox').first())).toBe('A lesson draft');
   await chooseLanguage(page, 'zh-CN');
   await page.getByRole('button', { name: '再讲一次', exact: true }).click();
   await expect(page.locator('.lesson-body').last()).toContainText('中文讲解');
@@ -56,7 +56,7 @@ test('practice controls and evidence labels translate while the answer draft sta
   await first.getByRole('textbox', { name: 'Exercise answer' }).fill('My answer draft');
   await first.getByRole('button', { name: 'Full solution', exact: true }).click();
   await chooseLanguage(page, 'zh-CN');
-  await expect(first.getByRole('textbox', { name: '练习作答' })).toHaveValue('My answer draft');
+  await expect.poll(() => editorText(first.getByRole('textbox', { name: '练习作答' }))).toBe('My answer draft');
   await expect(first.getByRole('group', { name: '确认查看完整解答' })).toContainText('有帮助完成');
   await expect(page.locator('#practice article').nth(2)).toContainText('需要再尝试');
   await expect(page.locator('#practice article').nth(3)).toContainText('独立完成');

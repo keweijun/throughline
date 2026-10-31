@@ -37,8 +37,11 @@ test('the last section links to the chapter page, whose recap is a lesson that n
   await expect(recap).toContainText('The chapter in one line');
   await expect(page.getByRole('button', { name: 'Recap again' })).toBeVisible();
 
-  // Passages in the recap can be highlighted like any lesson's.
-  expect((await dragSelect(page, recap.locator('p').first())).trim().length).toBeGreaterThan(5);
+  // Passages in the recap can be highlighted like any lesson's. The finished recap is rendered once more as it lands,
+  // which can replace the paragraph mid-drag, so the selection is retried until it holds.
+  await expect(async () => {
+    expect((await dragSelect(page, recap.locator('p').first())).trim().length).toBeGreaterThan(5);
+  }).toPass({ timeout: 5000 });
   await page.getByRole('button', { name: 'Highlight', exact: true }).click();
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size)).toBe(1);
 

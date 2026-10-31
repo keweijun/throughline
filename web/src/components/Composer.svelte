@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { modEnterToSend, sendKeys } from '../lib/keys';
-  import { autogrow } from '../lib/autogrow';
+  import { sendKeys } from '../lib/keys';
+  import { editor } from '../lib/editor';
   import { markdown, hasMath } from '../lib/markdown';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
@@ -109,9 +109,10 @@
 
   function paste(event: ClipboardEvent) {
     const files = imagesKey ? imageFiles(event.clipboardData) : [];
-    if (!files.length) return;
+    if (!files.length) return false;
     event.preventDefault();
     void attach(files);
+    return true;
   }
 
   function dragover(event: DragEvent) {
@@ -164,24 +165,10 @@
       </p>
     </div>
   {/if}
-  <textarea
-    {id}
-    {rows}
-    {value}
-    oninput={(event) => onvalue(event.currentTarget.value)}
-    onpaste={paste}
-    onkeydown={(event) => {
-      if (event.key === 'Escape' && oncancel) {
-        event.preventDefault();
-        oncancel();
-      }
-    }}
-    use:autogrow={value}
-    use:modEnterToSend={send}
-    aria-label={label}
-    aria-describedby={hintId}
-    {placeholder}
-  ></textarea>
+  <div
+    class="field"
+    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, onchange: onvalue, onsend: send, oncancel, onpaste: paste }}
+  ></div>
   {#if math && showPreview && rendered}
     <section class="preview" aria-label={t("Preview")}>
       <div class="prose" use:markdown={{ language: locale.language, text: rendered, breaks: true }}></div>
@@ -316,15 +303,88 @@
     text-decoration: underline;
   }
 
-  /* The frame draws the field, so the text area itself is bare. */
-  textarea,
-  textarea:hover,
-  textarea:focus {
-    min-height: 2.75rem;
+  /* The frame draws the field, so the editor itself is bare and reads like the rest of the interface. */
+  .field :global(.cm-editor) {
+    font-size: var(--step-0);
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  .field :global(.cm-editor.cm-focused) {
+    outline: none;
+  }
+
+  /* It grows with the text, then scrolls, like the text areas it replaces. */
+  .field :global(.cm-scroller) {
+    max-height: 18rem;
+    overflow-y: auto;
+    font-family: var(--sans);
+    line-height: inherit;
+  }
+
+  .field :global(.cm-content) {
     padding: 0.6rem 0.8rem 0.3rem;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
+    caret-color: var(--ink);
+  }
+
+  .field :global(.cm-line) {
+    padding: 0;
+  }
+
+  .field :global(.cm-placeholder) {
+    color: var(--pencil);
+    opacity: 0.75;
+  }
+
+  /* The suggestion list is drawn in the page, outside the frame, so it is styled globally. */
+  :global(.cm-tooltip.cm-tooltip-autocomplete) {
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--raised);
+    box-shadow: var(--shadow);
+  }
+
+  /* The rendered sample hangs beside the list inside the same tooltip, so the list rounds its own corners rather than
+     the tooltip clipping them. */
+  :global(.cm-tooltip-autocomplete > ul) {
+    border-radius: var(--radius);
+    font-family: var(--mono) !important;
+    font-size: var(--step--1);
+    max-height: 14rem !important;
+  }
+
+  :global(.cm-tooltip-autocomplete > ul > li) {
+    padding: 0.2rem 0.6rem !important;
+    color: var(--ink);
+  }
+
+  :global(.cm-tooltip-autocomplete > ul > li[aria-selected]) {
+    background: var(--accent-wash) !important;
+    color: var(--accent) !important;
+  }
+
+  :global(.cm-completionMatchedText) {
+    text-decoration: none !important;
+    font-weight: 700;
+  }
+
+  :global(.cm-completionDetail) {
+    margin-left: 0.5rem;
+    font-style: normal !important;
+    color: var(--pencil);
+  }
+
+  :global(.cm-tooltip.cm-completionInfo) {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--raised);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+
+  :global(.latex-sample) {
+    font-size: 1.15rem;
   }
 
   .preview {

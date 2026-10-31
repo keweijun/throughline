@@ -25,11 +25,7 @@ Lead the intake: the learner knows what they want, you know what a good course f
 The app reads PDFs and text files: Markdown, plain text, LaTeX, code, CSV and any other file in UTF-8 or UTF-16 (a text file in another encoding is refused; re-encode the copy in `inputs/` as UTF-8). Convert every other document to PDF so the learner sees its layout beside the lesson: Word, PowerPoint, Excel, OpenDocument, RTF, Pages, Keynote and EPUB, which are refused when registered directly. Web pages are text, but their markup reads badly; convert them to PDF too.
 
 1. Keep the original in `inputs/` and write the PDF to `inputs/converted/<original name>.pdf`.
-2. Use what the learner has, in this order, outside the sandbox:
-   - Microsoft Office on Windows: drive Word, PowerPoint or Excel from PowerShell through COM (`ExportAsFixedFormat`; PowerPoint `SaveAs` with format 32), with alerts off, and quit the application afterwards.
-   - LibreOffice on any system: `soffice --headless --convert-to pdf --outdir <inputs>/converted <file>`. On macOS `soffice` is in `/Applications/LibreOffice.app/Contents/MacOS/`, on Windows in `C:\Program Files\LibreOffice\program\`. It does nothing while LibreOffice is open, unless given its own profile with `-env:UserInstallation=file:///tmp/throughline-libreoffice`.
-   - Pages and Keynote on macOS: export to PDF with AppleScript. EPUB: Calibre's `ebook-convert`.
-   - None of these: offer to install LibreOffice, which is free, or ask the learner to export a PDF themselves.
+2. Convert with whatever the learner already has: a document tool you find installed, Microsoft Office, LibreOffice (`soffice --headless --convert-to pdf`), Pages or Keynote, or Calibre for EPUB. Conversions usually need to run outside the sandbox. If nothing can convert, offer to install LibreOffice, which is free, or ask the learner to export a PDF themselves.
 3. Check the PDF: as many pages or slides as the original, text that extracts, formulas and figures intact. Tell the learner what the conversion lost.
 4. Register the PDF with `converted_from` set to the original.
 5. When a slide deck has speaker notes, write them to `inputs/converted/<original name> (speaker notes).md`, a `## Slide N` heading followed by the notes for each slide that has any, and register it with the same `converted_from`. Read the notes with python-pptx, or from `ppt/notesSlides/*.xml` inside the `.pptx`. Cite the slide in the PDF and the explanation in the notes.

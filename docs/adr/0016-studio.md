@@ -11,8 +11,8 @@ So course work moves into the app. **Studio** is where the learner creates and r
 Its label is **Studio**, with "Create and change courses with Codex" under it: the name is a place in the app, and the line says what runs it. The name says what Studio is for: big requests that change a course, not questions about its content, which stay in **Questions** with the teacher. Its empty state and composer placeholder give examples of course work ("Make a course from these files", "Add this problem set", "Make chapter 3 more rigorous") rather than an invitation to ask anything.
 
 - **No course yet**: Studio fills the library page. It is the way into the app.
-- **Library with courses**: Studio stays at the top of the library page, above the course list; **New course** starts a Studio thread.
-- **In an open course**: Studio is a side panel view next to Questions, Source, Notes and Memory, in the shared panel layout, with the course named. The hand-offs that used to open Codex (Add files and Check sources under the route, checking an unchecked source location, building a route for a course without one, the fallback for a failed chapter build) open Studio with the request filled in instead. Work that needs room, like a whole new course, gets the full reading column.
+- **Library with courses**: Studio stays at the top of the library page, above the course list; **New course** starts a Studio thread, which becomes the new course's first thread.
+- **In an open course**: Studio is the first part of the course's **Course page**, with the course's threads (amended by ADR 0017; it was first a side panel view next to Questions, Source, Notes and Memory). The hand-offs that used to open Codex (Add files and Check sources, checking an unchecked source location, building a route for a course without one, the fallback for a failed chapter build) open it with the request filled in and a chip saying where the request came from. While a turn runs, the top bar shows that Studio is working or needs the learner, so they can go on studying.
 
 When the teacher in Questions is asked to change the course itself, it points to Studio rather than trying.
 

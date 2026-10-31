@@ -221,7 +221,9 @@ class Navigation(Feature):
         mapping = next((m for m in model['coverage'] if matching_ref(m, ref)), {})
         current = next((s for s in self.operation({'op': 'course.status'})['sources'] if s['id'] == source_id), {})
         available = renderer_available()
+        original = snapshot.get('converted_from')
         return {**ref, **unit, 'title': Path(snapshot['path']).name, 'kind': kind,
+                'converted_from': Path(original['path']).name if original else None,
                 'verification': mapping.get('verification', 'pending'), 'stale': current.get('revision') != revision,
                 'image_url': source_url(ref, 'image') if kind == '.pdf' and page and available else None,
                 'render_message': None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.',

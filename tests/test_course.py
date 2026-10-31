@@ -65,6 +65,48 @@ class CourseCLI(unittest.TestCase):
         bad_pdf = self.call('source.register', path=str(pdf))['source']
         self.assertEqual(bad_pdf['status'], 'failed')
         self.assertTrue(bad_pdf['errors'])
+    def test_any_text_file_is_read_by_line_and_binary_files_are_refused(self):
+        self.call('course.init', title='Quantum')
+        for name, data in [('notes.txt', 'First\nSecond\n'.encode()), ('solver.py', b'\xef\xbb\xbfdef f():\n    return 1\n'),
+                           ('Makefile', b'all:\n\techo hi\n'), ('wide.tex', '\\section{Wave}\nψ\n'.encode('utf-16'))]:
+            path = self.base / name
+            path.write_bytes(data)
+            source = self.call('source.register', path=str(path))['source']
+            self.assertEqual(source['status'], 'read', name)
+            units = self.call('source.read', source_id=source['id'])['units']
+            self.assertEqual(units[1]['locator'], {'line': 2}, name)
+            self.assertNotIn('\ufeff', units[0]['text'], name)
+        self.assertEqual(units[1]['text'], 'ψ')
+        for name, data, message in [('image.png', b'\x89PNG\r\n\x1a\n\x00\x00', 'PDF or text'), ('legacy.txt', 'café'.encode('latin-1'), 'UTF-8'),
+                                    ('deck.pptx', b'PK\x03\x04\x00\x00', 'convert'), ('essay.docx', b'PK\x03\x04\x00\x00', 'convert'),
+                                    ('memo.rtf', b'{\\rtf1 Hello}', 'convert')]:
+            path = self.base / name
+            path.write_bytes(data)
+            source = self.call('source.register', path=str(path))['source']
+            self.assertEqual(source['status'], 'failed', name)
+            self.assertIn(message, source['errors'][0], name)
+
+    def test_a_converted_document_names_its_original(self):
+        self.call('course.init', title='Quantum')
+        deck = self.base / 'lecture.pptx'
+        deck.write_bytes(b'PK\x03\x04 slides')
+        pdf = self.base / 'lecture.pdf'
+        pdf.write_bytes(b'not a pdf')
+        notes = self.base / 'lecture (speaker notes).md'
+        notes.write_text('## Slide 1\nSay why.\n', encoding='utf-8')
+        original = {'path': str(deck.resolve()), 'revision': __import__('hashlib').sha256(deck.read_bytes()).hexdigest()}
+        for path in (pdf, notes):
+            source = self.call('source.register', path=str(path), converted_from=str(deck))['source']
+            self.assertEqual(source['converted_from'], original)
+            self.assertEqual(self.call('source.read', source_id=source['id'])['converted_from'], original)
+        # Registering again without it keeps the original; an unreadable original is refused.
+        self.assertEqual(self.call('source.register', path=str(notes))['source']['converted_from'], original)
+        self.call('source.register', error='invalid_request', path=str(notes), converted_from=str(self.base / 'gone.pptx'))
+        self.call('source.register', error='invalid_request', path=str(notes), converted_from=7)
+        plain = self.base / 'plain.md'
+        plain.write_text('Plain', encoding='utf-8')
+        self.assertNotIn('converted_from', self.call('source.register', path=str(plain))['source'])
+
     def test_pdf_pages_keep_real_page_locations_and_empty_pdf_needs_review(self):
         try:
             from pypdf import PdfWriter

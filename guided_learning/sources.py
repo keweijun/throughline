@@ -6,9 +6,24 @@ from pathlib import Path
 from .store import OperationError
 from .curriculum import source_unit
 
+# Documents that are not text: Codex converts them to PDF and registers the PDF with `converted_from` (ADR 0015).
+CONVERTED = {'.doc', '.docx', '.dot', '.dotx', '.odt', '.rtf', '.pages', '.ppt', '.pptx', '.pps', '.ppsx', '.odp', '.key',
+             '.xls', '.xlsx', '.ods', '.numbers', '.epub'}
+
+def text_of(data):
+    """A text file's content, or None for binary data. UTF-8 (with or without a byte order mark) and UTF-16 with one."""
+    if data.startswith((b'\xff\xfe', b'\xfe\xff')):
+        text = data.decode('utf-16')
+    elif b'\x00' in data:
+        return None
+    else:
+        try:
+            text = data.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            raise ValueError('Text sources must be UTF-8: save the file as UTF-8 and register it again') from None
+    return None if '\x00' in text else text
+
 def extract(path, data):
-    if path.suffix.lower() in ('.md', '.markdown'):
-        return [{'id': f'line-{n}', 'locator': {'line': n}, 'text': text} for n, text in enumerate(data.decode('utf-8-sig').splitlines(), 1)]
     if path.suffix.lower() == '.pdf':
         try:
             from pypdf import PdfReader
@@ -23,7 +38,12 @@ def extract(path, data):
             except Exception as exc:
                 units.append({'id': f'page-{n}', 'locator': {'page': n}, 'text': '', 'status': 'failed', 'error': str(exc), 'verification': 'pending'})
         return units
-    raise ValueError('Supported sources are Markdown and PDF')
+    if path.suffix.lower() in CONVERTED:
+        raise ValueError(f'{path.suffix} files are not read directly: convert to PDF and register the PDF with converted_from')
+    text = text_of(data)
+    if text is None:
+        raise ValueError('Supported sources are PDF or text files: convert other documents to PDF first')
+    return [{'id': f'line-{n}', 'locator': {'line': n}, 'text': line} for n, line in enumerate(text.splitlines(), 1)]
 
 def write_snapshot(folder, revision, data):
     """Store the exact bytes under their hash; a crash never leaves a truncated snapshot behind."""
@@ -41,6 +61,17 @@ def write_snapshot(folder, revision, data):
     finally:
         temporary.unlink(missing_ok=True)
 
+def converted_from(raw_path):
+    """The document a registered file was converted from, by path and the revision that was converted."""
+    if not isinstance(raw_path, str) or not raw_path:
+        raise OperationError('invalid_request', 'converted_from must be the path of the original document')
+    path = Path(raw_path).resolve()
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise OperationError('invalid_request', f'converted_from must be a readable file: {exc}') from None
+    return {'path': str(path), 'revision': hashlib.sha256(data).hexdigest()}
+
 def register(store, request):
     raw_path = request.get('path')
     if not isinstance(raw_path, str) or not raw_path:
@@ -48,7 +79,9 @@ def register(store, request):
     path = Path(raw_path).resolve()
     source_id = 'src-' + hashlib.sha256(os.path.normcase(str(path)).encode()).hexdigest()[:24]
     previous = store.get('sources', source_id, {})
-    source = {'id': source_id, 'path': str(path), 'revision': previous.get('revision'), 'status': 'failed', 'verification': 'pending', 'errors': []}
+    original = converted_from(request.get('converted_from')) if 'converted_from' in request else previous.get('converted_from')
+    source = {'id': source_id, 'path': str(path), 'revision': previous.get('revision'), 'status': 'failed', 'verification': 'pending', 'errors': [],
+              **({'converted_from': original} if original else {})}
     try:
         data = path.read_bytes()
     except OSError as exc:
@@ -64,7 +97,8 @@ def register(store, request):
     except Exception as exc:
         units = []
         source['errors'] = [str(exc)]
-    snapshot = {'source_id': source_id, 'revision': revision, 'path': str(path), 'status': source['status'], 'verification': 'pending', 'units': units, 'errors': source['errors']}
+    snapshot = {'source_id': source_id, 'revision': revision, 'path': str(path), 'status': source['status'], 'verification': 'pending', 'units': units, 'errors': source['errors'],
+                **({'converted_from': original} if original else {})}
     write_snapshot(store.workspace / 'sources' / source_id, revision, data)
     store.put('source_revisions', source_id + ':' + revision, snapshot)
     store.put('sources', source_id, source)

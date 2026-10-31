@@ -48,6 +48,7 @@ test('the source tab lists every course document and returns to the open one', a
   await expect(list.locator('li')).not.toHaveCount(0);
   await expect(list).toContainText('lecture-2.pdf');
   await expect(list).toContainText('PDF');
+  await expect(list).toContainText('From lecture-2.pptx');
   await expect(list).not.toContainText('Not used on the route');
 
   await list.getByRole('button', { name: /Back to lecture-2\.pdf/ }).click();
@@ -58,5 +59,6 @@ test('the source tab lists every course document and returns to the open one', a
   await list.locator('li button').filter({ hasText: 'lecture-2.pdf' }).click();
   await expect(page.locator('.source-list')).toBeHidden();
   await expect(page.locator('.source-view h2')).toHaveText('lecture-2.pdf');
+  await expect(page.locator('.source-view .meta')).toContainText('From lecture-2.pptx');
   expect(errors).toEqual([]);
 });

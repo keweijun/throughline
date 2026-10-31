@@ -33,7 +33,7 @@ curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/main/install.s
 irm https://raw.githubusercontent.com/keweijun/throughline/main/install.ps1 | iex
 ```
 
-Either way the app is installed (no Node.js needed), the `$throughline` skill is added, your Throughline folder and a **Throughline** launcher in your app menu are created, and Throughline opens in your browser with a short welcome guide in the chat or terminal. To **update**, paste `Update https://github.com/keweijun/throughline` into Codex or run the script again; your courses are kept. **Settings → Check for updates** tells you when a newer version is out and opens that request in Codex.
+Either way the app is installed (no Node.js needed), the `$throughline` skill is added, your Throughline folder and a **Throughline** launcher in your app menu are created, and Throughline opens in your browser with a short welcome guide in the chat or terminal. Afterwards, `throughline` in a terminal opens it too. To **update**, paste `Update https://github.com/keweijun/throughline` into Codex or run the script again; your courses are kept. **Settings → Check for updates** tells you when a newer version is out and opens that request in Codex.
 
 ### For Codex: installing or updating Throughline
 

@@ -42,5 +42,12 @@ def main(argv=None):
     print(json.dumps(response, ensure_ascii=True))
     return code
 
+
+def throughline(argv=None):
+    """The `throughline` command: `guided-learning`, except that on its own it opens the app as the launcher does."""
+    argv = sys.argv[1:] if argv is None else argv
+    return main(argv or ['open'])
+
+
 if __name__ == '__main__':
     sys.exit(main())

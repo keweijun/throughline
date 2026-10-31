@@ -20,7 +20,7 @@ dev = ["httpx2>=2,<3"]
 
 [project.scripts]
 guided-learning = "guided_learning.__main__:main"
-throughline = "guided_learning.__main__:main"
+throughline = "guided_learning.__main__:throughline"
 guided-learning-web = "guided_learning.web:main"
 
 [tool.setuptools.packages.find]

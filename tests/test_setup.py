@@ -120,14 +120,24 @@ class MacLauncher(unittest.TestCase):
 
 
 class Commands(unittest.TestCase):
-    def test_throughline_is_the_same_command_as_guided_learning(self):
+    def test_both_commands_are_installed(self):
         try:
             import tomllib
         except ImportError:
             self.skipTest('tomllib needs Python 3.11')
         root = Path(__file__).resolve().parent.parent
         scripts = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']['scripts']
-        self.assertEqual(scripts['throughline'], scripts['guided-learning'])
+        self.assertEqual(scripts['guided-learning'], 'guided_learning.__main__:main')
+        self.assertEqual(scripts['throughline'], 'guided_learning.__main__:throughline')
+
+    def test_throughline_alone_opens_the_app_and_otherwise_is_guided_learning(self):
+        from guided_learning import __main__ as entry
+        with mock.patch.object(commands, 'main', return_value=0) as run:
+            self.assertEqual(entry.throughline([]), 0)
+            run.assert_called_once_with(['open'])
+            run.reset_mock()
+            entry.throughline(['stop'])
+            run.assert_called_once_with(['stop'])
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 from guided_learning.api import execute
+from guided_learning.launcher import Launcher
 from guided_learning.server.settings import TeacherSettings
 from guided_learning.server import serve
 
@@ -23,6 +24,8 @@ class Runner:
 
 try:
     serve(port=int(sys.argv[1]) if len(sys.argv) > 1 else 0, runner=Runner(), settings=TeacherSettings(root / 'settings.json'),
-          library_root=root, on_ready=lambda port: print(port, flush=True))
+          library_root=root, on_ready=lambda port: print(port, flush=True),
+          # Not this computer's launcher or Codex: the library's card and checks have their own fixture.
+          launcher=Launcher(Path(scratch.name + '-none') / 'throughline.desktop', platform='linux'), checks=lambda: [])
 finally:
     scratch.cleanup()

@@ -4,8 +4,9 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { exportNotes } from '../lib/notes';
-  import type { CodexModel, Settings } from '../lib/types';
+  import type { CodexModel, LauncherStatus, Settings } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
+  import LauncherHelp from './LauncherHelp.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
   type Pane = 'course' | 'teacher' | 'appearance' | 'about';
@@ -24,6 +25,7 @@
   let savingTeacher = $state(false);
   let savingLanguage = $state(false);
   let about = $state<{ version: string } | null>(null);
+  let launcher = $state<LauncherStatus | null>(null);
   let updateError = $state('');
   let checking = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
@@ -91,6 +93,11 @@
       about = await api.get<{ version: string }>('/api/about');
     } catch {
       // The pane still works without the version.
+    }
+    try {
+      launcher = await api.get<LauncherStatus>('/api/launcher');
+    } catch {
+      // Nor does it need the launcher.
     }
   }
 
@@ -397,6 +404,13 @@
             <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
           {/if}
         </div>
+
+        {#if launcher}
+          <div class="setting stacked">
+            <div class="text"><span class="title">{t("Opening Throughline next time")}</span></div>
+            <div><LauncherHelp {launcher} /></div>
+          </div>
+        {/if}
 
         <h4>{t("Credits")}</h4>
         <div class="credits">

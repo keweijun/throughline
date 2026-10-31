@@ -1,10 +1,50 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { api } from '../lib/api';
   import { t, locale } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import type { LibraryCourse } from '../lib/types';
+  import type { CodexCheck, LauncherStatus, LibraryCourse } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
+  import LauncherHelp from './LauncherHelp.svelte';
 
   let opening = $state<string | null>(null);
+  let launcher = $state<LauncherStatus | null>(null);
+  let checks = $state<CodexCheck[]>([]);
+  let checking = $state(false);
+
+  const failing = $derived(checks.filter((check) => !check.ok));
+
+  // Neither is needed to use the library, so a failure to load them shows nothing.
+  async function loadChecks() {
+    checking = true;
+    try {
+      checks = (await api.get<{ checks: CodexCheck[] }>('/api/checks')).checks;
+    } catch {
+      checks = [];
+    }
+    checking = false;
+  }
+
+  onMount(() => {
+    void loadChecks();
+    api.get<LauncherStatus>('/api/launcher').then((status) => (launcher = status), () => {});
+  });
+
+  async function dismissLauncher() {
+    if (launcher) launcher = { ...launcher, dismissed: true };
+    try {
+      await api.post('/api/seen', { id: 'launcher' });
+    } catch (error) {
+      app.error = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  /** What failed and what to do about it; a check this version does not know is shown as the host words it. */
+  function problem(check: CodexCheck) {
+    if (check.id === 'codex') return [t('Codex was not found.'), t('Install Codex (the desktop app or the CLI) and sign in; lessons need it.')];
+    if (check.id === 'signed_in') return [t('Codex is not signed in.'), t('Sign in to Codex: run “codex login” in a terminal, or sign in in the Codex app.')];
+    return [check.label, check.fix];
+  }
 
   const library = $derived(app.library);
   const newCourse = $derived(t('$throughline create a new course from these files: '));
@@ -34,6 +74,29 @@
       {/if}
     </div>
   </header>
+
+  {#if failing.length}
+    <div class="checks" role="alert">
+      <ul>
+        {#each failing as check (check.id)}
+          {@const [what, fix] = problem(check)}
+          <li><strong>{what}</strong> {fix}</li>
+        {/each}
+      </ul>
+      <button class="btn btn-small" disabled={checking} onclick={loadChecks}>{checking ? t('Checking…') : t('Check again')}</button>
+    </div>
+  {/if}
+
+  {#if launcher && !launcher.dismissed}
+    <aside class="next-time" aria-labelledby="next-time-title">
+      <div class="next-time-head">
+        <h2 id="next-time-title">{t('Opening Throughline next time')}</h2>
+        <button class="btn btn-quiet btn-small" onclick={dismissLauncher}>{t('Dismiss')}</button>
+      </div>
+      <LauncherHelp {launcher} />
+      <p class="muted later">{t('You can find this again in Settings → About.')}</p>
+    </aside>
+  {/if}
 
   {#if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
@@ -241,6 +304,59 @@
     gap: 0.45rem;
     padding-left: 1.25rem;
     color: var(--ink-soft);
+  }
+
+  .checks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 1.5rem;
+    margin-bottom: 1rem;
+    padding: 0.85rem 1.25rem;
+    border: 1px solid var(--caution);
+    border-radius: 10px;
+    background: var(--caution-wash);
+  }
+
+  .checks ul {
+    display: grid;
+    gap: 0.3rem;
+    flex: 1 1 24rem;
+    padding: 0;
+    list-style: none;
+    font-size: var(--step--1);
+  }
+
+  .checks strong {
+    color: var(--caution);
+    font-weight: 600;
+  }
+
+  .next-time {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--sheet);
+    box-shadow: inset 3px 0 0 var(--accent-wash);
+  }
+
+  .next-time-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .next-time h2 {
+    font-size: var(--step-0);
+    font-family: var(--sans);
+  }
+
+  .later {
+    margin-top: 0.6rem;
   }
 
   .codex {

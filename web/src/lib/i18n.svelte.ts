@@ -614,6 +614,8 @@ const messages = {
   "Show math preview": "显示公式预览",
   "{keys} to send": "{keys} 发送",
   "What the lesson focuses on · optional": "课程重点 · 可选",
+  "Choose a focus": "指定讲解重点",
+  "Start without a focus": "不指定重点",
   "Your answer · checked by the teacher": "你的作答 · 由老师检查",
   "Question about this exercise · never graded": "关于本题的提问 · 不计分",
   "Write your reasoning and answer, or paste or drop images of your work. Use $…$ for math.": "写下你的思路和答案，或粘贴、拖入解题过程的图片。公式用 $…$ 书写。",

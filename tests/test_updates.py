@@ -22,6 +22,7 @@ class UpdateCheck(unittest.TestCase):
         self.assertFalse(updates.newer('0.6.0', 'development'))
 
     def test_the_host_reports_main_s_declared_version(self):
+        updates._found.clear()
         with tempfile.TemporaryDirectory() as tmp:
             remote = Path(tmp) / 'pyproject.toml'
             remote.write_text('[project]\nname = "throughline"\nversion = "9.0.0"\n', encoding='utf-8')
@@ -34,9 +35,10 @@ class UpdateCheck(unittest.TestCase):
                 result = client.get('/api/update').json()
                 self.assertEqual(result, {'version': '0.5.1', 'latest': '9.0.0', 'available': True})
                 remote.write_text('version = "0.5.1"\n', encoding='utf-8')
-                self.assertFalse(client.get('/api/update').json()['available'])
+                self.assertTrue(client.get('/api/update').json()['available'], 'a launch check reuses the version found')
+                self.assertFalse(client.get('/api/update?fresh=1').json()['available'])
                 remote.unlink()
-                missing = client.get('/api/update')
+                missing = client.get('/api/update?fresh=1')
                 self.assertEqual(missing.status_code, 502)
                 self.assertEqual(missing.json()['code'], 'update_check_failed')
 

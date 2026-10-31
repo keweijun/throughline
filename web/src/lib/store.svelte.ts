@@ -3,7 +3,7 @@ import { locale, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset } from './stage';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
@@ -104,6 +104,8 @@ class AppStore {
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
   settings = $state<Settings | null>(null);
+  /** The latest update check; stays null when GitHub cannot be reached, so a failed launch check shows nothing. */
+  update = $state<UpdateCheck | null>(null);
   #settingsWrites = 0;
 
   /** Concept shown in the reading column; null follows the formal position. */
@@ -121,6 +123,8 @@ class AppStore {
   sourceList = $state(false);
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
+  /** The Settings category to show when the dialog next opens, such as About from the update notice. */
+  settingsPane = $state<string | null>(null);
   routeOpen = $state(false);
   /** The learner folded the route to its capsule; a stage too narrow for it folds it regardless. */
   routeFolded = $state(storedFold());
@@ -390,6 +394,12 @@ class AppStore {
       }
     })();
     return this.#refreshing;
+  }
+
+  /** Asks the host whether a newer Throughline is out; `fresh` skips the version the host found earlier. */
+  async checkForUpdate(fresh = false) {
+    this.update = await api.get<UpdateCheck>(fresh ? '/api/update?fresh=1' : '/api/update');
+    return this.update;
   }
 
   connect() {

@@ -89,24 +89,55 @@ test('About in Settings shows the version and credits, checks for updates and ha
     document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
   });
   let latest = '0.5.1';
+  const fresh: boolean[] = [];
   await page.route('**/api/about', (route) => route.fulfill({ json: { version: '0.5.1' } }));
-  await page.route('**/api/update', (route) => route.fulfill({ json: { version: '0.5.1', latest, available: latest !== '0.5.1' } }));
+  await page.route(/\/api\/update(\?|$)/, (route) => {
+    fresh.push(route.request().url().includes('fresh=1'));
+    return route.fulfill({ json: { version: '0.5.1', latest, available: latest !== '0.5.1' } });
+  });
   const { errors } = await course('library_browser_fixture');
+  await expect.poll(() => fresh).toEqual([false]);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Settings' });
   await dialog.getByRole('button', { name: 'About' }).click();
   await expect(dialog.getByRole('button', { name: 'About' })).toHaveAttribute('aria-current', 'page');
   await expect(dialog.getByText('Version 0.5.1')).toBeVisible();
   await expect(dialog.getByRole('link', { name: 'Keweijun' })).toHaveAttribute('href', 'https://github.com/keweijun');
-
-  await dialog.getByRole('button', { name: 'Check for updates' }).click();
+  // The launch check already answered.
   await expect(dialog.getByText('You have the latest version.')).toBeVisible();
   await expect(dialog.getByRole('link', { name: 'Update in Codex' })).toHaveCount(0);
 
   latest = '0.6.0';
   await dialog.getByRole('button', { name: 'Check for updates' }).click();
   await expect(dialog.getByText('Version 0.6.0 is available.')).toBeVisible();
+  expect(fresh).toEqual([false, true]);
   const link = dialog.getByRole('link', { name: 'Update in Codex' });
   expect(decodeURIComponent((await link.getAttribute('href'))!)).toContain('prompt=Update https://github.com/keweijun/throughline');
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: 'Settings (an update is available)' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a newer version found at launch marks Settings and its About category, and nothing else', async ({ page, course }) => {
+  await page.route(/\/api\/update(\?|$)/, (route) => route.fulfill({ json: { version: '0.5.1', latest: '0.6.0', available: true } }));
+  const { errors } = await course('library_browser_fixture');
+  const settings = page.getByRole('button', { name: 'Settings (an update is available)' });
+  await expect(settings).toBeVisible();
+  await expect(settings.locator('.update-dot')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await settings.click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('button', { name: 'About' }).locator('.update-dot')).toBeVisible();
+  await dialog.getByRole('button', { name: 'About' }).click();
+  await expect(dialog.getByText('Version 0.6.0 is available.')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Update in Codex' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a launch check that cannot reach GitHub shows nothing', async ({ page, course }) => {
+  const { errors } = await course('library_browser_fixture');
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.locator('.update-dot')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

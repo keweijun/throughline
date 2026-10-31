@@ -508,9 +508,9 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return {'version': version()}
 
     @app.get('/api/update')
-    def update_view():
+    def update_view(fresh: bool = False):
         try:
-            return updates.check()
+            return updates.check(fresh)
         except OperationError as exc:
             return JSONResponse({'error': str(exc), 'code': exc.code}, 502)
 

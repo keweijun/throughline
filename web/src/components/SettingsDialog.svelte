@@ -4,7 +4,7 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { exportNotes } from '../lib/notes';
-  import type { CodexModel, Settings, UpdateCheck } from '../lib/types';
+  import type { CodexModel, Settings } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
@@ -27,7 +27,6 @@
   let dailyReviews = $state(5);
   let savingReviews = $state(false);
   let about = $state<{ version: string } | null>(null);
-  let update = $state<UpdateCheck | null>(null);
   let updateError = $state('');
   let checking = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
@@ -102,9 +101,8 @@
     checking = true;
     updateError = '';
     try {
-      update = await api.get<UpdateCheck>('/api/update');
+      await app.checkForUpdate(true);
     } catch (error) {
-      update = null;
       updateError = error instanceof Error ? error.message : String(error);
     }
     checking = false;
@@ -250,6 +248,7 @@
       {#each panes as item (item.id)}
         <button class="category" aria-current={pane === item.id ? 'page' : undefined} onclick={() => (pane = item.id)}>
           {@render icon(item.id)}{t(item.label)}
+          {#if item.id === 'about' && app.update?.available}<span class="update-dot" title={t("An update is available")}></span>{/if}
         </button>
       {/each}
       {#if pane !== 'about'}
@@ -416,15 +415,15 @@
         <div class="setting">
           <div class="text">
             <span class="title">{t("Updates")}</span>
-            {#if update?.available}
-              <p role="status">{t("Version {latest} is available.", { latest: update.latest })} {t("Codex installs it and keeps your courses. Throughline closes while it updates; open it again afterwards.")}</p>
-            {:else if update}
-              <p role="status">{t("You have the latest version.")}</p>
+            {#if app.update?.available}
+              <p role="status">{t("Version {latest} is available.", { latest: app.update.latest })} {t("Codex installs it and keeps your courses. Throughline closes while it updates; open it again afterwards.")}</p>
             {:else if updateError}
               <p role="status">{t("Could not check for updates:")} {updateError}</p>
+            {:else if app.update}
+              <p role="status">{t("You have the latest version.")}</p>
             {/if}
           </div>
-          {#if update?.available}
+          {#if app.update?.available}
             <CodexLink class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
           {:else}
             <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
@@ -553,6 +552,14 @@
     transition:
       background-color var(--quick) var(--ease-out),
       color var(--quick) var(--ease-out);
+  }
+
+  .update-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-inline-start: auto;
+    border-radius: 50%;
+    background: var(--accent);
   }
 
   .category:hover {

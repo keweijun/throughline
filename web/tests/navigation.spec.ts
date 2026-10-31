@@ -66,3 +66,25 @@ test('both current and older citation formats open the cited source', async ({ p
   await citations.nth(1).click();
   await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);
 });
+
+test('a section starts with one click; a focus for the lesson is asked for only when wanted', async ({ page, course }) => {
+  await course('navigation_browser_fixture');
+  const card = page.locator('.request.first');
+  // The card leads with starting; the optional request stays folded away.
+  await expect(card.getByRole('button', { name: 'Start lesson' })).toBeVisible();
+  await expect(card.getByRole('textbox')).toHaveCount(0);
+
+  await card.getByRole('button', { name: 'Choose a focus' }).click();
+  const box = card.getByRole('textbox', { name: 'Lesson request' });
+  await expect(box).toBeFocused();
+  // Once open, the box's own button starts the lesson, so there is one Start lesson in the card.
+  await expect(card.getByRole('button', { name: 'Start lesson' })).toHaveCount(1);
+  await card.getByRole('button', { name: 'Start without a focus' }).click();
+  await expect(card.getByRole('textbox')).toHaveCount(0);
+
+  await card.getByRole('button', { name: 'Choose a focus' }).click();
+  await box.fill('Go slowly through the derivation');
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/lessons') && r.method() === 'POST');
+  await box.press('Control+Enter');
+  expect((await sent).postDataJSON().prompt).toBe('Go slowly through the derivation');
+});

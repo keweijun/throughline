@@ -11,6 +11,20 @@
   const setPrompt = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
   const running = $derived(app.runningLesson);
+  // Before the first lesson the request is optional, so the card leads with starting and opens the box only on request
+  // (or when a draft is waiting in it).
+  let focusing = $state(false);
+  const writing = $derived(hasLesson || focusing || prompt.trim() !== '');
+
+  function chooseFocus() {
+    focusing = true;
+    requestAnimationFrame(() => document.getElementById('lesson-prompt')?.focus());
+  }
+
+  function dropFocus() {
+    setPrompt('');
+    focusing = false;
+  }
 
   async function start() {
     if (busy || running) return;
@@ -34,6 +48,12 @@
       </p>
     {/if}
     {#snippet target()}{hasLesson ? t("Ask for another pass") : t("What the lesson focuses on · optional")}{/snippet}
+    {#if !writing}
+      <div class="row">
+        <button class="btn btn-primary" disabled={busy || !!running} onclick={start}>{t("Start lesson")}</button>
+        <button class="btn btn-quiet" onclick={chooseFocus}>{t("Choose a focus")}</button>
+      </div>
+    {:else}
     <Composer
       id="lesson-prompt"
       value={prompt}
@@ -45,7 +65,10 @@
       allowEmpty
       onsubmit={start}
       header={target}
+      onclose={hasLesson ? undefined : dropFocus}
+      closeLabel={t("Start without a focus")}
     />
+    {/if}
     {#if running}<p class="hint">{t("Another lesson is being written. Pause it first.")}</p>{/if}
   </div>
 {/if}
@@ -76,6 +99,13 @@
   p {
     color: var(--ink-soft);
     font-size: var(--step-0);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .hint {

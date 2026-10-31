@@ -1,8 +1,8 @@
 import { tick } from 'svelte';
-import { locale, type Language } from './i18n.svelte';
+import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
-import { scrollStage, stageHeight, stageOffset } from './stage';
+import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
@@ -785,12 +785,30 @@ class AppStore {
     scrollStage(0);
   }
 
-  startReview(conceptId: string) {
-    return this.act(() => api.post('/api/review/start', { concept_id: conceptId }));
+  /** Ask for a review set (ADR 0014): nothing for Review for me, or a request and scope, or the section a warm-up comes before. */
+  askReview(body: { request?: string; scope?: { chapter_ids?: string[]; concept_ids?: string[] }; warm_up_for?: string } = {}) {
+    return this.act(() => api.post('/api/review/sets', body));
   }
 
-  postponeReview(conceptId: string) {
-    return this.act(() => api.post('/api/review/postpone', { concept_id: conceptId }));
+  closeReviewSet(setId: string) {
+    return this.act(() => api.post(`/api/review/sets/${encodeURIComponent(setId)}/close`, {}));
+  }
+
+  /** A recall question's choice; its feedback was written with it, so nothing waits for the teacher. */
+  answerRecall(taskId: string, choice: CheckChoice) {
+    return this.act(() => api.post(`/api/review/tasks/${encodeURIComponent(taskId)}/answer`, { choice }));
+  }
+
+  dismissWarmUp(conceptId: string) {
+    return this.act(() => api.post(`/api/review/warm-ups/${encodeURIComponent(conceptId)}/dismiss`, {}));
+  }
+
+  /** Revisit a missed review question: a new side question quoting it, ready to send (ADR 0014). */
+  revisit(question: string) {
+    this.quote = { text: question, turnId: null, scrollY: stageScroll() };
+    if (!this.drafts.get('question').trim()) this.drafts.set('question', t("I missed this in review. Can you go over the idea again?"));
+    this.openPanel('questions');
+    requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
   /** A recap and the chapter quiz stay on the chapter page and never move the learner's position. */

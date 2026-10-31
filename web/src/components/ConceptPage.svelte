@@ -11,6 +11,7 @@
   import Practice from './Practice.svelte';
   import NextSection from './NextSection.svelte';
   import CodexLink from './CodexLink.svelte';
+  import ReviewSet from './ReviewSet.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
 
@@ -24,6 +25,11 @@
   const total = $derived(app.state?.curriculum.route.length ?? 0);
   const isCurrent = $derived(conceptId === app.currentId);
   const lessons = $derived(app.lessons(conceptId));
+  // The warm-up on offer for this section (its stale prerequisites), or the one already taken while it is open.
+  const warmUp = $derived(conceptId ? app.state?.review.warm_ups[conceptId] : undefined);
+  const warmUpSet = $derived(
+    (app.state?.review.sets ?? []).find((s) => s.kind === 'warm_up' && s.concept_id === conceptId && !s.closed_at && (s.open || !s.task_ids.length)),
+  );
   const position = $derived(app.state?.position);
   const explanations = $derived(app.explanationsFor(conceptId));
   const bookmarked = $derived(!!app.bookmark(conceptId));
@@ -248,6 +254,21 @@
     {/if}
 
     <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
+    {#if isCurrent && !lessons.length}
+      <!-- A warm-up on prerequisites studied a while ago, offered once and never in the way of the lesson (ADR 0014). -->
+      {#if warmUpSet}
+        <ReviewSet value={warmUpSet} />
+      {:else if warmUp}
+        <aside class="warm-up" aria-label={t("Warm-up")}>
+          <p>{t("This section builds on {sections}, which you have not practised for a while.", { sections: warmUp.map((id) => app.concept(id)?.title ?? id).join(', ') })}</p>
+          <div class="previewing-actions">
+            <button class="btn btn-small btn-primary" onclick={() => app.askReview({ warm_up_for: conceptId })}>{t("Warm up on what this builds on")}</button>
+            <button class="btn btn-small btn-quiet" onclick={() => app.dismissWarmUp(conceptId)}>{t("No thanks")}</button>
+          </div>
+        </aside>
+      {/if}
+    {/if}
+
     {#if isCurrent && !app.openLesson(conceptId)}
       <LessonRequest conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} />
     {/if}
@@ -464,6 +485,19 @@
     justify-items: start;
     color: var(--ink-soft);
     font-size: var(--step-0);
+  }
+
+  .warm-up {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 1.5rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--marker);
+    border-radius: var(--radius);
+    background: var(--raised);
+    font-size: var(--step-0);
+    color: var(--ink-soft);
   }
 
   @media (max-width: 40rem) {

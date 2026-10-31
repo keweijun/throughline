@@ -4,6 +4,8 @@ A course records its format version in `course/schema`; courses without it are v
 first operation's transaction, so a migration commits or rolls back with it. MIGRATIONS[i] moves a course from
 version i + 1 to i + 2. Each migration must be idempotent and keep learning evidence and raw interactions intact.
 """
+from datetime import datetime
+
 from .store import OperationError
 
 
@@ -93,7 +95,53 @@ def chapter_owned_recaps(store):
         store.put('practice_tasks', task['id'], task)
 
 
-MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments, chapter_owned_recaps]
+def review_sets(store):
+    """Review is asked for in review sets, with no schedule (ADR 0014).
+
+    Each earlier review request (a practice job with purpose `review`, one question for one section) joins the set of the
+    local day it started, `migrated-review:<date>`, a Review for me set dated by its first request; its question gains
+    `set_id`, `tests_concept_ids` (its section) and `kind: "apply"`. Each chapter quiz becomes a set scoped to its
+    chapter whose id is the quiz's, and its questions name it in `set_id`. Postponements ("Not now") and the daily review
+    limit are dropped. Evidence is untouched.
+    """
+    day_of = {}
+    for job in store.list('practice_jobs'):
+        if job.get('purpose') != 'review' or job.get('set_id'):
+            continue
+        turn = store.get('streams', job['id']) or {}
+        started = turn.get('started_at') if isinstance(turn.get('started_at'), (int, float)) else 0
+        identifier = 'migrated-review:' + datetime.fromtimestamp(started).date().isoformat()
+        found = store.get('review_sets', identifier)
+        if not found or started < found['created_at']:
+            store.put('review_sets', identifier, {'id': identifier, 'kind': 'for_me', 'created_at': started})
+        job['set_id'] = identifier
+        store.put('practice_jobs', job['id'], job)
+        day_of[job['id']] = identifier
+    for task in store.list('practice_tasks'):
+        if task.get('set_id'):
+            continue
+        if task.get('origin') == 'review':
+            identifier = day_of.get(task['id'].rsplit(':', 1)[0])
+            if not identifier:
+                identifier = 'migrated-review:' + datetime.fromtimestamp(0).date().isoformat()
+                if not store.get('review_sets', identifier):
+                    store.put('review_sets', identifier, {'id': identifier, 'kind': 'for_me', 'created_at': 0})
+            task.update(set_id=identifier, tests_concept_ids=task.get('tests_concept_ids') or [task['concept_id']], kind='apply')
+            store.put('practice_tasks', task['id'], task)
+        elif task.get('origin') == 'chapter_quiz' and task.get('chapter_id') and task.get('quiz_id'):
+            if not store.get('review_sets', task['quiz_id']):
+                store.put('review_sets', task['quiz_id'], {'id': task['quiz_id'], 'kind': 'chapter_quiz', 'chapter_id': task['chapter_id'],
+                                                           'scope': {'chapter_ids': [task['chapter_id']]}, 'created_at': task.get('created_at', 0)})
+            task['set_id'] = task['quiz_id']
+            store.put('practice_tasks', task['id'], task)
+    for item in store.list('review_postponements'):
+        store.delete('review_postponements', item['concept_id'])
+    preferences = store.get('course', 'preferences')
+    if preferences and 'daily_reviews' in preferences:
+        store.put('course', 'preferences', {k: v for k, v in preferences.items() if k != 'daily_reviews'})
+
+
+MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments, chapter_owned_recaps, review_sets]
 VERSION = len(MIGRATIONS) + 1
 
 

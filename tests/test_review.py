@@ -1,17 +1,15 @@
-"""The spaced review schedule (ADR 0008), computed from assessment evidence with an injected clock."""
+"""Review on request (ADR 0014): the review context, recall answers and warm-ups, read from the course with an injected clock."""
 import unittest
-from datetime import datetime
 
 from guided_learning import review
 from guided_learning.store import OperationError
 
 DAY = review.DAY
-# Noon, so a few hours either way stays on the same local day.
-T0 = datetime(2026, 3, 2, 12).timestamp()
+T0 = 1_800_000_000
 
 
 class MemoryStore:
-    """The calls the schedule makes on a course store, over plain dictionaries."""
+    """The calls the review module makes on a course store, over plain dictionaries."""
 
     def __init__(self):
         self.data = {}
@@ -32,149 +30,76 @@ class MemoryStore:
         return [project(v) for v in self.list(namespace)]
 
 
-class Schedule(unittest.TestCase):
+class ReviewContext(unittest.TestCase):
     def setUp(self):
         self.store = MemoryStore()
-        self.store.put('curriculum', 'model', {'route': ['a', 'b', 'c', 'd', 'e', 'f', 'g'], 'concepts': []})
-        self.sequence = 0
+        self.store.put('curriculum', 'model', {'route': ['a', 'b', 'c', 'd'], 'concepts': [
+            {'id': 'a', 'title': 'A', 'objective': 'Use A'}, {'id': 'b', 'title': 'B'},
+            {'id': 'c', 'title': 'C', 'prerequisites': ['a', 'b']}, {'id': 'd', 'title': 'D', 'prerequisites': ['c']}]})
 
-    def assess(self, concept, at, kind='independent', origin='practice', tests=None, task=None):
-        """Record one assessment the way practice.complete does: a task, an assessment interaction and the evidence."""
-        self.sequence += 1
-        task = task or f'task-{self.sequence}'
-        if not self.store.get('practice_tasks', task):
-            self.store.put('practice_tasks', task, {'id': task, 'concept_id': concept, 'origin': origin, 'history': [],
-                                                    **({'tests_concept_ids': tests} if tests else {})})
-        self.store.put('interactions', f'i{self.sequence}', {'id': f'i{self.sequence}', 'sequence': self.sequence})
-        item = {'id': f'e{self.sequence:03}', 'concept_id': concept, 'exercise_id': task, 'assessment_id': f'i{self.sequence}',
-                'kind': kind, 'outcome': 'needs_work' if kind == 'needs_work' else 'passed'}
-        if at is not None:
-            item['assessed_at'] = at
-        self.store.put('evidence', item['id'], item)
-        history = self.store.get('practice_tasks', task)['history']
-        history.append({'action': 'assess', 'outcome': item['outcome']})
-        return task
+    def lesson(self, cid, at):
+        self.store.put('streams', 'lesson-' + cid, {'id': 'lesson-' + cid, 'channel': 'mainline', 'status': 'completed', 'concept_id': cid, 'started_at': at})
 
-    def schedule(self, now):
-        return review.schedule(self.store, {'now': now})
+    def task(self, identifier, cid, **fields):
+        return self.store.put('practice_tasks', identifier, {'id': identifier, 'concept_id': cid, 'question': identifier, 'origin': 'self_created',
+                                                             'status': 'pending', 'history': [], **fields})
 
-    def section(self, now, concept):
-        return next(s for s in self.schedule(now)['sections'] if s['concept_id'] == concept)
+    def context(self, now, **request):
+        return {s['id']: s for s in review.context(self.store, {'now': now, **request})['sections']}
 
-    def test_nothing_is_reviewable_before_a_pass(self):
-        self.assess('a', T0, kind='needs_work')
-        result = self.schedule(T0 + 10 * DAY)
-        self.assertEqual((result['reviewable'], result['due'], result['upcoming']), (0, [], 0))
+    def test_studied_sections_with_days_since_practised_misses_and_set_aside_exercises(self):
+        self.lesson('a', T0)
+        self.lesson('b', T0 + DAY)
+        self.task('missed', 'a', status='attempted', history=[{'action': 'assess', 'outcome': 'needs_work', 'parts': ['correct', 'not_yet']}])
+        self.task('partly', 'a', status='attempted', history=[{'action': 'assess', 'outcome': 'needs_work', 'parts': ['correct', 'not_attempted']}])
+        self.task('solved', 'a', status='attempted', history=[{'action': 'assess', 'outcome': 'passed', 'parts': ['correct']}])
+        self.task('later', 'b', status='deferred')
+        self.store.put('evidence', 'e1', {'id': 'e1', 'concept_id': 'a', 'assessment_id': 'i1', 'assessed_at': T0 + 2 * DAY})
+        sections = self.context(T0 + 10 * DAY)
+        self.assertEqual(list(sections), ['a', 'b'], 'studied sections in route order')
+        self.assertEqual((sections['a']['days_since_practised'], sections['b']['days_since_practised']), (8, 9))
+        self.assertEqual(sections['a']['recent_misses'], ['missed', 'partly'])
+        self.assertEqual(sections['a']['objective'], 'Use A')
+        self.assertEqual(sections['b']['set_aside'], ['later'])
 
-    def test_any_pass_makes_a_section_due_a_day_later(self):
-        self.assess('a', T0, kind='hinted')
-        self.assertEqual(self.schedule(T0 + DAY - 60)['due'], [])
-        self.assertEqual(self.schedule(T0 + DAY - 60)['upcoming'], 1)
-        due = self.schedule(T0 + DAY)['due']
-        self.assertEqual([s['concept_id'] for s in due], ['a'])
-        self.assertEqual(due[0]['interval_days'], 1)
+    def test_sections_skipped_with_their_chapter_are_not_reviewed(self):
+        self.lesson('a', T0)
+        self.lesson('b', T0)
+        self.store.put('evidence_deferred', 'chapter-skip:one:b', {'id': 'chapter-skip:one:b', 'concept_id': 'b'})
+        self.assertEqual(list(self.context(T0)), ['a'])
 
-    def test_unaided_review_passes_climb_the_intervals_and_stay_at_sixty_days(self):
-        at = T0
-        self.assess('a', at)
-        for expected in (3, 7, 21, 60, 60):
-            at += 400 * DAY
-            self.assess('a', at, origin='review')
-            self.assertEqual(self.section(at, 'a')['interval_days'], expected)
-            self.assertEqual(self.section(at, 'a')['due_at'], at + expected * DAY)
+    def test_earlier_review_questions_carry_their_outcomes(self):
+        self.lesson('a', T0)
+        self.task('r1', 'a', origin='review', set_id='s', kind='recall', options=[{'text': 'x'}, {'text': 'y'}], correct=0,
+                  answer={'choice': 1, 'correct': False, 'at': T0 + DAY})
+        self.task('r2', 'a', origin='review', set_id='s', kind='apply')
+        earlier = review.context(self.store, {'now': T0})['earlier']
+        self.assertEqual([(e['question'], e['outcome']) for e in earlier], [('r1', 'missed'), ('r2', 'unanswered')])
+        self.assertIn('r1', self.context(T0)['a']['recent_misses'], 'a wrong recall answer is a miss')
+        self.assertEqual(self.context(T0 + 3 * DAY)['a']['days_since_practised'], 2, 'a recall answer is practice')
 
-    def test_an_assisted_review_pass_repeats_the_interval_and_needs_work_starts_over(self):
-        self.assess('a', T0)
-        self.assess('a', T0 + DAY, origin='review')
-        self.assess('a', T0 + 4 * DAY, origin='review')
-        self.assertEqual(self.section(T0 + 4 * DAY, 'a')['interval_days'], 7)
-        self.assess('a', T0 + 11 * DAY, kind='hinted', origin='review')
-        self.assertEqual(self.section(T0 + 11 * DAY, 'a')['interval_days'], 7)
-        self.assess('a', T0 + 18 * DAY, kind='needs_work', origin='review')
-        state = self.section(T0 + 18 * DAY, 'a')
-        self.assertEqual((state['interval_days'], state['due_at']), (1, T0 + 19 * DAY))
+    def test_only_an_option_of_a_recall_question_can_be_chosen(self):
+        self.lesson('a', T0)
+        self.task('r', 'a', origin='review', set_id='s', kind='recall', options=[{'text': 'x', 'explanation': ''}, {'text': 'y', 'explanation': ''}], correct=1)
+        with self.assertRaises(OperationError):
+            review.answer(self.store, {'task_id': 'r', 'choice': 2})
+        self.task('plain', 'a')
+        with self.assertRaises(OperationError):
+            review.answer(self.store, {'task_id': 'plain', 'choice': 0})
 
-    def test_ordinary_practice_restarts_the_wait_without_moving_the_step(self):
-        self.assess('a', T0)
-        self.assess('a', T0 + DAY, origin='review')
-        self.assess('a', T0 + 2 * DAY)
-        state = self.section(T0 + 2 * DAY, 'a')
-        self.assertEqual((state['interval_days'], state['due_at']), (3, T0 + 5 * DAY))
-        self.assess('a', T0 + 3 * DAY, kind='needs_work')
-        self.assertEqual(self.section(T0 + 3 * DAY, 'a')['interval_days'], 3, 'a failed ordinary exercise is not a review')
+    def test_warm_ups_offer_stale_studied_prerequisites_of_sections_not_started(self):
+        self.lesson('a', T0)
+        self.lesson('b', T0 + 5 * DAY)
+        self.assertEqual(review.warm_ups(self.store, {'now': T0 + 6 * DAY})['warm_ups'], {})
+        self.assertEqual(review.warm_ups(self.store, {'now': T0 + 8 * DAY})['warm_ups'], {'c': ['a']}, 'd builds on c, which is not studied')
+        self.assertEqual(review.warm_ups(self.store, {'now': T0 + 13 * DAY})['warm_ups'], {'c': ['a', 'b']})
+        self.lesson('c', T0 + 13 * DAY)
+        self.assertNotIn('c', review.warm_ups(self.store, {'now': T0 + 13 * DAY})['warm_ups'], 'c has started')
 
-    def test_a_chapter_quiz_question_reviews_every_section_it_tests(self):
-        self.assess('a', T0)
-        self.assess('b', T0)
-        self.assess('c', T0 + 2 * DAY, origin='chapter_quiz', tests=['a', 'b'])
-        now = T0 + 2 * DAY
-        self.assertEqual(self.section(now, 'a')['interval_days'], 3)
-        self.assertEqual(self.section(now, 'b')['interval_days'], 3)
-        self.assertNotIn('c', [s['concept_id'] for s in self.schedule(now)['sections']], 'the question was filed under c but tested a and b')
-        self.assertEqual(self.schedule(now)['done_today'], 2)
-
-    def test_due_sections_come_oldest_first_and_at_most_five_a_day(self):
-        for offset, concept in enumerate('gfedcba'):
-            self.assess(concept, T0 + offset * 60)
-        now = T0 + 30 * DAY
-        result = self.schedule(now)
-        self.assertEqual([s['concept_id'] for s in result['due']], list('gfedc'))
-        self.assertEqual(result['waiting'], 2)
-        self.assess('g', now - 60, origin='review')
-        self.assess('f', now - 30, origin='review')
-        result = self.schedule(now)
-        self.assertEqual(result['done_today'], 2)
-        self.assertEqual([s['concept_id'] for s in result['due']], list('edc'), 'reviews done today count toward the cap')
-        self.assertEqual(result['waiting'], 2)
-        result = self.schedule(now + DAY)
-        self.assertEqual([s['concept_id'] for s in result['due']], list('edcba'), 'tomorrow the cap starts again')
-
-    def test_the_course_sets_how_many_reviews_come_up_a_day(self):
-        for offset, concept in enumerate('gfedcba'):
-            self.assess(concept, T0 + offset * 60)
-        self.store.put('course', 'preferences', {'language': 'en', 'daily_reviews': 2})
-        result = self.schedule(T0 + 30 * DAY)
-        self.assertEqual(result['cap'], 2)
-        self.assertEqual([s['concept_id'] for s in result['due']], list('gf'))
-        self.assertEqual(result['waiting'], 5)
-
-    def test_a_started_review_stays_listed_until_answered(self):
-        self.assess('a', T0)
-        self.store.put('practice_tasks', 'r1', {'id': 'r1', 'concept_id': 'a', 'origin': 'review', 'status': 'pending', 'history': []})
-        due = self.schedule(T0 + DAY)['due']
-        self.assertEqual(due[0]['task_id'], 'r1')
-        self.assess('a', T0 + DAY + 60, origin='review', task='r1')
-        self.assertEqual(self.schedule(T0 + DAY + 120)['due'], [])
-
-    def test_not_now_postpones_a_due_section_by_one_day(self):
-        self.assess('a', T0)
-        with self.assertRaises(OperationError) as raised:
-            review.postpone(self.store, {'concept_id': 'a', 'now': T0 + 60})
-        self.assertEqual(raised.exception.code, 'not_due')
-        now = T0 + 2 * DAY
-        review.postpone(self.store, {'concept_id': 'a', 'now': now})
-        self.assertEqual(self.schedule(now)['due'], [])
-        self.assertEqual(self.schedule(now + DAY)['due'][0]['concept_id'], 'a')
-        self.assess('a', now + DAY, origin='review')
-        self.assertEqual(self.section(now + DAY, 'a')['due_at'], now + 4 * DAY, 'a later review replaces the postponement')
-        with self.assertRaises(OperationError) as raised:
-            review.postpone(self.store, {'concept_id': 'z', 'now': now})
-        self.assertEqual(raised.exception.code, 'not_reviewable')
-
-    def test_sections_skipped_with_their_chapter_are_not_scheduled(self):
-        self.assess('a', T0)
-        self.store.put('evidence_deferred', 'chapter-skip:one:a', {'id': 'chapter-skip:one:a', 'concept_id': 'a'})
-        self.assertEqual(self.schedule(T0 + 5 * DAY)['reviewable'], 0)
-        self.store.put('evidence_resolutions', 'r', {'id': 'r', 'deferred_id': 'chapter-skip:one:a'})
-        self.assertEqual(len(self.schedule(T0 + 5 * DAY)['due']), 1)
-
-    def test_an_undated_assessment_reads_as_long_ago(self):
-        self.assess('a', None)
-        self.assertEqual([s['concept_id'] for s in self.schedule(T0)['due']], ['a'])
-
-    def test_sections_no_longer_on_the_route_are_not_scheduled(self):
-        self.assess('gone', T0)
-        self.assertEqual(self.schedule(T0 + 5 * DAY)['reviewable'], 0)
+    def test_a_dismissed_warm_up_is_not_offered_again(self):
+        self.lesson('a', T0)
+        review.dismiss_warm_up(self.store, {'concept_id': 'c'})
+        self.assertEqual(review.warm_ups(self.store, {'now': T0 + 30 * DAY})['warm_ups'], {})
 
 
 if __name__ == '__main__':

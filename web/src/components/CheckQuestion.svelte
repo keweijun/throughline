@@ -2,9 +2,11 @@
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
+  import type { Snippet } from 'svelte';
   import type { CheckAnswer, CheckChoice, CheckQuestion } from '../lib/types';
 
-  // A lesson step's check question (ADR 0009): feedback comes from the explanations the step already returned.
+  // A lesson step's check question (ADR 0009), or a review's recall question (ADR 0014) when `onanswer` records the
+  // choice: feedback comes from the explanations the question was written with.
   let {
     lessonId,
     turnId,
@@ -12,7 +14,21 @@
     answer,
     more,
     oncorrect,
-  }: { lessonId: string; turnId: string; check: CheckQuestion; answer?: CheckAnswer; more: boolean; oncorrect?: () => void } = $props();
+    onanswer,
+    label,
+    after,
+  }: {
+    lessonId?: string;
+    turnId?: string;
+    check: CheckQuestion;
+    answer?: Pick<CheckAnswer, 'choice'>;
+    more: boolean;
+    oncorrect?: () => void;
+    onanswer?: (choice: CheckChoice) => Promise<unknown>;
+    label?: string;
+    /** Shown under the feedback once answered, such as Revisit after a miss. */
+    after?: Snippet<[boolean]>;
+  } = $props();
 
   // Shown at once, before the host has recorded the choice.
   let picked = $state<CheckChoice | null>(null);
@@ -23,7 +39,8 @@
   async function pick(value: CheckChoice) {
     if (choice !== null) return;
     picked = value;
-    if (!(await app.answerCheck(lessonId, turnId, value))) picked = null;
+    const recorded = onanswer ? await onanswer(value) : await app.answerCheck(lessonId!, turnId!, value);
+    if (!recorded) picked = null;
     // A right answer moves straight on; a miss waits so its explanation can be read before the repair.
     else if (value === check.correct && more) oncorrect?.();
   }
@@ -31,8 +48,8 @@
   const md = (text: string) => ({ language: locale.language, text });
 </script>
 
-<div class="check" role="group" aria-label={t('Check question')}>
-  <p class="label">{t('Check question')}</p>
+<div class="check" role="group" aria-label={label ?? t('Check question')}>
+  <p class="label">{label ?? t('Check question')}</p>
   <div class="prose question" use:markdown={md(check.question)}></div>
   <div class="options">
     {#each check.options as option, index}
@@ -66,6 +83,7 @@
         <div class="prose" use:markdown={md(right.text + '\n\n' + right.explanation)}></div>
         {#if more}<p class="hint">{t('The next step starts by going over this.')}</p>{/if}
       {/if}
+      {@render after?.(choice === check.correct)}
     </div>
   {/if}
 </div>

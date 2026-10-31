@@ -299,12 +299,12 @@ class CheckQuestions(SteppedLessons):
         self.assertEqual(self.lesson()['steps'][0]['answer']['choice'], wrong)
         self.assertFalse(self.post('/api/lessons/one/steps/one/check', {'choice': wrong})['changed'], 'a retry is idempotent')
         self.assertEqual(self.post('/api/lessons/one/steps/one/check', {'choice': 0}, 409)['code'], 'already_answered')
-        # Recorded as an interaction, never as evidence; it neither makes the section reviewable nor counts as a review.
+        # Recorded as an interaction, never as evidence, and not as a review answer.
         interaction = execute(self.root, {'op': 'session.resume', 'recent_limit': 20})['recent_interactions'][-1]
         self.assertEqual((interaction['id'], interaction['kind']), ('check-answer:one', 'check_answer'))
         self.assertIn('P = 1/2', interaction['text'])
         self.assertEqual(execute(self.root, {'op': 'evidence.view', 'concept_id': 'wave'})['history'], [])
-        self.assertEqual(self.state()['review']['sections'], [])
+        self.assertEqual(self.state()['review']['sets'], [])
 
         self.proceed('two')
         self.finish('two')

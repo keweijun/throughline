@@ -64,6 +64,11 @@
   const skippable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped' && !solved);
   // Another like this writes one more exercise of the same kind next to a section exercise (ADR 0011).
   const variantable = $derived((task.origin === 'source' || task.origin === 'self_created') && task.status !== 'skipped');
+  // A review or quiz question missed on some part offers Revisit: a side question going over that idea (ADR 0014).
+  const missed = $derived(
+    (task.origin === 'review' || task.origin === 'chapter_quiz') && !solved &&
+      !!lastAssessment && (lastAssessment.parts ? lastAssessment.parts.some((p) => p === 'partly_correct' || p === 'not_yet') : lastAssessment.outcome === 'needs_work'),
+  );
   const writingExercises = $derived(
     (app.state?.practice.jobs ?? []).some((j) => j.concept_id === task.concept_id && j.action === 'generate' && !j.purpose && app.isRunning(j.id)),
   );
@@ -120,11 +125,12 @@
   }
 </script>
 
-<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? t("Review question") : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? (number ? t('Review question {number}', { number }) : t("Review question")) : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
       {#if task.origin === 'review'}
-        {t("Review question")}
+        {number ? t('Review question {number}', { number }) : t("Review question")}
+        {#if task.tests_concept_ids?.length}<span class="origin">· {t("tests {sections}", { sections: titles(task.tests_concept_ids) })}</span>{/if}
       {:else if task.origin === 'chapter_quiz'}
         {number ? t('Quiz question {number}', { number }) : t("Quiz question")}
         {#if task.from_task_id}
@@ -283,6 +289,9 @@
         <button class="btn btn-quiet btn-small" disabled={busy} aria-pressed={asking} onclick={toggleAsking}>{t("Ask about this")}</button>
       </span>
       <span class="aside">
+        {#if missed}
+          <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task.question)}>{t("Revisit")}</button>
+        {/if}
         {#if variantable}
           <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>
         {/if}

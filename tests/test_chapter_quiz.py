@@ -10,6 +10,7 @@ CHAPTER = {'id': 'one', 'concept_ids': ['a', 'b', 'c', 'd']}
 class EarlierExercises(unittest.TestCase):
     def setUp(self):
         self.store = MemoryStore()
+        self.store.put('curriculum', 'model', {'route': ['a', 'b', 'c', 'd'], 'concepts': []})
         for cid in ('a', 'b', 'c'):
             self.store.put('streams', f'lesson-{cid}', {'id': f'lesson-{cid}', 'channel': 'mainline', 'status': 'completed', 'concept_id': cid})
         # A recap anchored to d is not a lesson of d, so d stays unstudied.

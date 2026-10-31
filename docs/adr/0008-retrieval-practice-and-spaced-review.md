@@ -1,5 +1,7 @@
 # Retrieval practice and spaced review
 
+_Superseded in part by ADR 0014: review is now asked for, in review sets, with no schedule; the chapter quiz becomes a review set. The reasons for retrieval practice and spacing below still hold._
+
 Throughline's job is to help a learner learn a subject properly across sessions (ADR 0004). Until now nothing brought earlier material back: practice sat only at the end of each section, the chapter recap explicitly set no exercises, and a section passed once was never revisited. Retrieval practice (answering from memory) and spacing (returning to material at growing intervals) are the best-supported ways to make learning last, and the course already records the evidence a schedule needs.
 
 ## Review schedule

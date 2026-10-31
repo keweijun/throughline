@@ -13,10 +13,8 @@
 
   const suggested = $derived((app.state?.memory ?? []).filter((e) => e.status === 'suggested').length);
 
-  // Review is always there while studying; before anything is reviewable its page explains when that happens (ADR 0008).
-  // The count is what is due today.
+  // Review is always there while studying, with no count: nothing comes due; the learner asks for a set (ADR 0014).
   const review = $derived(app.state?.review);
-  const reviewDue = $derived(review?.due.length ?? 0);
 
   // The side panel's views are switched only from here: picking another view swaps it, picking the open one closes the panel.
   const showing = (tab: PanelTab) => studying && app.panelOpen && app.panelTab === tab;
@@ -65,15 +63,14 @@
     {#if studying && review}
       <button
         id="open-review"
-        class="btn btn-quiet"
-        class:idle={!reviewDue}
+        class="btn btn-quiet review"
         aria-pressed={app.reviewOpen}
         aria-label={t("Review")}
-        title={reviewDue ? t("Sections due for review today") : t("Nothing due for review today")}
+        title={t("Answer questions from memory on what you have studied")}
         onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
       >
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Review")}</span>{#if reviewDue}<span class="count">{reviewDue}</span>{/if}
+        <span class="wide-only">{t("Review")}</span>
       </button>
     {/if}
     {#if studying}
@@ -282,8 +279,8 @@
       display: none;
     }
 
-    /* Phones have room for Review only when something is due. */
-    .idle {
+    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due. */
+    .review {
       display: none;
     }
   }

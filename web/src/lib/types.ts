@@ -134,15 +134,23 @@ export type Task = {
   id: string;
   concept_id: string;
   question: string;
-  /** What each exercise part asks, in order, optionally with a short label such as "(a)"; a task without parts is a single part (ADR 0011). */
-  parts?: (string | { label?: string; text: string })[];
+  /** What each exercise part asks, in order, optionally with a short label such as "(a)" and, in a review question, the
+   * sections the part tests; a task without parts is a single part (ADR 0011). */
+  parts?: (string | { label?: string; text: string; concept_ids?: string[] })[];
   /**
-   * `review` and `chapter_quiz` are retrieval questions (ADR 0008). A chapter quiz question belongs to its chapter
-   * (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks an earlier exercise
-   * again, the exercise it came from.
+   * `review` and `chapter_quiz` are retrieval questions in a review set (`set_id`, ADR 0014). A chapter quiz question
+   * belongs to its chapter (`chapter_id`, anchored to the last section), names the sections it tests and, when it asks
+   * an earlier exercise again, the exercise it came from.
    */
   origin: 'source' | 'self_created' | 'review' | 'chapter_quiz';
   tests_concept_ids?: string[];
+  set_id?: string;
+  /** A review question is answered in writing (`apply`) or by choosing one of `options` (`recall`), recorded in `answer`. */
+  kind?: 'apply' | 'recall';
+  idea?: string;
+  options?: CheckQuestion['options'];
+  correct?: number;
+  answer?: { choice: CheckChoice; correct: boolean; at: number };
   chapter_id?: string;
   quiz_id?: string;
   from_task_id?: string;
@@ -169,6 +177,8 @@ export type PracticeJob = {
   task_id?: string;
   purpose?: 'review' | 'chapter_quiz';
   chapter_id?: string;
+  /** The review set a review job writes the questions of (ADR 0014). */
+  set_id?: string;
   /** Asking for different exercises: what the learner said should change, and the exercises the new ones replace (ADR 0011). */
   note?: string;
   replaces?: string[];
@@ -232,8 +242,8 @@ export type DeferredExplanation = {
 
 export type Interaction = { id: string; role: 'user' | 'assistant'; text: string; concept_id?: string };
 
-/** A course's own presentation preferences; `daily_reviews` is the most reviews listed a day (ADR 0008). */
-export type Preferences = { language: 'en' | 'zh-CN'; daily_reviews: number };
+/** A course's own presentation preferences. */
+export type Preferences = { language: 'en' | 'zh-CN' };
 
 export type State = {
   preferences: Preferences;
@@ -257,27 +267,32 @@ export type State = {
   review: ReviewState;
 };
 
-/** A section's place in the spaced review schedule; `task_id` is its review question once started. */
-export type ReviewSection = {
-  concept_id: string;
-  step: number;
-  interval_days: number;
-  due_at: number;
-  last_review_at: number | null;
-  task_id: string | null;
+/** A review set (ADR 0014): the questions written for one request, with how many are answered and right. */
+export type ReviewSet = {
+  id: string;
+  kind: 'for_me' | 'request' | 'warm_up' | 'chapter_quiz';
+  request?: string;
+  scope?: { chapter_ids?: string[]; concept_ids?: string[] };
+  /** The section a warm-up comes before, or the chapter a quiz is scoped to. */
+  concept_id?: string;
+  chapter_id?: string;
+  /** What the teacher left out of the request, and why. */
+  note?: string;
+  created_at: number;
+  closed_at?: number;
+  task_ids: string[];
+  answered: number;
+  right: number;
+  /** Not closed and some question still unanswered. */
+  open: boolean;
 };
 
-/** Due sections (oldest first, at most `cap` a day counting `done_today`), with the review questions and their requests. */
+/** Review sets newest first, review questions and the requests writing them, warm-ups on offer (section id → its stale
+ * prerequisites) and how many sections can be reviewed. Chapter quiz questions stay in `practice`. */
 export type ReviewState = {
-  due: ReviewSection[];
-  waiting: number;
-  upcoming: number;
-  next_due_at: number | null;
+  sets: ReviewSet[];
   reviewable: number;
-  done_today: number;
-  cap: number;
-  now: number;
-  sections: ReviewSection[];
+  warm_ups: Record<string, string[]>;
   tasks: Task[];
   jobs: PracticeJob[];
 };

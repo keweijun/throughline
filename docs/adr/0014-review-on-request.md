@@ -13,7 +13,7 @@ Spacing and retrieval practice remain the reasons to review (ADR 0008). What cha
 
 ## Review sets
 
-A **review set** is a group of questions written for one request. The review page lists sets, never sections: open sets first with their progress, then earlier sets with their results. Nothing is listed until the learner asks.
+A **review set** is a group of questions written for one request. The review page lists sets, never sections: current sets first with their progress, then earlier sets, folded, with their results. A set stays current until the learner closes it (**Done**, or **Done for now** with questions unanswered) or, once every question is answered, for a day, so the feedback on its last answer can be read. Nothing is listed until the learner asks.
 
 - **Review for me** asks with no request; the teacher chooses what to review from the review context.
 - A **review request** is free text ("the variational method, not the derivations", "chapter 3 before my exam"), optionally with a scope of chapters or sections ticked from the route.
@@ -40,7 +40,7 @@ The teacher is asked to prefer sections that are stale or were missed, and to as
 
 ## Prepared set
 
-So that **Review for me** opens at once, the host writes one set in the background when the course is open, the host is idle, some section is studied, and no unopened prepared set exists. It runs at background priority, like preparation, and pauses for any learner request. It stays hidden until the learner asks for a review without a request, then becomes an ordinary set; a request with text or a scope always writes a new set.
+So that **Review for me** opens at once, the host writes one set in the background when the course is open, the host is idle (nothing running, and nothing for preparation of the next section to do), some section is studied, the learner has asked for a review in this course before, and no prepared set is waiting. Learners who never review spend no teacher turns on it. It starts only when idle and runs beside any request made after it. It stays hidden until the learner asks for a review without a request, then becomes an ordinary set; one whose writing failed is closed and replaced then, so a failing teacher is never retried in a loop. A request with text or a scope always writes a new set.
 
 ## Warm-up
 
@@ -52,11 +52,11 @@ A missed apply part or a wrong recall answer offers **Revisit**, a side question
 
 ## Chapter quiz
 
-The chapter quiz becomes a review set scoped to the chapter. **Take the chapter quiz** on the chapter page creates it, with the composition ADR 0008 defined (earlier exercises asked again, then new questions spanning the chapter's studied sections) and the rule that a new quiz waits until the questions of the last one are answered. It is listed on the chapter page and on the review page.
+The chapter quiz becomes a review set scoped to the chapter, whose id is the quiz's; its questions keep `origin: "chapter_quiz"` and name the set in `set_id`. **Take the chapter quiz** on the chapter page creates it, with the composition ADR 0008 defined (earlier exercises asked again, then new questions spanning the chapter's studied sections) and the rule that a new quiz waits until the questions of the last one are answered. It is listed on the chapter page and on the review page.
 
 ## What goes
 
-The schedule (`review.schedule` intervals, due sections, the daily cap), "Not now" (`review.postpone` and `review_postponements`), the count on **Review** in the top bar, and the `daily_reviews` preference with its Settings row. **Review** stays in the top bar as a plain entry. **Do later** remains a deferral: set-aside exercises are listed on their section and chapter pages, enter the review context, and are asked again by chapter quizzes.
+The schedule (`review.schedule` intervals, due sections, the daily cap), "Not now" (`review.postpone` and `review_postponements`), the count on **Review** in the top bar, and the `daily_reviews` preference with its Settings row. **Review** stays in the top bar as a plain entry (hidden on phone-width screens, where it used to show only when something was due). **Do later** remains a deferral: set-aside exercises are listed on their section and chapter pages, enter the review context, and are asked again by chapter quizzes.
 
 A migration (ADR 0007) turns existing review questions into review sets (one set per day they were started), turns each chapter quiz into a set scoped to its chapter keeping its `quiz_id`, and drops postponements and `daily_reviews`. Evidence is untouched.
 

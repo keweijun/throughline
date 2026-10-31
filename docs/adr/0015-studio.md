@@ -63,7 +63,7 @@ The first install still starts in Codex, since there is no app yet.
 
 ## Fallback and versions
 
-Studio uses experimental App Server methods. The web types are generated from the Codex version it is tested against (`codex app-server generate-ts`), and the host checks at start-up that the methods Studio needs exist. When they do not, the hand-offs keep opening a Codex chat as before (ADR 0004), and Settings says that a newer Codex enables Studio.
+Studio uses experimental App Server methods. The interface types the fields it reads after the protocol of the Codex version it is tested against (`codex app-server generate-ts`), and the host checks at start-up that the methods Studio needs exist. When they do not, the hand-offs keep opening a Codex chat as before (ADR 0004), and the Studio panel says that a newer Codex enables it.
 
 ## Considered and not chosen
 

@@ -123,6 +123,8 @@ class AppStore {
   sourceList = $state(false);
   quote = $state<Quote | null>(null);
   settingsOpen = $state(false);
+  /** The Settings category to show when the dialog next opens, such as About from the update notice. */
+  settingsPane = $state<string | null>(null);
   routeOpen = $state(false);
   /** The learner folded the route to its capsule; a stage too narrow for it folds it regardless. */
   routeFolded = $state(storedFold());

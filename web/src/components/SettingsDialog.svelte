@@ -126,7 +126,10 @@
       smallEffort = settings?.small_effort ?? '';
       dailyReviews = app.state?.preferences.daily_reviews ?? 5;
       teacherSaved = false;
-      if (!panes.some((p) => p.id === pane)) pane = panes[0].id;
+      const asked = panes.find((p) => p.id === app.settingsPane);
+      app.settingsPane = null;
+      if (asked) pane = asked.id;
+      else if (!panes.some((p) => p.id === pane)) pane = panes[0].id;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
@@ -203,16 +206,18 @@
 </script>
 
 {#snippet icon(id: Pane)}
+  <!-- One 24-unit grid and one stroke weight, so the four read as a set. -->
   <span class="glyph" aria-hidden="true">
-    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       {#if id === 'course'}
-        <path d="M10 5.6C8.4 4.3 6.1 4 3.3 4.6v10.2c2.8-.6 5.1-.3 6.7 1 1.6-1.3 3.9-1.6 6.7-1V4.6C13.9 4 11.6 4.3 10 5.6zM10 5.6v10.2" />
+        <path d="M3.5 5.6c3.2-.6 6-.1 8.5 1.8 2.5-1.9 5.3-2.4 8.5-1.8v12.2c-3.2-.6-6-.1-8.5 1.8-2.5-1.9-5.3-2.4-8.5-1.8zM12 7.4v12.2" />
       {:else if id === 'teacher'}
-        <path d="M10 4.2 2.6 7.6 10 11l7.4-3.4zM5.6 9.2v3.4c1.2 1.3 2.7 1.9 4.4 1.9s3.2-.6 4.4-1.9V9.2M17.4 7.6v4.2" />
+        <path d="M12 4.5 2.5 9 12 13.5 21.5 9zM6.5 11.2v4.4c1.6 1.6 3.4 2.4 5.5 2.4s3.9-.8 5.5-2.4v-4.4M21.5 9v5.5" />
       {:else if id === 'about'}
-        <circle cx="10" cy="10" r="6.6" /><path d="M10 9v4.6M10 6.4v.1" />
+        <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.2" /><circle cx="12" cy="7.9" r="1.1" fill="currentColor" stroke="none" />
       {:else}
-        <circle cx="10" cy="10" r="6.6" /><path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none" />
+        <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.8-.7 1.8-1.6 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.7 1.8-1.7h2.2a4.2 4.2 0 0 0 4.2-4.2c0-3.8-4-6.9-9-6.9z" />
+        <circle cx="7.6" cy="11.4" r="1.1" fill="currentColor" stroke="none" /><circle cx="9.9" cy="7.7" r="1.1" fill="currentColor" stroke="none" /><circle cx="14.4" cy="7.6" r="1.1" fill="currentColor" stroke="none" />
       {/if}
     </svg>
   </span>
@@ -248,7 +253,7 @@
       {#each panes as item (item.id)}
         <button class="category" aria-current={pane === item.id ? 'page' : undefined} onclick={() => (pane = item.id)}>
           {@render icon(item.id)}{t(item.label)}
-          {#if item.id === 'about' && app.update?.available}<span class="update-dot" title={t("An update is available")}></span>{/if}
+          {#if item.id === 'about' && app.update?.available}<span class="tag">{t("Update")}</span>{/if}
         </button>
       {/each}
       {#if pane !== 'about'}
@@ -545,21 +550,24 @@
     display: grid;
     place-items: center;
     flex: none;
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: 6px;
-    color: var(--pencil);
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    color: var(--ink-soft);
     transition:
       background-color var(--quick) var(--ease-out),
       color var(--quick) var(--ease-out);
   }
 
-  .update-dot {
-    width: 0.45rem;
-    height: 0.45rem;
+  .tag {
     margin-inline-start: auto;
-    border-radius: 50%;
-    background: var(--accent);
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 600;
   }
 
   .category:hover {

@@ -65,7 +65,7 @@ uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/
 guided-learning setup --language zh-CN
 ```
 
-使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`。两种方式都会获取最新版，所以安装和更新用的是同样三行命令。运行 `guided-learning --version` 可查看当前版本。
+使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`。两种方式都会获取最新版，所以安装和更新用的是同样三行命令。运行 `guided-learning --version` 可查看当前版本，运行 `guided-learning doctor` 可检查是否找到 Codex 并已登录。
 
 从 0.5.1 之前的版本（包名为 `codex-guided-learning`）更新时：在 `guided-learning stop` 之后运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），再按上面的步骤继续。
 

@@ -1,4 +1,4 @@
-"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop and courses."""
+"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop, courses and doctor."""
 import argparse
 import json
 import os
@@ -88,7 +88,7 @@ New learners often start with a bare request such as "help me create my first co
 
 If they are unsure what to learn, suggest goals that fit their files. Then wait for the files and the goal before building, and follow the `$throughline` skill's intake once both are clear.
 '''
-COMMANDS = ('setup', 'open', 'stop', 'courses')
+COMMANDS = ('setup', 'open', 'stop', 'courses', 'doctor')
 
 
 def version():
@@ -400,6 +400,25 @@ def courses(args):
     return 0
 
 
+def doctor(args):
+    """A readable check of the install, for the learner or Codex; exits 1 when something needs fixing."""
+    from . import checks
+    root = library.default_root()
+    launcher = launcher_path()
+    host = running()
+    rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
+            for check in checks.codex_checks()]
+    rows += [(root.is_dir(), 'Course library', str(root), 'Run `guided-learning setup`'),
+             (launcher.exists(), 'Launcher', str(launcher), 'Run `guided-learning setup`'),
+             (None, 'Throughline', f"running at http://127.0.0.1:{host['port']}/" if host else 'not running', '')]
+    print(f'Throughline {version()}')
+    for ok, label, detail, fix in rows:
+        print(f"  {'ok  ' if ok else '--  ' if ok is None else 'FAIL'}  {label}: {detail}")
+        if ok is False and fix:
+            print(f'        {fix}')
+    return 1 if any(ok is False for ok, *_ in rows) else 0
+
+
 def main(argv):
     parser = argparse.ArgumentParser(prog='guided-learning')
     commands = parser.add_subparsers(dest='command', required=True)
@@ -413,5 +432,6 @@ def main(argv):
     opener.add_argument('--no-browser', action='store_true')
     commands.add_parser('stop', help='Stop the background learning interface')
     commands.add_parser('courses', help='List the courses in the library as JSON')
+    commands.add_parser('doctor', help='Check that Throughline and Codex are ready')
     args = parser.parse_args(argv)
-    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses}[args.command](args)
+    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor}[args.command](args)

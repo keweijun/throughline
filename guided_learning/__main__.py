@@ -22,7 +22,7 @@ def main(argv=None):
     if argv and argv[0] in commands.COMMANDS:
         return commands.main(argv)
     background.teacher_models = saved_teacher_models
-    parser = argparse.ArgumentParser(prog='guided-learning', description='Execute one JSON course operation, or run setup, open, stop or courses')
+    parser = argparse.ArgumentParser(prog='guided-learning', description='Execute one JSON course operation, or run setup, open, stop, courses or doctor')
     parser.add_argument('--version', action='version', version=commands.version())
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument('--workspace', help='Course workspace directory')

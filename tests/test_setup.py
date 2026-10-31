@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import commands
+from guided_learning import checks, commands
 
 
 def setup_args(**options):
@@ -138,6 +138,37 @@ class Commands(unittest.TestCase):
             run.reset_mock()
             entry.throughline(['stop'])
             run.assert_called_once_with(['stop'])
+
+
+class Doctor(unittest.TestCase):
+    def doctor(self, home, found):
+        output = io.StringIO()
+        with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home}), \
+                mock.patch.object(checks, 'codex_checks', return_value=found), \
+                mock.patch.object(commands, 'launcher_path', return_value=Path(home) / 'throughline.desktop'), \
+                mock.patch.object(commands, 'running', return_value=None), redirect_stdout(output):
+            code = commands.main(['doctor'])
+        return code, output.getvalue()
+
+    def test_all_good(self):
+        with tempfile.TemporaryDirectory() as home:
+            (Path(home) / 'throughline.desktop').write_text('', encoding='utf-8')
+            code, output = self.doctor(home, [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)'),
+                                              checks.result('signed_in', True, 'Logged in using ChatGPT')])
+        self.assertEqual(code, 0, output)
+        self.assertIn(f'Throughline {commands.version()}', output)
+        self.assertIn('ok    Codex: codex-cli 1.0 (/bin/codex)', output)
+        self.assertIn(f'ok    Course library: {home}', output)
+        self.assertIn('--    Throughline: not running', output)
+        self.assertNotIn('FAIL', output)
+
+    def test_failures_say_what_to_do_and_exit_nonzero(self):
+        with tempfile.TemporaryDirectory() as home:
+            code, output = self.doctor(home, [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)'),
+                                              checks.result('signed_in', False, 'Not logged in')])
+        self.assertEqual(code, 1)
+        self.assertIn('FAIL  Signed in to Codex: Not logged in\n        Sign in to Codex: run `codex login`', output)
+        self.assertIn('FAIL  Launcher:', output)
 
 
 if __name__ == '__main__':

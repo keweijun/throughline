@@ -143,11 +143,22 @@ class AppStore {
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
   /** The Course page replaces the reading column: the course as a whole (ADR 0017). */
-  courseOpen = $state(false);
+  #courseOpen = $state(false);
+  get courseOpen() {
+    return this.#courseOpen;
+  }
+  // Overview has its own Sources and notes, and Studio needs the width, so arriving there puts the side panel aside;
+  // it comes back as it was in Learn or Review, or as soon as the learner opens it on Overview.
+  set courseOpen(open: boolean) {
+    if (open !== this.#courseOpen) this.panelAside = open;
+    this.#courseOpen = open;
+  }
   /** The Course page's tab; it stays as the learner left it until something asks for another. */
   coursePart = $state<CoursePart>('studio');
 
+  /** Whether the learner left the side panel open; `panelShown` says whether it is on screen. */
   panelOpen = $state(false);
+  panelAside = $state(false);
   panelTab = $state<PanelTab>('questions');
   source = $state<SourceView | null>(null);
   sourceLoading = $state(false);
@@ -860,6 +871,11 @@ class AppStore {
   openPanel(tab: PanelTab) {
     this.panelTab = tab;
     this.panelOpen = true;
+    this.panelAside = false;
+  }
+
+  get panelShown() {
+    return this.panelOpen && !this.panelAside;
   }
 
   /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */

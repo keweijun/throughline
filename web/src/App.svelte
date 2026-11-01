@@ -78,7 +78,7 @@
     if (event.key === 'Escape') {
       if (app.routeOpen) app.routeOpen = false;
       else if (app.libraryOpen && app.state && !(event.target as HTMLElement).closest('dialog')) app.libraryOpen = false;
-      else if (app.panelOpen && panelCoversLesson()) app.panelOpen = false;
+      else if (app.panelShown && panelCoversLesson()) app.panelOpen = false;
 
       return;
     }
@@ -91,8 +91,8 @@
       requestAnimationFrame(() => document.getElementById('question-input')?.focus());
     } else if (event.key === '[') step(-1);
     else if (event.key === ']') step(1);
-    else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
-    else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
+    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
+    else if (event.key === 'n') app.panelShown && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse();
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
@@ -108,7 +108,7 @@
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelOpen} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
+<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
   {#if app.libraryOpen}
     <Library />
   {:else if app.state}

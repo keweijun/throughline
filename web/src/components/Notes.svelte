@@ -83,7 +83,7 @@
 
   $effect(() => {
     const id = app.focusAnnotation;
-    if (!id || !app.panelOpen || app.panelTab !== 'notes') return;
+    if (!id || !app.panelShown || app.panelTab !== 'notes') return;
     const item = app.state?.annotations.find((a) => a.id === id);
     if (item && !matches(item)) search = '';
     if (item && (item.concept_id !== viewing || app.ownerChapter(item))) {

@@ -26,9 +26,9 @@
 
   // Opening the panel moves focus into it, unless something there already took it (such as the question box);
   // closing it returns focus to the top-bar toggle when focus was inside, so keyboard users are not dropped on the page.
-  let wasOpen = app.panelOpen;
+  let wasOpen = app.panelShown;
   $effect.pre(() => {
-    const open = app.panelOpen;
+    const open = app.panelShown;
     if (open === wasOpen) return;
     wasOpen = open;
     const tab = app.panelTab;
@@ -67,7 +67,7 @@
   }
 </script>
 
-<aside id="auxiliary" class="panel" aria-label={labels[app.panelTab]()} hidden={!app.panelOpen} tabindex="-1" bind:this={panel}>
+<aside id="auxiliary" class="panel" aria-label={labels[app.panelTab]()} hidden={!app.panelShown} tabindex="-1" bind:this={panel}>
   <!-- A focusable window splitter is interactive per WAI-ARIA, which this lint rule does not model. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div

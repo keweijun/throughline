@@ -51,7 +51,7 @@
   $effect(() => {
     if (!stage) return;
     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const observer = new ResizeObserver(([entry]) => (app.stageNarrow = entry.contentRect.width < 66 * rem));
+    const observer = new ResizeObserver(([entry]) => (app.stageNarrow = entry.contentRect.width < 68.5 * rem));
     observer.observe(stage);
     const phone = matchMedia('(max-width: 56rem)');
     const update = () => (app.phone = phone.matches);

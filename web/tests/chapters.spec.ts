@@ -162,10 +162,21 @@ test('the learner folds the route and unfolds it again, and the choice is rememb
 
   await page.reload();
   await expect(mini).toBeVisible();
-  await page.keyboard.press('r');
+  // The unfold button is the drawer's, so the capsule has none of its own; the keyboard reaches it by moving into the route.
+  await expect(page.getByRole('button', { name: 'Unfold the route' })).toBeHidden();
+  await mini.locator('.route-badge').first().focus();
+  await expect(full).toBeVisible();
+  await mini.locator('.route-badge').first().blur();
+  await expect(full).toBeHidden();
+  await mini.hover();
+  await full.getByRole('button', { name: 'Unfold the route' }).click();
   await expect(mini).toHaveCount(0);
   await expect(full).toBeVisible();
   await page.reload();
+  await expect(page.locator('#route .mini')).toHaveCount(0);
+  await page.keyboard.press('r');
+  await expect(page.locator('#route .mini')).toBeVisible();
+  await page.keyboard.press('r');
   await expect(page.locator('#route .mini')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

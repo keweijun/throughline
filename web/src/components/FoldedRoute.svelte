@@ -56,12 +56,6 @@
 </script>
 
 <div class="mini" bind:this={box}>
-  <!-- Unfolding needs room beside the reading column; without it the full route opens on hover instead. -->
-  {#if !app.stageNarrow}
-    <button class="unfold" aria-label={t('Unfold the route')} title={t('Unfold the route (r)')} onclick={() => app.toggleRoute()}>
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
-    </button>
-  {/if}
   <ol class="chapters">
     {#each chapters as chapter, index (chapter.id)}
       {@const total = chapter.concept_ids.length}
@@ -140,8 +134,8 @@
     }
   }
 
-  /* The capsule's own controls; the chapter badges keep the shared .route-badge look. */
-  .unfold,
+  /* The capsule's own control; the chapter badges keep the shared .route-badge look. Its unfold button is the
+     drawer's, at the top of the full route that opens beside it. */
   .dot {
     position: relative;
     display: block;
@@ -149,24 +143,6 @@
     border: 0;
     background: none;
     cursor: pointer;
-  }
-
-  .unfold {
-    display: grid;
-    place-items: center;
-    width: 1.6rem;
-    height: 1.6rem;
-    margin-bottom: 0.4rem;
-    border-radius: 50%;
-    color: var(--pencil);
-    transition:
-      color var(--quick) ease,
-      background-color var(--quick) ease;
-  }
-
-  .unfold:hover {
-    background: var(--accent-wash);
-    color: var(--accent);
   }
 
   .chapters,

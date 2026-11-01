@@ -221,6 +221,10 @@ export type Settings = {
 };
 
 export type UpdateCheck = { version: string; latest: string; available: boolean };
+/** An update the host asked a background Codex to install (`updates.progress`). */
+export type UpdateInstall = { state: 'running' | 'failed'; from: string; to: string; started: number; log: string; message?: string };
+/** What the tab knows while it waits: the steps it can see, and a progress estimate between them. */
+export type UpdateProgress = { to: string; step: 'starting' | 'installing' | 'restarting' | 'done'; progress: number; failed: string | null };
 
 export type ServiceTier = { id: string; name: string; description: string };
 

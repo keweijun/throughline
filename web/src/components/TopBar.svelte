@@ -93,7 +93,7 @@
   {/if}
 
   <div class="actions">
-    {#if app.connection !== 'live'}
+    {#if app.connection !== 'live' && !(app.updating && !app.updating.failed)}
       <span class="chip chip-caution" role="status">
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
@@ -125,7 +125,20 @@
         <span>{studio.waiting.length ? t("Studio needs you") : t("Studio working…")}</span>
       </button>
     {/if}
-    {#if app.update?.available}
+    {#if app.updating && !app.updating.failed}
+      <!-- The host is expected to go away while Codex installs; this replaces the reconnecting notice. -->
+      <button
+        class="btn btn-small update"
+        onclick={() => {
+          app.settingsPane = 'about';
+          app.settingsOpen = true;
+        }}
+        title={t("Codex is installing version {version}. Throughline comes back by itself.", { version: app.updating.to })}
+      >
+        <span class="pulse" aria-hidden="true"></span>
+        <span>{t("Updating · {percent}%", { percent: Math.round(app.updating.progress) })}</span>
+      </button>
+    {:else if app.update?.available}
       <!-- Noticeable but quiet: a small pill that waits beside Settings, never a banner or a toast. -->
       <button
         class="btn btn-small update"

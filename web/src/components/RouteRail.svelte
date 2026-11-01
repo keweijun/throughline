@@ -112,7 +112,7 @@
     });
   }
   $effect(() => {
-    void [app.viewingId, app.viewingChapter, app.reviewOpen, app.currentId, app.folded, app.routeOpen, nav, full];
+    void [app.viewingId, app.viewingChapter, app.pageOpen, app.currentId, app.folded, app.routeOpen, nav, full];
     reveal();
     const settled = setTimeout(reveal, 260);
     return () => clearTimeout(settled);
@@ -127,7 +127,7 @@
   {@const waiting = saved.get(id)}
   {@const skipped = app.isSkipped(id)}
   {@const step = status === 'current' ? app.stepProgress(id) : null}
-  {@const viewing = id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
+  {@const viewing = id === app.viewingId && !app.viewingChapter && !app.pageOpen}
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
     <span class="node" aria-hidden="true"><span class="route-dot {status}" class:viewing class:skipped></span></span>
     <button class="entry" class:viewing aria-current={viewing ? 'page' : undefined} onclick={() => app.view(id)}>
@@ -188,8 +188,8 @@
               ><span aria-hidden="true">{number + 1}</span></button>
               <button
                 class="entry chapter-name"
-                class:viewing={app.viewingChapter === chapter.id && !app.reviewOpen}
-                aria-current={app.viewingChapter === chapter.id && !app.reviewOpen ? 'page' : undefined}
+                class:viewing={app.viewingChapter === chapter.id && !app.pageOpen}
+                aria-current={app.viewingChapter === chapter.id && !app.pageOpen ? 'page' : undefined}
                 onclick={() => app.viewChapter(chapter.id)}
               >
                 <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>

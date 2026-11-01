@@ -4,8 +4,8 @@ import { test, expect, editorText } from './fixture';
 
 test('Studio sends a message with a skill chip and shows Codex reply', async ({ page, course }) => {
   const { errors } = await course('studio_browser_fixture');
-  await page.locator('#toggle-studio').click();
-  const panel = page.locator('#panel-studio');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
   await expect(panel.getByRole('heading', { name: 'Studio' })).toBeVisible();
   await expect(panel).toContainText('Create and change courses with Codex');
 
@@ -32,7 +32,7 @@ test('Studio sends a message with a skill chip and shows Codex reply', async ({ 
 test('an approval and a question wait in the transcript for the learner', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.keyboard.press('d');
-  const panel = page.locator('#panel-studio');
+  const panel = page.locator('#course-studio');
   const box = page.locator('#studio-input');
 
   await box.click();
@@ -59,7 +59,7 @@ test('an approval and a question wait in the transcript for the learner', async 
 test('a message while Codex works steers it, and Stop interrupts', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.keyboard.press('d');
-  const panel = page.locator('#panel-studio');
+  const panel = page.locator('#course-studio');
   const box = page.locator('#studio-input');
   await box.click();
   await box.pressSequentially('wait for me');
@@ -85,7 +85,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await box.click();
   await box.pressSequentially('hello');
   await page.keyboard.press('Control+Enter');
-  await expect(page.locator('#panel-studio .said-by-codex')).toHaveText('done');
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
 
   // After a reload, opening Studio reads the latest chat; hold that history back (taken before the next message)
   // until the message has been sent.
@@ -100,7 +100,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await box.click();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
-  const panel = page.locator('#panel-studio');
+  const panel = page.locator('#course-studio');
   await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
   await expect(panel.locator('.user .said').last()).toHaveText('wait for me', { timeout: 10_000 });
   await page.waitForTimeout(2000);
@@ -114,10 +114,10 @@ test('course hand-offs open Studio with the request and where it came from, and 
   const box = page.locator('#studio-input');
   await expect(box).toBeVisible();
   expect(await editorText(box)).toContain('$throughline add these files to the course waves');
-  const panel = page.locator('#panel-studio');
+  const panel = page.locator('#course-studio');
   await expect(panel.locator('form .origin')).toContainText('Section: Wave superposition');
 
-  await page.locator('#panel-studio input[type=file]:not([accept])').setInputFiles({ name: 'problem set.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+  await page.locator('#course-studio input[type=file]:not([accept])').setInputFiles({ name: 'problem set.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await expect(box.locator('.cm-chip-mention')).toHaveText('@inputs/problem set.pdf');
 
   // The context goes with the message, shown under it, and the chip is gone from the box.
@@ -135,21 +135,21 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   await page.keyboard.press('Control+Enter');
   const status = page.locator('.studio-status');
   // While Studio is on screen the transcript says it; elsewhere the top bar does.
-  await expect(page.locator('#panel-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(page.locator('#course-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
   await expect(status).toHaveCount(0);
-  await page.getByRole('button', { name: 'Close panel' }).click();
+  await page.getByRole('button', { name: 'Back to reading' }).click();
   await expect(status).toHaveText('Studio working…');
   await status.click();
-  await expect(page.locator('#panel-studio')).toBeVisible();
-  await page.locator('#panel-studio').getByRole('button', { name: 'Stop' }).click();
+  await expect(page.locator('#course-studio')).toBeVisible();
+  await page.locator('#course-studio').getByRole('button', { name: 'Stop' }).click();
 
   await page.getByRole('button', { name: 'New chat' }).click();
   await box.click();
   await box.pressSequentially('please approve this');
   await page.keyboard.press('Control+Enter');
-  await expect(page.locator('#panel-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
-  await page.getByRole('button', { name: 'Close panel' }).click();
+  await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to reading' }).click();
   await expect(status).toHaveText('Studio needs you');
   await status.click();
-  await expect(page.locator('#panel-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
+  await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
 });

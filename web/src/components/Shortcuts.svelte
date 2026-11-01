@@ -17,7 +17,7 @@
     [']', 'Next section'],
     ['s', 'Show or hide the source reader'],
     ['n', 'Show or hide your notes'],
-    ['m', 'Show or hide course memory'],
+    ['m', 'Show or hide the course page'],
     ['d', 'Show or hide Studio'],
     ['r', 'Fold or unfold the route'],
     ['Esc', 'Close a drawer or popup'],

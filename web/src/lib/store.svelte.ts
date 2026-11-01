@@ -6,7 +6,9 @@ import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
-export type PanelTab = 'questions' | 'source' | 'notes' | 'memory' | 'studio';
+export type PanelTab = 'questions' | 'source' | 'notes';
+/** A part of the Course page to scroll to when it opens. */
+export type CoursePart = 'studio' | 'memory' | 'sources' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -115,6 +117,8 @@ class AppStore {
   viewingChapter = $state<string | null>(null);
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
+  /** The Course page replaces the reading column: the course as a whole (ADR 0017). */
+  courseOpen = $state(false);
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -165,6 +169,11 @@ class AppStore {
   get libraryCourse() {
     const library = this.library;
     return library?.root ? library.courses.find((c) => c.path === library.active) : undefined;
+  }
+
+  /** The review page or the Course page is in the reading column instead of a section or chapter. */
+  get pageOpen() {
+    return this.reviewOpen || this.courseOpen;
   }
 
   get viewingId(): string | null {
@@ -485,7 +494,7 @@ class AppStore {
 
   view(conceptId: string) {
     this.viewingChapter = null;
-    this.reviewOpen = false;
+    this.reviewOpen = this.courseOpen = false;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
     this.#chapterToggles = { at: null, open: {} };
@@ -700,13 +709,14 @@ class AppStore {
 
   /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
   get studioShown() {
-    return this.panelOpen && this.panelTab === 'studio';
+    return this.courseOpen && !this.libraryOpen;
   }
 
   /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
    * the box focused when `focus`. */
   showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
-    this.openPanel('studio');
+    // Studio is course-level, the first part of the Course page (ADR 0017).
+    if (!this.courseOpen || this.libraryOpen) this.showCourse('studio');
     if (thread && studio.threadId !== thread) void studio.open(thread);
     if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
   }
@@ -778,7 +788,7 @@ class AppStore {
 
   viewChapter(chapterId: string) {
     this.viewingChapter = chapterId;
-    this.reviewOpen = false;
+    this.reviewOpen = this.courseOpen = false;
     this.routeOpen = false;
     this.#chapterToggles = { at: null, open: {} };
     scrollStage(0);
@@ -786,21 +796,32 @@ class AppStore {
 
   /** Moving the position lands on the new section, unless the learner has gone elsewhere while it was being made. */
   async #move(action: () => Promise<unknown>) {
-    const before = [this.viewing, this.viewingChapter, this.reviewOpen];
+    const before = [this.viewing, this.viewingChapter, this.reviewOpen, this.courseOpen];
     if (await this.act(action)) {
-      const after = [this.viewing, this.viewingChapter, this.reviewOpen];
+      const after = [this.viewing, this.viewingChapter, this.reviewOpen, this.courseOpen];
       if (after.some((value, i) => value !== before[i])) return;
       this.viewing = this.viewingChapter = null;
-      this.reviewOpen = false;
+      this.reviewOpen = this.courseOpen = false;
       scrollStage(0);
     }
   }
 
   showReview() {
     this.reviewOpen = true;
+    this.courseOpen = false;
     this.libraryOpen = false;
     this.routeOpen = false;
     scrollStage(0);
+  }
+
+  /** Opens the Course page, scrolled to one of its parts when asked. */
+  showCourse(part?: CoursePart) {
+    this.courseOpen = true;
+    this.reviewOpen = false;
+    this.libraryOpen = false;
+    this.routeOpen = false;
+    if (part) requestAnimationFrame(() => document.getElementById(`course-${part}`)?.scrollIntoView({ block: 'start' }));
+    else scrollStage(0);
   }
 
   /** Ask for a review set (ADR 0014): nothing for Review for me, or a request and scope, or the section a warm-up comes before. */

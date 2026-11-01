@@ -3,6 +3,22 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Show or hide the course page": "显示或隐藏课程页",
+  "This course: changing it, what the teacher remembers, sources and notes (m)": "本课程：修改课程、老师记住的内容、来源和笔记（m）",
+  "A preference to confirm": "有一条偏好待确认",
+  "Settings: teacher, appearance and about": "设置：老师、外观和关于",
+  "Change this course": "修改这门课",
+  "Chapters": "章节",
+  "{title}: {studied} of {total} sections studied": "{title}：已学 {studied}/{total} 节",
+  "Chapters: {count}": "章数：{count}",
+  "On this page": "本页内容",
+  "Back to reading": "回到学习",
+  "Add files, rebuild the route, check pages or change how the course is taught. Each request opens a Codex chat with it typed in; this page updates when Codex is done.": "添加文件、重建学习路线、核对页面，或调整这门课的讲法。每个请求都会打开一段已写好请求的 Codex 对话；Codex 完成后本页会自动更新。",
+  "$throughline in the course {course}, ": "$throughline 在课程 {course} 中，",
+  "Something else in Codex": "在 Codex 中做其他修改",
+  "Every document in the course; choose one to open it in the reader.": "课程中的所有文档；选择一个即可在阅读器中打开。",
+  "Open notes": "打开笔记",
+  "The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.": "界面和新的讲授内容，保存在本课程中。来源和已保存的讲解保持原有语言。",
   "Submitted answer": "已提交的作答",
   "Restore submitted answer": "恢复这次作答",
   "The response was interrupted. Please try again.": "回复已中断，请重试。",

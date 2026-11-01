@@ -94,9 +94,9 @@ test('a question about an exercise, a side question and a note take images too',
   const item = page.locator('.notes-panel .item.note');
   await expect(item.locator('.katex')).toHaveCount(2);
   await expect(item.getByRole('img')).toHaveCount(1);
-  // Exporting is in Settings, for the whole course, so the Notes panel stays a list and a writing box.
+  // Exporting is on the Course page, for the whole course, so the Notes panel stays a list and a writing box.
   await expect(page.locator('.notes-panel').getByRole('button', { name: /Export/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.locator('#open-course').click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export notes' }).click();
   const archive = await download;

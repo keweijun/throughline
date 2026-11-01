@@ -7,7 +7,7 @@
   // so they sit at the top and stay until answered; a confirmation is safe to ignore, sits at the bottom and clears
   // itself.
   const suggestion = $derived(
-    app.libraryOpen || (app.panelOpen && app.panelTab === 'memory') ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'),
+    app.libraryOpen || app.courseOpen ? undefined : app.state?.memory?.find((e) => e.status === 'suggested'),
   );
 
   let top = $state<HTMLElement>();

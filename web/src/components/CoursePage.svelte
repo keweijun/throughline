@@ -251,8 +251,11 @@
     color: var(--pencil);
   }
 
+  /* A fixed height, which Studio fills with its box at the bottom: content loading inside never shifts the box. */
   .studio-frame {
-    max-height: min(72vh, 46rem);
+    display: flex;
+    flex-direction: column;
+    height: min(72vh, 46rem);
     overflow-y: auto;
     padding: 0 0.75rem;
     border: 1px solid var(--rule);

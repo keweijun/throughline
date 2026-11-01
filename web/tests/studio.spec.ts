@@ -35,7 +35,7 @@ test('an approval and a question wait in the transcript for the learner', async 
   const panel = page.locator('#course-studio');
   const box = page.locator('#studio-input');
 
-  await box.click();
+  await expect(box).toBeFocused(); // `d` puts the caret in the box
   await box.pressSequentially('please approve this');
   await page.keyboard.press('Control+Enter');
   const request = panel.getByRole('group', { name: 'Codex wants to run a command' });
@@ -56,12 +56,35 @@ test('an approval and a question wait in the transcript for the learner', async 
   await expect(panel.locator('.said-by-codex').last()).toHaveText('answer: {"goal": {"answers": ["Exam"]}}');
 });
 
+test('Studio takes a message while Codex starts, and its first load never moves the box from under the learner', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  // Hold Studio's first load until the learner has typed and sent, so it lands while they are at the box.
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/api/studio', async (route) => {
+    const response = await route.fetch();
+    await gate;
+    await route.fulfill({ response });
+  });
+  await page.keyboard.press('d');
+  const box = page.locator('#studio-input');
+  await expect(box).toBeFocused(); // `d` puts the caret in the box, even before Studio has loaded
+  const before = await box.boundingBox();
+  await page.keyboard.type('wait for me');
+  await page.keyboard.press('Control+Enter'); // sent while Codex is still starting: it waits, it is not dropped
+  release();
+  await expect(page.locator('#course-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
+  expect((await box.boundingBox())?.y).toBe(before?.y);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('a message while Codex works steers it, and Stop interrupts', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.keyboard.press('d');
   const panel = page.locator('#course-studio');
   const box = page.locator('#studio-input');
-  await box.click();
+  await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
   await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
@@ -82,7 +105,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await course('studio_browser_fixture');
   await page.keyboard.press('d');
   const box = page.locator('#studio-input');
-  await box.click();
+  await expect(box).toBeFocused();
   await box.pressSequentially('hello');
   await page.keyboard.press('Control+Enter');
   await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
@@ -97,7 +120,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await page.reload();
   await page.keyboard.press('d');
   await expect(page.getByRole('combobox', { name: 'Studio chats' })).toContainText('hello');
-  await box.click();
+  await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
   const panel = page.locator('#course-studio');
@@ -106,6 +129,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await page.waitForTimeout(2000);
   await expect(panel.locator('.user .said').last()).toHaveText('wait for me');
   await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
@@ -130,7 +154,7 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   await course('studio_browser_fixture');
   await page.keyboard.press('d');
   const box = page.locator('#studio-input');
-  await box.click();
+  await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
   const status = page.locator('.studio-status');

@@ -20,7 +20,16 @@
 
   let busy = $state(false);
   let attaching = $state(0);
-  let view: EditorView | undefined;
+  let view = $state.raw<EditorView>();
+  // A request for the caret (`d`, a hand-off) is answered once Studio is on screen with its editor, even when it
+  // mounts later than the request, say while the course is still loading.
+  $effect(() => {
+    const request = studio.focusRequest;
+    if (!active || !view || request === studio.focusAnswered) return;
+    studio.focusAnswered = request;
+    const editor = view;
+    requestAnimationFrame(() => editor.focus());
+  });
   let chips: ChipRange[] = [];
   let recalled = 0;
   let list = $state<HTMLElement>();
@@ -96,6 +105,14 @@
 
   async function send() {
     if (busy) return;
+    // The box takes a message while Codex is still starting; it goes out once Studio knows Codex can run it, and stays
+    // in the box when Codex cannot.
+    if (studio.available !== true) {
+      busy = true;
+      const ready = await studio.load().then(() => studio.available);
+      busy = false;
+      if (!ready) return;
+    }
     const key = draftKey;
     const text = draft;
     const attached = images;
@@ -263,7 +280,7 @@
         label={t("Message to Codex")}
         placeholder={studio.running ? t("Add to what Codex is doing…") : t("Ask Codex for course work · $ for skills, @ for files")}
         submitLabel={studio.running ? t("Add") : t("Send")}
-        disabled={busy || attaching > 0 || studio.available !== true}
+        disabled={busy || attaching > 0}
         onsubmit={send}
         header={target}
         imagesKey={draftKey}
@@ -281,7 +298,17 @@
 </section>
 
 <style>
+  /* Studio fills the frame it is mounted in, with its writing box at the bottom, so what loads above it (the welcome,
+     a reopened chat) never moves the box from under the learner's pointer or caret. */
+  .studio {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    min-height: 100%;
+  }
+
   .transcript {
+    flex: 1 0 auto;
     gap: 1rem;
   }
 

@@ -76,7 +76,7 @@
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse('memory');
-    else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio();
+    else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.helpOpen = true;
   }

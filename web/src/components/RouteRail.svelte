@@ -546,7 +546,8 @@
     transition: none;
   }
 
-  .rail.folded:not(.resting):has(:global(.mini:hover), .full:hover) .full {
+  /* The drawer carries the unfold button, so it also opens when the keyboard moves into the route. */
+  .rail.folded:not(.resting):has(:global(.mini:hover), .full:hover, :global(:focus-visible)) .full {
     opacity: 1;
     visibility: visible;
     transform: none;

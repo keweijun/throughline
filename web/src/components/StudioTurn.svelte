@@ -1,7 +1,7 @@
 <script lang="ts">
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
-  import { CONTEXT, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
+  import { CONTEXT, outputTail, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
 
   /** One Studio turn as Codex draws it: the learner's message, then what Codex said and did, in order. */
   let { turn, last = false }: { turn: StudioTurn; last?: boolean } = $props();
@@ -56,79 +56,214 @@
 
   const diffClass = (line: string) => (line.startsWith('+') && !line.startsWith('+++') ? 'add' : line.startsWith('-') && !line.startsWith('---') ? 'del' : line.startsWith('@@') ? 'hunk' : '');
 
-  const items = $derived(turn.items);
-  const answered = $derived(items.some((i) => i.type === 'agentMessage' && (i as { phase: string | null }).phase !== 'commentary' && (i as { text: string }).text));
+  const isTool = (item: StudioItem) => ['commandExecution', 'fileChange', 'mcpToolCall', 'webSearch', 'imageView'].includes(item.type);
+  const isMessage = (item: StudioItem): item is Extract<StudioItem, { type: 'agentMessage' }> => item.type === 'agentMessage';
+  const running = (item: StudioItem) => (item as { status?: string }).status === 'inProgress';
+  /** A command that only looked at files, which Codex counts as exploring. */
+  const explores = (item: StudioItem) =>
+    item.type === 'commandExecution' && !!(item as Command).commandActions?.length && (item as Command).commandActions.every((a) => a.type !== 'unknown');
+  function itemFailed(item: StudioItem) {
+    if (item.type === 'commandExecution') return failed(item as Command);
+    const status = (item as { status?: string }).status;
+    return status === 'failed' || status === 'declined' || (item.type === 'mcpToolCall' && !!(item as { error: unknown }).error);
+  }
+
+  /** What one tool call did, in Codex's words. */
+  function toolLabel(item: StudioItem) {
+    if (item.type === 'commandExecution') return describe(item as Command);
+    if (item.type === 'fileChange') return changeSummary(item as Changes);
+    if (item.type === 'mcpToolCall') {
+      const call = item as Extract<StudioItem, { type: 'mcpToolCall' }>;
+      return t('Used {tool} from {server}', { tool: call.tool, server: call.server });
+    }
+    if (item.type === 'webSearch') {
+      const query = (item as { query?: string }).query;
+      return query ? t('Searched the web for {query}', { query }) : t('Searched the web');
+    }
+    return t('Looked at {file}', { file: base((item as { path: string }).path) });
+  }
+
+  /** A folded run of tool calls named as Codex names it: what was done, in the order it was first done. */
+  function groupLabel(group: StudioItem[]) {
+    const counts = new Map<string, number>();
+    for (const item of group) {
+      const kind = explores(item) ? 'explore' : item.type;
+      counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    const parts = [...counts].map(([kind, n]) =>
+      kind === 'explore' ? t('Explored files')
+      : kind === 'commandExecution' ? (n === 1 ? t('Ran a command') : t('Ran commands'))
+      : kind === 'fileChange' ? (n === 1 ? t('Edited a file') : t('Edited files'))
+      : kind === 'mcpToolCall' ? (n === 1 ? t('Used a tool') : t('Used tools'))
+      : kind === 'webSearch' ? t('Searched the web')
+      : t('Looked at images'));
+    if (locale.language !== 'en') return parts.join('，');
+    return parts.map((part, i) => (i ? part[0].toLowerCase() + part.slice(1) : part)).join(', ');
+  }
+
+  type Row = { kind: 'item'; item: StudioItem } | { kind: 'tools'; id: string; items: StudioItem[] };
+
   const working = $derived(turn.status === 'inProgress');
+  // The answer is the last message Codex marked final; in a finished turn saved without phases, its last plain message.
+  const answer = $derived.by(() => {
+    const messages = turn.items.filter(isMessage).filter((m) => m.text).reverse();
+    return messages.find((m) => m.phase === 'final_answer') ?? (working ? undefined : messages.find((m) => m.phase !== 'commentary'));
+  });
+  // The learner's message opens the turn; the work follows in order, its consecutive tool calls folded into one row.
+  // Reasoning only names what Codex is doing while it works, as in Codex.
+  const leading = $derived.by(() => {
+    const first = turn.items.findIndex((i) => i.type !== 'userMessage');
+    return first < 0 ? turn.items : turn.items.slice(0, first);
+  });
+  const rows = $derived.by(() => {
+    const out: Row[] = [];
+    for (const item of turn.items.slice(leading.length)) {
+      if (item === answer || item.type === 'reasoning' || (isMessage(item) && !item.text)) continue;
+      const previous = out.at(-1);
+      if (isTool(item) && previous?.kind === 'tools') previous.items.push(item);
+      else if (isTool(item)) out.push({ kind: 'tools', id: item.id, items: [item] });
+      else out.push({ kind: 'item', item });
+    }
+    return out;
+  });
+
+  // Once the answer starts, the work before it folds behind how long it took, as Codex folds a turn; the learner can
+  // open it again, and their choice holds for this turn.
+  const foldable = $derived(!!answer && turn.status !== 'interrupted' && rows.some((r) => r.kind === 'tools' || r.item.type !== 'userMessage'));
+  let opened = $state(false);
+  const folded = $derived(foldable && !opened);
+
+  let now = $state(Date.now());
+  $effect(() => {
+    if (!working) return;
+    const clock = setInterval(() => (now = Date.now()), 1000);
+    return () => clearInterval(clock);
+  });
+  function duration(ms: number) {
+    const seconds = Math.max(1, Math.round(ms / 1000));
+    const minutes = Math.floor(seconds / 60);
+    return minutes ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+  }
+  const took = $derived(
+    turn.durationMs ? turn.durationMs
+    : turn.startedAt && turn.completedAt ? (turn.completedAt - turn.startedAt) * 1000
+    : turn.startedAt && working ? now - turn.startedAt * 1000
+    : null,
+  );
+  const steps = $derived(rows.reduce((n, r) => n + (r.kind === 'tools' ? r.items.length : 1), 0));
+  const foldLabel = $derived(
+    took === null ? t('Worked through {count} steps', { count: steps })
+    : working ? t('Working for {time}', { time: duration(took) })
+    : t('Worked for {time}', { time: duration(took) }),
+  );
+
+  // While Codex works, the heading of its newest reasoning says what it is thinking about, as Codex shows it.
+  const thinking = $derived.by(() => {
+    const summary = ([...turn.items].reverse().find((i) => i.type === 'reasoning') as Extract<StudioItem, { type: 'reasoning' }> | undefined)?.summary ?? [];
+    const text = summary.filter(Boolean).at(-1) ?? '';
+    const heading = [...text.matchAll(/\*\*([^*\n]+)\*\*|^#+\s+(.+)$/gm)].at(-1);
+    return heading ? (heading[1] ?? heading[2]).trim() : '';
+  });
+
+  // Output is drawn only while its fold is open, so a long run costs nothing until the learner looks at it.
+  let shown = $state<Record<string, boolean>>({});
+  const toggle = (id: string) => (event: Event) => (shown[id] = (event.currentTarget as HTMLDetailsElement).open);
 </script>
 
-<div class="turn">
-  {#each items as item (item.id)}
-    {#if item.type === 'userMessage'}
-      {@const content = (item as Extract<StudioItem, { type: 'userMessage' }>).content}
-      <div class="user">
-        {#each content as input, i (i)}
-          {#if input.type === 'text' && input.text.startsWith(CONTEXT)}
-            <span class="origin" title={input.text.slice(CONTEXT.length)}>{input.text.slice(CONTEXT.length)}</span>
-          {:else if input.type === 'text'}
-            <p class="said">{#each segments(input) as part, j (j)}{#if part.chip}<span class="chip">{part.text}</span>{:else}{part.text}{/if}{/each}</p>
-          {:else if input.type === 'localImage'}
-            <span class="attachment">🖼 {base(input.path)}</span>
-          {:else if input.type === 'mention' && !content.some((c) => c.type === 'text' && c.text.includes(input.name))}
-            <span class="attachment">@{input.name}</span>
-          {/if}
-        {/each}
-      </div>
-    {:else if item.type === 'agentMessage'}
-      {@const message = item as Extract<StudioItem, { type: 'agentMessage' }>}
-      {#if message.text}
-        <div class="prose said-by-codex" class:commentary={message.phase === 'commentary'} use:markdown={{ language: locale.language, text: message.text }}></div>
+{#snippet said(item: StudioItem)}
+  {@const content = (item as Extract<StudioItem, { type: 'userMessage' }>).content}
+  <div class="user">
+    {#each content as input, i (i)}
+      {#if input.type === 'text' && input.text.startsWith(CONTEXT)}
+        <span class="origin" title={input.text.slice(CONTEXT.length)}>{input.text.slice(CONTEXT.length)}</span>
+      {:else if input.type === 'text'}
+        <p class="said">{#each segments(input) as part, j (j)}{#if part.chip}<span class="chip">{part.text}</span>{:else}{part.text}{/if}{/each}</p>
+      {:else if input.type === 'localImage'}
+        <span class="attachment">🖼 {base(input.path)}</span>
+      {:else if input.type === 'mention' && !content.some((c) => c.type === 'text' && c.text.includes(input.name))}
+        <span class="attachment">@{input.name}</span>
       {/if}
-    {:else if item.type === 'reasoning'}
-      {@const summary = ((item as Extract<StudioItem, { type: 'reasoning' }>).summary ?? []).filter(Boolean)}
-      {#if summary.length}
-        <details class="tool thinking">
-          <summary>{t("Thinking")}</summary>
-          <div class="prose detail" use:markdown={{ language: locale.language, text: summary.join('\n\n') }}></div>
-        </details>
+    {/each}
+  </div>
+{/snippet}
+
+{#snippet tool(item: StudioItem)}
+  {#if item.type === 'commandExecution'}
+    {@const command = item as Command}
+    <details class="tool" class:failed={failed(command)} ontoggle={toggle(item.id)}>
+      <summary>
+        <span class="dot" class:running={command.status === 'inProgress'} aria-hidden="true"></span>
+        <span class="what">{describe(command)}</span>
+        {#if failed(command)}<span class="badge">{command.status === 'declined' ? t("declined") : t("failed")}</span>{/if}
+      </summary>
+      {#if shown[item.id]}
+        <div class="output"><pre><code>$ {inner(command.command)}{command.aggregatedOutput ? '\n' + outputTail(command.aggregatedOutput) : ''}</code></pre></div>
       {/if}
-    {:else if item.type === 'commandExecution'}
-      {@const command = item as Command}
-      <details class="tool" class:failed={failed(command)}>
-        <summary>
-          <span class="dot" class:running={command.status === 'inProgress'} aria-hidden="true"></span>
-          <span class="what">{describe(command)}</span>
-          {#if failed(command)}<span class="badge">{command.status === 'declined' ? t("declined") : t("failed")}</span>{/if}
-        </summary>
-        <pre class="output"><code>$ {inner(command.command)}{command.aggregatedOutput ? '\n' + command.aggregatedOutput : ''}</code></pre>
-      </details>
-    {:else if item.type === 'fileChange'}
-      {@const change = item as Changes}
-      <details class="tool" class:failed={change.status === 'failed' || change.status === 'declined'}>
-        <summary>
-          <span class="dot" class:running={change.status === 'inProgress'} aria-hidden="true"></span>
-          <span class="what">{changeSummary(change)}</span>
-        </summary>
+    </details>
+  {:else if item.type === 'fileChange'}
+    {@const change = item as Changes}
+    <details class="tool" class:failed={itemFailed(change)} ontoggle={toggle(item.id)}>
+      <summary>
+        <span class="dot" class:running={change.status === 'inProgress'} aria-hidden="true"></span>
+        <span class="what">{changeSummary(change)}</span>
+      </summary>
+      {#if shown[item.id]}
         {#each change.changes as file (file.path)}
           <p class="file">{file.kind.type === 'add' ? t("New file") : file.kind.type === 'delete' ? t("Deleted") : t("Changed")} · <code>{file.path}</code></p>
-          {#if file.diff}<pre class="output diff"><code>{#each file.diff.split('\n') as line, k (k)}<span class={diffClass(line)}>{line}{'\n'}</span>{/each}</code></pre>{/if}
+          {#if file.diff}<div class="output diff"><pre><code>{#each file.diff.split('\n') as line, k (k)}<span class={diffClass(line)}>{line}{'\n'}</span>{/each}</code></pre></div>{/if}
         {/each}
-      </details>
-    {:else if item.type === 'mcpToolCall'}
-      {@const call = item as Extract<StudioItem, { type: 'mcpToolCall' }>}
-      <p class="tool line" class:failed={!!call.error}><span class="dot" class:running={call.status === 'inProgress'} aria-hidden="true"></span>{t("Used {tool} from {server}", { tool: call.tool, server: call.server })}</p>
-    {:else if item.type === 'webSearch'}
-      {@const query = (item as { query?: string }).query}
-      <p class="tool line"><span class="dot" aria-hidden="true"></span>{query ? t("Searched the web for {query}", { query }) : t("Searched the web")}</p>
-    {:else if item.type === 'imageView'}
-      <p class="tool line"><span class="dot" aria-hidden="true"></span>{t("Looked at {file}", { file: base((item as { path: string }).path) })}</p>
-    {:else if item.type === 'contextCompaction'}
-      <p class="compacted">{t("Earlier messages were summarized to make room")}</p>
-    {:else if item.type === 'plan'}
-      <div class="prose plan-text" use:markdown={{ language: locale.language, text: (item as { text: string }).text }}></div>
+      {/if}
+    </details>
+  {:else}
+    <p class="tool line" class:failed={itemFailed(item)}><span class="dot" class:running={running(item)} aria-hidden="true"></span><span class="what">{toolLabel(item)}</span></p>
+  {/if}
+{/snippet}
+
+{#snippet work(row: Row, live: boolean)}
+  {#if row.kind === 'tools' && row.items.length === 1}
+    {@render tool(row.items[0])}
+  {:else if row.kind === 'tools'}
+    {@const current = row.items.at(-1)!}
+    <!-- Consecutive tool calls fold into one row; while Codex is still at them, the row names what it is doing now. -->
+    <details class="tool group" class:failed={row.items.some(itemFailed)}>
+      <summary>
+        <span class="dot" class:running={live && running(current)} aria-hidden="true"></span>
+        <span class="what">{live ? toolLabel(current) : groupLabel(row.items)}</span>
+        <span class="count">{row.items.length}</span>
+      </summary>
+      <div class="calls">
+        {#each row.items as item (item.id)}{@render tool(item)}{/each}
+      </div>
+    </details>
+  {:else if row.item.type === 'userMessage'}
+    {@render said(row.item)}
+  {:else if isMessage(row.item)}
+    <div class="prose said-by-codex" class:commentary={row.item.phase === 'commentary'} use:markdown={{ language: locale.language, text: row.item.text }}></div>
+  {:else if row.item.type === 'contextCompaction'}
+    <p class="compacted">{t("Earlier messages were summarized to make room")}</p>
+  {:else if row.item.type === 'plan'}
+    <div class="prose plan-text" use:markdown={{ language: locale.language, text: (row.item as { text: string }).text }}></div>
+  {/if}
+{/snippet}
+
+<div class="turn">
+  {#each leading as item (item.id)}{@render said(item)}{/each}
+
+  {#if foldable}
+    <button type="button" class="fold" aria-expanded={!folded} onclick={() => (opened = folded)}>
+      <span class="chevron" aria-hidden="true">›</span>{foldLabel}
+    </button>
+  {/if}
+  {#each rows as row, i (row.kind === 'tools' ? row.id : row.item.id)}
+    {#if !folded}
+      {@render work(row, working && !answer && last && i === rows.length - 1)}
+    {:else if row.kind === 'item' && row.item.type === 'userMessage'}
+      <!-- What the learner added while Codex worked stays in view when the work folds, as in Codex. -->
+      {@render said(row.item)}
     {/if}
   {/each}
 
-  {#if turn.plan?.length}
+  {#if turn.plan?.length && !folded}
     <ol class="plan" aria-label={t("Codex's plan")}>
       {#each turn.plan as step, i (i)}
         <li class={step.status}><span class="box" aria-hidden="true">{step.status === 'completed' ? '✓' : step.status === 'inProgress' ? '•' : ''}</span>{step.step}</li>
@@ -136,8 +271,11 @@
     </ol>
   {/if}
 
-  {#if working && last && !answered}
-    <p class="working" role="status"><span class="dot running" aria-hidden="true"></span>{t("Working…")}</p>
+  {#if working && last && !answer}
+    <p class="working" role="status"><span class="dot running" aria-hidden="true"></span>{thinking || t("Working…")}</p>
+  {/if}
+  {#if answer}
+    <div class="prose said-by-codex" use:markdown={{ language: locale.language, text: answer.text }}></div>
   {/if}
   {#if turn.status === 'interrupted'}
     <p class="ended">{t("Stopped")}</p>
@@ -243,14 +381,52 @@
     font-family: var(--mono);
   }
 
-  .thinking summary {
-    font-style: italic;
+  .count {
+    flex: none;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--raised);
+    font-size: 0.7rem;
   }
 
-  .detail {
-    margin: 0.35rem 0 0 0.9rem;
+  /* An opened run of tool calls scrolls in a box of its own, so a long run never pushes the answer far away. */
+  .calls {
+    display: grid;
+    gap: 0.4rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0.4rem 0 0 0.2rem;
+    padding-left: 0.7rem;
+    border-left: 1px solid var(--rule);
+  }
+
+  /* The work of a turn with an answer, folded behind how long it took. */
+  .fold {
+    justify-self: start;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
     font-size: 0.8rem;
     color: var(--pencil);
+    cursor: pointer;
+  }
+
+  .fold:hover {
+    color: var(--ink-soft);
+  }
+
+  .chevron {
+    display: inline-block;
+    transition: transform 0.15s;
+  }
+
+  .fold[aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
   }
 
   .dot {
@@ -282,11 +458,15 @@
     }
   }
 
+  /* Reversed, so a long output opens at its end, which is what the learner looks for, as in Codex. */
   .output {
+    display: flex;
+    flex-direction: column-reverse;
     margin: 0.35rem 0 0;
     padding: 0.5rem 0.6rem;
     max-height: 16rem;
     overflow: auto;
+    overscroll-behavior: contain;
     border-radius: var(--radius);
     background: var(--raised);
     border: 1px solid var(--rule);
@@ -295,6 +475,12 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--ink-soft);
+  }
+
+  .output pre {
+    margin: 0;
+    font: inherit;
+    white-space: inherit;
   }
 
   .diff .add {

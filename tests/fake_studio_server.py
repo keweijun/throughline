@@ -2,8 +2,9 @@
 
 It logs every message it receives to <log> as JSON lines. A turn's text picks its script: "approve" asks to run a
 command and replies with the learner's decision, "ask" asks a question and replies with the answer, "wait" keeps
-running until it is steered or interrupted; anything else replies "done". With `old` it lacks `turn/steer`, as an
-older Codex would."""
+running until it is steered or interrupted, "busy" works through a long turn with lots of output; anything else
+replies "done". A turn with an output schema writes a chat's title from the first words of its prompt. With `old` it
+lacks `turn/steer`, as an older Codex would."""
 import json
 import sys
 import time
@@ -38,8 +39,38 @@ def message(tid, turn, text, item='m'):
     turns[turn]['items'].append({**entry, 'text': text})
 
 
+def busy(tid, turn, steps):
+    """A long turn as Codex works through a big request: commentary, reasoning, reads, searches and commands with
+    long output, streamed in small pieces with pauses, then the answer."""
+    def item(entry, deltas=(), method=None, key='delta'):
+        note('item/started', {'threadId': tid, 'turnId': turn, 'item': {**entry, 'status': 'inProgress'} if 'status' in entry else entry})
+        for delta in deltas:
+            note(method, {'threadId': tid, 'turnId': turn, 'itemId': entry['id'], key: delta})
+            time.sleep(0.02)
+        note('item/completed', {'threadId': tid, 'turnId': turn, 'item': entry})
+        turns[turn]['items'].append(entry)
+
+    for n in range(steps):
+        item({'type': 'agentMessage', 'id': f'{turn}-c{n}', 'text': f'Looking at part {n}.', 'phase': 'commentary'})
+        item({'type': 'reasoning', 'id': f'{turn}-r{n}', 'summary': [f'Part {n} needs a check.'], 'content': []})
+        for k, (kind, extra) in enumerate([('read', {'name': f'notes{n}.md', 'path': f'inputs/notes{n}.md'}),
+                                           ('search', {'query': f'term{n}', 'path': 'inputs'})]):
+            item({'type': 'commandExecution', 'id': f'{turn}-x{n}-{k}', 'command': f"/bin/zsh -lc 'look {n} {k}'", 'cwd': '.',
+                  'status': 'completed', 'commandActions': [{'type': kind, 'command': f'look {n} {k}', **extra}],
+                  'aggregatedOutput': 'line\n' * 50, 'exitCode': 0})
+        output = [f'output {n} line {i} ' + 'x' * 60 + LINE for i in range(400)]
+        item({'type': 'commandExecution', 'id': f'{turn}-run{n}', 'command': f"/bin/zsh -lc 'python build.py {n}'", 'cwd': '.',
+              'status': 'completed', 'commandActions': [{'type': 'unknown', 'command': f'python build.py {n}'}],
+              'aggregatedOutput': ''.join(output), 'exitCode': 0},
+             [''.join(output[i:i + 20]) for i in range(0, len(output), 20)], 'item/commandExecution/outputDelta')
+    message(tid, turn, 'All parts are built.')
+    finish(tid, turn)
+
+
 def finish(tid, turn, status='completed'):
     turns[turn]['status'] = status
+    turns[turn]['completedAt'] = time.time()
+    turns[turn]['durationMs'] = int((turns[turn]['completedAt'] - turns[turn]['startedAt']) * 1000)
     note('turn/completed', {'threadId': tid, 'turn': turns[turn]})
 
 
@@ -68,13 +99,14 @@ for line in sys.stdin:
         continue
     if method == 'thread/start':
         tid = f't{len(threads) + 1}'
-        threads[tid] = {'cwd': params.get('cwd')}
+        threads[tid] = {'cwd': params.get('cwd'), 'ephemeral': bool(params.get('ephemeral'))}
         reply = {'thread': thread(tid)}
         note('thread/started', {'thread': thread(tid)})
     elif method == 'thread/resume':
         reply = {'thread': thread(params['threadId'])}
     elif method == 'thread/list':
-        reply = {'data': [thread(t, preview=threads[t].get('preview', '')) for t in threads if not threads[t].get('archived')]}
+        reply = {'data': [thread(t, preview=threads[t].get('preview', '')) for t in threads
+                         if not threads[t].get('archived') and not threads[t]['ephemeral']]}
     elif method == 'thread/turns/list':
         mine = [t for t in turns.values() if t['thread'] == params['threadId']]
         reply = {'data': [{k: v for k, v in t.items() if k != 'thread'} for t in reversed(mine)], 'nextCursor': None}
@@ -88,12 +120,17 @@ for line in sys.stdin:
         threads[tid].setdefault('preview', text)
         turn = f'u{len(turns) + 1}'
         turns[turn] = {'id': turn, 'thread': tid, 'items': [{'type': 'userMessage', 'id': turn + '-user', 'content': params['input']}],
-                       'status': 'inProgress', 'error': None}
+                       'status': 'inProgress', 'error': None, 'startedAt': time.time()}
         send({'id': rid, 'result': {'turn': {'id': turn, 'items': [], 'status': 'inProgress'}}})
         note('turn/started', {'threadId': tid, 'turn': {'id': turn, 'items': [], 'status': 'inProgress'}})
         note('item/started', {'threadId': tid, 'turnId': turn, 'item': turns[turn]['items'][0]})
         note('item/completed', {'threadId': tid, 'turnId': turn, 'item': turns[turn]['items'][0]})
-        if 'approve' in text:
+        if params.get('outputSchema'):
+            # A title: the first words of the prompt the title turn quotes, after "User prompt:".
+            words = text.split('User prompt:')[-1].replace('$throughline', '').split()
+            message(tid, turn, json.dumps({'title': 'Title: ' + ' '.join(words[:3])}))
+            finish(tid, turn)
+        elif 'approve' in text:
             ask = next(asked)
             waiting[ask] = (tid, turn, 'approve')
             send({'id': ask, 'method': 'item/commandExecution/requestApproval',
@@ -105,6 +142,8 @@ for line in sys.stdin:
                   'params': {'threadId': tid, 'turnId': turn, 'itemId': 'q1', 'isBlocking': True,
                              'questions': [{'id': 'goal', 'header': 'Goal', 'question': 'What for?', 'isOther': True,
                                             'isSecret': False, 'options': [{'label': 'Exam', 'description': ''}]}]}})
+        elif 'busy' in text:
+            busy(tid, turn, 16)
         elif 'wait' not in text:
             message(tid, turn, 'done')
             finish(tid, turn)

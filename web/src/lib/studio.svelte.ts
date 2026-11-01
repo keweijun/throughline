@@ -44,7 +44,29 @@ export type StudioTurn = {
   items: StudioItem[];
   error: { message: string } | null;
   plan?: PlanStep[];
+  /** When Codex started and finished it (seconds) and how long it took, for "Worked for". */
+  startedAt?: number | null;
+  completedAt?: number | null;
+  durationMs?: number | null;
 };
+
+/** How much of a command's output is kept, from its end, as Codex keeps it. */
+export const OUTPUT_KEPT = 20000;
+export const TRUNCATED = '[output truncated]\n';
+/** The end of a command's output, marked when its start was cut. */
+export const outputTail = (text: string) => (text.length > OUTPUT_KEPT ? TRUNCATED + text.slice(-OUTPUT_KEPT) : text);
+
+/** A chat's first message as a label until its title arrives, as Codex shows one: plain text, skills left out, one
+ * line of at most 60 characters. */
+export function provisionalTitle(text: string) {
+  const plain = text
+    .replace(/(^|\s)\$[\w:.-]+/g, '$1')
+    .replace(/[*_`#>]+/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length <= 60 ? plain : `${plain.slice(0, 59).trimEnd()}…`;
+}
 
 export type ApprovalMethod = 'item/commandExecution/requestApproval' | 'item/fileChange/requestApproval' | 'item/permissions/requestApproval';
 export type UserInputQuestion = { id: string; header: string; question: string; isOther: boolean; isSecret: boolean; options: { label: string; description: string }[] | null };
@@ -152,6 +174,20 @@ class StudioStore {
 
   get thread() {
     return this.threads.find((t) => t.id === this.threadId);
+  }
+
+  /** A chat's name: its title, else the start of its first message, which for a chat just begun the list may not
+   * know yet. */
+  label(id: string) {
+    const thread = this.threads.find((x) => x.id === id);
+    if (thread?.name) return thread.name;
+    let first = thread?.preview ?? '';
+    if (!first && id === this.threadId) {
+      const said = this.turns[0]?.items.find((i) => i.type === 'userMessage') as Extract<StudioItem, { type: 'userMessage' }> | undefined;
+      const text = said?.content.find((c) => c.type === 'text' && !c.text.startsWith(CONTEXT));
+      first = text?.type === 'text' ? text.text : '';
+    }
+    return provisionalTitle(first.startsWith(CONTEXT) ? '' : first) || t('Untitled chat');
   }
 
   /** Loads availability and the course's threads once, opening the most recent thread. */
@@ -411,6 +447,7 @@ class StudioStore {
     switch (method) {
       case 'turn/started':
         this.#turn(params.turn.id).status = 'inProgress';
+        this.#turn(params.turn.id).startedAt = params.turn.startedAt ?? Date.now() / 1000;
         this.activeTurn = params.turn.id;
         this.error = '';
         void this.refreshThreads();
@@ -419,6 +456,8 @@ class StudioStore {
         const turn = this.#turn(params.turn.id);
         turn.status = params.turn.status;
         turn.error = params.turn.error;
+        turn.completedAt = params.turn.completedAt ?? Date.now() / 1000;
+        turn.durationMs = params.turn.durationMs ?? null;
         if (this.activeTurn === params.turn.id) this.activeTurn = null;
         this.pending = this.pending.filter((p) => p.params.turnId !== params.turn.id);
         void this.read(thread);
@@ -455,7 +494,7 @@ class StudioStore {
       }
       case 'item/commandExecution/outputDelta': {
         const item = this.#item(params.turnId, params.itemId);
-        if (item) item.aggregatedOutput = (item.aggregatedOutput ?? '') + params.delta;
+        if (item) item.aggregatedOutput = outputTail((item.aggregatedOutput ?? '') + params.delta);
         break;
       }
       case 'turn/plan/updated':

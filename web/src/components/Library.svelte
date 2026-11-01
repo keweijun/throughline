@@ -280,6 +280,8 @@
     flex-direction: column;
     height: max(26rem, calc(100vh - var(--topbar) - 13rem));
     overflow-y: auto;
+    /* Scrolling past the transcript's ends never carries on into the page, which would move the frame away. */
+    overscroll-behavior: contain;
     padding: 1.1rem 1.1rem 0;
     border: 1px solid var(--rule);
     border-radius: var(--radius);

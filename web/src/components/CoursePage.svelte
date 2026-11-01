@@ -412,6 +412,8 @@
   .studio-frame {
     height: calc(max(24rem, 100vh - var(--topbar) - 22rem) + var(--grown, 0px));
     max-height: none;
+    /* Scrolling past the transcript's ends never carries on into the page, which would move the frame away. */
+    overscroll-behavior: contain;
   }
 
   .actions {

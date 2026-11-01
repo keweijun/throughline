@@ -231,20 +231,52 @@
     return null;
   }
 
-  // The transcript follows new output while the learner is at its end, as a chat does.
+  // The transcript follows new output, as a chat does, until the learner scrolls up; reaching its end again, or
+  // sending, follows it once more. Growth is watched rather than the events behind it, so output that renders late
+  // (Markdown, an opened fold) is followed too, and scrolling up is never undone by the next piece of output.
+  let following = $state(true);
+  let scroller = $state<HTMLElement | null>(null);
+  const atEnd = (node: HTMLElement) => node.scrollHeight - node.scrollTop - node.clientHeight < 8;
+  function toEnd() {
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  }
   $effect(() => {
-    const last = studio.turns.at(-1);
-    void [studio.turns.length, last?.items.length, last?.status, JSON.stringify(last?.items.at(-1) ?? '').length, studio.pending.length];
-    const scroller = scrollParent(list);
-    if (!scroller) return;
-    const near = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
-    if (near) requestAnimationFrame(() => (scroller.scrollTop = scroller.scrollHeight));
+    const node = scrollParent(list);
+    scroller = node;
+    if (!node || !list) return;
+    let last = node.scrollTop;
+    const onScroll = () => {
+      if (node.scrollTop < last - 2) following = atEnd(node);
+      else if (atEnd(node)) following = true;
+      last = node.scrollTop;
+    };
+    // A wheel or touch upward means the learner wants to read back, even while output keeps the end moving.
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) following = false;
+    };
+    const onTouch = () => (following = false);
+    const grew = new ResizeObserver(() => {
+      if (following) toEnd();
+      last = node.scrollTop;
+    });
+    grew.observe(list);
+    node.addEventListener('scroll', onScroll, { passive: true });
+    node.addEventListener('wheel', onWheel, { passive: true });
+    node.addEventListener('touchmove', onTouch, { passive: true });
+    return () => {
+      grew.disconnect();
+      node.removeEventListener('scroll', onScroll);
+      node.removeEventListener('wheel', onWheel);
+      node.removeEventListener('touchmove', onTouch);
+    };
+  });
+  // A message the learner sends, or another chat opened, brings the end back into view.
+  $effect(() => {
+    void [studio.threadId, studio.sent.length];
+    following = true;
+    requestAnimationFrame(toEnd);
   });
 
-  const threadLabel = (id: string) => {
-    const thread = studio.threads.find((x) => x.id === id);
-    return thread?.name || thread?.preview || t('Untitled chat');
-  };
 </script>
 
 <section class="panel-view studio" aria-labelledby="studio-title">
@@ -265,8 +297,10 @@
           }}
         >
           <option value="">{t("New chat")}</option>
+          <!-- A chat just begun, until the list knows it. -->
+          {#if studio.threadId && !studio.thread}<option value={studio.threadId}>{studio.label(studio.threadId)}</option>{/if}
           {#each studio.threads as thread (thread.id)}
-            <option value={thread.id}>{thread.running ? '● ' : ''}{threadLabel(thread.id)}</option>
+            <option value={thread.id}>{thread.running ? '● ' : ''}{studio.label(thread.id)}</option>
           {/each}
         </select>
         <button class="btn btn-quiet btn-small" disabled={!studio.threadId} onclick={() => studio.newThread()}>{t("New chat")}</button>
@@ -310,7 +344,7 @@
 
   {#snippet target()}
     <span class="target">
-      {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if title}{' · '}{title}{/if}
+      {studio.threadId ? studio.label(studio.threadId) : t("New chat")}{#if title}{' · '}{title}{/if}
       {#if studio.origin}
         <span class="origin" title={studio.origin.text}>
           <span class="origin-label">{studio.origin.label}</span>

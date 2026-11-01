@@ -53,7 +53,7 @@ Everything in the app belongs to one of three levels, and each level has its pla
 **The top bar says where the learner is**, from left to right:
 
 - **A breadcrumb, All courses › the course.** The logo and "All courses" lead to the library; the course's name opens a menu of the library's other courses, so switching courses does not need the library.
-- **The course's three places, Study · Review · Overview**, as one switch with the current place filled. A course is studied, reviewed and looked after as a whole, and these are where; the way back to studying is always the same control, so the Course page needs no "Back to reading".
+- **The course's three places, Overview · Learn · Review**, as one switch with the current place filled. A course is studied, reviewed and looked after as a whole, and these are where; the way back to studying is always the same control, so the Course page needs no "Back to reading".
 - The section's position (Section 28 of 70) beside it.
 - On the right, what is used while reading a section (Questions, Source, Notes), then Settings and Help.
 

@@ -125,8 +125,17 @@
   {#if studying}
     <!-- The three places of one course; the one you are in is always marked, so the way back is always the same. -->
     <div class="places" role="group" aria-label={t("This course")}>
-      <button id="open-study" class="place" aria-label={t("Study")} aria-current={place === 'study' ? 'page' : undefined} onclick={() => ((app.courseOpen = false), (app.reviewOpen = false))}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Study")}</span>
+      <button
+        id="open-course"
+        class="place" aria-label={t("Overview")}
+        aria-current={place === 'overview' ? 'page' : undefined}
+        title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
+        onclick={() => app.showCourse()}
+      >
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Overview")}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+      </button>
+      <button id="open-study" class="place" aria-label={t("Learn")} aria-current={place === 'study' ? 'page' : undefined} onclick={() => ((app.courseOpen = false), (app.reviewOpen = false))}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Learn")}</span>
       </button>
       {#if review}
         <button
@@ -139,15 +148,6 @@
           <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Review")}</span>
         </button>
       {/if}
-      <button
-        id="open-course"
-        class="place" aria-label={t("Overview")}
-        aria-current={place === 'overview' ? 'page' : undefined}
-        title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
-        onclick={() => app.showCourse()}
-      >
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Overview")}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
-      </button>
     </div>
     {#if route.length && index >= 0}
       <div class="progress" title={t("{studied} of {total} sections studied", { studied, total: route.length })}>

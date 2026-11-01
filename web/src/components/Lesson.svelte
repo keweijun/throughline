@@ -7,6 +7,7 @@
   import type { Turn } from '../lib/types';
   import TurnControls from './TurnControls.svelte';
   import CheckQuestion from './CheckQuestion.svelte';
+  import SuggestedChange from './SuggestedChange.svelte';
   import SuggestedMemory from './SuggestedMemory.svelte';
   import Hint from './Hint.svelte';
 
@@ -171,6 +172,7 @@
   {/if}
 
   <SuggestedMemory entries={app.suggestedBy([turn.id])} />
+  <SuggestedChange turnId={turn.id} />
   {#if turn.status === 'completed' && turn.text}
     <Hint id="select-passage">{t('Select any passage in the lesson to ask about it, highlight it or add a note.')}</Hint>
     {#if turn.source_refs?.length}

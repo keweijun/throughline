@@ -124,6 +124,7 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | POST | `/api/memory` | The learner tells the teacher what to remember (`text`, the section in view as `concept_id`, optional `id`): `memory.request` records the message and a `memory` turn answers; `/api/state` lists requests under `memory_requests` |
 | PUT/DELETE | `/api/memory/{id}` | Edit a course memory entry's `text`, or delete it (a dismissed suggestion is deleted too); `/api/state` lists entries under `memory` |
 | POST | `/api/memory/{id}/confirm` | Confirm a suggested preference so it enters prompts |
+| PUT | `/api/course-changes/{id}` | Answer a course change the teacher suggested (ADR 0016): `status` is `opened` (the learner opened it in Studio) or `dismissed`; `/api/state` lists the open one under `changes` |
 | GET | `/api/about` | The installed version, for Settings' About tab |
 | GET | `/api/update` | The installed version, the version on GitHub `main` and whether it is newer; 502 when GitHub cannot be reached. The interface asks once at launch; a version found in the last six hours is reused unless `fresh=1` (the About pane's Check for updates). Installing it is handed to Codex |
 | GET | `/api/health` | Process id and launch id; the cheap liveness probe `guided-learning open` and `stop` use |

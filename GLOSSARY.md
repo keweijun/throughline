@@ -85,6 +85,9 @@ _Avoid_: Course manager, a second store of progress, Studio (where courses are c
 **Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
 _Avoid_: Chat, workshop, side question, teaching.
 
+**Suggested course change**: A change to the course itself that the teacher proposes under a lesson reply or side-question answer, which the learner opens in Studio with the request filled in or dismisses. One is open at a time (ADR 0016).
+_Avoid_: Suggested preference (course memory), a Studio hand-off button, supplement (taught in the side question itself).
+
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
 

@@ -2,7 +2,7 @@
   import type { Completion, CompletionContext, CompletionSource } from '@codemirror/autocomplete';
   import type { EditorView } from '@codemirror/view';
   import { insertChip, type ChipRange } from '../lib/editor';
-  import { t } from '../lib/i18n.svelte';
+  import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { studio, type StudioMessage } from '../lib/studio.svelte';
   import Composer from './Composer.svelte';
@@ -43,12 +43,33 @@
   const draft = $derived(app.drafts.get(draftKey));
   const images = $derived(app.drafts.images(draftKey));
 
-  // Course work Studio is for, offered when a chat is empty; each fills the box rather than sending.
-  const examples = $derived([
-    { label: t('Add files to this course'), text: `$throughline ${t('Add these files to {course}:', { course })} ` },
-    { label: t('Check the pages that still need review'), text: `$throughline ${t('Review the pages of {course} that still need checking.', { course })}` },
-    { label: t('Change how this course is taught'), text: `$throughline ${t('In {course},', { course })} ` },
-  ]);
+  // Course work Studio can do, offered when a chat is empty; each fills the box rather than sending. Adding files
+  // always shows; three more are drawn from the rest each time Studio opens, so the learner sees its range over time.
+  const IDEAS: [MessageKey, MessageKey][] = [
+    ['Check the pages that still need review', 'Review the pages of {course} that still need checking.'],
+    ['Change how this course is taught', 'In {course},'],
+    ['Turn a past exam into practice', 'In {course}, turn this past exam into practice in its style:'],
+    ['Add a section the course is missing', 'In {course}, add a section on'],
+    ['Fill in derivations the notes skip', 'In {course}, fill in the derivations my materials skip in chapter'],
+    ['Add Python exercises to a chapter', 'In {course}, add Python exercises I can run to chapter'],
+    ['Make a one-page cheat sheet', 'Make a one-page cheat sheet of {course} as a PDF, covering'],
+    ['Make Anki cards of what I find hard', 'Make Anki cards from the difficulties in {course}.'],
+    ['Teach this course in another language', 'From now on, teach {course} in'],
+  ];
+  const drawn = IDEAS.map((_, i) => i);
+  for (let i = drawn.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [drawn[i], drawn[j]] = [drawn[j], drawn[i]];
+  }
+  const shown: [MessageKey, MessageKey][] = [
+    ['Add files to this course', 'Add these files to {course}:'],
+    ...drawn.slice(0, 3).sort((a, b) => a - b).map((i) => IDEAS[i]),
+  ];
+  // A request that ends in a full stop is complete; the others leave the caret after a space for the learner to finish.
+  const examples = $derived(shown.map(([label, text]) => {
+    const request = t(text, { course });
+    return { label: t(label), text: `$throughline ${request}${/[.。]$/.test(request) ? '' : ' '}` };
+  }));
 
   const atWordStart = (context: CompletionContext, from: number) => from === 0 || /\s/.test(context.state.sliceDoc(from - 1, from));
 
@@ -221,7 +242,7 @@
       <p class="panel-empty" role="status">{t("Starting Codex…")}</p>
     {:else if !studio.turns.length}
       <div class="welcome">
-        <p class="panel-empty">{t("Ask for course work here: adding files, rebuilding chapters, checking pages, changing how the course is taught. Questions about the material go to Questions.")}</p>
+        <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
         <ul class="examples">
           {#each examples as example (example.label)}
             <li><button class="btn btn-quiet btn-small" onclick={() => fill(example.text)}>{example.label}</button></li>

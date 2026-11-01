@@ -63,6 +63,7 @@ class StudioTest(unittest.TestCase):
         self.assertEqual((started['sandbox'], started['approvalPolicy'], started['ephemeral']), ('workspace-write', 'on-request', False))
         self.assertIn('Throughline Studio', started['developerInstructions'])
         self.assertIn('never run `guided-learning open`', started['developerInstructions'])
+        self.assertIs(started['config']['features.default_mode_request_user_input'], True)
         turn = self.received('turn/start')[0]
         self.assertEqual(turn['approvalPolicy'], 'on-request')
         self.assertEqual(turn['sandboxPolicy']['type'], 'workspaceWrite')

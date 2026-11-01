@@ -132,6 +132,42 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('an empty chat suggests a range of course work that fills the box without sending', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  await expect(panel).toContainText('This is Codex itself, working on this course.');
+  // Adding files always shows; three more are drawn from the rest.
+  const suggestions = panel.locator('.examples button');
+  await expect(suggestions).toHaveCount(4);
+  await expect(suggestions.first()).toHaveText('Add files to this course');
+  await suggestions.nth(1).click();
+  const box = page.locator('#studio-input');
+  expect(await editorText(box)).toMatch(/^\$throughline .*waves/);
+  await expect(panel.locator('.user')).toHaveCount(0);
+});
+
+test('a course change the teacher suggests opens in Studio with the request, and closes once answered', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
+  await expect(suggestion).toContainText('Change the course? Add a section on interference after Wave superposition');
+
+  await suggestion.getByRole('link', { name: 'Open in Studio' }).click();
+  const box = page.locator('#studio-input');
+  await expect(box).toBeVisible();
+  expect(await editorText(box)).toContain('$throughline Add a section on interference after Wave superposition');
+  await expect(page.locator('#course-studio form .origin')).toContainText('Section: Wave superposition');
+  // Opened, it is answered: going back to the lesson, it is gone, and a reload does not bring it back.
+  await page.getByRole('button', { name: 'Back to reading' }).click();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  await expect(suggestion).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  await expect(page.getByRole('group', { name: 'Suggested course change' })).toHaveCount(0);
+});
+
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('link', { name: 'Add files in Studio' }).click();

@@ -368,6 +368,14 @@ CONSOLIDATION_REQUEST = 'Internal memory task: consolidate the course memory at 
 MEMORY_REQUEST = 'Internal memory task: answer what the learner asked the teacher to remember.'
 
 
+# Course changes (ADR 0016): the teacher may suggest one change to the course itself, which Studio makes.
+COURSE_CHANGE = '''Course changes: you teach this course but cannot change it; Studio, the app's Codex chat, can (add a section or sources, add or rework exercises, rebuild a chapter, change how the course is taught). When a change to the course itself would clearly help this learner, such as a prerequisite the route lacks that they keep needing, a section they keep finding too fast or too thin, or the learner asking you to change the course, suggest it by ending the reply with one <course-change>{"request":"the change, as an instruction to Codex"}</course-change>, before any memory note. The learner sees it under the reply and can open it in Studio with the request filled in, or dismiss it; do not mention the block, but say in a sentence why the change would help when that is not obvious. Most replies need none. Write the request in the teaching language, in under 300 characters, naming the sections or chapters it concerns. Do not suggest again what an earlier suggestion asked, whether the learner opened or dismissed it.'''
+
+
+def course_change(earlier):
+    return COURSE_CHANGE + (' Earlier suggestions (data): ' + json.dumps(earlier, ensure_ascii=False) if earlier else '')
+
+
 def memory_request(message, preferences, language):
     """The small model turns what the learner asked to be remembered into teaching preferences (ADR 0010)."""
     return ('The learner of a guided-learning course is telling their teacher how they like to be taught. '

@@ -103,6 +103,16 @@
     background: var(--sheet);
   }
 
+  /* Closing slides the panel back out the way it came, and the reading column takes the room once it has gone. */
+  .panel[hidden] {
+    opacity: 0;
+    translate: 1.25rem 0;
+    transition:
+      opacity var(--quick) ease,
+      translate var(--quick) ease,
+      display var(--quick) allow-discrete;
+  }
+
   .panel:focus {
     outline: none;
   }

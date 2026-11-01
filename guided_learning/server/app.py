@@ -6,6 +6,7 @@ import os
 import socket
 import tempfile
 import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,7 +25,7 @@ from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
 from .settings import Seen, TeacherSettings
-from .studio import MAX_UPLOAD, Studio, message_input
+from .studio import LIBRARY, MAX_UPLOAD, Studio, message_input
 
 log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
@@ -214,6 +215,10 @@ class StudioRename(Body):
 
 class StudioAccess(Body):
     full_access: bool
+
+
+class StudioRefile(Body):
+    name: str
 
 
 class Courses:
@@ -525,13 +530,15 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.post(IMAGE_UPLOAD)
-    async def upload_image(request: Request):
+    async def upload_image(request: Request, scope: str = ''):
         data = await request.body()
-        return {'image': await asyncio.to_thread(attached.save, host.workspace, data)}
+        folder = image_folder(scope)
+        folder.mkdir(parents=True, exist_ok=True)
+        return {'image': await asyncio.to_thread(attached.save, folder, data)}
 
     @app.get(IMAGE_UPLOAD + '/{name}')
-    def image(name: str):
-        path = attached.path(host.workspace, name)
+    def image(name: str, scope: str = ''):
+        path = attached.path(image_folder(scope), name)
         return FileResponse(path, media_type=attached.TYPES[path.suffix[1:]])
 
     @app.post('/api/practice/tasks/{task_id}/{action}')
@@ -685,9 +692,24 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def course_folder():
         return courses.require().workspace
 
+    def scoped(scope=''):
+        """The open course, or with `scope=library` the library page's Studio, which works before a course is open."""
+        if scope == 'library':
+            if courses.root is None:
+                raise OperationError('no_library', 'This host was started for a single course')
+            return LIBRARY
+        return course_folder()
+
+    def intake_today():
+        return studio.intake() / time.strftime('%Y-%m-%d')
+
+    def image_folder(scope=''):
+        """Where attached images are kept: the open course, or the library's intake before a course exists."""
+        return studio.intake() if scope == 'library' else host.workspace
+
     @app.get('/api/studio')
-    def studio_view():
-        course = course_folder()
+    def studio_view(scope: str = ''):
+        course = scoped(scope)
         try:
             studio.ready()
             return {'available': True, 'access': studio.access(), 'threads': studio.threads(course)}
@@ -697,37 +719,45 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return {'available': False, 'error': str(exc), 'access': studio.access(), 'threads': []}
 
     @app.get('/api/studio/activity')
-    def studio_activity():
-        return studio.activity(course_folder())
+    def studio_activity(scope: str = ''):
+        return studio.activity(scoped(scope))
 
     @app.get('/api/studio/skills')
-    def studio_skills():
-        return {'skills': studio.skills(course_folder())}
+    def studio_skills(scope: str = ''):
+        return {'skills': studio.skills(scoped(scope))}
 
     @app.get('/api/studio/search')
-    def studio_search(q: str = ''):
-        return {'files': studio.search(course_folder(), q) if q.strip() else []}
+    def studio_search(q: str = '', scope: str = ''):
+        return {'files': studio.search(scoped(scope), q) if q.strip() else []}
 
     @app.get('/api/studio/threads/{thread_id}')
-    def studio_thread(thread_id: str):
-        return studio.history(course_folder(), thread_id)
+    def studio_thread(thread_id: str, scope: str = ''):
+        return studio.history(scoped(scope), thread_id)
 
     @app.put('/api/studio/threads/{thread_id}')
-    def studio_rename(thread_id: str, body: StudioRename):
-        return studio.rename(course_folder(), thread_id, body.name)
+    def studio_rename(thread_id: str, body: StudioRename, scope: str = ''):
+        return studio.rename(scoped(scope), thread_id, body.name)
 
     @app.delete('/api/studio/threads/{thread_id}')
-    def studio_archive(thread_id: str):
-        return studio.archive(course_folder(), thread_id)
+    def studio_archive(thread_id: str, scope: str = ''):
+        return studio.archive(scoped(scope), thread_id)
 
     @app.post('/api/studio/threads/{thread_id}/interrupt')
-    def studio_interrupt(thread_id: str):
-        return studio.interrupt(course_folder(), thread_id)
+    def studio_interrupt(thread_id: str, scope: str = ''):
+        return studio.interrupt(scoped(scope), thread_id)
+
+    @app.post('/api/studio/threads/{thread_id}/course')
+    def studio_refile(thread_id: str, body: StudioRefile):
+        """A library chat that made a course moves to it, so the course's Overview lists it from then on."""
+        path = library.course_path(courses.root, body.name) if courses.root else None
+        if path is None or not library.is_course(path):
+            raise OperationError('unknown_course', f'No course named {body.name} in the library')
+        return studio.refile(thread_id, path.resolve())
 
     @app.post('/api/studio/messages')
-    def studio_send(body: StudioMessage):
-        course = course_folder()
-        images = [attached.path(course, name) for name in body.images]
+    def studio_send(body: StudioMessage, scope: str = ''):
+        course = scoped(scope)
+        images = [attached.path(image_folder(scope), name) for name in body.images]
         items = message_input(body.text, [e.model_dump() for e in body.elements], [s.model_dump() for s in body.skills],
                               [m.model_dump() for m in body.mentions], images, body.context)
         if not items:
@@ -749,14 +779,17 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return result
 
     @app.post(FILE_UPLOAD)
-    async def studio_upload(request: Request, name: str):
-        course = course_folder()
+    async def studio_upload(request: Request, name: str, scope: str = ''):
+        course = scoped(scope)
+        # Before a course exists, files wait in the library's intake; the path returned is the library's.
+        folder = intake_today() if course == LIBRARY else None
+        course = courses.root if course == LIBRARY else course
         # Spooled to disk past a few megabytes, so a large PDF never sits in memory.
         with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as spool:
             async for chunk in request.stream():
                 spool.write(chunk)
             spool.seek(0)
-            return await asyncio.to_thread(studio.upload, course, name, iter(lambda: spool.read(1024 * 1024), b''))
+            return await asyncio.to_thread(studio.upload, course, name, iter(lambda: spool.read(1024 * 1024), b''), folder)
 
     @app.get('/api/library')
     def library_view():

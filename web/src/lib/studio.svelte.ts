@@ -77,7 +77,14 @@ export const CONTEXT = 'Context from Throughline: ';
 type History = { id: string; turns: StudioTurn[]; active_turn: string | null; pending: StudioRequest[] };
 type Activity = { running: string[]; waiting: StudioRequest[] };
 
+/** Where Studio works: the open course, or the library page before a course is open (#109). */
+export type StudioScope = 'course' | 'library';
+
 class StudioStore {
+  /** The course whose Overview shows Studio, or the library page; switching starts from that place's chats. */
+  scope = $state<StudioScope>('course');
+  /** On the library page, the courses there were when this chat began, so a course Codex makes can be offered. */
+  coursesBefore = $state<string[] | null>(null);
   /** Null until asked; false when this Codex cannot run Studio, which then hands off to a Codex chat instead. */
   available = $state<boolean | null>(null);
   error = $state('');
@@ -110,6 +117,29 @@ class StudioStore {
   /** Whether the learner chose a chat (sent, opened or started one), which the first load must then leave alone. */
   #chosen = false;
 
+  /** An endpoint for this scope: the library page's Studio adds `scope=library`; the course's needs nothing. */
+  url(path: string) {
+    return this.scope === 'library' ? `${path}${path.includes('?') ? '&' : '?'}scope=library` : path;
+  }
+
+  /** Moves Studio between the library page and a course's Overview; each has its own chats, so this starts afresh. */
+  setScope(scope: StudioScope) {
+    if (scope === this.scope) return;
+    this.scope = scope;
+    this.#loaded = null;
+    this.#chosen = false;
+    this.#reading++;
+    this.threads = [];
+    this.threadId = null;
+    this.turns = [];
+    this.activeTurn = null;
+    this.pending = [];
+    this.context = null;
+    this.origin = null;
+    this.skills = [];
+    this.coursesBefore = null;
+  }
+
   get running() {
     return !!this.activeTurn;
   }
@@ -124,7 +154,7 @@ class StudioStore {
       this.#loaded = (async () => {
         this.loading = true;
         try {
-          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; threads: StudioThread[] }>('/api/studio');
+          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; threads: StudioThread[] }>(this.url('/api/studio'));
           this.available = view.available;
           this.error = view.error ?? '';
           this.access = view.access;
@@ -149,7 +179,7 @@ class StudioStore {
 
   async loadSkills() {
     try {
-      this.skills = (await api.get<{ skills: StudioSkill[] }>('/api/studio/skills')).skills;
+      this.skills = (await api.get<{ skills: StudioSkill[] }>(this.url('/api/studio/skills'))).skills;
     } catch {
       // Skills are a convenience of the box; Codex still reads `$name` in the text.
     }
@@ -180,7 +210,7 @@ class StudioStore {
 
   async refreshThreads() {
     try {
-      const view = await api.get<{ threads: StudioThread[] }>('/api/studio');
+      const view = await api.get<{ threads: StudioThread[] }>(this.url('/api/studio'));
       this.threads = view.threads;
     } catch {
       // The next event or visit tries again.
@@ -212,7 +242,7 @@ class StudioStore {
     const reading = ++this.#reading;
     this.#readsOut++;
     try {
-      const history = await api.get<History>(`/api/studio/threads/${encodeURIComponent(id)}`);
+      const history = await api.get<History>(this.url(`/api/studio/threads/${encodeURIComponent(id)}`));
       if (reading !== this.#reading || this.threadId !== id) return;
       this.turns = history.turns;
       this.activeTurn = history.active_turn;
@@ -229,6 +259,7 @@ class StudioStore {
 
   newThread() {
     this.#chosen = true;
+    this.coursesBefore = null;
     this.#reading++;
     this.threadId = null;
     this.turns = [];
@@ -244,7 +275,7 @@ class StudioStore {
     const stale = this.#readsOut > 0;
     this.#reading++;
     const origin = this.origin;
-    const result = await api.post<{ thread: string; turn: string; steered: boolean }>('/api/studio/messages', {
+    const result = await api.post<{ thread: string; turn: string; steered: boolean }>(this.url('/api/studio/messages'), {
       thread_id: this.threadId,
       ...message,
       ...(origin ? { context: origin.text } : {}),
@@ -267,7 +298,7 @@ class StudioStore {
 
   async stop() {
     if (!this.threadId) return;
-    await api.post(`/api/studio/threads/${encodeURIComponent(this.threadId)}/interrupt`);
+    await api.post(this.url(`/api/studio/threads/${encodeURIComponent(this.threadId)}/interrupt`));
   }
 
   async answer(request: StudioRequest, body: { decision?: string; answers?: Record<string, string[]> }) {
@@ -282,22 +313,22 @@ class StudioStore {
   }
 
   async rename(id: string, name: string) {
-    await api.put(`/api/studio/threads/${encodeURIComponent(id)}`, { name });
+    await api.put(this.url(`/api/studio/threads/${encodeURIComponent(id)}`), { name });
     await this.refreshThreads();
   }
 
   async archive(id: string) {
-    await api.delete(`/api/studio/threads/${encodeURIComponent(id)}`);
+    await api.delete(this.url(`/api/studio/threads/${encodeURIComponent(id)}`));
     if (this.threadId === id) this.newThread();
     await this.refreshThreads();
   }
 
   search(query: string) {
-    return api.get<{ files: StudioFile[] }>(`/api/studio/search?q=${encodeURIComponent(query)}`).then((r) => r.files);
+    return api.get<{ files: StudioFile[] }>(this.url(`/api/studio/search?q=${encodeURIComponent(query)}`)).then((r) => r.files);
   }
 
   upload(file: File) {
-    return api.upload<StudioFile>(`/api/studio/files?name=${encodeURIComponent(file.name)}`, file);
+    return api.upload<StudioFile>(this.url(`/api/studio/files?name=${encodeURIComponent(file.name)}`), file);
   }
 
   #turn(id: string) {

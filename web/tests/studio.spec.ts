@@ -227,3 +227,38 @@ test('opening Studio on the course page leaves the page at its top and names the
   // The folder is "waves"; the learner sees the course's title.
   await expect(page.locator('#course-studio .target').first()).toContainText('New chat · Waves');
 });
+
+test('the library page has its own Studio: new courses begin there, and course actions ask it', async ({ page, course }) => {
+  const { base, errors } = await course('studio_browser_fixture');
+  await page.locator('#open-courses').click();
+  const library = page.locator('.studio-part');
+  await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
+
+  // A course card's action asks Studio here, naming the course.
+  await page.getByRole('button', { name: 'Add files', exact: true }).click();
+  const box = page.locator('#studio-input');
+  await expect(box).toBeFocused();
+  await expect(box).toContainText('$throughline add these files to the course waves:');
+
+  // New course starts a fresh chat; what is sent there is the library's, not the open course's.
+  await page.getByRole('button', { name: 'New course', exact: true }).click();
+  await expect(box).toBeFocused();
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(library.locator('.said-by-codex')).toHaveText('done');
+  expect((await (await page.request.get(base + '/api/studio?scope=library')).json()).threads).toHaveLength(1);
+  expect((await (await page.request.get(base + '/api/studio')).json()).threads).toHaveLength(0);
+
+  // A course that appears in the library after the chat began is offered for opening.
+  await page.route('**/api/library', async (route) => {
+    const listed = await (await route.fetch()).json();
+    listed.courses.push({ name: 'optics', path: '/library/optics', title: 'Optics', concepts: 3, sources: 1 });
+    await route.fulfill({ json: listed });
+  });
+  // Showing the library reads it again.
+  await page.locator('#open-courses').click();
+  await expect(library.getByRole('button', { name: 'Open Optics' })).toBeVisible();
+  expect(errors).toEqual([]);
+});

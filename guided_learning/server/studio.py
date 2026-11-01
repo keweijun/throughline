@@ -33,6 +33,19 @@ INSTRUCTIONS = PARAGRAPH.join([
     "attaches here are already copied into the course's `inputs/` folder: register them where they are.",
     'Studio is a small panel beside the course, so keep replies brief and lead with what the learner has to decide.',
 ])
+# Before a course is open, on the library page, Studio works for the library as a whole: making a course, or course
+# work on any course by name. Its threads are filed under this key until the learner opens the course one made.
+LIBRARY = 'library'
+LIBRARY_INSTRUCTIONS = PARAGRAPH.join([
+    "You are working in Throughline Studio, the Throughline app's own Codex chat for course work. "
+    'The learner is on the course library page, with no course open. Use the $throughline skill: most often they '
+    'want to make a new course from their files; they may also ask for work on an existing course by name.',
+    'The app is already open, so never run `guided-learning open` or `guided-learning stop`. Files the learner '
+    'attaches here are kept in the library\'s `.intake/` folder until a course takes them: copy the ones a new course '
+    "uses into its `inputs/` folder and register them there. When a course is made or changed, say so and name its "
+    'folder; the library shows it by itself, and the learner opens it from there.',
+    'Keep replies brief and lead with what the learner has to decide.',
+])
 LINE = chr(10)
 
 
@@ -323,7 +336,8 @@ class Studio:
                   # Codex offers its question tool only in Plan mode unless this feature is on; with it, the skill
                   # asks intake and other choices as options the learner clicks. A Codex without it ignores the key.
                   'config': {'model_reasoning_effort': current['effort'], 'features.default_mode_request_user_input': True},
-                  'developerInstructions': INSTRUCTIONS.format(course=f', with the course in {course} open')}
+                  'developerInstructions': LIBRARY_INSTRUCTIONS if course == LIBRARY else
+                  INSTRUCTIONS.format(course=f', with the course in {course} open')}
         if current['model']:
             params['model'] = current['model']
         if current['service_tier']:
@@ -406,6 +420,20 @@ class Studio:
             server.call('turn/interrupt', {'threadId': thread, 'turnId': turn})
         return {'thread': thread}
 
+    def intake(self):
+        """Where files attached on the library page wait for the course a Studio chat makes: hidden, so the library
+        never lists it as a course, and dated, so one day's files stay together."""
+        if self.root is None:
+            raise StudioError('no_library', 'Studio on the library page needs the course library')
+        return self.root / '.intake'
+
+    def refile(self, thread, course):
+        """File a library thread under the course it made, so the course's Overview shows it from now on."""
+        self._owns(LIBRARY, thread)
+        self._record(LIBRARY, thread, keep=False)
+        self._record(course, thread)
+        return {'thread': thread, 'course': str(course)}
+
     def rename(self, course, thread, name):
         self._load(course, thread).call('thread/name/set', {'threadId': thread, 'name': name.strip()[:120]})
         self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
@@ -459,7 +487,8 @@ class Studio:
         return skills
 
     def search(self, course, query):
-        found = self._server().call('fuzzyFileSearch', {'query': query, 'roots': [str(course)], 'cancellationToken': None})
+        root = self.root if course == LIBRARY else course
+        found = self._server().call('fuzzyFileSearch', {'query': query, 'roots': [str(root)], 'cancellationToken': None})
         files = []
         for match in found.get('files', []):
             relative = Path(match['path'])
@@ -470,12 +499,13 @@ class Studio:
         return files[:30]
 
     @staticmethod
-    def upload(course, name, chunks):
-        """Copy an attached file into the course's `inputs/` folder, where the skill registers sources from."""
+    def upload(course, name, chunks, folder=None):
+        """Copy an attached file into the course's `inputs/` folder, where the skill registers sources from, or into
+        `folder` (the library's intake, before a course exists); the path returned is relative to `course`."""
         name = Path(str(name or '').replace(chr(0), '')).name.strip()
         if not name or name.startswith('.'):
             raise StudioError('invalid_studio_file', 'The file needs a name')
-        folder = Path(course) / 'inputs'
+        folder = Path(folder) if folder else Path(course) / 'inputs'
         folder.mkdir(parents=True, exist_ok=True)
         target, stem, suffix = folder / name, Path(name).stem, Path(name).suffix
         for n in itertools.count(2):

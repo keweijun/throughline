@@ -136,7 +136,7 @@
   @keyframes capsule-in {
     from {
       opacity: 0;
-      transform: translateX(-0.4rem);
+      translate: -0.4rem 0;
     }
   }
 
@@ -200,13 +200,13 @@
     border-radius: 999px;
     background: var(--accent-wash);
     animation: tray-in var(--settle) var(--ease-out);
+    transform-origin: top;
   }
 
   @keyframes tray-in {
     from {
       opacity: 0;
-      transform: scaleY(0.85);
-      transform-origin: top;
+      scale: 1 0.85;
     }
   }
 

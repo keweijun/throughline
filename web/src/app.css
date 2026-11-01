@@ -365,7 +365,7 @@ summary::before,
   border-right: 1.6px solid currentColor;
   border-bottom: 1.6px solid currentColor;
   transform: rotate(-45deg);
-  transition: transform 0.15s ease;
+  transition: transform var(--quick) var(--ease-out);
   vertical-align: middle;
 }
 
@@ -1001,6 +1001,37 @@ dialog[open] {
 
 dialog[open]::backdrop {
   animation: enter-fade var(--settle) ease;
+}
+
+/* Closing settles back the way the dialog came, a little faster; the dialog stays in the top layer until it has. */
+dialog {
+  opacity: 0;
+  scale: 0.97;
+  translate: 0 4px;
+  transition:
+    opacity var(--quick) ease,
+    scale var(--quick) ease,
+    translate var(--quick) ease,
+    overlay var(--quick) allow-discrete,
+    display var(--quick) allow-discrete;
+}
+
+dialog[open] {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+}
+
+dialog::backdrop {
+  opacity: 0;
+  transition:
+    opacity var(--quick) ease,
+    overlay var(--quick) allow-discrete,
+    display var(--quick) allow-discrete;
+}
+
+dialog[open]::backdrop {
+  opacity: 1;
 }
 
 /* Thin scrollbars that take the theme's colours instead of the platform default. */

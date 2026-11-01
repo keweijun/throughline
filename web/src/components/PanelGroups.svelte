@@ -1,6 +1,7 @@
 <script lang="ts" generics="T">
   import type { Snippet } from 'svelte';
   import { slide } from 'svelte/transition';
+  import { prefersReducedMotion } from 'svelte/motion';
   import type { PanelGroup, PanelScope } from '../lib/panel';
 
   // One way to list side-panel items under their chapter and section; a single section needs no heading of its own.
@@ -21,7 +22,7 @@
     {#if scope !== 'section'}<h3 class="section">{group.title}</h3>{/if}
     <div class="items">
       {#each group.items as entry (key(entry))}
-        <div transition:slide={{ duration: 200 }}>{@render item(entry)}</div>
+        <div transition:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}>{@render item(entry)}</div>
       {/each}
     </div>
   </section>

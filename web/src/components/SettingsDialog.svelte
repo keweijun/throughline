@@ -546,7 +546,8 @@
     transition:
       background-color var(--quick) var(--ease-out),
       border-color var(--quick) var(--ease-out),
-      color var(--quick) var(--ease-out);
+      color var(--quick) var(--ease-out),
+      box-shadow var(--quick) var(--ease-out);
   }
 
   .glyph {
@@ -838,5 +839,14 @@
     .scope {
       display: none;
     }
+  }
+
+  /* A pane that comes into view fades in rather than replacing the last one in a blink. */
+  .pane > * {
+    animation: enter-fade var(--quick) ease;
+  }
+
+  .foot [role='status'] {
+    animation: enter-fade var(--quick) ease;
   }
 </style>

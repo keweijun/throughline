@@ -154,6 +154,7 @@
   }
 
   .user {
+    animation: enter-rise var(--settle) var(--ease-out);
     justify-self: end;
     display: grid;
     gap: 0.3rem;
@@ -198,6 +199,7 @@
   }
 
   .said-by-codex {
+    animation: enter-fade var(--settle) ease;
     font-size: var(--step--1);
     overflow-wrap: anywhere;
   }
@@ -207,6 +209,7 @@
   }
 
   .tool {
+    animation: enter-fade var(--settle) ease;
     min-width: 0;
     font-size: 0.8rem;
     color: var(--pencil);
@@ -315,6 +318,7 @@
   }
 
   .compacted {
+    animation: enter-fade var(--settle) ease;
     margin: 0;
     text-align: center;
     font-size: 0.75rem;
@@ -322,6 +326,7 @@
   }
 
   .plan {
+    animation: enter-fade var(--settle) ease;
     display: grid;
     gap: 0.2rem;
     margin: 0;
@@ -362,6 +367,7 @@
 
   .working,
   .ended {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     align-items: baseline;
     gap: 0.45rem;
@@ -376,5 +382,9 @@
 
   .plan-text {
     font-size: var(--step--1);
+  }
+
+  .working {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

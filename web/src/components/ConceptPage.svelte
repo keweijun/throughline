@@ -283,7 +283,7 @@
 
 <style>
   .page {
-    animation: enter-rise 0.28s var(--ease-out);
+    animation: enter-rise var(--settle) var(--ease-out);
     max-width: var(--measure);
     margin-inline: auto;
   }

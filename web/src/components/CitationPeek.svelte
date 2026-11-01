@@ -106,26 +106,12 @@
     background: var(--raised);
     box-shadow: var(--shadow);
     font-size: var(--step--1);
-    animation: rise 0.14s ease-out;
+    animation: enter-rise var(--quick) var(--ease-out);
   }
 
   .peek.above {
     transform: translateY(-100%);
-    animation-name: drop;
-  }
-
-  @keyframes rise {
-    from {
-      opacity: 0;
-      translate: 0 4px;
-    }
-  }
-
-  @keyframes drop {
-    from {
-      opacity: 0;
-      translate: 0 -4px;
-    }
+    animation-name: enter-drop;
   }
 
   .head {

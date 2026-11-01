@@ -75,6 +75,7 @@
 
 <style>
   .request {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.75rem;
     margin-top: 2.5rem;

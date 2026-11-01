@@ -157,6 +157,7 @@
   }
 
   .feedback {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.4rem;
     padding-top: 0.4rem;

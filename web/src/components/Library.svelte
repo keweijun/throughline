@@ -450,6 +450,7 @@
   }
 
   .empty {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     justify-items: start;
     gap: 0.9rem;
@@ -466,6 +467,7 @@
   }
 
   .checks {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -530,5 +532,12 @@
   .codex h2 {
     font-size: var(--step-0);
     font-family: var(--sans);
+  }
+
+  /* Switching between the list and a new course brings the other in rather than swapping it in a blink; a fade, so
+     Studio's box never moves under a learner already typing in it. */
+  .studio-part,
+  header > div {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

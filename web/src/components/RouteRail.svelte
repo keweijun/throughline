@@ -393,7 +393,7 @@
 
   @keyframes arrive {
     from {
-      transform: scale(0.4);
+      scale: 0.4;
       box-shadow: 0 0 0 0 var(--marker-wash);
     }
   }

@@ -177,11 +177,16 @@
   }
 
   .problem {
+    animation: enter-rise var(--settle) var(--ease-out);
     color: var(--danger);
     font-size: var(--step-0);
   }
 
   .practice > .btn {
     justify-self: start;
+  }
+
+  .status {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

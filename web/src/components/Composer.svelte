@@ -290,6 +290,7 @@
 
 <style>
   .composer {
+    animation: enter-fade var(--settle) ease;
     display: grid;
     min-width: 0;
     border: 1px solid var(--rule-strong);
@@ -338,6 +339,7 @@
   }
 
   .quote {
+    animation: enter-fade var(--quick) ease;
     display: grid;
     gap: 0.15rem;
     margin: 0.5rem 0.75rem 0;
@@ -365,6 +367,7 @@
   }
 
   .preview {
+    animation: enter-fade var(--quick) ease;
     margin: 0 0.8rem;
     padding: 0.45rem 0 0.2rem;
     border-top: 1px dashed var(--rule);
@@ -389,6 +392,7 @@
   }
 
   .images li {
+    animation: enter-pop var(--quick) var(--ease-out);
     position: relative;
   }
 

@@ -23,7 +23,7 @@ test('Studio sends a message with a skill chip and shows Codex reply', async ({ 
   await expect(panel.locator('.said-by-codex')).toHaveText('done');
   expect(await editorText(box)).toBe('');
   // The chat is listed under what it began with, and the up arrow brings the message back.
-  await expect(panel.getByRole('combobox', { name: 'Studio chats' })).toContainText('add the solutions');
+  await expect(panel.getByRole('region', { name: 'Chats' })).toContainText('add the solutions');
   await box.click();
   await page.keyboard.press('ArrowUp');
   expect(await editorText(box)).toBe('$throughline add the solutions');
@@ -143,7 +143,7 @@ test('a slow history read from opening Studio never overwrites a message sent me
   });
   await page.reload();
   await page.keyboard.press('d');
-  await expect(page.getByRole('combobox', { name: 'Studio chats' })).toContainText('hello');
+  await expect(page.getByRole('region', { name: 'Chats' })).toContainText('hello');
   await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
@@ -378,6 +378,72 @@ test('a long turn can be read back while it runs, then folds behind its answer, 
   await expect(panel.locator('.commentary')).toHaveCount(16);
 
   // The chat is named from its first message by a side turn, in place of the message itself.
-  await expect(panel.getByRole('combobox', { name: 'Studio chats' })).toContainText('Title: keep busy with');
+  await expect(panel.getByRole('region', { name: 'Chats' })).toContainText('Title: keep busy with');
+  expect(errors).toEqual([]);
+});
+
+test('questions Codex asks in its answer are answered by clicking, and go back to Codex as it reads them', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('$throughline start the interview');
+  await page.keyboard.press('Control+Enter');
+
+  const card = panel.getByRole('form', { name: 'Codex has a question' });
+  await expect(card.getByRole('group', { name: 'What is the goal?' })).toBeVisible();
+  await card.getByLabel('Exam (recommended)').check();
+  await card.getByRole('textbox', { name: 'How deep?' }).fill('Rigorous');
+  await card.getByRole('button', { name: 'Answer' }).click();
+  // Codex reads the answers in the form its own app sends; the transcript shows them as answers, and the card closes.
+  await expect(panel.locator('.said-by-codex').last()).toHaveText('answers: What is the goal?=Exam (recommended); How deep?=Rigorous');
+  await expect(panel.locator('.replies')).toContainText('Rigorous');
+  await expect(card.getByRole('button', { name: 'Answer' })).toHaveCount(0);
+  await expect(card).toContainText('Exam (recommended)');
+  expect(errors).toEqual([]);
+});
+
+test('chats are listed beside Studio on a wide page, and pinned above the transcript with Stop by Send on a narrow one', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  const chats = page.getByRole('region', { name: 'Chats' });
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('first');
+  await page.keyboard.press('Control+Enter');
+  await expect(panel.locator('.said-by-codex')).toHaveText('done');
+  await chats.getByRole('button', { name: 'New chat' }).click();
+  await expect(panel.locator('.said-by-codex')).toHaveCount(0);
+  await box.click();
+  await box.pressSequentially('second');
+  await page.keyboard.press('Control+Enter');
+  await expect(chats.locator('.chat')).toHaveCount(2);
+  await expect(chats.locator('[aria-current="true"]')).toContainText('second');
+  await chats.locator('.chat').filter({ hasText: 'first' }).click();
+  await expect(panel.locator('.user')).toHaveText('first');
+
+  // Narrow, the chats are Studio's own bar: one row that stays at the frame's top as the transcript scrolls.
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await expect(chats).toBeHidden();
+  const picker = panel.getByRole('combobox', { name: 'Studio chats' });
+  const fresh = panel.getByRole('button', { name: 'New chat' });
+  await expect(picker).toBeVisible();
+  const [a, b] = [await picker.boundingBox(), await fresh.boundingBox()];
+  expect(Math.abs(a!.y + a!.height / 2 - (b!.y + b!.height / 2))).toBeLessThan(4);
+  await box.click();
+  await box.pressSequentially('please wait');
+  await page.keyboard.press('Control+Enter');
+  const frame = panel.locator('.studio-frame');
+  await frame.evaluate((f) => (f.scrollTop = f.scrollHeight));
+  const top = (await frame.boundingBox())!.y;
+  await expect.poll(async () => (await picker.boundingBox())!.y - top).toBeLessThan(30);
+  // Stop sits at the end of the row, beside the send button, as in Codex.
+  const stop = panel.getByRole('button', { name: 'Stop' });
+  const send = panel.getByRole('button', { name: 'Add' });
+  expect((await stop.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
+  expect((await stop.boundingBox())!.x).toBeLessThan((await send.boundingBox())!.x);
+  await stop.click();
   expect(errors).toEqual([]);
 });

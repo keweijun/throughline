@@ -5,6 +5,7 @@
   import { exportNotes } from '../lib/notes';
   import CodexLink from './CodexLink.svelte';
   import TeachingPreferences from './TeachingPreferences.svelte';
+  import StudioChats from './StudioChats.svelte';
   import SourceList from './SourceList.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
@@ -181,7 +182,11 @@
       </div>
     {/if}
     </div>
-    <TeachingPreferences />
+    <!-- Beside Studio: its chats, as Codex lists threads beside a chat, then how the learner is taught. -->
+    <div class="studio-aside">
+      {#if studio.available}<StudioChats />{/if}
+      <TeachingPreferences />
+    </div>
     </div>
   </div>
 
@@ -373,6 +378,26 @@
   @media (min-width: 72rem) {
     .studio-row {
       grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+  }
+
+  .studio-aside {
+    display: grid;
+    gap: 1.5rem;
+    align-content: start;
+    min-width: 0;
+  }
+
+  /* Where the aside drops below Studio, the chats are Studio's own pinned bar instead; beside it, the bar steps aside. */
+  @media (max-width: 71.99rem) {
+    .studio-aside :global(.chats) {
+      display: none;
+    }
+  }
+
+  @media (min-width: 72rem) {
+    #course-studio :global(.studio > .panel-head) {
+      display: none;
     }
   }
 

@@ -328,15 +328,17 @@
     color: var(--pencil);
   }
 
+  /* Studio and Memory are built for the side panel: the same surface and padding here keep their raised writing box
+     and its pinned strip (.panel-foot, painted in --sheet) on one ground, aligned with what is listed above it. */
   .frame {
     display: flex;
     flex-direction: column;
     max-height: max(24rem, calc(100vh - var(--topbar) - 22rem));
     overflow-y: auto;
-    padding: 0.75rem 0.75rem 0;
+    padding: 1.1rem 1.1rem 0;
     border: 1px solid var(--rule);
     border-radius: var(--radius);
-    background: var(--raised);
+    background: var(--sheet);
   }
 
   /* Studio's frame keeps one height, which Studio fills with its box at the bottom, so content loading inside it (the

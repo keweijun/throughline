@@ -248,11 +248,12 @@
     --gutter: 1.75rem;
     --capsule: 2.25rem;
     --marker-ground: var(--ground);
+    --top: 2.5rem;
     position: sticky;
     top: 0;
     max-height: calc(100dvh - var(--topbar));
     overflow-y: auto;
-    padding: 2.5rem 0.75rem 2rem clamp(0.75rem, 2vw, 1.5rem);
+    padding: var(--top) 0.75rem 2rem clamp(0.75rem, 2vw, 1.5rem);
   }
 
   /* Unfolding brings the labels back in rather than snapping them. */
@@ -263,14 +264,14 @@
   /* The heading and its fold button stay at the top while the route scrolls under them. */
   .head {
     position: sticky;
-    top: -2.5rem;
+    top: calc(-1 * var(--top));
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin: -2.5rem 0 0.75rem;
-    padding: 2.5rem 0 0.4rem var(--gutter);
+    margin: calc(-1 * var(--top)) 0 0.75rem;
+    padding: var(--top) 0 0.4rem var(--gutter);
     background: var(--marker-ground);
   }
 
@@ -509,7 +510,8 @@
   }
 
   /* Folded, the route is FoldedRoute's capsule centred in the column. Pointing at the capsule opens the full route as a
-     drawer beside it, which slides in, and waits a moment before closing so brushing past its edge does not flicker. */
+     card a little to its right, as tall as the route needs and centred as the capsule is, which slides in, and waits a
+     moment before closing so brushing past its edge or crossing the gap to it does not flicker. */
   .rail.folded {
     z-index: 20;
     display: flex;
@@ -521,18 +523,25 @@
     pointer-events: none;
   }
 
+  /* Hidden, the card takes no pointer; while it fades out it still does, so the pointer can reach it across the gap. */
   .rail.folded .full {
     --marker-ground: var(--sheet);
+    --top: 1.25rem;
     position: absolute;
     top: 0;
     bottom: 0;
-    left: calc(50% + var(--capsule) / 2 - 1px);
+    left: calc(50% + var(--capsule) / 2 + 0.5rem);
     width: var(--rail);
+    height: fit-content;
+    max-height: calc(100% - 2rem);
+    margin-block: auto;
     overflow-y: auto;
-    padding: 2.5rem 0.75rem 2rem;
+    padding: var(--top) 0.75rem 1.25rem;
     background: var(--sheet);
-    border-right: 1px solid var(--rule);
+    border: 1px solid var(--rule);
+    border-radius: calc(var(--radius) * 2);
     box-shadow: var(--shadow);
+    pointer-events: auto;
     opacity: 0;
     visibility: hidden;
     transform: translateX(-0.6rem);
@@ -579,7 +588,7 @@
       z-index: 35;
       width: min(20rem, 86vw);
       max-height: none;
-      padding-top: 1.5rem;
+      --top: 1.5rem;
       background: var(--sheet);
       border-right: 1px solid var(--rule);
       box-shadow: var(--shadow);

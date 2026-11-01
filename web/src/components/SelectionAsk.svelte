@@ -101,6 +101,7 @@
   }
 
   function ask() {
+    app.markSeen('hint-select-passage');
     if (!pending) return;
     const { text, turnId, source, questionId } = pending;
     app.quote = { text, turnId, source, questionId, scrollY: stageScroll() };
@@ -123,6 +124,7 @@
   }
 
   async function save(withNote: boolean) {
+    app.markSeen('hint-select-passage');
     if (target) {
       const { id } = target;
       const text = note.trim();

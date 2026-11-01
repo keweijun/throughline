@@ -15,14 +15,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from .. import images as attached, library, updates
 from ..commands import version
 from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
-from .settings import TeacherSettings
+from .settings import Seen, TeacherSettings
 from .studio import MAX_UPLOAD, Studio, message_input
 
 log = logging.getLogger(__name__)
@@ -157,6 +157,10 @@ class SettingsRequest(Body):
     effort: str = 'medium'
 
 
+class SeenRequest(Body):
+    id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')
+
+
 class OpenCourseRequest(Body):
     name: str
 
@@ -289,6 +293,7 @@ class ActiveHost:
 
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None):
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
+    seen = Seen(courses.settings.path.with_name('seen.json'))
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -556,6 +561,15 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         result = host.preparation.schedule(retry=True)
         host.changed('preparation')
         return {k: v for k, v in result.items() if k != 'turn'}
+
+    @app.get('/api/seen')
+    def seen_view():
+        """What this learner has seen once, such as one-time hints (ADR 0017)."""
+        return {'seen': seen.all()}
+
+    @app.post('/api/seen')
+    def mark_seen(body: SeenRequest):
+        return {'seen': seen.add(body.id)}
 
     @app.get('/api/settings')
     def settings_view():

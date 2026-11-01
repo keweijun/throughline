@@ -3,7 +3,9 @@
 // Libraries load on first use, so a course that never draws a diagram never downloads Mermaid. Drawing is synchronous
 // from caches: when a library or an asynchronous drawing becomes ready, subscribers render again.
 import DOMPurify from 'dompurify';
+import { locale } from './i18n.svelte';
 import { drawPlot } from './plot';
+import './python-cell';
 
 type HighlightJs = typeof import('highlight.js').default;
 type Mermaid = typeof import('mermaid').default;
@@ -149,6 +151,13 @@ export function drawWidgets(root: DocumentFragment, open: boolean, notes: Notes)
       } catch (error) {
         pre.replaceWith(failed('plot', source, (error as Error).message, notes.plot));
       }
+    } else if (language === 'python-run') {
+      if (streaming) return;
+      // The cell keeps its editor in a shadow root; the language attribute redraws its labels when the language changes.
+      const cell = document.createElement('python-cell');
+      cell.setAttribute('source', source.replace(/\n$/, ''));
+      cell.setAttribute('data-language', locale.language);
+      pre.replaceWith(cell);
     } else if (language && language !== 'text' && language !== 'plaintext') {
       const hljs = highlighter();
       if (!hljs) return;

@@ -28,7 +28,7 @@ class Selection(unittest.TestCase):
             call_cli(self, path, 'course.init', title='Chemistry')
             listed = call_cli(self, path, 'widgets.list')
             self.assertEqual(listed['selected'], [])
-            self.assertEqual({'plot', 'chemistry'}, {item['id'] for item in listed['library']})
+            self.assertEqual({'plot', 'chemistry', 'python'}, {item['id'] for item in listed['library']})
             self.assertTrue(all(item['summary'] and item['subjects'] for item in listed['library']))
             saved = call_cli(self, path, 'widgets.save', ids=['chemistry', 'plot', 'plot'])
             self.assertEqual(saved['selected'], ['plot', 'chemistry'])

@@ -4,6 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { markdown, labelFor } from '../lib/markdown';
   import { highlights, annotationPassage } from '../lib/highlight';
+  import { ANSWER, type Answer } from '../lib/python-cell';
   import { evidenceLabel, helpLabels, partLabels, partStatuses, solved as isSolved } from '../lib/format';
   import type { SkipReason, Task } from '../lib/types';
   import AttachedImages from './AttachedImages.svelte';
@@ -116,6 +117,21 @@
     setImages(submittedJob?.images ?? []);
   }
 
+  // A Python cell in this exercise's question adds the learner's code and its output to the answer (ADR 0013).
+  let article = $state<HTMLElement>();
+  $effect(() => {
+    const node = article;
+    if (!node) return;
+    const add = (event: Event) => {
+      const { exercise, text } = (event as CustomEvent<Answer>).detail;
+      if (exercise !== task.id) return;
+      const current = app.drafts.get(draftKey);
+      setAnswer(current.trim() ? `${current.trimEnd()}\n\n${text}` : text);
+    };
+    node.addEventListener(ANSWER, add);
+    return () => node.removeEventListener(ANSWER, add);
+  });
+
   async function ask() {
     if (busy || !question.trim()) return;
     busy = true;
@@ -132,7 +148,7 @@
   }
 </script>
 
-<article class="exercise" id="exercise-{task.id}" class:solved aria-label={task.origin === 'review' ? (number ? t('Review question {number}', { number }) : t("Review question")) : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" bind:this={article} class:solved aria-label={task.origin === 'review' ? (number ? t('Review question {number}', { number }) : t("Review question")) : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
       {#if task.origin === 'review'}

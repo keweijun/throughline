@@ -77,7 +77,7 @@ FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': '
 
 class Host:
     def __init__(self, workspace, runner=None, settings=None, events=None):
-        from .features import Memory, Navigation, Practice, Preparation, Questions
+        from .features import CourseChanges, Memory, Navigation, Practice, Preparation, Questions
         from .builds import ChapterBuilds
         from .review import Review
         self.workspace = Path(workspace).resolve()
@@ -104,10 +104,11 @@ class Host:
         self.preparation = Preparation(self)
         self.builds = ChapterBuilds(self)
         self.review = Review(self)
+        self.course_changes = CourseChanges(self)
         self.memory = Memory(self)
         # Order matters: prompt additions are appended, and completions handled, in this order; memory goes last, after
         # practice has recorded the interactions a note cites.
-        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.memory)
+        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.course_changes, self.memory)
         self.questions.recover()
         self.navigation.recover()
         self.preparation.start()

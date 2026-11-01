@@ -21,8 +21,13 @@ fake = [sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), 
 
 
 class Runner:
+    """Lessons suggest a change to the course, which opens in Studio (ADR 0016)."""
+
     def run(self, prompt, cwd, emit, cancel):
-        emit({'kind': 'final', 'text': 'A wave.'})
+        text = 'A wave.'
+        if 'Practice only' not in prompt:
+            text += '\n<course-change>{"request":"Add a section on interference after Wave superposition"}</course-change>'
+        emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 
 

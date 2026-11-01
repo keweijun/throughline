@@ -147,6 +147,27 @@ test('an empty chat suggests a range of course work that fills the box without s
   await expect(panel.locator('.user')).toHaveCount(0);
 });
 
+test('a course change the teacher suggests opens in Studio with the request, and closes once answered', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
+  await expect(suggestion).toContainText('Change the course? Add a section on interference after Wave superposition');
+
+  await suggestion.getByRole('link', { name: 'Open in Studio' }).click();
+  const box = page.locator('#studio-input');
+  await expect(box).toBeVisible();
+  expect(await editorText(box)).toContain('$throughline Add a section on interference after Wave superposition');
+  await expect(page.locator('#course-studio form .origin')).toContainText('Section: Wave superposition');
+  // Opened, it is answered: going back to the lesson, it is gone, and a reload does not bring it back.
+  await page.getByRole('button', { name: 'Back to reading' }).click();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  await expect(suggestion).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.lesson-body')).toHaveText('A wave.');
+  await expect(page.getByRole('group', { name: 'Suggested course change' })).toHaveCount(0);
+});
+
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('link', { name: 'Add files in Studio' }).click();

@@ -15,8 +15,8 @@ NOTE = re.compile(r'<course-memory>\s*(\{.*?\})\s*</course-memory>', re.S)
 
 
 def strip(text):
-    """Text as the learner sees it: without the teacher's memory note."""
-    return re.sub(r'\s*<course-memory>.*?(</course-memory>|$)', '', text or '', flags=re.S)
+    """Text as the learner sees it: without the teacher's memory note or suggested course change."""
+    return re.sub(r'\s*<(course-memory|course-change)>.*?(</\1>|$)', '', text or '', flags=re.S)
 
 
 def _text(value):

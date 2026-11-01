@@ -11,7 +11,7 @@ const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
 // Structured blocks a teacher reply ends with; the host reads them and the learner never sees them.
 const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
 // The teacher's course memory note (ADR 0010), wherever it is and while it is still streaming.
-const MEMORY = /\s*<course-memory>[\s\S]*?(<\/course-memory>|$)/g;
+const MEMORY = /\s*<(course-memory|course-change)>[\s\S]*?(<\/\1>|$)/g;
 
 // Delimiters, by the group of MATH that holds a formula's TeX: $$…$$, \[…\], \(…\) and $…$.
 const DELIMITER = { 3: 2, 4: 2, 5: 2, 6: 1 } as const;

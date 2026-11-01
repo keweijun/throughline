@@ -1,7 +1,8 @@
 <script lang="ts">
   import { markdown } from '../lib/markdown';
+  import StudioQuestions from './StudioQuestions.svelte';
   import { locale, t } from '../lib/i18n.svelte';
-  import { CONTEXT, outputTail, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
+  import { CONTEXT, outputTail, parseReply, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
 
   /** One Studio turn as Codex draws it: the learner's message, then what Codex said and did, in order. */
   let { turn, last = false }: { turn: StudioTurn; last?: boolean } = $props();
@@ -106,7 +107,7 @@
   const working = $derived(turn.status === 'inProgress');
   // The answer is the last message Codex marked final; in a finished turn saved without phases, its last plain message.
   const answer = $derived.by(() => {
-    const messages = turn.items.filter(isMessage).filter((m) => m.text).reverse();
+    const messages = turn.items.filter(isMessage).filter((m) => m.text || m.questions?.length).reverse();
     return messages.find((m) => m.phase === 'final_answer') ?? (working ? undefined : messages.find((m) => m.phase !== 'commentary'));
   });
   // The learner's message opens the turn; the work follows in order, its consecutive tool calls folded into one row.
@@ -118,7 +119,7 @@
   const rows = $derived.by(() => {
     const out: Row[] = [];
     for (const item of turn.items.slice(leading.length)) {
-      if (item === answer || item.type === 'reasoning' || (isMessage(item) && !item.text)) continue;
+      if (item === answer || item.type === 'reasoning' || (isMessage(item) && !item.text && !item.questions?.length)) continue;
       const previous = out.at(-1);
       if (isTool(item) && previous?.kind === 'tools') previous.items.push(item);
       else if (isTool(item)) out.push({ kind: 'tools', id: item.id, items: [item] });
@@ -176,6 +177,11 @@
     {#each content as input, i (i)}
       {#if input.type === 'text' && input.text.startsWith(CONTEXT)}
         <span class="origin" title={input.text.slice(CONTEXT.length)}>{input.text.slice(CONTEXT.length)}</span>
+      {:else if input.type === 'text' && parseReply(input.text)}
+        <!-- Answers to Codex's questions, sent in the form Codex reads, shown as what the learner answered. -->
+        <dl class="replies">
+          {#each parseReply(input.text) ?? [] as reply (reply.questionItemId)}<dt>{reply.question}</dt><dd>{reply.answer}</dd>{/each}
+        </dl>
       {:else if input.type === 'text'}
         <p class="said">{#each segments(input) as part, j (j)}{#if part.chip}<span class="chip">{part.text}</span>{:else}{part.text}{/if}{/each}</p>
       {:else if input.type === 'localImage'}
@@ -219,6 +225,15 @@
   {/if}
 {/snippet}
 
+{#snippet message(item: Extract<StudioItem, { type: 'agentMessage' }>)}
+  {#if item.text}
+    <div class="prose said-by-codex" class:commentary={item.phase === 'commentary' && item !== answer} use:markdown={{ language: locale.language, text: item.text }}></div>
+  {/if}
+  {#if item.questions?.length}
+    <StudioQuestions item={item.id} questions={item.questions} current={last} />
+  {/if}
+{/snippet}
+
 {#snippet work(row: Row, live: boolean)}
   {#if row.kind === 'tools' && row.items.length === 1}
     {@render tool(row.items[0])}
@@ -238,7 +253,7 @@
   {:else if row.item.type === 'userMessage'}
     {@render said(row.item)}
   {:else if isMessage(row.item)}
-    <div class="prose said-by-codex" class:commentary={row.item.phase === 'commentary'} use:markdown={{ language: locale.language, text: row.item.text }}></div>
+    {@render message(row.item)}
   {:else if row.item.type === 'contextCompaction'}
     <p class="compacted">{t("Earlier messages were summarized to make room")}</p>
   {:else if row.item.type === 'plan'}
@@ -251,7 +266,7 @@
 
   {#if foldable}
     <button type="button" class="fold" aria-expanded={!folded} onclick={() => (opened = folded)}>
-      <span class="chevron" aria-hidden="true">›</span>{foldLabel}
+      <span class="chevron" class:open={!folded} aria-hidden="true"></span>{foldLabel}
     </button>
   {/if}
   {#each rows as row, i (row.kind === 'tools' ? row.id : row.item.id)}
@@ -274,9 +289,7 @@
   {#if working && last && !answer}
     <p class="working" role="status"><span class="dot running" aria-hidden="true"></span>{thinking || t("Working…")}</p>
   {/if}
-  {#if answer}
-    <div class="prose said-by-codex" use:markdown={{ language: locale.language, text: answer.text }}></div>
-  {/if}
+  {#if answer}{@render message(answer)}{/if}
   {#if turn.status === 'interrupted'}
     <p class="ended">{t("Stopped")}</p>
   {:else if turn.status === 'failed' || turn.error}
@@ -307,6 +320,21 @@
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  .replies {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+  }
+
+  .replies dt {
+    color: var(--ink-soft);
+  }
+
+  .replies dd {
+    margin: 0 0 0.25rem;
+    font-weight: 600;
   }
 
   .chip {
@@ -405,8 +433,7 @@
   .fold {
     justify-self: start;
     display: inline-flex;
-    align-items: baseline;
-    gap: 0.4rem;
+    align-items: center;
     padding: 0;
     border: 0;
     background: none;
@@ -418,15 +445,6 @@
 
   .fold:hover {
     color: var(--ink-soft);
-  }
-
-  .chevron {
-    display: inline-block;
-    transition: transform 0.15s;
-  }
-
-  .fold[aria-expanded='true'] .chevron {
-    transform: rotate(90deg);
   }
 
   .dot {

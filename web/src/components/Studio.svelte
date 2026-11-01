@@ -280,7 +280,7 @@
 </script>
 
 <section class="panel-view studio" aria-labelledby="studio-title">
-  <header class="panel-head">
+  <header class="panel-head pinned">
     <div class="panel-bar">
       <h2 id="studio-title">{t("Studio")}</h2>
     </div>
@@ -354,16 +354,19 @@
     </span>
   {/snippet}
   {#snippet tools()}
-    {#if studio.running}
-      <button type="button" class="btn btn-small stop" onclick={() => void studio.stop()} title={t("Stop Codex")}>
-        <span class="square" aria-hidden="true"></span>{t("Stop")}
-      </button>
-    {/if}
     <StudioControls />
     {#if studio.context !== null}
       <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
     {/if}
     {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
+  {/snippet}
+  <!-- Stop sits beside Send, where Codex puts it. -->
+  {#snippet actions()}
+    {#if studio.running}
+      <button type="button" class="btn btn-small stop" onclick={() => void studio.stop()} title={t("Stop Codex")}>
+        <span class="square" aria-hidden="true"></span>{t("Stop")}
+      </button>
+    {/if}
   {/snippet}
   <div class="panel-foot">
     {#each made as item (item.name)}
@@ -393,6 +396,7 @@
         onview={(editor) => (view = editor)}
         onfiles={attachFiles}
         {tools}
+        {actions}
       />
     {/if}
   </div>
@@ -504,6 +508,41 @@
     font-size: 0.75rem;
     color: var(--pencil);
     white-space: nowrap;
+  }
+
+  /* The chat picker and New chat on one row, pinned to the top of the frame as the writing box is to its bottom, so
+     the transcript scrolls between them. The frame's top padding is taken in, so nothing shows above the bar. */
+  .pinned {
+    position: sticky;
+    top: -1.1rem;
+    z-index: 2;
+    margin-top: -1.1rem;
+    padding-top: 1.1rem;
+    background: var(--sheet);
+  }
+
+  .pinned::after {
+    content: '';
+    position: absolute;
+    inset: 100% 0 -1.1rem;
+    background: linear-gradient(to top, transparent, var(--sheet));
+    pointer-events: none;
+  }
+
+  .pinned .panel-tools {
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .pinned select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    font-size: var(--step--1);
+  }
+
+  .pinned .panel-tools .btn {
+    flex: none;
   }
 
   /* One row of tools however much Studio shows in it; its chips give way first (StudioControls). */

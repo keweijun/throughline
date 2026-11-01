@@ -26,7 +26,7 @@ export type CommandAction =
 
 export type StudioItem =
   | { type: 'userMessage'; id: string; content: StudioUserInput[] }
-  | { type: 'agentMessage'; id: string; text: string; phase: 'commentary' | 'partial_answer' | 'final_answer' | null }
+  | { type: 'agentMessage'; id: string; text: string; phase: 'commentary' | 'partial_answer' | 'final_answer' | null; questions?: AsyncQuestion[] | null }
   | { type: 'reasoning'; id: string; summary: string[] }
   | { type: 'plan'; id: string; text: string }
   | { type: 'commandExecution'; id: string; command: string; status: string; commandActions: CommandAction[]; aggregatedOutput: string | null; exitCode: number | null }
@@ -36,6 +36,32 @@ export type StudioItem =
   | { type: 'imageView'; id: string; path: string }
   | { type: 'contextCompaction'; id: string }
   | { type: string; id: string };
+
+/** A question Codex asks in its message rather than by waiting on the learner (Codex's async user input). */
+export type AsyncQuestion = { title: string; options: string[] | null };
+/** An answer to one, sent back as Codex's own app sends it: in a user message, by the question's id. */
+export type QuestionReply = { questionItemId: string; question: string; answer: string };
+
+const REPLY_OPEN = '<send_user_message_question_reply>';
+const REPLY_CLOSE = '</send_user_message_question_reply>';
+/** The id Codex's app gives a message's question: the message and the question's place in it. */
+export const questionId = (itemId: string, index: number) => JSON.stringify(['request_user_input_async', itemId, index]);
+export const replyText = (replies: QuestionReply[]) => `${REPLY_OPEN}\n${JSON.stringify(replies)}\n${REPLY_CLOSE}`;
+/** The answers a user message carries, if it is a reply to Codex's questions. */
+export function parseReply(text: string): QuestionReply[] | null {
+  const at = text.lastIndexOf(REPLY_OPEN);
+  const end = text.lastIndexOf(REPLY_CLOSE);
+  if (at < 0 || end < at) return null;
+  try {
+    const parsed = JSON.parse(text.slice(at + REPLY_OPEN.length, end));
+    const list = (Array.isArray(parsed) ? parsed : [parsed]).filter(
+      (r): r is QuestionReply => typeof r?.questionItemId === 'string' && typeof r?.answer === 'string',
+    );
+    return list.length ? list : null;
+  } catch {
+    return null;
+  }
+}
 
 export type PlanStep = { step: string; status: 'pending' | 'inProgress' | 'completed' };
 export type StudioTurn = {
@@ -170,6 +196,20 @@ class StudioStore {
 
   get running() {
     return !!this.activeTurn;
+  }
+
+  /** The answers already given to Codex's questions in this chat, by question id. */
+  get replies() {
+    const found = new Map<string, string>();
+    for (const turn of this.turns) {
+      for (const item of turn.items) {
+        if (item.type !== 'userMessage') continue;
+        for (const input of (item as Extract<StudioItem, { type: 'userMessage' }>).content) {
+          if (input.type === 'text') for (const reply of parseReply(input.text) ?? []) found.set(reply.questionItemId, reply.answer);
+        }
+      }
+    }
+    return found;
   }
 
   get thread() {

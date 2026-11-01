@@ -4,7 +4,7 @@ import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
@@ -51,6 +51,26 @@ function storedWidth() {
     return DEFAULT_PANEL;
   }
 }
+
+/** The version an update installed, kept across the reload that shows it, and read once. */
+function takeUpdated(): string | null {
+  try {
+    const version = sessionStorage.getItem('updated-to');
+    sessionStorage.removeItem('updated-to');
+    return version;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The tab sees three steps of a background update: Codex starting while the host still answers, the host gone while
+ * Codex installs, and a new host. Between them the bar eases toward the next step, so it moves without claiming one.
+ */
+const UPDATE_STEPS = { starting: [3, 22, 20], installing: [25, 92, 50], restarting: [95, 98, 5], done: [100, 100, 1] } as const;
+// Longer than updates.GIVE_UP on the host, which reports the failure itself while it answers.
+const UPDATE_WAIT = 22 * 60_000;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Unsent text the learner typed (exercise answers, lesson requests, follow-ups), keyed by what it belongs to, so it
@@ -108,6 +128,10 @@ class AppStore {
   settings = $state<Settings | null>(null);
   /** The latest update check; stays null when GitHub cannot be reached, so a failed launch check shows nothing. */
   update = $state<UpdateCheck | null>(null);
+  /** An update a background Codex is installing, followed by this tab; it keeps a failure until the next attempt. */
+  updating = $state<UpdateProgress | null>(null);
+  /** The version the update this tab waited for installed, shown once in About after the reload. */
+  updated = $state<string | null>(takeUpdated());
   #settingsWrites = 0;
 
   /** Concept shown in the reading column; null follows the formal position. */
@@ -431,6 +455,70 @@ class AppStore {
   async checkForUpdate(fresh = false) {
     this.update = await api.get<UpdateCheck>(fresh ? '/api/update?fresh=1' : '/api/update');
     return this.update;
+  }
+
+  /** Has a background Codex install the latest version; Throughline closes and comes back by itself (ADR 0004). */
+  async installUpdate(language: Language) {
+    const { pid } = await api.get<{ pid: number }>('/api/health');
+    const { update } = await api.post<{ update: UpdateInstall }>('/api/update/install', { language });
+    void this.#follow(update, pid);
+  }
+
+  /** Picks up an update that is still running or has failed, after a reload or in another tab. */
+  async resumeUpdate() {
+    const [{ update }, { pid }] = await Promise.all([
+      api.get<{ update: UpdateInstall | null }>('/api/update/install'),
+      api.get<{ pid: number }>('/api/health'),
+    ]);
+    if (update?.state === 'failed') this.updating = { to: update.to, step: 'starting', progress: 0, failed: update.message ?? '' };
+    // Which host started it is unknown here, so only a host that goes away counts as progress.
+    else if (update) void this.#follow(update, pid);
+  }
+
+  async #follow(update: UpdateInstall, pid: number) {
+    const began = Date.now();
+    let step: UpdateProgress['step'] = 'starting';
+    let since = began;
+    const show = (failed: string | null = null) => {
+      const [from, to, seconds] = UPDATE_STEPS[step];
+      const progress = from + (to - from) * (1 - Math.exp(-(Date.now() - since) / (seconds * 1000)));
+      this.updating = { to: update.to, step, progress, failed };
+    };
+    const move = (next: UpdateProgress['step']) => {
+      if (next !== step) [step, since] = [next, Date.now()];
+    };
+    show();
+    for (let tick = 0; ; tick++) {
+      await pause(1000);
+      const health = await api.get<{ pid: number }>('/api/health').catch(() => null);
+      if (!health) move('installing');
+      else if (health.pid !== pid || step !== 'starting') {
+        // A new host: done when it runs another version, failed once it says so, and otherwise not answering yet.
+        move('restarting');
+        const about = await api.get<{ version: string }>('/api/about').catch(() => null);
+        if (about && about.version !== update.from) {
+          move('done');
+          show();
+          try {
+            sessionStorage.setItem('updated-to', about.version);
+          } catch {
+            // Only the confirmation in About is lost.
+          }
+          await pause(400);
+          location.reload();
+          return;
+        }
+      }
+      // The host that answers reports a failure itself: Codex exited early, answered, or ran out of time.
+      if (health && tick % 2 === 1) {
+        const state = await api.get<{ update: UpdateInstall | null }>('/api/update/install').catch(() => null);
+        if (state?.update?.state === 'failed') return show(state.update.message ?? '');
+      }
+      if (Date.now() - began > UPDATE_WAIT) {
+        return show(health ? t('The update did not finish; see {log}', { log: update.log }) : t('Throughline did not come back after the update. Open it from the launcher; the log is at {log}', { log: update.log }));
+      }
+      show();
+    }
   }
 
   connect() {

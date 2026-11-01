@@ -330,18 +330,23 @@ def _error_text(exc):
     return f'The learning host did not answer ({getattr(exc, "reason", exc)}).'
 
 
-def _spawn(port):
-    log = library.state_dir() / 'host.log'
-    log.parent.mkdir(parents=True, exist_ok=True)
-    command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
-    launch_id = str(uuid.uuid4())
-    options = {'stdin': subprocess.DEVNULL, 'stderr': subprocess.STDOUT,
-               'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
+def detached():
+    """Popen options for a windowless process that outlives the one starting it."""
+    options = {'stdin': subprocess.DEVNULL, 'stderr': subprocess.STDOUT}
     if os.name == 'nt':
         # Not DETACHED_PROCESS: a venv's python.exe is a launcher, and a detached launcher's child gets a visible console.
         options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     else:
         options['start_new_session'] = True
+    return options
+
+
+def _spawn(port):
+    log = library.state_dir() / 'host.log'
+    log.parent.mkdir(parents=True, exist_ok=True)
+    command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
+    launch_id = str(uuid.uuid4())
+    options = {**detached(), 'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
     with log.open('ab') as output:
         process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30

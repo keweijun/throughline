@@ -24,6 +24,12 @@
     app.connect();
     // A quiet check at launch: a newer version only marks Settings, and a failure shows nothing.
     app.checkForUpdate().catch(() => {});
+    app.resumeUpdate().catch(() => {});
+    // The update this tab waited for reloaded it: About says what was installed.
+    if (app.updated) {
+      app.settingsPane = 'about';
+      app.settingsOpen = true;
+    }
   });
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a

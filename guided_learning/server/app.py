@@ -177,6 +177,11 @@ class OpenCourseRequest(Body):
     name: str
 
 
+class UpdateRequest(Body):
+    # The language Codex reports the result in.
+    language: Literal['en', 'zh-CN'] = 'en'
+
+
 class StudioSpan(Body):
     start: int
     end: int
@@ -628,6 +633,23 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return updates.check(fresh)
         except OperationError as exc:
             return JSONResponse({'error': str(exc), 'code': exc.code}, 502)
+
+    @app.get('/api/update/install')
+    def update_progress():
+        return {'update': updates.progress(library.state_dir())}
+
+    @app.post('/api/update/install')
+    def update_install(body: UpdateRequest):
+        # Stopping the host pauses teaching turns, but a Studio turn writing the course would be cut off.
+        if courses.studio.active:
+            return JSONResponse({'error': 'Codex is working in Studio; update when it is done', 'code': 'studio_running'}, 409)
+        # Codex opens the same course on the same port again, so the waiting tab finds it; `open` names library courses only.
+        open_now = courses.host.workspace if courses.host else None
+        active = open_now.name if open_now and open_now.parent == courses.root else None
+        try:
+            return {'update': updates.install(library.state_dir(), port, active, body.language)}
+        except OperationError as exc:
+            return JSONResponse({'error': str(exc), 'code': exc.code}, 502 if exc.code == 'update_check_failed' else 409)
 
     @app.get('/api/launcher')
     def launcher_view():

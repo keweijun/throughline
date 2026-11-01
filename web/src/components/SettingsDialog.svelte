@@ -4,7 +4,7 @@
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { studio } from '../lib/studio.svelte';
-  import type { CodexModel, LauncherStatus, Settings } from '../lib/types';
+  import type { CodexModel, LauncherStatus, Settings, UpdateProgress } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
 
@@ -122,6 +122,25 @@
       updateError = error instanceof Error ? error.message : String(error);
     }
     checking = false;
+  }
+
+  const updating = $derived(app.updating);
+  let starting = $state(false);
+  const UPDATE_STEP: Record<UpdateProgress['step'], MessageKey> = {
+    starting: 'Codex is getting ready to install version {version}…',
+    installing: 'Installing version {version}…',
+    restarting: 'Starting Throughline again…',
+    done: 'Updated. Reloading…',
+  };
+
+  async function installUpdate() {
+    starting = true;
+    try {
+      await app.installUpdate(locale.language);
+    } catch (e) {
+      app.error = e instanceof Error ? e.message : String(e);
+    }
+    starting = false;
   }
 
   // A saved model the list does not offer stays selectable rather than being silently replaced.
@@ -377,18 +396,36 @@
         <div class="setting">
           <div class="text">
             <span class="title">{t("Updates")}</span>
-            {#if app.update?.available}
-              <p role="status">{t("Version {latest} is available.", { latest: app.update.latest })} {t("Codex installs it and keeps your courses. Throughline closes while it updates; open it again afterwards.")}</p>
+            {#if updating && !updating.failed}
+              <p role="status">{t(UPDATE_STEP[updating.step], { version: updating.to })}</p>
+            {:else if updating?.failed}
+              <p role="status">{t("The update did not finish:")} {updating.failed}</p>
+            {:else if app.updated && !app.update?.available}
+              <p role="status">{t("Updated to version {version}. Your courses are as you left them.", { version: app.updated })}</p>
+            {:else if app.update?.available}
+              <p role="status">{t("Version {latest} is available.", { latest: app.update.latest })} {t("Codex installs it in the background and keeps your courses. Throughline closes for a minute or two and comes back by itself.")}</p>
             {:else if updateError}
               <p role="status">{t("Could not check for updates:")} {updateError}</p>
             {:else if app.update}
               <p role="status">{t("You have the latest version.")}</p>
             {/if}
           </div>
-          {#if app.update?.available}
-            <CodexLink chat class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+          {#if updating && !updating.failed}
+            <span class="percent" aria-hidden="true">{Math.round(updating.progress)}%</span>
+          {:else if app.update?.available || updating?.failed}
+            <div class="update-actions">
+              {#if updating?.failed}
+                <CodexLink chat class="btn btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+              {/if}
+              <button class="btn btn-primary btn-small" onclick={installUpdate} disabled={starting}>{t(updating?.failed ? "Try again" : "Update")}</button>
+            </div>
           {:else}
             <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
+          {/if}
+          {#if updating && !updating.failed}
+            <div class="progress" role="progressbar" aria-label={t("Update progress")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(updating.progress)}>
+              <span style:width="{updating.progress}%"></span>
+            </div>
           {/if}
         </div>
 
@@ -631,6 +668,40 @@
   .setting.stacked {
     grid-template-columns: 1fr;
     border-bottom: 0;
+  }
+
+  .update-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .percent {
+    font-size: var(--step--1);
+    color: var(--pencil);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .progress {
+    grid-column: 1 / -1;
+    height: 0.375rem;
+    border-radius: 999px;
+    background: var(--rule);
+    overflow: hidden;
+  }
+
+  .progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent);
+    /* Ticks arrive once a second; the bar glides between them. */
+    transition: width 1s linear;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .progress span {
+      transition: none;
+    }
   }
 
   .setting > select,

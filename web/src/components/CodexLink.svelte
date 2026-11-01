@@ -14,8 +14,9 @@
     class: className = '',
     chat = false,
     origin = null,
+    onfollow,
     children,
-  }: { prompt: string; class?: string; chat?: boolean; origin?: StudioOrigin | null; children: Snippet } = $props();
+  }: { prompt: string; class?: string; chat?: boolean; origin?: StudioOrigin | null; onfollow?: () => void; children: Snippet } = $props();
 
   const root = $derived(app.library?.root ?? '');
   /** A new Codex chat (working in the library folder) with the request typed in but not sent, so files can be attached. */
@@ -42,6 +43,7 @@
   $effect(() => () => clearTimeout(timer));
 
   async function follow(event: MouseEvent) {
+    onfollow?.();
     if (!inStudio) return void copy();
     event.preventDefault();
     await studio.load();

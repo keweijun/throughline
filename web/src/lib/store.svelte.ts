@@ -659,6 +659,16 @@ class AppStore {
     return this.act(() => api.delete(`/api/memory/${encodeURIComponent(id)}`));
   }
 
+  /** The course change a turn's reply suggested, while it is still open (ADR 0016). */
+  changeBy(turnId: string) {
+    return (this.state?.changes ?? []).find((c) => c.id === turnId) ?? null;
+  }
+
+  /** The learner opened a suggested course change in Studio or dismissed it; either way it is no longer shown. */
+  resolveChange(id: string, status: 'opened' | 'dismissed') {
+    return this.act(() => api.put(`/api/course-changes/${encodeURIComponent(id)}`, { status }));
+  }
+
   toggleBookmark(conceptId: string, source?: AnnotationSource | null) {
     const existing = this.bookmark(conceptId, source);
     if (existing) return this.removeAnnotation(existing.id);

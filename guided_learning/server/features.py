@@ -15,6 +15,7 @@ from .. import images as attached
 from .. import review
 from ..store import OperationError
 from .. import memory
+from .. import course_changes
 from ..streaming import BACKGROUND, PREPARED_STEP
 from . import prompts
 
@@ -968,6 +969,26 @@ class Memory(Feature):
             self.operation({'op': 'memory.note', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'interaction_ids': own, 'note': note})
         except OperationError:
             log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
+
+
+class CourseChanges(Feature):
+    """A change to the course itself that a lesson or side-question reply suggests making in Studio (ADR 0016)."""
+
+    def prompt(self, turn, context):
+        if turn['channel'] not in ('mainline', PREPARED_STEP, 'sidequestion'):
+            return ''
+        return prompts.course_change(self.operation({'op': 'course_change.history'})['changes'])
+
+    def on_complete(self, turn):
+        if turn['channel'] not in ('mainline', 'sidequestion'):
+            return
+        note = tagged_json(course_changes.NOTE, turn['final_text'])
+        if not isinstance(note, dict) or not isinstance(note.get('request'), str):
+            return
+        try:
+            self.operation({'op': 'course_change.suggest', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'request': note['request']})
+        except OperationError:
+            log.info('Course change suggested by turn %s was refused', turn['id'], exc_info=True)
 
 
 class Preparation(Feature):

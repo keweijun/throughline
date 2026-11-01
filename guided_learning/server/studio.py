@@ -320,7 +320,9 @@ class Studio:
         full = self.access()['full_access']
         params = {'cwd': str(self._cwd(course)), 'approvalPolicy': 'never' if full else 'on-request',
                   'sandbox': 'danger-full-access' if full else 'workspace-write',
-                  'config': {'model_reasoning_effort': current['effort']},
+                  # Codex offers its question tool only in Plan mode unless this feature is on; with it, the skill
+                  # asks intake and other choices as options the learner clicks. A Codex without it ignores the key.
+                  'config': {'model_reasoning_effort': current['effort'], 'features.default_mode_request_user_input': True},
                   'developerInstructions': INSTRUCTIONS.format(course=f', with the course in {course} open')}
         if current['model']:
             params['model'] = current['model']

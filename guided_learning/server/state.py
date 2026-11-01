@@ -105,6 +105,7 @@ PARTS = {
     'memory': lambda host: {'memory': host.operation({'op': 'memory.view'})['entries'],
                             'memory_requests': host.operation({'op': 'memory.requests'})['requests']},
     'skipped': lambda host: {'skipped': host.practice.skipped()},
+    'course_changes': lambda host: host.operation({'op': 'course_change.list'}),
     'builds': lambda host: {'builds': host.builds.state()},
 }
 # Parts a `changed` event may reload without the rest of the state.

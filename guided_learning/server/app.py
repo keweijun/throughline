@@ -95,6 +95,10 @@ class MemoryAskRequest(Body):
     concept_id: str
 
 
+class CourseChangeRequest(Body):
+    status: Literal['dismissed', 'opened']
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -495,6 +499,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.delete('/api/memory/{identifier}')
     def remove_memory(identifier: str):
         result = host.operation({'op': 'memory.delete', 'id': identifier})
+        host.changed()
+        return result
+
+    @app.put('/api/course-changes/{identifier}')
+    def resolve_course_change(identifier: str, body: CourseChangeRequest):
+        # The learner opened a suggested course change in Studio or dismissed it (ADR 0016).
+        result = host.operation({'op': 'course_change.resolve', 'id': identifier, 'status': body.status})
         host.changed()
         return result
 

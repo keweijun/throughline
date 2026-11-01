@@ -147,7 +147,7 @@ test('help maps what the learner can do by level and shows where each thing is',
 
   // Studio has no control of its own to point at; Help opens it on the Course page.
   await page.keyboard.press('?');
-  await help.getByRole('listitem').filter({ hasText: 'Change the course with Codex' }).getByRole('button', { name: 'Open' }).click();
+  await help.getByRole('listitem').filter({ hasText: 'Codex itself, working on your course' }).getByRole('button', { name: 'Open' }).click();
   await expect(page.locator('#course-studio')).toBeVisible();
 });
 

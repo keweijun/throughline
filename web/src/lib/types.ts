@@ -266,8 +266,18 @@ export type State = {
   memory: MemoryEntry[];
   memory_requests: MemoryRequest[];
   skipped: Skipped[];
+  /** The open course change the teacher suggested, if any (ADR 0016). */
+  changes: CourseChange[];
   builds: ChapterBuild[];
   review: ReviewState;
+};
+
+/** A change to the course itself that a lesson or side-question reply suggests making in Studio; `id` is its turn. */
+export type CourseChange = {
+  id: string;
+  concept_id: string;
+  request: string;
+  status: 'suggested';
 };
 
 /** A review set (ADR 0014): the questions written for one request, with how many are answered and right. */

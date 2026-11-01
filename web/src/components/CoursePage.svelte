@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { t } from '../lib/i18n.svelte';
   import { app, type CoursePart } from '../lib/store.svelte';
   import { exportNotes } from '../lib/notes';
   import CodexLink from './CodexLink.svelte';
-  import Memory from './Memory.svelte';
+  import TeachingPreferences from './TeachingPreferences.svelte';
   import SourceList from './SourceList.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
@@ -29,7 +30,6 @@
 
   const parts: { id: CoursePart; label: () => string }[] = [
     { id: 'studio', label: () => (studio.available === false ? t('Change this course') : t('Studio')) },
-    { id: 'memory', label: () => t('Course memory') },
     { id: 'sources', label: () => t('Sources') },
     { id: 'notes', label: () => t('Your notes') },
   ];
@@ -41,7 +41,42 @@
     exporting = false;
   }
 
-  // One tab at a time at full height, so Studio and Memory, each with a writing box, never share the screen.
+  // Once the learner writes to Studio, the course's header steps aside: the page scrolls it away under the pinned tabs
+  // and Studio's frame grows upward by as much, so its box stays exactly where it was. Leaving the tab gives it back.
+  let grown = $state<number | null>(null);
+  // A page shorter than the window cannot scroll that far by itself; this much room under the frame lets it.
+  let room = $state(0);
+  let barHeight = $state(0);
+  let frame = $state<HTMLElement>();
+
+  async function startWork() {
+    const stage = document.getElementById('stage');
+    if (grown !== null || !stage || !frame) return;
+    const gap = parseFloat(getComputedStyle(frame.closest('.page')!).rowGap) || 0;
+    const by = Math.max(0, Math.round(frame.getBoundingClientRect().top - stage.getBoundingClientRect().top - barHeight - gap));
+    grown = by;
+    await tick();
+    const from = stage.scrollTop;
+    stage.scrollBy({ top: by, behavior: 'instant' });
+    const short = by - (stage.scrollTop - from);
+    if (short < 1) return;
+    room = short;
+    await tick();
+    stage.scrollBy({ top: short, behavior: 'instant' });
+  }
+
+  $effect(() => {
+    if (app.courseOpen && app.coursePart === 'studio') return;
+    grown = null;
+    room = 0;
+  });
+
+  // A turn that starts by any other way than the box, such as a hand-off from a lesson, counts as writing too.
+  $effect(() => {
+    if (studio.running && app.courseOpen && app.coursePart === 'studio') void startWork();
+  });
+
+  // One tab at a time at full height, so Studio has the room and nothing scrolls inside something else that scrolls.
   function onTabKey(event: KeyboardEvent) {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
     if (!step) return;
@@ -91,29 +126,33 @@
         <span>{t('Sources: {count}', { count: sources })}</span>
       </p>
     </div>
-
-    <div class="bar">
-      <div class="tabs" role="tablist" aria-label={t('This course')} tabindex="-1" onkeydown={onTabKey}>
-        {#each parts as part (part.id)}
-          <button
-            id="course-tab-{part.id}"
-            class="tab"
-            role="tab"
-            aria-selected={app.coursePart === part.id}
-            aria-controls="course-{part.id}"
-            tabindex={app.coursePart === part.id ? 0 : -1}
-            onclick={() => (app.coursePart = part.id)}
-          >
-            {part.label()}{#if part.id === 'memory' && suggested}<span class="dot" aria-hidden="true"></span>{/if}
-          </button>
-        {/each}
-      </div>
-    </div>
   </header>
+
+  <!-- Outside the header, so the tabs stay pinned while the header scrolls away. -->
+  <div class="bar" bind:offsetHeight={barHeight}>
+    <div class="tabs" role="tablist" aria-label={t('This course')} tabindex="-1" onkeydown={onTabKey}>
+      {#each parts as part (part.id)}
+        <button
+          id="course-tab-{part.id}"
+          class="tab"
+          role="tab"
+          aria-selected={app.coursePart === part.id}
+          aria-controls="course-{part.id}"
+          tabindex={app.coursePart === part.id ? 0 : -1}
+          onclick={() => (app.coursePart = part.id)}
+        >
+          {part.label()}{#if part.id === 'studio' && suggested}<span class="dot" aria-hidden="true"></span>{/if}
+        </button>
+      {/each}
+    </div>
+  </div>
 
   <!-- Studio is course-level (ADR 0017): the first tab. Where Codex cannot run it, the hand-offs open a Codex chat
        instead (ADR 0016). Hidden tabs stay mounted, so each keeps its place. -->
   <div class="part" id="course-studio" role="tabpanel" aria-labelledby="course-tab-studio" hidden={app.coursePart !== 'studio'}>
+    <!-- How the learner is taught stands beside Studio, where it is changed: tell Studio, and it records it here. -->
+    <div class="studio-row">
+    <div class="studio-main">
     {#if studio.available === false}
       <h2>{t('Change this course')}</h2>
       <p class="lead">{t('Add files, rebuild the route, check pages or change how the course is taught. Each request opens a Codex chat with it typed in; this page updates when Codex is done.')}</p>
@@ -130,16 +169,19 @@
       {/if}
     {:else}
       <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
-      <div class="frame studio-frame" data-scroller>
+      <div
+        class="frame studio-frame"
+        data-scroller
+        bind:this={frame}
+        style:--grown={grown === null ? null : `${grown}px`}
+        style:margin-bottom={room ? `${room}px` : null}
+        onfocusin={(event) => (event.target as Element).closest('.cm-editor') && void startWork()}
+      >
         <Studio active={app.courseOpen && app.coursePart === 'studio'} />
       </div>
     {/if}
-  </div>
-
-  <div class="part" id="course-memory" role="tabpanel" aria-labelledby="course-tab-memory" hidden={app.coursePart !== 'memory'}>
-    <!-- Like Studio, Memory scrolls inside its own frame, so its writing box to the teacher stays in view. -->
-    <div class="frame" data-scroller>
-      <Memory active={app.courseOpen && app.coursePart === 'memory'} />
+    </div>
+    <TeachingPreferences />
     </div>
   </div>
 
@@ -257,11 +299,17 @@
     font-weight: 600;
   }
 
+  /* Pinned under the top bar, so the tabs stay at hand while the header scrolls away; as close to the header as before. */
   .bar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
     display: flex;
     align-items: end;
     gap: 1rem;
+    margin-top: -0.75rem;
     border-bottom: 1px solid var(--rule);
+    background: var(--ground);
   }
 
   .tabs {
@@ -315,8 +363,26 @@
     font-weight: 600;
   }
 
-  /* Memory and Studio bring their own headings; on the page their tabs already name them. */
-  #course-memory :global(.panel-bar),
+  /* Studio takes the room; how the learner is taught stands beside it on a wide screen and below it otherwise. */
+  .studio-row {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @media (min-width: 72rem) {
+    .studio-row {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+  }
+
+  .studio-main {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* Studio brings its own heading; on the page its tab already names it. */
   #course-studio :global(.studio > .panel-head > .panel-bar),
   #course-studio :global(.studio > .panel-head > .panel-intro) {
     display: none;
@@ -344,7 +410,8 @@
   /* Studio's frame keeps one height, which Studio fills with its box at the bottom, so content loading inside it (the
      welcome, a reopened chat) never moves the box from under the learner's pointer. */
   .studio-frame {
-    height: max(24rem, calc(100vh - var(--topbar) - 22rem));
+    height: calc(max(24rem, 100vh - var(--topbar) - 22rem) + var(--grown, 0px));
+    max-height: none;
   }
 
   .actions {

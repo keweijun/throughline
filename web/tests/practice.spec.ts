@@ -72,7 +72,7 @@ test('skipping two exercises for the same reason suggests a preference to confir
   await banner.getByRole('button', { name: 'Remember', exact: true }).click();
   await expect(banner).toBeHidden();
   await page.keyboard.press('m');
-  await expect(page.locator('.memory-panel #memory-preference')).toContainText('Fewer long calculations');
+  await expect(page.locator('#course-preferences')).toContainText('Fewer long calculations');
 });
 
 test('a full solution asks for confirmation first', async ({ page, course }) => {

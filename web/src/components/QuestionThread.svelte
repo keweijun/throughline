@@ -22,7 +22,10 @@
   const later = $derived(decision?.category === 'future' && decision.target_concept_id ? app.concept(decision.target_concept_id) : undefined);
   const scheduled = $derived(app.state?.deferred_explanations.find((e) => e.id === `web:${question.id}`));
   let node: HTMLElement | undefined = $state();
+  let head: HTMLElement | undefined = $state();
   let flash = $state(false);
+  // Whether the open thread's question has scrolled out of view above its answers, so a one-line strip stands in for it.
+  let away = $state(false);
   let busy = $state(false);
 
   async function retryMissing(item: QuestionReply) {
@@ -42,6 +45,26 @@
     const timer = setTimeout(() => (flash = false), 1600);
     return () => clearTimeout(timer);
   });
+
+  // The question scrolls away with the answers, leaving all the panel's height to them; the strip brings it back.
+  $effect(() => {
+    if (!open || !head) {
+      away = false;
+      return;
+    }
+    let root = head.parentElement;
+    while (root && !/(auto|scroll)/.test(getComputedStyle(root).overflowY)) root = root.parentElement;
+    const observer = new IntersectionObserver(
+      ([entry]) => (away = !entry.isIntersecting && !!entry.rootBounds && entry.boundingClientRect.bottom <= entry.rootBounds.top),
+      { root },
+    );
+    observer.observe(head);
+    return () => observer.disconnect();
+  });
+
+  function backToQuestion() {
+    node?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
 
   async function choose(choice: 'accept' | 'decline') {
     if (busy) return;
@@ -90,7 +113,7 @@
 {/snippet}
 
 <article class="thread" class:flash class:open id="thread-{question.id}" bind:this={node} data-question-id={question.id}>
-  <div class="head">
+  <div class="head" bind:this={head}>
     <button
       class="toggle"
       aria-expanded={open}
@@ -121,6 +144,14 @@
 
   {#if open}
   <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: 200 }}>
+  <!-- Takes no room in the thread, so the answers never move when it appears. -->
+  <div class="pin">
+    {#if away}
+      <button class="pin-bar" onclick={backToQuestion} title={t("Back to the question")}>
+        <span class="pin-title" use:markdown={{ language: locale.language, text: question.question }}></span>
+      </button>
+    {/if}
+  </div>
   {#if answer}{@render answered(answer)}{/if}
 
   <!-- How the teacher placed the question on the route is its own reasoning; the learner sees only what it changes. -->
@@ -240,15 +271,48 @@
 
   .your-notes { padding: 0; border: 0; background: none; color: var(--mine); font: inherit; font-weight: 600; cursor: pointer; }
 
-  /* An open thread keeps its question in view while its answers scroll by, clear of the panel's close button. */
+  /* An open thread's question lines up with its follow-ups, clear of the panel's close button. */
   .thread.open .head {
+    padding-right: 2.2rem;
+  }
+
+  /* Once an open thread's question scrolls away, one line of it stays at the top of the panel, clear of its close button. */
+  .pin {
     position: sticky;
     top: 0;
     z-index: 1;
-    margin: -0.4rem 0 0;
-    padding: 0.4rem 2.2rem 0.5rem 0;
-    background: var(--sheet);
-    box-shadow: 0 1px 0 var(--rule);
+    height: 0;
+    margin-bottom: -0.6rem;
+  }
+
+  .pin-bar {
+    position: absolute;
+    top: 0;
+    left: -1.7rem;
+    right: 0;
+    display: block;
+    padding: 0.4rem 2.2rem 0.45rem 0.75rem;
+    border: 0;
+    border-radius: 0 0 var(--radius) var(--radius);
+    background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--sheet);
+    box-shadow: 0 0 0 0.4rem var(--sheet);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    animation: enter-fade var(--quick) ease;
+  }
+
+  .pin-title {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .pin-title :global(p) {
+    display: inline;
   }
 
   .reply {
@@ -266,7 +330,7 @@
     background: var(--accent-wash);
   }
 
-  /* Follow-ups keep the inset the open thread's sticky question leaves for the panel's close button, so every question box lines up. */
+  /* Follow-ups keep the open thread's inset for the panel's close button, so every question box lines up. */
   .reply .asked {
     margin-right: 2.2rem;
   }
@@ -291,11 +355,6 @@
     border-bottom: 1px solid var(--rule);
   }
 
-
-  /* An open thread's question stays in view, so its quote is kept short there; scroll it to read the rest. */
-  .head blockquote {
-    max-height: 4.6em;
-  }
 
   .title {
     font-family: var(--sans);

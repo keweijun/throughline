@@ -35,7 +35,7 @@ if (Get-Command pipx -ErrorAction SilentlyContinue) {
 }
 
 # 4.
-uv tool install --reinstall $Package
+uv tool install --reinstall-package throughline $Package
 if ($LASTEXITCODE -ne 0) { throw 'uv could not install Throughline; see the messages above.' }
 uv tool update-shell *> $null  # uv's tool folder on PATH in new terminals
 $Bin = (uv tool dir --bin).Trim()

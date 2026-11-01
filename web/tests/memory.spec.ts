@@ -1,14 +1,14 @@
 import { test, expect } from './fixture';
 
-test('the teacher suggests a preference inline, and the Memory tab lists only confirmed preferences', async ({ page, course }) => {
+test('the teacher suggests a preference inline, and the Overview lists the confirmed ones to edit or delete', async ({ page, course }) => {
   const { errors } = await course('memory_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('has one wavelength');
   await expect(page.locator('.lesson-body')).not.toContainText('course-memory');
   await expect(page.locator('.lesson-body')).not.toContainText('One step at a time');
 
-  // A suggested preference is asked right after the lesson step that suggested it, and nowhere else; the course button
-  // marks it until it is answered.
+  // A suggested preference is asked right after the lesson step that suggested it, and nowhere else; Overview is
+  // marked until it is answered.
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested preference' });
   await expect(suggestion).toContainText('Remember: One step at a time?');
   await expect(page.getByRole('group', { name: 'Suggested preference' })).toHaveCount(1);
@@ -17,45 +17,26 @@ test('the teacher suggests a preference inline, and the Memory tab lists only co
   await expect(suggestion).toHaveCount(0);
   await expect(page.locator('#open-course .dot')).toHaveCount(0);
 
-  // Memory is a tab of the Course page (ADR 0017).
+  // How the learner is taught sits beside Studio on the Overview (ADR 0017); there is no Memory tab.
   await page.locator('#open-course').click();
-  await page.getByRole('tab', { name: 'Course memory' }).click();
-  const memory = page.locator('.memory-panel');
-  await expect(memory.locator('#memory-preference')).toContainText('One step at a time');
+  await expect(page.getByRole('tab', { name: 'Course memory' })).toHaveCount(0);
+  const taught = page.locator('#course-preferences');
+  await expect(taught).toContainText('One step at a time');
   // Taught terms and difficulties are the teacher's working notes, not shown.
-  await expect(memory).not.toContainText('plane wave');
-  await expect(memory).not.toContainText('Adding probabilities');
+  await expect(taught).not.toContainText('plane wave');
+  await expect(taught).not.toContainText('Adding probabilities');
 
-  await memory.locator('#memory-preference .item').getByRole('button', { name: 'Edit' }).click();
-  await memory.locator('#memory-preference').getByRole('textbox').fill('One step at a time, then $e^{ikx}$');
-  await memory.locator('#memory-preference').getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(memory.locator('#memory-preference .katex')).toBeVisible();
+  await taught.locator('.item').getByRole('button', { name: 'Edit' }).click();
+  await taught.getByRole('textbox').fill('One step at a time, then $e^{ikx}$');
+  await taught.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(taught.locator('.katex')).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
-  await memory.locator('#memory-preference .item').getByRole('button', { name: 'Delete' }).click();
-  await expect(memory.locator('#memory-preference .item')).toHaveCount(0);
+  await taught.locator('.item').getByRole('button', { name: 'Delete' }).click();
+  await expect(taught.locator('.item')).toHaveCount(0);
 
   await page.reload();
   await page.keyboard.press('m');
-  await expect(page.locator('.memory-panel #memory-preference .item')).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
-test('the learner tells the teacher in their own words what to remember', async ({ page, course }) => {
-  const { errors } = await course('memory_browser_fixture');
-  await page.keyboard.press('m');
-  const memory = page.locator('.memory-panel');
-
-  await memory.getByRole('textbox', { name: 'Tell the teacher what to remember' }).fill('Please keep it short');
-  await memory.locator('.panel-foot').getByRole('button', { name: 'Send', exact: true }).click();
-  const exchange = memory.getByRole('region', { name: 'What you asked the teacher to remember' }).locator('article');
-  await expect(exchange).toContainText('Please keep it short');
-  await expect(exchange).toContainText('I will keep my answers short.');
-  await expect(memory.locator('#memory-preference .item')).toContainText('Keep answers short');
-
-  await page.reload();
-  await page.keyboard.press('m');
-  await expect(page.locator('.memory-panel #memory-preference')).toContainText('Keep answers short');
-  await expect(page.locator('.memory-panel article')).toContainText('I will keep my answers short.');
+  await expect(page.locator('#course-preferences')).toContainText('Nothing yet.');
   expect(errors).toEqual([]);
 });

@@ -52,7 +52,7 @@ main() {
   fi
 
   # 4.
-  uv tool install --reinstall "$PACKAGE"
+  uv tool install --reinstall-package throughline "$PACKAGE"
   uv tool update-shell >/dev/null 2>&1 || true  # uv's tool folder on PATH in new terminals
   bin="$(uv tool dir --bin)"
 

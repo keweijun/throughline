@@ -9,7 +9,7 @@ Throughline is the study app; this skill builds and changes courses and opens th
 
 The `guided-learning` command is the app; the browser interface it opens is the teaching surface. The learner should not need to type commands: run them yourself. If `guided-learning` is not found, ask the learner to install Throughline first (the project README has a prompt to paste) and stop.
 
-To update Throughline when the learner asks: run `guided-learning stop`, then remove the pre-0.5.1 package name (`uv tool uninstall codex-guided-learning` or `pipx uninstall codex-guided-learning`; "not installed" is fine), then `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"` (or `pipx install --force` with the same package), then `guided-learning setup`, outside the sandbox. Courses are kept.
+To update Throughline when the learner asks: run `guided-learning stop`, then remove the pre-0.5.1 package name (`uv tool uninstall codex-guided-learning` or `pipx uninstall codex-guided-learning`; "not installed" is fine), then `uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"` (or `pipx install --force` with the same package), then `guided-learning setup`, outside the sandbox. Courses are kept.
 
 Use the course workspace as the only official state. Courses live in the learner's Throughline folder; the learner may call this skill from any Codex chat or folder, so always address courses by name through the command, never by the current directory; `guided-learning courses` prints its `root` and lists courses by name.
 

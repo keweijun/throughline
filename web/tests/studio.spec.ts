@@ -1,4 +1,4 @@
-import { test, expect, editorText } from './fixture';
+import { test, expect, editorText, courseOperation } from './fixture';
 
 /** Studio (ADR 0016) against the scripted App Server in tests/fake_studio_server.py. */
 
@@ -78,6 +78,29 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
   expect((await box.boundingBox())?.y).toBe(before?.y);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
+test('writing to Studio scrolls the course header away under the pinned tabs, without moving the box', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const frame = page.locator('#course-studio .frame');
+  await expect(frame.getByRole('heading', { name: 'What would you like to change in this course?' })).toBeVisible();
+  const box = page.locator('#studio-input');
+  const before = (await box.boundingBox())!;
+  const height = (await frame.boundingBox())!.height;
+  await expect(page.locator('#course-title')).toBeInViewport();
+
+  await box.click();
+  await expect(page.locator('#course-title')).not.toBeInViewport();
+  await expect(page.getByRole('tab', { name: 'Studio' })).toBeInViewport();
+  expect((await frame.boundingBox())!.height).toBeGreaterThan(height + 50);
+  expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/studio-working.png` });
+
+  // Another tab gives the header back its room.
+  await page.getByRole('tab', { name: 'Sources' }).click();
+  await page.getByRole('tab', { name: 'Studio' }).click();
+  await expect.poll(async () => (await frame.boundingBox())!.height).toBeCloseTo(height, 0);
 });
 
 test('a message while Codex works steers it, and Stop interrupts', async ({ page, course }) => {
@@ -233,8 +256,10 @@ test("the library page has its own Studio for new courses; a course card's actio
   await page.locator('#open-courses').click();
   // On All courses the breadcrumb is just that: the open course is offered by the library itself.
   await expect(page.locator('#course-switcher')).toHaveCount(0);
+  // The list is the page; New course opens the library's Studio across it.
   const library = page.locator('.studio-part');
-  await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  await expect(library).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New course', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
 
@@ -249,6 +274,8 @@ test("the library page has its own Studio for new courses; a course card's actio
   // New course starts a fresh chat in the library; what is sent there is the library's, not the open course's.
   await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'New course', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'New course', level: 1 })).toBeVisible();
+  await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
   await expect(box).toBeFocused();
   await box.pressSequentially('hello');
   await page.keyboard.press('Control+Enter');
@@ -256,14 +283,16 @@ test("the library page has its own Studio for new courses; a course card's actio
   expect((await (await page.request.get(base + '/api/studio?scope=library')).json()).threads).toHaveLength(1);
   expect((await (await page.request.get(base + '/api/studio')).json()).threads).toHaveLength(0);
 
-  // A course that appears in the library after the chat began is offered for opening.
-  await page.route('**/api/library', async (route) => {
-    const listed = await (await route.fetch()).json();
-    listed.courses.push({ name: 'optics', path: '/library/optics', title: 'Optics', concepts: 3, sources: 1 });
-    await route.fulfill({ json: listed });
-  });
-  // Showing the library reads it again.
-  await page.locator('#open-courses').click();
-  await expect(library.getByRole('button', { name: 'Open Optics' })).toBeVisible();
+  // Codex makes the course (here the test does, as the skill would); once it has a route, the chat moves into it by
+  // itself and the course opens at its Studio, where the same chat carries on.
+  const thread = (await (await page.request.get(base + '/api/studio?scope=library')).json()).threads[0].id;
+  const root = (await (await page.request.get(base + '/api/library')).json()).root;
+  const optics = `${root}/optics`;
+  courseOperation(optics, { op: 'course.init', title: 'Optics' });
+  courseOperation(optics, { op: 'curriculum.save', concepts: [{ id: 'lens', title: 'Thin lenses' }], route: ['lens'], coverage: [] });
+  await expect(page.locator('#course-switcher')).toContainText('Optics', { timeout: 15_000 });
+  await expect(page.locator('#course-studio')).toBeVisible();
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
+  expect((await (await page.request.get(base + '/api/studio')).json()).threads.map((t: { id: string }) => t.id)).toEqual([thread]);
   expect(errors).toEqual([]);
 });

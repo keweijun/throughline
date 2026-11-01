@@ -43,7 +43,7 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
    然后用当初安装它的工具卸载旧包名（0.5.1 之前的包名，会提供同一个命令）：`uv tool uninstall codex-guided-learning`、`pipx uninstall codex-guided-learning` 或 `python -m pip uninstall -y codex-guided-learning`。如果提示未安装，忽略即可。课程不受影响。
 2. 用第一个可用的工具从 GitHub 安装最新版：
-   - `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
@@ -61,7 +61,7 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
 ```sh
 guided-learning stop                 # 更新时执行；首次安装可跳过
-uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"
+uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"
 guided-learning setup --language zh-CN
 ```
 
@@ -77,7 +77,7 @@ guided-learning setup --language zh-CN
 
 1. 把 PDF 或笔记拖进课程工坊（也可以写出它们所在的文件夹），再用一句话说明想学什么，例如“量子力学，学到微扰理论，为了期末考试”。
 2. Codex 会先问几个简单的问题：你的目标和截止时间、对资料所需的各项先修知识掌握得如何、希望讲到多细。然后它会建议课程名，把文件复制进贯学文件夹，生成跨资料的学习路线，并告诉你哪些内容仍需核对。
-3. 完成后，课程工坊会提示你打开这门课。之后可以从应用菜单里的 **Throughline** 启动器打开贯学。
+3. 完成后，课程会自动打开，这段对话也随之转到它的课程工坊里。之后可以从应用菜单里的 **Throughline** 启动器打开贯学。
 
 以后创建课程也是一样：在课程库中点击 **新建课程**，或在任意 Codex 对话中输入 `$throughline`。如果你的 Codex 版本太旧、不支持课程工坊，课程库的按钮会改为打开一段已填好请求的 Codex 对话。
 
@@ -87,7 +87,7 @@ guided-learning setup --language zh-CN
 
 - **在贯学里学习**：从应用菜单中的 **Throughline** 启动器打开（安装时会自动添加），或运行 `throughline`。讲解、提问和练习都在后台调用 Codex，学习时不需要打开 Codex。课程库会告诉你启动器在哪里、可以把它添加到桌面，Codex 无法回复时也会提示。
 - **在课程工坊里修改课程**：顶栏中与「学习」「复习」并列的 **概览** 展示整门课程，第一个标签 **课程工坊**（或按 `d`）就是贯学里的 Codex 对话，使用同一个 `$throughline` 技能。可以让它加入一份习题、重建某一章、核对页面，或把某一章讲得更严谨；可以附上或拖入文件、用 `@` 引用文件，并批准 Codex 的请求。它工作时你可以继续学习，需要你时顶栏会提示。路线下方的 **在课程工坊中添加文件** 和阅读器中的 **在课程工坊中核对此位置** 会打开已填好请求的课程工坊；你要求它记住的学习偏好会写入课程记忆。
-- **在课程库里创建课程**：**全部课程** 页面有自己的课程工坊，就在课程旁边：点击 **新建课程** 开始一段对话；课程卡片上的 **添加文件**、**生成路线** 和 **核对资料** 会替你在那里提出请求。Codex 读完资料、生成路线后，课程工坊会提示你打开新课程。在 Codex 对话中用 `$throughline` 也可以，例如 `$throughline 把这份习题加入 quantum`。
+- **在课程库里创建课程**：在 **全部课程** 页面点击 **新建课程**，打开课程库自己的课程工坊。Codex 读完资料、生成路线后，这段对话会自动转到新课程里，新课程随之打开在它的课程工坊。课程卡片上的 **添加文件** 和 **核对资料** 会打开那门课的课程工坊，并填好请求。在 Codex 对话中用 `$throughline` 也可以，例如 `$throughline 把这份习题加入 quantum`。
 
 ![课程页上的课程工坊：贯学里的 Codex 对话，在加入习题前先问你一个问题](docs/images/studio-zh-CN.png)
 
@@ -100,7 +100,7 @@ guided-learning setup --language zh-CN
 - **旁支提问**：选中一句话或一个公式即可提问，讲解默认继续进行，除非你选择暂停。如果某个问题要到后面的小节才能讲透，它会被保存到那个小节。
 - **资料原文**：把鼠标停在引用上可预览原文，点击后在内置阅读器中打开对应的页或行。尚未核对的资料会一直标注"尚未核对"。
 - **练习**：每次讲解后都有练习。提示和答案随时可看，但会如实记录，得到帮助后的正确回答不会算作独立完成。练习不合适时，可以换一组并说明希望有什么不同，也可以针对某道题再来一道类似的。
-- **当前位置**：顶栏写着 **全部课程 › 你的课程**，点课程名可以切换课程；旁边的 **概览 · 学习 · 复习** 是一门课的三个地方。**概览** 展示整门课程：一条按章节显示学习进度的进度条，下面是 **课程工坊**、**课程记忆**、**来源** 和 **我的笔记** 几个标签。在课程记忆中，你可以用自己的话告诉老师你喜欢怎样学习；老师提出的偏好会在出现的地方直接询问你。
+- **当前位置**：顶栏写着 **全部课程 › 你的课程**，点课程名可以切换课程；旁边的 **概览 · 学习 · 复习** 是一门课的三个地方。**概览** 展示整门课程：一条按章节显示学习进度的进度条，下面是 **课程工坊**、**来源** 和 **我的笔记** 几个标签。课程工坊旁边的 **你的学习方式** 列出老师遵循的偏好，可以编辑或删除；想调整讲法就告诉课程工坊，老师提出的偏好会在出现的地方直接询问你。
 - **帮助**：按 `?` 可以看到在整个应用、这门课和当前小节里能做什么，**指给我看** 会标出每个控件的位置，下面还有键盘快捷键。第一次遇到看不出用法的操作（比如选中一段内容）时，会有一条简短提示。
 - **复习**：想复习时随时点 **复习** 要几道题，凭记忆作答：有选一选就能答的快题，也有把几个小节联系起来的书面题。**帮我复习** 让教师挑你最久没练习的内容和之前答错的地方；你也可以自己说想复习什么。没有到期提醒。学到一个建立在较早内容上的小节时，会先提供一次简短热身；每个章节页还可以做一次章节测验。
 

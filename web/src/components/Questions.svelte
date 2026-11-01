@@ -206,6 +206,7 @@
       closeLabel={t("Ask a new question instead")}
       quote={quote ? { text: quote.text, source: thread ? undefined : quote.source, id: thread ? undefined : 'branch-selection' } : null}
       onremovequote={() => (app.quote = null)}
+      compact
       imagesKey={draftKey}
       {tools}
     />

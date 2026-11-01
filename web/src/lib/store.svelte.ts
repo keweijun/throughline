@@ -136,7 +136,8 @@ class AppStore {
   /** Set by the app: the reading column has no room beside the full route, and the window is a phone's. */
   stageNarrow = $state(false);
   phone = $state(false);
-  shortcutsOpen = $state(false);
+  /** Help: what the learner can do by level, with the keyboard shortcuts (ADR 0017). */
+  helpOpen = $state(false);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
   /** Annotation to scroll to and flash in the Notes tab. */

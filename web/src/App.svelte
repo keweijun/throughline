@@ -14,7 +14,7 @@
   import SelectionAsk from './components/SelectionAsk.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
-  import Shortcuts from './components/Shortcuts.svelte';
+  import Help from './components/Help.svelte';
   import Toasts from './components/Toasts.svelte';
   import Library from './components/Library.svelte';
 
@@ -77,7 +77,7 @@
     else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse('memory');
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio();
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
-    else if (event.key === '?') app.shortcutsOpen = true;
+    else if (event.key === '?') app.helpOpen = true;
   }
 </script>
 
@@ -124,7 +124,7 @@
 <SelectionAsk />
 <SettingsDialog />
 <CitationPeek />
-<Shortcuts />
+<Help />
 <Toasts />
 
 <style>

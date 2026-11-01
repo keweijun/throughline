@@ -43,7 +43,7 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
    然后用当初安装它的工具卸载旧包名（0.5.1 之前的包名，会提供同一个命令）：`uv tool uninstall codex-guided-learning`、`pipx uninstall codex-guided-learning` 或 `python -m pip uninstall -y codex-guided-learning`。如果提示未安装，忽略即可。课程不受影响。
 2. 用第一个可用的工具从 GitHub 安装最新版：
-   - `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
@@ -61,7 +61,7 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
 ```sh
 guided-learning stop                 # 更新时执行；首次安装可跳过
-uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"
+uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"
 guided-learning setup --language zh-CN
 ```
 

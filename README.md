@@ -43,7 +43,7 @@ When a user asks you to install or update Throughline, run these steps yourself,
 
    Then remove the package's pre-0.5.1 name, which installs the same command, with the tool that installed it: `uv tool uninstall codex-guided-learning`, `pipx uninstall codex-guided-learning`, or `python -m pip uninstall -y codex-guided-learning`. An error that it is not installed is fine. Courses are kept.
 2. Install the latest version from GitHub, using the first tool that is available:
-   - `uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
+   - `uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
@@ -61,7 +61,7 @@ With [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```sh
 guided-learning stop                 # when updating; skip on a first install
-uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/throughline"
+uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline"
 guided-learning setup                # add --language zh-CN for the Chinese welcome guide
 ```
 

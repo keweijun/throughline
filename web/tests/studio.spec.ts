@@ -78,6 +78,36 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await expect(panel.locator('.ended')).toHaveText('Stopped');
 });
 
+test('a slow history read from opening Studio never overwrites a message sent meanwhile', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.keyboard.press('d');
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
+
+  // After a reload, opening Studio reads the latest chat; hold that history back (taken before the next message)
+  // until the message has been sent.
+  await page.route('**/api/studio/threads/*', async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.fulfill({ response });
+  });
+  await page.reload();
+  await page.keyboard.press('d');
+  await expect(page.getByRole('combobox', { name: 'Studio chats' })).toContainText('hello');
+  await box.click();
+  await box.pressSequentially('wait for me');
+  await page.keyboard.press('Control+Enter');
+  const panel = page.locator('#course-studio');
+  await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
+  await expect(panel.locator('.user .said').last()).toHaveText('wait for me', { timeout: 10_000 });
+  await page.waitForTimeout(2000);
+  await expect(panel.locator('.user .said').last()).toHaveText('wait for me');
+  await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
+});
+
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('link', { name: 'Add files in Studio' }).click();

@@ -22,7 +22,7 @@ def main(argv=None):
     if argv and argv[0] in commands.COMMANDS:
         return commands.main(argv)
     background.teacher_models = saved_teacher_models
-    parser = argparse.ArgumentParser(prog='guided-learning', description='Execute one JSON course operation, or run setup, open, stop or courses')
+    parser = argparse.ArgumentParser(prog='guided-learning', description='Execute one JSON course operation, or run setup, open, stop, courses or doctor')
     parser.add_argument('--version', action='version', version=commands.version())
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument('--workspace', help='Course workspace directory')
@@ -41,6 +41,13 @@ def main(argv=None):
         response, code = {'ok': False, 'error': {'code': 'internal_error', 'message': f'{exc.__class__.__name__}: {exc}'}}, 1
     print(json.dumps(response, ensure_ascii=True))
     return code
+
+
+def throughline(argv=None):
+    """The `throughline` command: `guided-learning`, except that on its own it opens the app as the launcher does."""
+    argv = sys.argv[1:] if argv is None else argv
+    return main(argv or ['open'])
+
 
 if __name__ == '__main__':
     sys.exit(main())

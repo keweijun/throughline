@@ -43,6 +43,9 @@ _Avoid_: Exercise, quiz, diagnostic test.
 **Exercise part**: One subquestion of an exercise, assessed on its own; an exercise is solved when all its parts are correct (ADR 0011).
 _Avoid_: Step (a lesson step), a separate exercise.
 
+**Explanation exercise**: An exercise asking the learner to explain an idea in their own words to a stated reader, assessed by its ideas rather than its wording (ADR 0011).
+_Avoid_: Paraphrase, ritual restatement, a separate kind of record.
+
 **Skipped exercise**: An exercise the learner closed as too easy, too tedious or not relevant; it records no outcome and is never reminded.
 _Avoid_: Deferred item ("Do later" stays in scope and enters the review context), replaced exercise, failed, skipped section.
 

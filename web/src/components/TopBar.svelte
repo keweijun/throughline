@@ -4,10 +4,6 @@
   import { studio } from '../lib/studio.svelte';
   import type { LibraryCourse } from '../lib/types';
 
-  const route = $derived(app.state?.curriculum.route ?? []);
-  const index = $derived(app.routeIndex(app.currentId));
-  // The bar fills as sections are studied to the end, so starting the last section does not read as finishing the course.
-  const studied = $derived(route.filter((id) => app.studied(id)).length);
   const studying = $derived(!!app.state && !app.libraryOpen);
   // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
   // start Codex. Events keep it current from then on.
@@ -69,6 +65,7 @@
 </script>
 
 <header class="topbar">
+  <div class="start">
   {#if studying}
   <button
     class="btn btn-quiet menu"
@@ -121,9 +118,10 @@
       <span class="course">{t("Throughline")}</span>
     {/if}
   </nav>
+  </div>
 
   {#if studying}
-    <!-- The three places of one course; the one you are in is always marked, so the way back is always the same. -->
+    <!-- The three places of one course, centred in the bar; the one you are in is always marked, so the way back is always the same. -->
     <div class="places" role="group" aria-label={t("This course")}>
       <button
         id="open-course"
@@ -149,12 +147,6 @@
         </button>
       {/if}
     </div>
-    {#if route.length && index >= 0}
-      <div class="progress" title={t("{studied} of {total} sections studied", { studied, total: route.length })}>
-        <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
-        <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
-      </div>
-    {/if}
   {/if}
 
   <div class="actions">
@@ -231,7 +223,9 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    display: flex;
+    /* Three columns of equal sides, so the course's places sit in the middle of the window whatever the sides hold. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: 1.25rem;
     height: var(--topbar);
@@ -239,6 +233,14 @@
     background: color-mix(in srgb, var(--ground) 88%, transparent);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--rule);
+  }
+
+  .start {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
   }
 
   .menu {
@@ -372,29 +374,32 @@
     border-top: 1px solid var(--rule);
   }
 
-  /* One switch for the course's three places; the open one is filled, like the side panel's switcher. */
+  /* One quiet switch for the course's three places: the open one is lifted onto a sheet rather than filled with ink. */
   .places {
+    grid-column: 2;
     display: flex;
-    flex: none;
-    gap: 0.15rem;
-    padding: 0.2rem;
-    border: 1px solid var(--rule);
+    gap: 2px;
+    padding: 3px;
     border-radius: 999px;
-    background: var(--raised);
+    background: color-mix(in srgb, var(--rule) 55%, transparent);
   }
 
   .place {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.25rem 0.85rem;
+    padding: 0.2rem 0.9rem;
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--ink-soft);
+    color: var(--pencil);
     font: inherit;
-    font-weight: 600;
+    font-size: var(--step--1);
+    font-weight: 500;
     cursor: pointer;
+    transition:
+      color var(--quick) ease,
+      background-color var(--quick) ease;
   }
 
   .place:hover {
@@ -402,8 +407,10 @@
   }
 
   .place[aria-current='page'] {
-    background: var(--accent);
-    color: var(--sheet);
+    /* In the dark, the raised sheet is darker than the track, so the lift is a lighter fill there. */
+    background: light-dark(var(--raised), var(--rule-strong));
+    color: var(--ink);
+    box-shadow: 0 1px 2px var(--shadow-near), 0 0 0 1px color-mix(in srgb, var(--rule) 60%, transparent);
   }
 
   .dot {
@@ -414,37 +421,12 @@
     background: var(--marker);
   }
 
-  .progress {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: var(--step--1);
-    color: var(--pencil);
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .track {
-    width: 7rem;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--rule);
-    overflow: hidden;
-  }
-
-  .track span {
-    transition: width 0.4s var(--ease-out);
-    display: block;
-    height: 100%;
-    background: var(--accent);
-  }
-
   .actions {
+    grid-column: 3;
+    justify-self: end;
     display: flex;
-    flex: none;
     align-items: center;
     gap: 0.25rem;
-    margin-left: auto;
   }
 
   /* One control for the side panel's three views, so it reads as a single switch rather than three more buttons. */
@@ -536,12 +518,6 @@
     }
   }
 
-  @media (max-width: 68rem) {
-    .progress .track {
-      display: none;
-    }
-  }
-
   .narrow-only {
     display: none;
   }
@@ -556,7 +532,6 @@
       display: none;
     }
 
-    .progress,
     .shortcuts {
       display: none;
     }

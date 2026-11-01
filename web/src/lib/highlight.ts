@@ -72,11 +72,15 @@ const tokenize = (needle: string) => needle.replace(FORMULA, (m) => token(m.star
 /**
  * Every occurrence of a passage in rendered text, ignoring whitespace differences and citation chips. A formula in the
  * passage matches the rendered formula with the same TeX; passages saved from text whose formulas differ since are
- * matched on their words alone.
+ * matched on their words alone, and passages saved with a chip's label are matched with chips read as text.
  */
 export function occurrences(root: HTMLElement, needle: string, options: LocateOptions = {}): Range[] {
   const found = search(root, tokenize(needle), options, true);
-  return found.length || !needle.includes('$') ? found : search(root, needle.replace(FORMULA, ' '), options, false);
+  if (found.length) return found;
+  const words = needle.includes('$') ? search(root, needle.replace(FORMULA, ' '), options, false) : [];
+  if (words.length || options.skip) return words;
+  // Passages selected before chips were left out of them carry a chip's label in the text.
+  return search(root, tokenize(needle), { ...options, skip: '.katex, .widget' }, true);
 }
 
 type Position = [Text, number] | Element;

@@ -903,6 +903,19 @@ class Memory(Feature):
             log.info('Memory consolidation of %s could not start', concept_id, exc_info=True)
             return {'created': False}
 
+    def ask(self, identifier, text, concept_id):
+        """The learner tells the teacher what to remember; a small-model turn answers and adds or removes preferences."""
+        record = self.operation({'op': 'memory.request', 'id': identifier, 'text': text, 'concept_id': concept_id})['request']
+        self.host.start_turn({'id': record['turn_id'], 'concept_id': concept_id, 'channel': 'memory', 'record_user': False,
+                              'prompt': prompts.MEMORY_REQUEST})
+        return record
+
+    def request_prompt(self, turn):
+        record = next(r for r in self.operation({'op': 'memory.requests'})['requests'] if r['turn_id'] == turn['id'])
+        preferences = [{'id': e['id'], 'text': e['text']} for e in self.operation({'op': 'memory.view'})['entries']
+                       if e['kind'] == 'preference' and e['status'] in ('confirmed', 'suggested')]
+        return prompts.memory_request(record['text'], preferences, turn.get('language', 'en'))
+
     def consolidation_prompt(self, turn):
         titles = {c['id']: c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts']}
         entries = [{'id': e['id'], 'kind': e['kind'], 'status': e['status'], 'text': e['text'], 'section': titles.get(e['concept_id'], e['concept_id'])}
@@ -924,6 +937,13 @@ class Memory(Feature):
         return prompts.MEMORY_USE if turn['channel'] in ('practice', 'preparation') else ''
 
     def on_complete(self, turn):
+        if turn['channel'] == 'memory':
+            try:
+                reply = parse_json(turn['final_text'])
+            except ValueError:
+                reply = None
+            self.operation({'op': 'memory.answer', 'id': turn['id'].removeprefix('memory-'), 'reply': reply})
+            return
         if turn['channel'] == 'consolidation':
             try:
                 self.operation({'op': 'memory.consolidate', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'reply': parse_json(turn['final_text'])})

@@ -128,7 +128,10 @@
   </div>
 
   <div class="part" id="course-memory" role="tabpanel" aria-labelledby="course-tab-memory" hidden={app.coursePart !== 'memory'}>
-    <Memory />
+    <!-- Like Studio, Memory scrolls inside its own frame, so its writing box to the teacher stays in view. -->
+    <div class="frame">
+      <Memory active={app.courseOpen && app.coursePart === 'memory'} />
+    </div>
   </div>
 
   <div class="part" id="course-sources" role="tabpanel" aria-labelledby="course-tab-sources" hidden={app.coursePart !== 'sources'}>

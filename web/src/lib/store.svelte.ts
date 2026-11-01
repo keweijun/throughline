@@ -102,7 +102,6 @@ class AppStore {
   state = $state<State | null>(null);
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
-  notice = $state<{ title: string; detail?: string } | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** Teacher settings belong to the learner, so they are available before a course is open. */
@@ -156,7 +155,6 @@ class AppStore {
   readonly drafts = new Drafts();
 
   #refreshTimer: ReturnType<typeof setTimeout> | null = null;
-  #noticeTimer: ReturnType<typeof setTimeout> | null = null;
   #refreshing: Promise<void> | null = null;
   /** What the next load fetches: the whole state, some parts of it, or nothing (null). */
   #queued: Set<StatePart> | 'all' | null = null;
@@ -508,13 +506,6 @@ class AppStore {
     }
   }
 
-  /** A short confirmation that clears itself. */
-  notify(title: string, detail?: string) {
-    this.notice = { title, detail };
-    if (this.#noticeTimer) clearTimeout(this.#noticeTimer);
-    this.#noticeTimer = setTimeout(() => (this.notice = null), 8000);
-  }
-
   view(conceptId: string) {
     this.viewingChapter = null;
     this.reviewOpen = this.courseOpen = false;
@@ -643,6 +634,16 @@ class AppStore {
       (list) => drop(list, id),
       () => api.delete(`/api/annotations/${encodeURIComponent(id)}`),
     );
+  }
+
+  /** Preferences the teacher suggested in these turns' memory notes, whose entries are named `<turn id>:<index>`. */
+  suggestedBy(turnIds: string[]) {
+    return (this.state?.memory ?? []).filter((e) => e.status === 'suggested' && turnIds.includes(e.id.slice(0, e.id.lastIndexOf(':'))));
+  }
+
+  /** The learner tells the teacher in their own words what to remember; a small-model turn answers. */
+  askMemory(text: string, conceptId: string) {
+    return this.act(() => api.post('/api/memory', { id: newId(), text, concept_id: conceptId }));
   }
 
   editMemory(id: string, text: string) {

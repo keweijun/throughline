@@ -59,7 +59,8 @@ test('a skipped exercise is closed and does not follow the learner', async ({ pa
 test('skipping two exercises for the same reason suggests a preference to confirm', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
   const exercises = page.locator('#practice article');
-  const banner = page.getByRole('status').filter({ hasText: 'Remember: Fewer long calculations?' });
+  // It is asked on the exercise whose skip suggested it.
+  const banner = exercises.nth(1).getByRole('group', { name: 'Suggested preference' }).filter({ hasText: 'Remember: Fewer long calculations?' });
   for (const index of [0, 1]) {
     await exercises.nth(index).getByRole('button', { name: 'Skip', exact: true }).click();
     await exercises.nth(index).getByRole('button', { name: 'Too tedious' }).click();

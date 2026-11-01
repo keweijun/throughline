@@ -88,6 +88,13 @@ class MemoryRequest(Body):
     text: str
 
 
+class MemoryAskRequest(Body):
+    id: Optional[uuid.UUID] = None
+    text: str
+    # The section in view; the request turn is anchored there, while the preferences belong to the whole course.
+    concept_id: str
+
+
 class ChoiceRequest(Body):
     choice: Literal['accept', 'decline']
 
@@ -465,6 +472,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         result = host.operation({'op': 'annotations.delete', 'id': identifier})
         host.changed()
         return result
+
+    @app.post('/api/memory')
+    def ask_memory(body: MemoryAskRequest):
+        # The learner tells the teacher in their own words what to remember (ADR 0010).
+        result = host.memory.ask(str(body.id or uuid.uuid4()), body.text, body.concept_id)
+        host.changed()
+        return {'request': result}
 
     @app.put('/api/memory/{identifier}')
     def edit_memory(identifier: str, body: MemoryRequest):

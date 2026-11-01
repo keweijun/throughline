@@ -102,7 +102,8 @@ PARTS = {
     'settings': lambda host: {'settings': host.settings.public()},
     'lessons': lambda host: host.operation({'op': 'lesson.list'}),
     'annotations': lambda host: host.operation({'op': 'annotations.list'}),
-    'memory': lambda host: {'memory': host.operation({'op': 'memory.view'})['entries']},
+    'memory': lambda host: {'memory': host.operation({'op': 'memory.view'})['entries'],
+                            'memory_requests': host.operation({'op': 'memory.requests'})['requests']},
     'skipped': lambda host: {'skipped': host.practice.skipped()},
     'builds': lambda host: {'builds': host.builds.state()},
 }

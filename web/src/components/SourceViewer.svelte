@@ -70,8 +70,8 @@
         <p class="muted">{t("Not yet checked against the original. Compare formulas and figures with the page itself. Select text to ask about it.")}</p>
         {#if course}
           <p class="muted">
-            <CodexLink prompt={t('$throughline review {location} (source {source}, unit {unit}) in the course {course}', { location: label, source: s.source_id, unit: s.unit_id, course: course.name })}>
-              {t('Check this location in Codex')}
+            <CodexLink prompt={t('$throughline review {location} (source {source}, unit {unit}) in the course {course}', { location: label, source: s.source_id, unit: s.unit_id, course: course.name })} origin={{ label, text: `source ${s.source_id}, unit ${s.unit_id} (${label})` }}>
+              {t('Check this location in Studio')}
             </CodexLink>
           </p>
         {/if}

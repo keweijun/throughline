@@ -8,6 +8,7 @@
   import type { SkipReason, Task } from '../lib/types';
   import AttachedImages from './AttachedImages.svelte';
   import Composer from './Composer.svelte';
+  import Hint from './Hint.svelte';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
 
@@ -279,12 +280,13 @@
       rows={3}
     />
     {#if composing}
+    <Hint id="recorded-help">{t('Hints, key steps and the full solution are always here. Using one is recorded, so a correct answer after it counts as solved with help.')}</Hint>
     <!-- Help toward an answer comes first; setting the exercise aside is a different choice, so it sits apart. -->
     <div class="help-row">
       <span class="help" role="group" aria-label={t("Help with this exercise")}>
         <span class="stuck">{t("Stuck?")}</span>
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('hint')}>{t("Hint")}</button>
-        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('steps')}>{t("Key steps")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (app.markSeen('hint-recorded-help'), act('hint'))}>{t("Hint")}</button>
+        <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (app.markSeen('hint-recorded-help'), act('steps'))}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSolution = true), (confirmSkip = false))}>{t("Full solution")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} aria-pressed={asking} onclick={toggleAsking}>{t("Ask about this")}</button>
       </span>

@@ -3,6 +3,9 @@
   import { app } from '../lib/store.svelte';
   import type { Ref } from '../lib/types';
 
+  /** On the Course page the list sits under the page's own heading, with no reader to go back to. */
+  let { page = false }: { page?: boolean } = $props();
+
   type Entry = {
     id: string;
     name: string;
@@ -48,11 +51,13 @@
   const others = $derived(entries.filter((e) => !here.includes(e) && !inChapter.includes(e)));
 </script>
 
-<section class="source-list" aria-labelledby="sources-title">
-  <header class="panel-head">
-    <div class="panel-bar"><h2 id="sources-title">{t("Course sources")}</h2></div>
-  </header>
-  {#if app.source}
+<section class="source-list" aria-labelledby={page ? undefined : 'sources-title'} aria-label={page ? t("Course sources") : undefined}>
+  {#if !page}
+    <header class="panel-head">
+      <div class="panel-bar"><h2 id="sources-title">{t("Course sources")}</h2></div>
+    </header>
+  {/if}
+  {#if app.source && !page}
     <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
   {/if}
   {#if !entries.length}

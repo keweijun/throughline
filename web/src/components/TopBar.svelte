@@ -1,12 +1,22 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app, type PanelTab } from '../lib/store.svelte';
+  import { studio } from '../lib/studio.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
   // The bar fills as sections are studied to the end, so starting the last section does not read as finishing the course.
   const studied = $derived(route.filter((id) => app.studied(id)).length);
   const studying = $derived(!!app.state && !app.libraryOpen);
+  // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
+  // start Codex. Events keep it current from then on.
+  let activityAsked = false;
+  $effect(() => {
+    if (studying && !activityAsked) {
+      activityAsked = true;
+      void studio.loadActivity();
+    }
+  });
   const openQuestions = $derived(
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
@@ -39,7 +49,27 @@
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
-    <span class="course">{studying ? app.state!.course.title : t("Throughline")}</span>
+    {#if !studying}<span class="course">{t("Throughline")}</span>{/if}
+    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
+    <button id="open-courses" class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Courses")}</span>
+    </button>
+    {#if studying}
+      <!-- Left to right the bar goes from the app to the course to the section being read (ADR 0017). The course button
+           opens the Course page, so it looks like a button rather than a title. -->
+      <span class="divider" aria-hidden="true"></span>
+      <button
+        id="open-course"
+        class="course course-button"
+        aria-pressed={app.courseOpen}
+        title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
+        onclick={() => (app.courseOpen ? (app.courseOpen = false) : app.showCourse())}
+      >
+        <svg class="page-icon" viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="3" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+        <span class="name">{app.state!.course.title}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+      </button>
+    {/if}
   </div>
 
   {#if route.length && index >= 0 && studying}
@@ -48,30 +78,25 @@
       <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
     </div>
   {/if}
+  {#if studying && review}
+    <button
+      id="open-review"
+      class="btn btn-quiet review"
+      aria-pressed={app.reviewOpen}
+      aria-label={t("Review")}
+      title={t("Answer questions from memory on what you have studied")}
+      onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
+    >
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Review")}</span>
+    </button>
+  {/if}
 
   <div class="actions">
     {#if app.connection !== 'live'}
       <span class="chip chip-caution" role="status">
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
-    {/if}
-    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
-    <button class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Courses")}</span>
-    </button>
-    {#if studying && review}
-      <button
-        id="open-review"
-        class="btn btn-quiet review"
-        aria-pressed={app.reviewOpen}
-        aria-label={t("Review")}
-        title={t("Answer questions from memory on what you have studied")}
-        onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
-      >
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Review")}</span>
-      </button>
     {/if}
     {#if studying}
       <div class="switcher" class:open={app.panelOpen} role="group" aria-label={t("Questions and sources")}>
@@ -86,11 +111,19 @@
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Notes")}</span>
       </button>
-      <button id="toggle-memory" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('memory')} aria-label={t("Memory")} title={t("What the teacher remembers about this course")} onclick={() => toggle('memory')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3.5a5 5 0 0 0-3 9v2.5h6V12.5a5 5 0 0 0-3-9zM8 17h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Memory")}</span>{#if suggested}<span class="count">{suggested}</span>{/if}
-      </button>
       </div>
+    {/if}
+    {#if studying && !app.studioShown && (studio.waiting.length || studio.working.length)}
+      <!-- What Codex is doing in Studio, on every page; the question itself stays in Studio's transcript. -->
+      <button
+        class="btn btn-small studio-status"
+        class:needs={studio.waiting.length > 0}
+        onclick={() => app.showStudio({ thread: studio.attention })}
+        title={studio.waiting.length ? t("Codex is waiting for your answer in Studio") : t("Codex is working on your course in Studio")}
+      >
+        <span class="pulse" aria-hidden="true"></span>
+        <span>{studio.waiting.length ? t("Studio needs you") : t("Studio working…")}</span>
+      </button>
     {/if}
     {#if app.update?.available}
       <!-- Noticeable but quiet: a small pill that waits beside Settings, never a banner or a toast. -->
@@ -106,11 +139,11 @@
         <span class="wide-only">{t("Update available")}</span>
       </button>
     {/if}
-    <button class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: course, teacher, appearance and about")}>
+    <button id="open-settings" class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: teacher, appearance and about")}>
       <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16.02 8.14L18.08 8.61L18.08 11.39L16.02 11.86L15.57 12.94L16.70 14.73L14.73 16.70L12.94 15.57L11.86 16.02L11.39 18.08L8.61 18.08L8.14 16.02L7.06 15.57L5.27 16.70L3.30 14.73L4.43 12.94L3.98 11.86L1.92 11.39L1.92 8.61L3.98 8.14L4.43 7.06L3.30 5.27L5.27 3.30L7.06 4.43L8.14 3.98L8.61 1.92L11.39 1.92L11.86 3.98L12.94 4.43L14.73 3.30L16.70 5.27L15.57 7.06Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /><circle cx="10" cy="10" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
     </button>
-    <button class="btn btn-quiet icon shortcuts" onclick={() => (app.shortcutsOpen = true)} aria-label={t("Keyboard shortcuts")} title={t("Keyboard shortcuts (?)")}>
-      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="1.75" y="4.5" width="16.5" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M5 8h.01M8 8h.01M11 8h.01M14.5 8h.5M6.5 10.5h.01M9.5 10.5h.01M12.5 10.5h.01M6.5 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+    <button id="open-help" class="btn btn-quiet icon shortcuts" onclick={() => (app.helpOpen = true)} aria-label={t("Help")} title={t("Help and keyboard shortcuts (?)")}>
+      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="7.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M7.8 7.9a2.3 2.3 0 1 1 3.3 2.1c-.7.3-1.1.9-1.1 1.6v.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><circle cx="10" cy="14.4" r=".95" fill="currentColor" /></svg>
     </button>
   </div>
 </header>
@@ -152,6 +185,54 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* The title reads as the course's name, with a quiet hover that says it opens something. */
+  .course-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: var(--raised);
+    color: inherit;
+    font: inherit;
+    font-size: var(--step-0);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .course-button:hover,
+  .course-button[aria-pressed='true'] {
+    background: var(--accent-wash);
+  }
+
+  .course-button .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .page-icon {
+    flex: none;
+    color: var(--pencil);
+  }
+
+  .divider {
+    flex: none;
+    width: 1px;
+    height: 1.4rem;
+    background: var(--rule);
+  }
+
+  .dot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--marker);
   }
 
   .progress {
@@ -235,6 +316,39 @@
   .update:hover {
     background: var(--accent);
     color: var(--on-accent);
+  }
+
+  .studio-status {
+    gap: 0.4rem;
+    border-radius: 999px;
+    border-color: var(--rule);
+    background: var(--raised);
+    color: var(--ink-soft);
+  }
+
+  .studio-status.needs {
+    border-color: var(--caution);
+    background: var(--caution-wash);
+    color: var(--caution);
+    font-weight: 600;
+  }
+
+  .pulse {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: studio-pulse 1.2s ease-in-out infinite;
+  }
+
+  .studio-status:not(.needs) .pulse {
+    background: var(--accent);
+  }
+
+  @keyframes studio-pulse {
+    50% {
+      opacity: 0.3;
+    }
   }
 
   @media (hover: none), (max-width: 30rem) {

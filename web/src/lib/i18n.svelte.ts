@@ -3,6 +3,14 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "What would you like to change in this course?": "想怎样修改这门课？",
+  "Where you are": "当前位置",
+  "All courses": "全部课程",
+  "Switch course": "切换课程",
+  "Study": "学习",
+  "Overview": "概览",
+  "Every course in your Throughline folder, and the course switcher beside it. Open one, or make a new one.": "贯学文件夹中的所有课程；旁边的课程名可以切换课程。打开一门，或新建一门。",
+  "The course as a whole: Studio, what the teacher remembers, sources and your notes. Study, Review and Overview are the course's three places.": "整门课程：课程工坊、老师记住的内容、来源和你的笔记。学习、复习和概览是一门课的三个地方。",
   "Tip": "提示",
   "Got it": "知道了",
   "Select any passage in the lesson to ask about it, highlight it or add a note.": "选中讲解中的任意一段，即可就它提问、高亮或添加笔记。",

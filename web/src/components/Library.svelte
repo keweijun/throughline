@@ -71,7 +71,7 @@
 <section class="library" aria-labelledby="library-title">
   <header>
     <div>
-      <h1 id="library-title">{t('Your courses')}</h1>
+      <h1 id="library-title">{t('All courses')}</h1>
       {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
     </div>
     <div class="header-actions">

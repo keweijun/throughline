@@ -17,7 +17,7 @@
     {
       title: 'Throughline',
       items: [
-        { title: 'Your courses', text: 'Every course in your Throughline folder. Open one, or make a new one.', target: '#open-courses' },
+        { title: 'All courses', text: 'Every course in your Throughline folder, and the course switcher beside it. Open one, or make a new one.', target: '#open-courses' },
         { title: 'Settings', text: 'Appearance and language, the teacher model and its effort, and updates.', target: '#open-settings' },
       ],
     },
@@ -27,7 +27,7 @@
             title: 'This course' as MessageKey,
             items: [
               { title: 'Route', text: 'Chapters and sections in teaching order, with where you are. Select one to look at it without moving.', target: '#route' },
-              { title: 'Course page', text: 'The course as a whole: Studio, what the teacher remembers, sources and your notes. Open it from the course title.', target: '#open-course', key: 'm' },
+              { title: 'Overview', text: 'The course as a whole: Studio, what the teacher remembers, sources and your notes. Study, Review and Overview are the course\'s three places.', target: '#open-course', key: 'm' },
               { title: 'Studio', text: 'Codex itself, working on your course. If you can describe a change, it can probably make it: new sections or exercises, added files, a different way of teaching.', key: 'd', open: () => app.showStudio({ focus: true }) },
               { title: 'Review', text: 'Questions to answer from memory on what you have studied, whenever you ask for them.', target: '#open-review' },
             ] as Item[],

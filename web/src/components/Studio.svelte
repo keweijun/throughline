@@ -247,6 +247,7 @@
       <p class="panel-empty" role="status">{t("Starting Codex…")}</p>
     {:else if !studio.turns.length}
       <div class="welcome">
+        <h3 class="welcome-title">{t("What would you like to change in this course?")}</h3>
         <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
         <ul class="examples">
           {#each examples as example (example.label)}
@@ -334,27 +335,54 @@
   }
 
   .transcript {
+    display: flex;
     flex: 1 0 auto;
+    flex-direction: column;
     gap: 1rem;
   }
 
+  /* An empty chat asks its question in the middle of the frame, as a chat app does, with the ideas under it. */
   .welcome {
     display: grid;
-    gap: 0.6rem;
+    justify-items: center;
+    gap: 0.75rem;
+    max-width: 40rem;
+    margin: auto;
+    padding: 1.5rem 0;
+    text-align: center;
+  }
+
+  .welcome-title {
+    font-family: var(--serif);
+    font-size: var(--step-1);
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .welcome .examples {
+    justify-content: center;
   }
 
   .examples {
-    display: grid;
-    justify-items: start;
-    gap: 0.2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .examples .btn {
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: var(--raised);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .examples .btn:hover {
+    border-color: var(--accent);
     color: var(--accent);
-    text-align: left;
   }
 
   .unavailable {

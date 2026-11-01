@@ -2,6 +2,7 @@
   import { t } from '../lib/i18n.svelte';
   import { app, type PanelTab } from '../lib/store.svelte';
   import { studio } from '../lib/studio.svelte';
+  import type { LibraryCourse } from '../lib/types';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
@@ -22,6 +23,39 @@
   );
 
   const suggested = $derived((app.state?.memory ?? []).filter((e) => e.status === 'suggested').length);
+
+  // Study, Review or the course's Overview: the reading column shows one of them.
+  const place = $derived(app.courseOpen ? 'overview' : app.reviewOpen ? 'review' : 'study');
+
+  // The course switcher lists the library's other courses that can be opened, the open one first.
+  let menuOpen = $state(false);
+  let switcher = $state<HTMLElement>();
+  const others = $derived(
+    (app.library?.courses ?? [])
+      .filter((c) => !c.error && c.concepts)
+      .sort((a, b) => Number(b.path === app.library?.active) - Number(a.path === app.library?.active)),
+  );
+  function toggleMenu() {
+    menuOpen = !menuOpen;
+    if (menuOpen) void app.loadLibrary(true);
+  }
+  function switchTo(course: LibraryCourse) {
+    menuOpen = false;
+    if (course.path === app.library?.active) app.libraryOpen = false;
+    else void app.openCourse(course.name);
+  }
+  // The menu closes on a click outside it or on Escape, as menus do.
+  $effect(() => {
+    if (!menuOpen) return;
+    const away = (event: Event) => switcher && !switcher.contains(event.target as Node) && (menuOpen = false);
+    const escape = (event: KeyboardEvent) => event.key === 'Escape' && (menuOpen = false);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  });
 
   // Review is always there while studying, with no count: nothing comes due; the learner asks for a set (ADR 0014).
   const review = $derived(app.state?.review);
@@ -47,49 +81,80 @@
   </button>
   {/if}
 
-  <div class="title">
-    <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
-    {#if !studying}<span class="course">{t("Throughline")}</span>{/if}
-    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
-    <button id="open-courses" class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Courses")}</span>
+  <!-- Where you are, from the widest place in: all courses › this course, which switches to another course (ADR 0017). -->
+  <nav class="where" aria-label={t("Where you are")}>
+    <button id="open-courses" class="crumb home" aria-current={app.libraryOpen ? 'page' : undefined} onclick={() => app.showLibrary()} title={t("All courses")}>
+      <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
+      <span class="wide-only">{t("All courses")}</span>
     </button>
-    {#if studying}
-      <!-- Left to right the bar goes from the app to the course to the section being read (ADR 0017). The course button
-           opens the Course page, so it looks like a button rather than a title. -->
-      <span class="divider" aria-hidden="true"></span>
+    {#if app.state}
+      <span class="sep" aria-hidden="true">›</span>
+      <div class="switch" bind:this={switcher}>
+        <button
+          id="course-switcher"
+          class="crumb course"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title={t("Switch course")}
+          onclick={toggleMenu}
+        >
+          <span class="name">{app.state.course.title}</span>
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        {#if menuOpen}
+          <ul class="course-menu" role="menu" aria-label={t("Switch course")}>
+            {#each others as course (course.path)}
+              <li role="none">
+                <button role="menuitem" class:active={course.path === app.library?.active} onclick={() => switchTo(course)}>
+                  <span class="title">{course.title ?? course.name}</span>
+                  {#if course.current}<span class="meta">{course.current}</span>{/if}
+                </button>
+              </li>
+            {/each}
+            <li role="none" class="all">
+              <button role="menuitem" onclick={() => ((menuOpen = false), app.showLibrary())}>{t("All courses")}</button>
+            </li>
+          </ul>
+        {/if}
+      </div>
+    {:else if !app.libraryOpen}
+      <span class="course">{t("Throughline")}</span>
+    {/if}
+  </nav>
+
+  {#if studying}
+    <!-- The three places of one course; the one you are in is always marked, so the way back is always the same. -->
+    <div class="places" role="group" aria-label={t("This course")}>
+      <button id="open-study" class="place" aria-label={t("Study")} aria-current={place === 'study' ? 'page' : undefined} onclick={() => ((app.courseOpen = false), (app.reviewOpen = false))}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Study")}</span>
+      </button>
+      {#if review}
+        <button
+          id="open-review"
+          class="place" aria-label={t("Review")}
+          aria-current={place === 'review' ? 'page' : undefined}
+          title={t("Answer questions from memory on what you have studied")}
+          onclick={() => app.showReview()}
+        >
+          <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Review")}</span>
+        </button>
+      {/if}
       <button
         id="open-course"
-        class="course course-button"
-        aria-pressed={app.courseOpen}
+        class="place" aria-label={t("Overview")}
+        aria-current={place === 'overview' ? 'page' : undefined}
         title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
-        onclick={() => (app.courseOpen ? (app.courseOpen = false) : app.showCourse())}
+        onclick={() => app.showCourse()}
       >
-        <svg class="page-icon" viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="3" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
-        <span class="name">{app.state!.course.title}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Overview")}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
       </button>
-    {/if}
-  </div>
-
-  {#if route.length && index >= 0 && studying}
-    <div class="progress" title={t("{studied} of {total} sections studied", { studied, total: route.length })}>
-      <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
-      <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
     </div>
-  {/if}
-  {#if studying && review}
-    <button
-      id="open-review"
-      class="btn btn-quiet review"
-      aria-pressed={app.reviewOpen}
-      aria-label={t("Review")}
-      title={t("Answer questions from memory on what you have studied")}
-      onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
-    >
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Review")}</span>
-    </button>
+    {#if route.length && index >= 0}
+      <div class="progress" title={t("{studied} of {total} sections studied", { studied, total: route.length })}>
+        <span>{t('Section {number} of {total}', { number: index + 1, total: route.length })}</span>
+        <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
+      </div>
+    {/if}
   {/if}
 
   <div class="actions">
@@ -100,8 +165,8 @@
     {/if}
     {#if studying}
       <div class="switcher" class:open={app.panelOpen} role="group" aria-label={t("Questions and sources")}>
-      <button id="toggle-questions" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
-        {t("Questions")}{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
+      <button id="toggle-questions" class="btn btn-quiet" aria-label={t("Questions")} aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4.5h12v8.5H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Questions")}</span>{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
       </button>
       <button id="toggle-source" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
@@ -167,16 +232,60 @@
     display: none;
   }
 
-  .title {
+  /* All courses › this course: a breadcrumb, quiet until pointed at, with the open place in ink. */
+  .where {
     display: flex;
     flex: 0 1 auto;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.15rem;
     min-width: 0;
+  }
+
+  .crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.3rem 0.55rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: var(--step-0);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .crumb:hover,
+  .crumb[aria-expanded='true'] {
+    background: var(--accent-wash);
+    color: var(--ink);
+  }
+
+  .crumb.home {
+    margin-left: -0.55rem;
+  }
+
+  .crumb[aria-current='page'],
+  .crumb.course {
+    color: var(--ink);
+  }
+
+  .crumb .name {
+    min-width: 0;
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mark {
     flex: none;
+  }
+
+  .sep {
+    color: var(--pencil);
   }
 
   .course {
@@ -187,44 +296,101 @@
     text-overflow: ellipsis;
   }
 
-  /* The title reads as the course's name, with a quiet hover that says it opens something. */
-  .course-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
+  .switch {
+    position: relative;
     min-width: 0;
-    padding: 0.25rem 0.65rem;
-    border: 1px solid var(--rule-strong);
+  }
+
+  .course-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    z-index: 50;
+    display: grid;
+    min-width: 18rem;
+    max-width: 26rem;
+    max-height: 60vh;
+    margin: 0;
+    padding: 0.35rem;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--sheet);
+    box-shadow: var(--shadow);
+  }
+
+  .course-menu button {
+    display: grid;
+    gap: 0.1rem;
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .course-menu button:hover,
+  .course-menu button:focus-visible {
+    background: var(--accent-wash);
+  }
+
+  .course-menu button.active .title::after {
+    content: ' ✓';
+    color: var(--accent);
+  }
+
+  .course-menu .title {
+    font-weight: 600;
+  }
+
+  .course-menu .meta {
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .course-menu .all {
+    margin-top: 0.25rem;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* One switch for the course's three places; the open one is filled, like the side panel's switcher. */
+  .places {
+    display: flex;
+    flex: none;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    border: 1px solid var(--rule);
     border-radius: 999px;
     background: var(--raised);
-    color: inherit;
+  }
+
+  .place {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.85rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-soft);
     font: inherit;
-    font-size: var(--step-0);
     font-weight: 600;
     cursor: pointer;
   }
 
-  .course-button:hover,
-  .course-button[aria-pressed='true'] {
-    background: var(--accent-wash);
+  .place:hover {
+    color: var(--ink);
   }
 
-  .course-button .name {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .page-icon {
-    flex: none;
-    color: var(--pencil);
-  }
-
-  .divider {
-    flex: none;
-    width: 1px;
-    height: 1.4rem;
-    background: var(--rule);
+  .place[aria-current='page'] {
+    background: var(--accent);
+    color: var(--sheet);
   }
 
   .dot {
@@ -393,9 +559,18 @@
       display: none;
     }
 
-    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due. */
-    .review {
+    /* On a phone the course switcher keeps only its arrow, and the three places tighten, so nothing scrolls sideways. */
+    .sep,
+    .crumb.course .name {
       display: none;
+    }
+
+    .place {
+      padding: 0.25rem 0.5rem;
+    }
+
+    .topbar {
+      gap: 0.5rem;
     }
   }
 </style>

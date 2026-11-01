@@ -260,12 +260,18 @@
     animation: enter-fade var(--settle) ease;
   }
 
+  /* The heading and its fold button stay at the top while the route scrolls under them. */
   .head {
+    position: sticky;
+    top: -2.5rem;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin: 0 0 0.75rem var(--gutter);
+    margin: -2.5rem 0 0.75rem;
+    padding: 2.5rem 0 0.4rem var(--gutter);
+    background: var(--marker-ground);
   }
 
   h2 {
@@ -424,8 +430,9 @@
     color: var(--ink);
   }
 
+  /* Sections sit a step below their chapter's name, as items under a heading. */
   .name {
-    font-size: var(--step-0);
+    font-size: 0.875rem;
     line-height: 1.35;
   }
 
@@ -473,9 +480,8 @@
   }
 
   .chapter-name .name {
-    font-size: var(--step--1);
+    font-size: var(--step-0);
     font-weight: 600;
-    letter-spacing: 0.01em;
     color: var(--ink-soft);
   }
 

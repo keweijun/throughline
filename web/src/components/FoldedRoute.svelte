@@ -151,13 +151,21 @@
     cursor: pointer;
   }
 
+  /* The unfold button stays at the top of the capsule while its dots scroll under it. */
   .unfold {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: none;
+    /* Covers the capsule's top padding too, so no dot shows above the button. */
+    box-shadow: 0 -0.4rem 0 0.4rem var(--sheet);
     display: grid;
     place-items: center;
     width: 1.6rem;
     height: 1.6rem;
     margin-bottom: 0.4rem;
     border-radius: 50%;
+    background: var(--sheet);
     color: var(--pencil);
     transition:
       color var(--quick) ease,

@@ -141,34 +141,48 @@ class Commands(unittest.TestCase):
 
 
 class Doctor(unittest.TestCase):
-    def doctor(self, home, found):
+    FOUND = checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)')
+
+    def doctor(self, home, found, answer=None):
         output = io.StringIO()
-        with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home}), \
+        with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_CONFIG': str(Path(home) / 's.json')}), \
                 mock.patch.object(checks, 'codex_checks', return_value=found), \
+                mock.patch.object(checks, 'probe_model', return_value='gpt-6-luna'), \
+                mock.patch.object(checks, 'codex_answers', return_value=answer) as asked, \
                 mock.patch.object(commands, 'launcher_path', return_value=Path(home) / 'throughline.desktop'), \
                 mock.patch.object(commands, 'running', return_value=None), redirect_stdout(output):
             code = commands.main(['doctor'])
-        return code, output.getvalue()
+        return code, output.getvalue(), asked
 
-    def test_all_good(self):
+    def test_all_good_names_the_model_and_how_long_it_took(self):
         with tempfile.TemporaryDirectory() as home:
             (Path(home) / 'throughline.desktop').write_text('', encoding='utf-8')
-            code, output = self.doctor(home, [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)'),
-                                              checks.result('signed_in', True, 'Logged in using ChatGPT')])
+            answer = checks.result('answers', True, '', model='gpt-6-luna', seconds=2.4)
+            code, output, asked = self.doctor(home, [self.FOUND], answer)
         self.assertEqual(code, 0, output)
+        asked.assert_called_once_with('gpt-6-luna')
         self.assertIn(f'Throughline {commands.version()}', output)
         self.assertIn('ok    Codex: codex-cli 1.0 (/bin/codex)', output)
+        self.assertIn('ok    Codex answers: gpt-6-luna replied in 2.4 s', output)
         self.assertIn(f'ok    Course library: {home}', output)
         self.assertIn('--    Throughline: not running', output)
         self.assertNotIn('FAIL', output)
 
     def test_failures_say_what_to_do_and_exit_nonzero(self):
         with tempfile.TemporaryDirectory() as home:
-            code, output = self.doctor(home, [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)'),
-                                              checks.result('signed_in', False, 'Not logged in')])
+            answer = checks.result('answers', False, '401 Unauthorized', model='gpt-6-luna', seconds=1.0)
+            code, output, _ = self.doctor(home, [self.FOUND], answer)
         self.assertEqual(code, 1)
-        self.assertIn('FAIL  Signed in to Codex: Not logged in\n        Sign in to Codex: run `codex login`', output)
+        self.assertIn('FAIL  Codex answers: 401 Unauthorized (gpt-6-luna, 1.0 s)\n'
+                      '        Check that `codex` works in a terminal (signed in, or with an API key).', output)
         self.assertIn('FAIL  Launcher:', output)
+
+    def test_without_codex_no_model_is_asked(self):
+        with tempfile.TemporaryDirectory() as home:
+            code, output, asked = self.doctor(home, [checks.result('codex', False)])
+        self.assertEqual(code, 1)
+        asked.assert_not_called()
+        self.assertIn('FAIL  Codex: not found', output)
 
 
 if __name__ == '__main__':

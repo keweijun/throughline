@@ -8,7 +8,8 @@
   let { launcher }: { launcher: LauncherStatus } = $props();
 
   let busy = $state<'desktop' | 'show' | null>(null);
-  let done = $state('');
+  // What was done, translated when shown, so it follows the page's language.
+  let done = $state<'desktop' | 'show' | null>(null);
 
   const where = $derived(
     {
@@ -25,10 +26,10 @@
   // Success shows beside the buttons; a failure goes to the shared error banner.
   async function run(action: 'desktop' | 'show') {
     busy = action;
-    done = '';
+    done = null;
     try {
       await api.post(`/api/launcher/${action}`);
-      done = action === 'desktop' ? t('Added to your desktop.') : shown;
+      done = action;
     } catch (error) {
       app.error = error instanceof Error ? error.message : String(error);
     }
@@ -41,7 +42,7 @@
   <div class="actions">
     <button class="btn btn-small" disabled={busy !== null} onclick={() => run('desktop')}>{t('Add to desktop')}</button>
     <button class="btn btn-small" disabled={busy !== null} onclick={() => run('show')}>{t('Show launcher')}</button>
-    {#if done}<span class="done" role="status">{done}</span>{/if}
+    {#if done}<span class="done" role="status">{done === 'desktop' ? t('Added to your desktop.') : shown}</span>{/if}
   </div>
 {:else}
   <p class="where">{t('This computer has no Throughline launcher yet. To add one, run this in a terminal:')} <code>guided-learning setup</code></p>

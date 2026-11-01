@@ -2,6 +2,7 @@
   import { t, locale } from './lib/i18n.svelte';
   import { onMount } from 'svelte';
   import { app } from './lib/store.svelte';
+  import { studio } from './lib/studio.svelte';
   import { panelCoversLesson } from './lib/media';
   import { scrollStageByKey } from './lib/stage';
   import TopBar from './components/TopBar.svelte';
@@ -19,7 +20,7 @@
   import Library from './components/Library.svelte';
 
   onMount(() => {
-    void app.sync();
+    void app.sync().then(handOver);
     void app.loadSeen();
     app.connect();
     // A quiet check at launch: a newer version only marks Settings, and a failure shows nothing.
@@ -31,6 +32,14 @@
       app.settingsOpen = true;
     }
   });
+
+  // A course action in the library asks this course's Studio: fill it in once the course has loaded.
+  function handOver() {
+    const prompt = app.takeStudioHandoff();
+    if (!prompt) return;
+    app.drafts.set('studio:new', studio.handoff(prompt));
+    app.showStudio({ focus: true });
+  }
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a
   // drawer on a phone. The stage is measured rather than queried in CSS so the rail, its capsule and the grid agree.

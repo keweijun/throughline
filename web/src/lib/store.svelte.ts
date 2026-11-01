@@ -404,6 +404,34 @@ class AppStore {
     void this.loadLibrary();
   }
 
+  /** A request for one course's Studio, from the library: handed over at once when that course is open, or after
+   * opening it, which reloads the page, so it waits in this tab's session storage until the course has loaded. */
+  askCourseStudio(name: string, prompt: string) {
+    try {
+      sessionStorage.setItem('studio-handoff', JSON.stringify({ course: name, prompt }));
+    } catch {
+      // Without session storage the course still opens; the request is not filled in.
+    }
+    if (this.libraryCourse?.name === name) {
+      this.libraryOpen = false;
+      return true;
+    }
+    void this.openCourse(name);
+    return false;
+  }
+
+  /** The request a library action stashed for this course, taken once. */
+  takeStudioHandoff(): string | null {
+    try {
+      const stashed = JSON.parse(sessionStorage.getItem('studio-handoff') ?? 'null') as { course: string; prompt: string } | null;
+      if (!stashed || stashed.course !== this.libraryCourse?.name) return null;
+      sessionStorage.removeItem('studio-handoff');
+      return stashed.prompt;
+    } catch {
+      return null;
+    }
+  }
+
   async openCourse(name: string) {
     const opened = await this.act(() => api.post<Library>('/api/library/open', { name }));
     // Everything in the store belongs to one course, so start clean.

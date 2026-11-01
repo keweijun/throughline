@@ -39,8 +39,15 @@
   });
   onDestroy(() => clearTimeout(poll));
 
+  let nextTime = $state<HTMLDialogElement>();
+  $effect(() => {
+    // Only when there is a launcher to point to; without one, Settings → About says how to add it.
+    if (launcher?.exists && !launcher.dismissed && nextTime && !nextTime.open) nextTime.showModal();
+  });
+
   async function dismissLauncher() {
-    if (launcher) launcher = { ...launcher, dismissed: true };
+    if (!launcher || launcher.dismissed) return;
+    launcher = { ...launcher, dismissed: true };
     try {
       await api.post('/api/seen', { id: 'launcher' });
     } catch (error) {
@@ -73,6 +80,17 @@
     if (prompt) app.drafts.set('studio:library:new', prompt);
     studio.focusRequest++;
     studioPart?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  /** Opens the course at its own Studio with the request filled in; one already open is handed it at once. */
+  function courseStudio(name: string, prompt: string) {
+    if (app.askCourseStudio(name, prompt)) {
+      const handed = app.takeStudioHandoff();
+      if (handed) {
+        app.drafts.set('studio:new', studio.handoff(handed));
+        app.showStudio({ focus: true });
+      }
+    } else opening = name;
   }
 
   async function open(course: LibraryCourse) {
@@ -112,16 +130,15 @@
     </div>
   {/if}
 
-  {#if launcher && !launcher.dismissed}
-    <aside class="next-time" aria-labelledby="next-time-title">
-      <div class="next-time-head">
-        <h2 id="next-time-title">{t('Opening Throughline next time')}</h2>
-        <button class="btn btn-quiet btn-small" onclick={dismissLauncher}>{t('Dismiss')}</button>
-      </div>
+  <!-- Shown once, the first time the library opens after installing, as Settings is: centred, over the page. -->
+  <dialog class="next-time" bind:this={nextTime} onclose={dismissLauncher} aria-labelledby="next-time-title">
+    {#if launcher}
+      <h2 id="next-time-title">{t('Opening Throughline next time')}</h2>
       <LauncherHelp {launcher} />
       <p class="muted later">{t('You can find this again in Settings → About.')}</p>
-    </aside>
-  {/if}
+      <button class="btn btn-primary btn-small got-it" onclick={() => nextTime?.close()}>{t('Got it')}</button>
+    {/if}
+  </dialog>
 
   <!-- With courses, they come first on a wide screen and Studio stands beside them; otherwise Studio leads. -->
   <div class="main" class:both={studioHere && !!library?.courses.length}>
@@ -189,9 +206,10 @@
               {#if !course.concepts}
                 <button class="link" onclick={() => ask(t('$throughline build the route for the course {course}', { course: course.name }))}>{t('Build the route')}</button>
               {/if}
-              <button class="link" onclick={() => ask(t('$throughline add these files to the course {course}: ', { course: course.name }))}>{t('Add files')}</button>
+              <!-- Work on one course goes to that course's own Studio, on its Overview. -->
+              <button class="link" onclick={() => courseStudio(course.name, t('$throughline add these files to the course {course}: ', { course: course.name }))}>{t('Add files')}</button>
               {#if course.needs_review}
-                <button class="link" onclick={() => ask(t('$throughline review the pages that still need review in the course {course}', { course: course.name }))}>{t('Check sources')}</button>
+                <button class="link" onclick={() => courseStudio(course.name, t('$throughline review the pages that still need review in the course {course}', { course: course.name }))}>{t('Check sources')}</button>
               {/if}
             </div>
           {:else if !course.error && library.root}
@@ -466,25 +484,28 @@
   }
 
   .next-time {
-    margin-bottom: 1rem;
-    padding: 1rem 1.25rem;
+    width: min(34rem, calc(100vw - 2rem));
+    padding: 1.4rem 1.5rem 1.25rem;
     border: 1px solid var(--rule);
     border-radius: 10px;
     background: var(--sheet);
-    box-shadow: inset 3px 0 0 var(--accent-wash);
+    color: var(--ink);
+    box-shadow: var(--shadow);
   }
 
-  .next-time-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.35rem;
+  .next-time::backdrop {
+    background: rgb(17 20 27 / 0.45);
   }
 
   .next-time h2 {
-    font-size: var(--step-0);
+    margin-bottom: 0.6rem;
+    font-size: var(--step-1);
     font-family: var(--sans);
+  }
+
+  .got-it {
+    display: block;
+    margin: 1.1rem 0 0 auto;
   }
 
   .later {

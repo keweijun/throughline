@@ -79,7 +79,6 @@
     ['Make a course from these files', 'Make a course from these files. I want to learn'],
     ['Make a course from a folder', 'Make a course from the files in the folder'],
     ['Make a course for an exam', 'Make a course for my exam on'],
-    ['Add files to a course', 'Add these files to the course'],
   ];
   // A request that ends in a full stop is complete; the others leave the caret after a space for the learner to finish.
   const examples = $derived((library ? LIBRARY_IDEAS : shown).map(([label, text]) => {

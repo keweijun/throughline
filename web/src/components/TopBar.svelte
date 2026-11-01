@@ -57,7 +57,7 @@
   const review = $derived(app.state?.review);
 
   // The side panel's views are switched only from here: picking another view swaps it, picking the open one closes the panel.
-  const showing = (tab: PanelTab) => studying && app.panelOpen && app.panelTab === tab;
+  const showing = (tab: PanelTab) => studying && app.panelShown && app.panelTab === tab;
   function toggle(tab: PanelTab) {
     if (showing(tab)) app.panelOpen = false;
     else app.openPanel(tab);
@@ -156,7 +156,7 @@
       </span>
     {/if}
     {#if studying}
-      <div class="switcher" class:open={app.panelOpen} role="group" aria-label={t("Questions and sources")}>
+      <div class="switcher" class:open={app.panelShown} role="group" aria-label={t("Questions and sources")}>
       <button id="toggle-questions" class="btn btn-quiet" aria-label={t("Questions")} aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4.5h12v8.5H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Questions")}</span>{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
       </button>

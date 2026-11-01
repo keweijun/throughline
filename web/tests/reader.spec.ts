@@ -76,6 +76,35 @@ test('the top bar is the only navigation for the side panel and focus returns to
   await expect(page.locator('#toggle-notes')).toBeFocused();
 });
 
+test('Overview puts the side panel aside, and Learn and Review bring it back as it was', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  const panel = page.locator('#auxiliary');
+  await page.locator('#toggle-notes').click();
+  await expect(panel).toBeVisible();
+
+  // Overview has its own Sources and notes, and Studio needs the width.
+  await page.locator('#open-course').click();
+  await expect(panel).toBeHidden();
+  await expect(page.locator('#toggle-notes')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#open-study').click();
+  await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
+
+  // Opening it on Overview shows it there; it was the learner's choice.
+  await page.keyboard.press('m');
+  await expect(panel).toBeHidden();
+  await page.keyboard.press('s');
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  await expect(page.locator('#toggle-source')).toHaveAttribute('aria-pressed', 'true');
+
+  // Review keeps the panel: a missed question is checked against its source or asked about.
+  await page.keyboard.press('m');
+  await page.keyboard.press('m');
+  await expect(panel).toBeHidden();
+  await page.locator('#open-review').click();
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('the reading column scrolls beside the open panel, not past it', async ({ page, course }) => {
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();

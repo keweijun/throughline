@@ -142,6 +142,7 @@
       submitLabel={t('Send')}
       onsubmit={() => void ask()}
       header={target}
+      compact
       disabled={!viewing}
     />
   </div>

@@ -80,6 +80,29 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('writing to Studio scrolls the course header away under the pinned tabs, without moving the box', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const frame = page.locator('#course-studio .frame');
+  await expect(frame.getByRole('heading', { name: 'What would you like to change in this course?' })).toBeVisible();
+  const box = page.locator('#studio-input');
+  const before = (await box.boundingBox())!;
+  const height = (await frame.boundingBox())!.height;
+  await expect(page.locator('#course-title')).toBeInViewport();
+
+  await box.click();
+  await expect(page.locator('#course-title')).not.toBeInViewport();
+  await expect(page.getByRole('tab', { name: 'Studio' })).toBeInViewport();
+  expect((await frame.boundingBox())!.height).toBeGreaterThan(height + 50);
+  expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/studio-working.png` });
+
+  // Another tab gives the header back its room.
+  await page.getByRole('tab', { name: 'Sources' }).click();
+  await page.getByRole('tab', { name: 'Studio' }).click();
+  await expect.poll(async () => (await frame.boundingBox())!.height).toBeCloseTo(height, 0);
+});
+
 test('a message while Codex works steers it, and Stop interrupts', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.keyboard.press('d');

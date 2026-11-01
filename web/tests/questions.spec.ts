@@ -160,6 +160,10 @@ test('threads start collapsed, one opens at a time, and the box switches between
   const first = page.locator('#thread-q1');
   const second = page.locator('#thread-q2');
   await expect(page.locator('#branch-panel .answer')).toHaveCount(0);
+  // At rest the box is one line; writing in it brings back its header and tools.
+  await expect(page.getByRole('textbox', { name: 'Side question' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeHidden();
+  await page.getByRole('textbox', { name: 'Side question' }).click();
   await expect(page.getByRole('button', { name: 'Ask', exact: true })).toBeVisible();
 
   await first.getByRole('button', { name: 'Expand question' }).click();
@@ -170,6 +174,7 @@ test('threads start collapsed, one opens at a time, and the box switches between
   await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · Second question');
 
   // Clearing the target closes the thread and turns the box back into a new question.
+  await page.getByRole('textbox', { name: 'Follow-up question' }).click();
   await page.getByRole('button', { name: 'Ask a new question instead' }).click();
   await expect(second.locator('.answer')).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Side question' }).fill('A third question');
@@ -178,4 +183,31 @@ test('threads start collapsed, one opens at a time, and the box switches between
   await expect(asked.locator('.title').first()).toHaveText('A third question');
   await expect(asked.locator('.answer')).toBeVisible();
   await expect(page.locator('#branch-panel .composer')).toContainText('Follow-up · A third question');
+});
+
+test("an open thread's question scrolls away with its answers and leaves a strip that brings it back", async ({ page, course }) => {
+  const { base } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await page.request.post(base + '/api/questions', { data: { id: 'q1', question: 'What does the phase do?' } });
+  await page.reload();
+  await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
+  const thread = page.locator('#thread-q1');
+  await thread.getByRole('button', { name: 'Expand question' }).click();
+  await expect(thread.locator('.answer')).toBeVisible();
+  const strip = thread.locator('.pin-bar');
+  await expect(strip).toHaveCount(0);
+
+  const answer = thread.locator('.answer');
+  const top = (await answer.boundingBox())!.y;
+  await page.locator('#auxiliary > .body').evaluate((body) => body.scrollBy({ top: 400, behavior: 'instant' }));
+  await expect(strip).toBeVisible();
+  await expect(strip).toHaveText('What does the phase do?');
+  // The strip takes no room in the thread: the answers move by exactly the scroll, no more.
+  expect((await answer.boundingBox())!.y).toBeCloseTo(top - 400, 0);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/question-strip.png` });
+
+  await strip.click();
+  await expect(thread.locator('.head .title')).toBeInViewport();
+  await expect(strip).toHaveCount(0);
 });

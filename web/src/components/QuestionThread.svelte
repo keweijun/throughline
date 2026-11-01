@@ -37,7 +37,7 @@
   }
 
   $effect(() => {
-    if (app.focusThread !== question.id || !node || !app.panelOpen) return;
+    if (app.focusThread !== question.id || !node || !app.panelShown) return;
     open = true;
     requestAnimationFrame(() => node!.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     flash = true;

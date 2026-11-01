@@ -92,6 +92,7 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | POST | `/api/images` | Upload one image to attach to an answer, a side question or a learner note as the raw body (`Content-Type: image/…`, PNG, JPEG, GIF or WebP, up to 25 MiB; JSON bodies stay under 1 MiB); returns `{image}`, its name; 415 for anything else |
 | GET | `/api/images/{name}` | An uploaded image |
 | GET | `/api/studio` | Whether Studio can run (`available`, `error`), its access and the open course's threads |
+| | `?scope=library` | On every Studio route but access and requests, and on `/api/images`: the library page's Studio, before a course is open. Its threads are filed under the library, run in the library folder, search the whole library, and keep attached files and images in the library's `.intake/` (files under a dated folder) |
 | GET | `/api/studio/access` | `{full_access, saved, forced}`; on Windows this asks Codex whether its sandbox is ready |
 | PUT | `/api/studio/access` | `{full_access}`; saved per user |
 | GET | `/api/studio/activity` | `{running, waiting}`: the course's threads Codex works in, and what it waits on; never starts Codex |
@@ -103,6 +104,7 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | PUT | `/api/studio/threads/{id}` | `{name}`: rename a thread |
 | DELETE | `/api/studio/threads/{id}` | Archive a thread and drop it from the course |
 | POST | `/api/studio/threads/{id}/interrupt` | Stop the running turn |
+| POST | `/api/studio/threads/{id}/course` | `{name}`: file a library thread under the course it made, so that course's Overview lists it |
 | POST | `/api/studio/requests/{id}` | Answer an approval (`{decision}`: accept, acceptForSession, decline or cancel) or questions (`{answers: {question: [answer]}}`) |
 | GET | `/api/review` | Review sets newest first with their progress (a prepared one hidden), review questions and their requests, warm-ups on offer and how many sections can be reviewed |
 | POST | `/api/review/sets` | Ask for a review set: nothing for Review for me (the prepared set when usable), `request` and/or `scope` (`chapter_ids`, `concept_ids`), or `warm_up_for` a section; 409 `nothing_to_review` when nothing studied matches |

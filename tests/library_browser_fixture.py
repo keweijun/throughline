@@ -28,6 +28,8 @@ try:
           library_root=root, on_ready=lambda port: print(port, flush=True),
           # Not this computer's launcher or Codex: the library's card and checks have their own fixture.
           launcher=Launcher(Path(scratch.name + '-none') / 'throughline.desktop', platform='linux'), 
-          checks=CodexStatus(cheap=lambda: [], probe=lambda: None))
+          checks=CodexStatus(cheap=lambda: [], probe=lambda: None),
+          # A Codex without Studio's methods: the library keeps its Codex-chat buttons, and no real Codex starts.
+          studio_command=[sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), str(Path(scratch.name + '-studio.log')), 'old'])
 finally:
     scratch.cleanup()

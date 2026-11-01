@@ -40,6 +40,7 @@
     onrecall,
     onview,
     onfiles,
+    imageScope = '',
   }: {
     id?: string;
     value: string;
@@ -75,6 +76,8 @@
     onchips?: (chips: ChipRange[]) => void;
     onrecall?: () => string | null;
     onview?: (view: EditorView) => void;
+    /** `library` while Studio works on the library page, where images wait in the library's intake. */
+    imageScope?: string;
     /** Takes files that are not images, dropped, pasted or chosen; without it the box takes images only. */
     onfiles?: (files: File[]) => void;
   } = $props();
@@ -108,7 +111,7 @@
     if (!key) return;
     for (const file of files.filter((f) => f.type.startsWith('image/'))) {
       uploading += 1;
-      const result = await app.act(() => api.upload<{ image: string }>('/api/images', file));
+      const result = await app.act(() => api.upload<{ image: string }>(`/api/images${imageScope ? `?scope=${imageScope}` : ''}`, file));
       uploading -= 1;
       const current = app.drafts.images(key);
       if (result && !current.includes(result.image)) app.drafts.setImages(key, [...current, result.image]);
@@ -152,7 +155,7 @@
 
   let filePicker = $state<HTMLInputElement>();
 
-  const url = (name: string) => `/api/images/${encodeURIComponent(name)}`;
+  const url = (name: string) => `/api/images/${encodeURIComponent(name)}${imageScope ? `?scope=${imageScope}` : ''}`;
 </script>
 
 <form

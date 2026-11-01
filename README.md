@@ -73,21 +73,21 @@ To uninstall, run `guided-learning stop`, then `uv tool uninstall throughline` (
 
 ## Create your first course
 
-After installing, Throughline opens in your browser on your course library. A new course starts in Codex, which reads your files and asks you a few questions:
+After installing, Throughline opens in your browser on your course library, where **Studio**, a Codex chat inside Throughline, asks what you would like to learn:
 
-1. Type `$throughline make a course from these files`, attach your PDFs or notes (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
+1. Drop your PDFs or notes into Studio (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
 2. Codex asks a few quick questions: your goal and deadline, how well you know each prerequisite it found in the files, and how much detail you want. Then it suggests a course name, copies your files into the Throughline folder, builds a route across them and tells you what still needs checking.
-3. When it is done, the course opens in Throughline in your browser. Next time, open it from the **Throughline** launcher in your app menu.
+3. When it is done, Studio offers to open the course. Next time, open Throughline from the **Throughline** launcher in your app menu.
 
-Later courses work the same way: **New course in Codex** in the library, or `$throughline` in any Codex chat. Once a course exists, you change it from inside Throughline, in **Studio**.
+Later courses work the same way: **New course** in the library, or `$throughline` in any Codex chat. If your Codex is too old for Studio, the library's buttons open a Codex chat with the request typed in instead.
 
 ## How it works
 
-Throughline is where you study and where you change a course; a new course starts in Codex.
+Throughline is where you study, and where you make and change your courses with Codex.
 
 - **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it), or run `throughline`. Lessons, questions and practice run Codex in the background, so you never need Codex open to study. The library tells you where the launcher is, can add it to your desktop, and says so if Codex can't answer.
 - **Change a course in Studio.** **Overview**, next to Learn and Review in the top bar, shows the course as a whole; its first tab, **Studio** (or press `d`), is a Codex chat inside Throughline with the same `$throughline` skill. Ask it to add a problem set, rebuild a chapter, check pages or teach a chapter more rigorously; attach or drop files, mention them with `@`, and approve what Codex asks. You can keep studying while it works: the top bar says when Studio needs you. **Add files in Studio** below the route and **Check this location in Studio** in the reader open it with the request filled in, and what you ask it to remember about how you like to be taught goes into the course memory.
-- **Start a course in Codex.** In the library, **New course in Codex** opens a new Codex chat with the `$throughline` request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself. A Codex chat with `$throughline` can also change a course, for example `$throughline add this problem set to quantum`.
+- **Start a course in the library.** **All courses** has its own Studio, beside your courses: **New course** starts a chat there, and a course card's **Add files**, **Build the route** and **Check sources** ask it for you. Codex reads your files, builds the route, and Studio offers to open the new course. A Codex chat with `$throughline` works too, for example `$throughline add this problem set to quantum`.
 
 ![Studio on the course page: a Codex chat inside Throughline, asking a question before it adds a problem set](docs/images/studio-en.png)
 

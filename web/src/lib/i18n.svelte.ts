@@ -3,6 +3,21 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Make a course from these files": "用这些文件建一门课",
+  "Make a course from these files. I want to learn": "用这些文件建一门课。我想学",
+  "Make a course from a folder": "用一个文件夹建课",
+  "Make a course from the files in the folder": "用这个文件夹里的文件建一门课：",
+  "Make a course for an exam": "为考试建一门课",
+  "Make a course for my exam on": "为我的考试建一门课，考试内容是",
+  "Add files to a course": "为课程添加文件",
+  "Add these files to the course": "把这些文件加入课程",
+  "What would you like to learn?": "想学什么？",
+  "Drop your PDFs, slides or notes here, or name the folder they are in, and say what you want to learn. Codex reads them, asks you a few questions and builds the course.": "把 PDF、幻灯片或笔记拖到这里，或写出它们所在的文件夹，再说说想学什么。Codex 会读这些资料、问你几个问题，然后建好课程。",
+  "Codex made the course {course}.": "Codex 建好了课程 {course}。",
+  "New course": "新建课程",
+  "Build the route": "生成路线",
+  "Add files": "添加文件",
+  "Check sources": "核对资料",
   "What would you like to change in this course?": "想怎样修改这门课？",
   "Where you are": "当前位置",
   "All courses": "全部课程",

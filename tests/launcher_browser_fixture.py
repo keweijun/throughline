@@ -38,6 +38,8 @@ class Runner:
 try:
     serve(port=int(sys.argv[1]) if len(sys.argv) > 1 else 0, runner=Runner(), settings=TeacherSettings(root / 'config' / 'settings.json'),
           library_root=root / 'library', launcher=Launcher(entry, platform='linux', desktop=root / 'Desktop', start=lambda command: None),
-          checks=checks.CodexStatus(cheap=lambda: [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)')], probe=probe), on_ready=lambda port: print(port, flush=True))
+          checks=checks.CodexStatus(cheap=lambda: [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)')], probe=probe), on_ready=lambda port: print(port, flush=True),
+          # A Codex without Studio's methods, so no real Codex starts.
+          studio_command=[sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), str(root / 'studio.log'), 'old'])
 finally:
     scratch.cleanup()

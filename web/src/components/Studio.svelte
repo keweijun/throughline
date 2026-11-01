@@ -3,8 +3,10 @@
   import type { EditorView } from '@codemirror/view';
   import { insertChip, type ChipRange } from '../lib/editor';
   import { t, type MessageKey } from '../lib/i18n.svelte';
+  import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { studio, type StudioMessage } from '../lib/studio.svelte';
+  import { untrack } from 'svelte';
+  import { studio, type StudioMessage, type StudioScope } from '../lib/studio.svelte';
   import Composer from './Composer.svelte';
   import StudioTurn from './StudioTurn.svelte';
   import StudioRequest from './StudioRequest.svelte';
@@ -16,7 +18,8 @@
    * It is self-contained, so it can sit wherever it is mounted: `active` says it is on screen, and it scrolls whatever
    * scrolls it, keeping its writing box at that container's bottom.
    */
-  let { active = true }: { active?: boolean } = $props();
+  // `scope` is where Studio is mounted: a course's Overview, or the library page before a course is open (#109).
+  let { active = true, scope = 'course' }: { active?: boolean; scope?: StudioScope } = $props();
 
   let busy = $state(false);
   let attaching = $state(0);
@@ -35,13 +38,17 @@
   let list = $state<HTMLElement>();
 
   $effect(() => {
+    const where = scope;
+    // Moving the store is not something this effect reads, so two mounts never hand it back and forth.
+    untrack(() => studio.setScope(where));
     if (active) void studio.load();
   });
+  const library = $derived(scope === 'library');
 
   // Requests name the course by its folder, as the skill addresses courses; the learner sees its title.
-  const course = $derived(app.libraryCourse?.name ?? app.state?.course?.title ?? '');
-  const title = $derived(app.state?.course?.title ?? course);
-  const draftKey = $derived(`studio:${studio.threadId ?? 'new'}`);
+  const course = $derived(library ? '' : (app.libraryCourse?.name ?? app.state?.course?.title ?? ''));
+  const title = $derived(library ? '' : (app.state?.course?.title ?? course));
+  const draftKey = $derived(`studio:${library ? 'library:' : ''}${studio.threadId ?? 'new'}`);
   const draft = $derived(app.drafts.get(draftKey));
   const images = $derived(app.drafts.images(draftKey));
 
@@ -67,8 +74,15 @@
     ['Add files to this course', 'Add these files to {course}:'],
     ...drawn.slice(0, 3).sort((a, b) => a - b).map((i) => IDEAS[i]),
   ];
+  // On the library page Studio is mostly how a course begins.
+  const LIBRARY_IDEAS: [MessageKey, MessageKey][] = [
+    ['Make a course from these files', 'Make a course from these files. I want to learn'],
+    ['Make a course from a folder', 'Make a course from the files in the folder'],
+    ['Make a course for an exam', 'Make a course for my exam on'],
+    ['Add files to a course', 'Add these files to the course'],
+  ];
   // A request that ends in a full stop is complete; the others leave the caret after a space for the learner to finish.
-  const examples = $derived(shown.map(([label, text]) => {
+  const examples = $derived((library ? LIBRARY_IDEAS : shown).map(([label, text]) => {
     const request = t(text, { course });
     return { label: t(label), text: `$throughline ${request}${/[.。]$/.test(request) ? '' : ' '}` };
   }));
@@ -145,6 +159,8 @@
     busy = true;
     app.drafts.set(key, '');
     app.drafts.setImages(key, []);
+    // On the library page, a chat remembers the courses there were when it began, to offer the one Codex makes.
+    if (library && studio.coursesBefore === null) studio.coursesBefore = (app.library?.courses ?? []).map((c) => c.name);
     try {
       await studio.send({ ...sent, images: attached });
     } catch (e) {
@@ -168,6 +184,20 @@
       }
       attaching -= 1;
     }
+  }
+
+  // Courses that appeared in the library since this chat began, offered once Codex has finished with them.
+  const made = $derived(
+    library && studio.coursesBefore && !studio.running
+      ? (app.library?.courses ?? []).filter((c) => !c.error && c.concepts && !studio.coursesBefore!.includes(c.name))
+      : [],
+  );
+
+  // Opening the course files this chat under it, so the course's Overview lists it from then on.
+  async function openMade(name: string) {
+    const thread = studio.threadId;
+    if (thread) await app.act(() => api.post(`/api/studio/threads/${encodeURIComponent(thread)}/course`, { name }));
+    await app.openCourse(name);
   }
 
   function recall() {
@@ -247,8 +277,13 @@
       <p class="panel-empty" role="status">{t("Starting Codex…")}</p>
     {:else if !studio.turns.length}
       <div class="welcome">
-        <h3 class="welcome-title">{t("What would you like to change in this course?")}</h3>
-        <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
+        {#if library}
+          <h3 class="welcome-title">{t("What would you like to learn?")}</h3>
+          <p class="panel-empty">{t("Drop your PDFs, slides or notes here, or name the folder they are in, and say what you want to learn. Codex reads them, asks you a few questions and builds the course.")}</p>
+        {:else}
+          <h3 class="welcome-title">{t("What would you like to change in this course?")}</h3>
+          <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
+        {/if}
         <ul class="examples">
           {#each examples as example (example.label)}
             <li><button class="btn btn-quiet btn-small" onclick={() => fill(example.text)}>{example.label}</button></li>
@@ -299,6 +334,12 @@
     {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
   {/snippet}
   <div class="panel-foot">
+    {#each made as item (item.name)}
+      <div class="made" role="status">
+        <span>{t("Codex made the course {course}.", { course: item.title ?? item.name })}</span>
+        <button class="btn btn-primary btn-small" onclick={() => openMade(item.name)}>{t("Open {course}", { course: item.title ?? item.name })}</button>
+      </div>
+    {/each}
     {#if studio.available !== false}
       <Composer
         id="studio-input"
@@ -311,6 +352,7 @@
         onsubmit={send}
         header={target}
         imagesKey={draftKey}
+        imageScope={library ? 'library' : ''}
         imagesAlone
         preview={false}
         {completions}
@@ -350,6 +392,19 @@
     margin: auto;
     padding: 1.5rem 0;
     text-align: center;
+  }
+
+  .made {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--accent-wash);
+    font-weight: 600;
   }
 
   .welcome-title {

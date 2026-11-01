@@ -5,6 +5,8 @@
   import { app } from '../lib/store.svelte';
   import type { CodexCheck, CodexChecks, LauncherStatus, LibraryCourse } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
+  import Studio from './Studio.svelte';
+  import { studio } from '../lib/studio.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
 
   let opening = $state<string | null>(null);
@@ -61,6 +63,18 @@
     return new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(course.updated * 1000));
   }
 
+  // Studio is the way to make and change courses here (#109); where Codex cannot run it, the buttons open a Codex chat.
+  const studioHere = $derived(!!library?.root && studio.available !== false);
+  let studioPart = $state<HTMLElement>();
+
+  /** A request in the library's Studio: a new chat with it typed in and the caret after it, as a hand-off does. */
+  function ask(prompt = '') {
+    studio.newThread();
+    if (prompt) app.drafts.set('studio:library:new', prompt);
+    studio.focusRequest++;
+    studioPart?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
   async function open(course: LibraryCourse) {
     opening = course.name;
     await app.openCourse(course.name);
@@ -75,7 +89,11 @@
       {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
     </div>
     <div class="header-actions">
-      <CodexLink class="btn btn-primary btn-small" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
+      {#if studioHere}
+        <button class="btn btn-primary btn-small" onclick={() => ask()}>{t('New course')}</button>
+      {:else}
+        <CodexLink class="btn btn-primary btn-small" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
+      {/if}
       {#if app.state}
         <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
       {/if}
@@ -105,8 +123,22 @@
     </aside>
   {/if}
 
+  <!-- With courses, they come first on a wide screen and Studio stands beside them; otherwise Studio leads. -->
+  <div class="main" class:both={studioHere && !!library?.courses.length}>
+  {#if studioHere}
+    <!-- Studio in the library: where a course begins, and course work on any course by name (ADR 0016, #109). -->
+    <section class="studio-part" class:alone={!library?.courses.length} aria-labelledby="library-studio-title" bind:this={studioPart}>
+      <h2 id="library-studio-title" class="part-title">{t('Studio')} <span>{t('Create and change courses with Codex')}</span></h2>
+      <div class="frame" data-scroller>
+        <Studio scope="library" />
+      </div>
+    </section>
+  {/if}
+
   {#if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
+  {:else if !library.courses.length && studioHere}
+    <!-- With no course yet, Studio above is the way in. -->
   {:else if !library.courses.length}
     <div class="empty">
       <h2>{t('Create your first course')}</h2>
@@ -151,7 +183,18 @@
               <span class="chip chip-plain">{t('Route not built yet')}</span>
             {/if}
           </div>
-          {#if !course.error && library.root}
+          {#if !course.error && library.root && studioHere}
+            <!-- Course work asked here goes to Studio above, naming the course, as a Codex chat would. -->
+            <div class="codex-actions">
+              {#if !course.concepts}
+                <button class="link" onclick={() => ask(t('$throughline build the route for the course {course}', { course: course.name }))}>{t('Build the route')}</button>
+              {/if}
+              <button class="link" onclick={() => ask(t('$throughline add these files to the course {course}: ', { course: course.name }))}>{t('Add files')}</button>
+              {#if course.needs_review}
+                <button class="link" onclick={() => ask(t('$throughline review the pages that still need review in the course {course}', { course: course.name }))}>{t('Check sources')}</button>
+              {/if}
+            </div>
+          {:else if !course.error && library.root}
             <div class="codex-actions">
               {#if !course.concepts}
                 <CodexLink prompt={t('$throughline build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
@@ -166,9 +209,10 @@
       {/each}
     </ul>
   {/if}
+  </div>
 
-  <!-- Without a library folder there are no Codex buttons for this to explain. -->
-  {#if library?.root}
+  <!-- Without a library folder, or with Studio running, there are no Codex buttons for this to explain. -->
+  {#if library?.root && !studioHere}
   <aside class="codex" aria-labelledby="codex-title">
     <h2 id="codex-title">{t('Courses are built in Codex')}</h2>
     <p class="muted">{t('The Codex buttons open a new Codex chat with a $throughline request typed in. Attach your files, send, and this page updates when Codex is done.')}</p>
@@ -178,6 +222,87 @@
 </section>
 
 <style>
+  /* Studio here sits on the side panel's surface and padding, as on a course's Overview, so its writing box lines up. */
+  .main {
+    display: grid;
+    gap: 1.75rem;
+    align-items: start;
+  }
+
+  /* A label for the part, in the interface's face; the serif is for the courses' own names. */
+  .part-title {
+    margin-bottom: 0.6rem;
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    font-weight: 600;
+  }
+
+  .part-title span {
+    margin-left: 0.5rem;
+    font-weight: 400;
+    color: var(--pencil);
+  }
+
+  /* Studio's own heading would repeat the section's title. */
+  .studio-part :global(.studio > .panel-head > .panel-bar),
+  .studio-part :global(.studio > .panel-head > .panel-intro) {
+    display: none;
+  }
+
+  /* On a wide screen the courses take the main column and Studio stays in view beside them as the list scrolls. */
+  @media (min-width: 76rem) {
+    .library:has(.main.both) {
+      max-width: 82rem;
+    }
+
+    .main.both {
+      grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
+    }
+
+    .main.both .studio-part {
+      position: sticky;
+      top: 1.5rem;
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    /* Short enough that the box shows below the launcher card at a laptop's height, and once the list scrolls. */
+    .main.both .studio-part .frame {
+      height: min(32rem, calc(100vh - var(--topbar) - 4rem));
+    }
+  }
+
+  .studio-part .frame {
+    display: flex;
+    flex-direction: column;
+    height: 24rem;
+    overflow-y: auto;
+    padding: 1.1rem 1.1rem 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--sheet);
+  }
+
+  /* With no course yet, Studio is the page. */
+  .studio-part.alone .frame {
+    height: max(26rem, calc(100vh - var(--topbar) - 16rem));
+  }
+
+  .codex-actions .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .codex-actions .link:hover {
+    text-decoration: underline;
+  }
+
   .library {
     grid-column: 1 / -1;
     width: 100%;

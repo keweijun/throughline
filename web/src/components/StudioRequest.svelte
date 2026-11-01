@@ -116,6 +116,7 @@
 
 <style>
   .request {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.5rem;
     padding: 0.7rem 0.8rem;

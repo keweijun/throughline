@@ -299,7 +299,7 @@
     font-size: 0.8rem;
     font-weight: 700;
     cursor: pointer;
-    transition: transform 0.15s;
+    transition: transform var(--quick) var(--ease-out);
   }
 
   .note.mine {
@@ -362,6 +362,7 @@
   }
 
   .next {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.75rem;
     margin-top: 1.75rem;
@@ -396,6 +397,7 @@
   }
 
   .error {
+    animation: enter-rise var(--settle) var(--ease-out);
     margin-bottom: 1rem;
     padding: 0.6rem 0.8rem;
     border-radius: var(--radius);
@@ -405,6 +407,7 @@
   }
 
   .waiting {
+    animation: enter-fade var(--settle) ease;
     font-family: var(--serif);
     font-style: italic;
     color: var(--pencil);

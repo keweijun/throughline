@@ -107,6 +107,7 @@
 
 <style>
   .page {
+    animation: enter-rise var(--settle) var(--ease-out);
     max-width: var(--measure);
     margin-inline: auto;
     display: grid;

@@ -203,7 +203,9 @@
 </article>
 
 <style>
+  /* Fades rather than rises: `d` puts the caret in Studio's box at once, and the box never moves under the learner. */
   .page {
+    animation: enter-fade var(--settle) ease;
     max-width: calc(var(--measure) + 20rem);
     margin-inline: auto;
     display: grid;
@@ -264,7 +266,7 @@
     border-radius: 999px;
     background: var(--rule);
     cursor: pointer;
-    transition: transform var(--quick, 120ms) ease-out;
+    transition: transform var(--quick) var(--ease-out);
   }
 
   .segment:disabled {
@@ -284,6 +286,7 @@
     position: absolute;
     inset: 0 auto 0 0;
     background: var(--accent);
+    transition: width 0.4s var(--ease-out);
   }
 
   .facts {
@@ -424,5 +427,10 @@
     .segment {
       transition: none;
     }
+  }
+
+  /* A tab that comes into view fades in, as the side panel's views do. */
+  .part:not([hidden]) {
+    animation: enter-fade var(--quick) ease;
   }
 </style>

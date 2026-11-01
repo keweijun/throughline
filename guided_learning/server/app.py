@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import socket
+import tempfile
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -22,6 +23,7 @@ from ..store import OperationError
 from . import state as public_state
 from .host import EventBus, Host, turn_summary
 from .settings import TeacherSettings
+from .studio import MAX_UPLOAD, Studio, message_input
 
 log = logging.getLogger(__name__)
 DIST = Path(__file__).resolve().parent.parent / 'web_dist'
@@ -29,6 +31,8 @@ MAX_BODY = 1024 * 1024
 # An attached image is uploaded as its own raw body, so a phone photo fits; JSON bodies keep the small limit.
 IMAGE_UPLOAD = '/api/images'
 MAX_IMAGE = 25 * 1024 * 1024
+# A file attached in Studio is uploaded as its own raw body of any type, like an image.
+FILE_UPLOAD = '/api/studio/files'
 
 
 class Body(BaseModel):
@@ -157,14 +161,50 @@ class OpenCourseRequest(Body):
     name: str
 
 
+class StudioSpan(Body):
+    start: int
+    end: int
+
+
+class StudioReference(Body):
+    name: str
+    path: str
+
+
+class StudioMessage(Body):
+    thread_id: Optional[str] = None
+    text: str = ''
+    elements: list[StudioSpan] = []
+    skills: list[StudioReference] = []
+    mentions: list[StudioReference] = []
+    images: list[str] = []
+    # Where a hand-off came from (a chapter, section or source location), sent to Codex with the message.
+    context: Optional[str] = None
+
+
+class StudioAnswer(Body):
+    decision: Optional[str] = None
+    answers: Optional[dict[str, list[str]]] = None
+
+
+class StudioRename(Body):
+    name: str
+
+
+class StudioAccess(Body):
+    full_access: bool
+
+
 class Courses:
     """The course library this host serves and the one course it owns at a time."""
 
-    def __init__(self, root, runner, settings, watch_interval=1.5):
+    def __init__(self, root, runner, settings, watch_interval=1.5, studio_command=None):
         self.root = Path(root).resolve() if root else None
         self.runner = runner
         self.settings = settings
         self.events = EventBus()
+        self.studio = Studio(self.root, self.events, settings, command=studio_command,
+                             path=Path(settings.path).with_name('studio.json'))
         self.lock = threading.Lock()
         self.host = None
         self.watch_interval = watch_interval
@@ -231,6 +271,7 @@ class Courses:
 
     def close(self):
         self.stopping.set()
+        self.studio.close()
         with self.lock:
             if self.host:
                 self.host.close()
@@ -246,8 +287,8 @@ class ActiveHost:
         return getattr(self._courses.require(), name)
 
 
-def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5):
-    courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval)
+def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None):
+    courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -271,12 +312,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     async def guard(request: Request, call_next):
         has_body = request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
         image = request.method == 'POST' and request.url.path == IMAGE_UPLOAD
+        upload = request.method == 'POST' and request.url.path == FILE_UPLOAD
         if has_body:
             try:
                 size = int(request.headers.get('content-length', '0'))
             except ValueError:
                 size = -1
-            if request.headers.get('transfer-encoding') or size < 0 or size > (MAX_IMAGE if image else MAX_BODY):
+            if request.headers.get('transfer-encoding') or size < 0 or size > (MAX_UPLOAD if upload else MAX_IMAGE if image else MAX_BODY):
                 return JSONResponse({'error': 'Request body must have a bounded Content-Length'}, 413)
         origin = request.headers.get('origin')
         if request.headers.get('host') not in allowed or (origin is not None and origin not in origins):
@@ -286,7 +328,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         if request.url.path.startswith('/api/') and site is not None and site not in ('same-origin', 'none'):
             return JSONResponse({'error': 'Invalid local origin'}, 403)
         content_type = request.headers.get('content-type', '').split(';')[0].strip()
-        if has_body and size and not (content_type.startswith('image/') if image else content_type == 'application/json'):
+        if has_body and size and not upload and not (content_type.startswith('image/') if image else content_type == 'application/json'):
             return JSONResponse({'error': 'An image is required' if image else 'JSON required'}, 415)
         response = await call_next(request)
         response.headers['Cache-Control'] = 'no-store'
@@ -548,6 +590,85 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         """A cheap liveness probe for `guided-learning open` and `stop`."""
         return {'pid': os.getpid(), 'launch_id': os.environ.get('GUIDED_LEARNING_LAUNCH_ID')}
 
+    # Studio (ADR 0016): course work as a Codex chat, for the open course.
+    studio = courses.studio
+
+    def course_folder():
+        return courses.require().workspace
+
+    @app.get('/api/studio')
+    def studio_view():
+        course = course_folder()
+        try:
+            studio.ready()
+            return {'available': True, 'access': studio.access(), 'threads': studio.threads(course)}
+        except OperationError as exc:
+            if exc.code != 'studio_unavailable':
+                raise
+            return {'available': False, 'error': str(exc), 'access': studio.access(), 'threads': []}
+
+    @app.get('/api/studio/activity')
+    def studio_activity():
+        return studio.activity(course_folder())
+
+    @app.get('/api/studio/skills')
+    def studio_skills():
+        return {'skills': studio.skills(course_folder())}
+
+    @app.get('/api/studio/search')
+    def studio_search(q: str = ''):
+        return {'files': studio.search(course_folder(), q) if q.strip() else []}
+
+    @app.get('/api/studio/threads/{thread_id}')
+    def studio_thread(thread_id: str):
+        return studio.history(course_folder(), thread_id)
+
+    @app.put('/api/studio/threads/{thread_id}')
+    def studio_rename(thread_id: str, body: StudioRename):
+        return studio.rename(course_folder(), thread_id, body.name)
+
+    @app.delete('/api/studio/threads/{thread_id}')
+    def studio_archive(thread_id: str):
+        return studio.archive(course_folder(), thread_id)
+
+    @app.post('/api/studio/threads/{thread_id}/interrupt')
+    def studio_interrupt(thread_id: str):
+        return studio.interrupt(course_folder(), thread_id)
+
+    @app.post('/api/studio/messages')
+    def studio_send(body: StudioMessage):
+        course = course_folder()
+        images = [attached.path(course, name) for name in body.images]
+        items = message_input(body.text, [e.model_dump() for e in body.elements], [s.model_dump() for s in body.skills],
+                              [m.model_dump() for m in body.mentions], images, body.context)
+        if not items:
+            raise OperationError('empty_studio_message', 'Write a message or attach something')
+        return studio.send(course, body.thread_id, items)
+
+    @app.post('/api/studio/requests/{request_id}')
+    def studio_answer(request_id: str, body: StudioAnswer):
+        return studio.answer(request_id, body.model_dump(exclude_none=True))
+
+    @app.get('/api/studio/access')
+    def studio_access_view():
+        return studio.checked_access()
+
+    @app.put('/api/studio/access')
+    def studio_access(body: StudioAccess):
+        result = studio.set_full_access(body.full_access)
+        courses.events.publish({'type': 'changed', 'scope': 'settings'})
+        return result
+
+    @app.post(FILE_UPLOAD)
+    async def studio_upload(request: Request, name: str):
+        course = course_folder()
+        # Spooled to disk past a few megabytes, so a large PDF never sits in memory.
+        with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as spool:
+            async for chunk in request.stream():
+                spool.write(chunk)
+            spool.seek(0)
+            return await asyncio.to_thread(studio.upload, course, name, iter(lambda: spool.read(1024 * 1024), b''))
+
     @app.get('/api/library')
     def library_view():
         return courses.view()
@@ -580,7 +701,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     return app
 
 
-def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None):
+def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -588,7 +709,7 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
-    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root)
+    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root, studio_command=studio_command)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

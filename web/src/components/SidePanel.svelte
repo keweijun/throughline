@@ -5,6 +5,7 @@
   import SourceViewer from './SourceViewer.svelte';
   import Notes from './Notes.svelte';
   import Memory from './Memory.svelte';
+  import Studio from './Studio.svelte';
 
   // The top bar's toggles are the panel's only navigation; each view keeps its own scroll position between visits.
   const scroll: Record<string, number> = {};
@@ -15,6 +16,7 @@
     source: () => t('Source'),
     notes: () => t('Notes'),
     memory: () => t('Memory'),
+    studio: () => t('Studio'),
   };
 
   let shown = app.panelTab;
@@ -91,6 +93,7 @@
     <div class="view" id="panel-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
     <div class="view docked" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
     <div class="view" id="panel-memory" hidden={app.panelTab !== 'memory'}><Memory /></div>
+    <div class="view docked" id="panel-studio" hidden={app.panelTab !== 'studio'}><Studio active={app.studioShown} /></div>
   </div>
 </aside>
 

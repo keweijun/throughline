@@ -1,12 +1,22 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app, type PanelTab } from '../lib/store.svelte';
+  import { studio } from '../lib/studio.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
   const index = $derived(app.routeIndex(app.currentId));
   // The bar fills as sections are studied to the end, so starting the last section does not read as finishing the course.
   const studied = $derived(route.filter((id) => app.studied(id)).length);
   const studying = $derived(!!app.state && !app.libraryOpen);
+  // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
+  // start Codex. Events keep it current from then on.
+  let activityAsked = false;
+  $effect(() => {
+    if (studying && !activityAsked) {
+      activityAsked = true;
+      void studio.loadActivity();
+    }
+  });
   const openQuestions = $derived(
     (app.state?.questions ?? []).filter((q) => q.status === 'unanswered' || q.status === 'suggested' || (q.choice === 'accept' && !q.returned)).length,
   );
@@ -90,7 +100,23 @@
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 3.5a5 5 0 0 0-3 9v2.5h6V12.5a5 5 0 0 0-3-9zM8 17h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Memory")}</span>{#if suggested}<span class="count">{suggested}</span>{/if}
       </button>
+      <button id="toggle-studio" class="btn btn-quiet studio-toggle" aria-controls="auxiliary" aria-pressed={showing('studio')} aria-label={t("Studio")} title={t("Studio: create and change courses with Codex (d)")} onclick={() => toggle('studio')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 2.5l1.6 4.4 4.4 1.6-4.4 1.6L10 14.5l-1.6-4.4L4 8.5l4.4-1.6zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Studio")}</span>
+      </button>
       </div>
+    {/if}
+    {#if studying && !app.studioShown && (studio.waiting.length || studio.working.length)}
+      <!-- What Codex is doing in Studio, on every page; the question itself stays in Studio's transcript. -->
+      <button
+        class="btn btn-small studio-status"
+        class:needs={studio.waiting.length > 0}
+        onclick={() => app.showStudio({ thread: studio.attention })}
+        title={studio.waiting.length ? t("Codex is waiting for your answer in Studio") : t("Codex is working on your course in Studio")}
+      >
+        <span class="pulse" aria-hidden="true"></span>
+        <span>{studio.waiting.length ? t("Studio needs you") : t("Studio working…")}</span>
+      </button>
     {/if}
     {#if app.update?.available}
       <!-- Noticeable but quiet: a small pill that waits beside Settings, never a banner or a toast. -->
@@ -237,6 +263,39 @@
     color: var(--on-accent);
   }
 
+  .studio-status {
+    gap: 0.4rem;
+    border-radius: 999px;
+    border-color: var(--rule);
+    background: var(--raised);
+    color: var(--ink-soft);
+  }
+
+  .studio-status.needs {
+    border-color: var(--caution);
+    background: var(--caution-wash);
+    color: var(--caution);
+    font-weight: 600;
+  }
+
+  .pulse {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: studio-pulse 1.2s ease-in-out infinite;
+  }
+
+  .studio-status:not(.needs) .pulse {
+    background: var(--accent);
+  }
+
+  @keyframes studio-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
   @media (hover: none), (max-width: 30rem) {
     .shortcuts {
       display: none;
@@ -279,8 +338,10 @@
       display: none;
     }
 
-    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due. */
-    .review {
+    /* Phones have no room for Review beside the panel switcher; it was shown there only when something was due.
+       Studio is reached there from the course's own hand-offs (Add files in Studio, …). */
+    .review,
+    .studio-toggle {
       display: none;
     }
   }

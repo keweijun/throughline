@@ -74,6 +74,7 @@
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.panelOpen && app.panelTab === 'memory' ? (app.panelOpen = false) : app.openPanel('memory');
+    else if (event.key === 'd') app.studioShown ? (app.panelOpen = false) : app.showStudio();
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.shortcutsOpen = true;
   }

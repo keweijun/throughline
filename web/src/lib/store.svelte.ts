@@ -3,9 +3,10 @@ import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
+import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
-export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
+export type PanelTab = 'questions' | 'source' | 'notes' | 'memory' | 'studio';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -416,6 +417,10 @@ class AppStore {
   }
 
   #apply(event: HostEvent) {
+    if (event.type === 'studio') {
+      studio.apply(event);
+      return;
+    }
     if (event.type === 'changed' && event.scope === 'course') {
       location.reload();
       return;
@@ -691,6 +696,19 @@ class AppStore {
   openPanel(tab: PanelTab) {
     this.panelTab = tab;
     this.panelOpen = true;
+  }
+
+  /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
+  get studioShown() {
+    return this.panelOpen && this.panelTab === 'studio';
+  }
+
+  /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
+   * the box focused when `focus`. */
+  showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
+    this.openPanel('studio');
+    if (thread && studio.threadId !== thread) void studio.open(thread);
+    if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
   }
 
   /** Sets the panel width; a width the learner chose is kept for later visits unless `save` defers that. */

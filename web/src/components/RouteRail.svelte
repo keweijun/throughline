@@ -8,6 +8,8 @@
   import FoldedRoute from './FoldedRoute.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
+  // The section on the page, which Add files names as where the request came from.
+  const viewedSection = $derived(app.viewingId ? app.concept(app.viewingId) : undefined);
   const currentIndex = $derived(app.routeIndex(app.currentId));
   const saved = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -221,11 +223,11 @@
     {/if}
     {#if course}
       <section class="codex" aria-labelledby="codex-title">
-        <h3 id="codex-title">{t('Change this course in Codex')}</h3>
-        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+        <h3 id="codex-title">{t('Change this course in Studio')}</h3>
+        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })} origin={viewedSection ? { label: t('Section: {section}', { section: viewedSection.title }), text: `section "${viewedSection.title}" (${viewedSection.id})` } : null}>{t('Add files in Studio')}</CodexLink>
         {#if course.needs_review}
           <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
-            {t('Check {count} source locations in Codex', { count: course.needs_review })}
+            {t('Check {count} source locations in Studio', { count: course.needs_review })}
           </CodexLink>
         {/if}
       </section>

@@ -238,6 +238,53 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
 });
 
+test("Studio's writing box chooses its own model and effort, and its access, as in Codex", async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.route('**/api/models', (route) =>
+    route.fulfill({
+      json: {
+        models: [
+          { id: 'model-a', name: 'Model A', description: '', default: true, efforts: ['low', 'medium', 'high'], tiers: [] },
+          { id: 'model-b', name: 'Model B', description: '', default: false, efforts: ['low', 'high'], tiers: [] },
+        ],
+      },
+    }),
+  );
+  await page.locator('#open-course').click();
+  const model = page.locator('#studio-model');
+  // Until the learner picks, Studio runs on the teacher's model (Codex's default here) and effort.
+  await expect(model).toHaveText('Model A · Medium');
+  await model.click();
+  const menu = page.getByRole('group', { name: "Studio's model and reasoning effort" });
+  await expect(menu.getByRole('radio', { name: /Same as the teacher/ })).toBeChecked();
+  // A model without the chosen effort takes the nearest one below it.
+  await menu.getByRole('radio', { name: 'Model B' }).check();
+  await expect(model).toHaveText('Model B · Low');
+  await expect(menu.getByRole('radio', { name: 'Medium' })).toHaveCount(0);
+  await menu.getByRole('radio', { name: 'High' }).check();
+  await expect(model).toHaveText('Model B · High');
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  const access = page.locator('#studio-access');
+  await expect(access).toHaveText('Library access');
+  await access.click();
+  await page.getByRole('radio', { name: /Full access/ }).click();
+  await expect(access).toHaveText('Full access');
+  await expect(access).toHaveClass(/full/);
+  await expect(page.getByRole('group', { name: 'Access' })).toBeHidden();
+
+  // Both are the learner's, kept across visits; lessons keep the teacher's model in Settings.
+  await page.reload();
+  await page.locator('#open-course').click();
+  await expect(page.locator('#studio-model')).toHaveText('Model B · High');
+  await expect(page.locator('#studio-access')).toHaveText('Full access');
+  await page.locator('#studio-model').click();
+  await page.getByRole('radio', { name: /Same as the teacher/ }).check();
+  await expect(page.locator('#studio-model')).toHaveText('Model A · Medium');
+  expect(errors).toEqual([]);
+});
+
 test('opening Studio on the course page leaves the page at its top and names the course by its title', async ({ page, course }) => {
   // Short enough that the page itself scrolls, so an empty chat could hand its scrolling to the page.
   await page.setViewportSize({ width: 1280, height: 640 });

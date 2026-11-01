@@ -3,6 +3,10 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Studio's model and reasoning effort": "课程工坊的模型和推理强度",
+  "Applies to Studio from the next message. Lessons keep the teacher's model, set in Settings.": "从下一条消息起用于课程工坊。上课仍使用在设置中选择的老师模型。",
+  "Access": "访问权限",
+  "Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.": "课程工坊是 Codex 创建和修改课程的地方。和在 Codex 中一样，可以在它的输入框里选择模型和访问权限；未选择时使用老师的模型。",
   "Codex is waiting for your answer.": "Codex 在等你回答。",
   "Codex is making it.": "Codex 正在建课。",
   "Open the chat": "打开对话",
@@ -831,9 +835,7 @@ const messages = {
   "Approve": "批准",
   "Approve for this chat": "在本对话中批准",
   "Decline": "拒绝",
-  "Studio is where Codex creates and changes your courses. It reads any file you point it to and writes inside your Throughline folder without asking.": "Codex 在课程工坊里创建和修改你的课程。它可以读取你指定的任何文件，并且无需询问即可在你的 Throughline 文件夹内写入。",
   "Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.": "这台 Windows 电脑尚未设置 Codex 的沙盒，因此课程工坊与 Codex 一样以完全访问运行。",
-  "Let Codex change files anywhere and run commands without asking, as Codex can in its own app. Off, it asks before writing outside your Throughline folder or using the network.": "让 Codex 像在它自己的应用中一样，修改任何位置的文件并直接运行命令。关闭时，它在 Throughline 文件夹以外写入或使用网络前会先询问。",
   "Add files in Studio": "在课程工坊中添加文件",
   "Check {count} source locations in Studio": "在课程工坊中核对 {count} 处来源位置",
   "Check this location in Studio": "在课程工坊中核对此位置",

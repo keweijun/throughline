@@ -86,6 +86,28 @@ class StudioTest(unittest.TestCase):
         self.assertTrue(saved['full_access'])
         self.assertEqual(saved['courses'][str(self.course.resolve())], [thread])
 
+    def test_studio_runs_on_the_teachers_model_until_the_learner_picks_its_own(self):
+        self.client.put('/api/settings', json={'model': 'teacher-model', 'effort': 'low', 'service_tier': 'fast'})
+        thread = self.send('first')['thread']
+        self.history(thread, lambda h: self.replies(h) == ['done'] and not h['active_turn'])
+        turn = self.received('turn/start')[-1]
+        self.assertEqual((turn['model'], turn['effort']), ('teacher-model', 'low'))
+        self.assertEqual(self.received('thread/start')[-1]['serviceTier'], 'fast')
+        self.assertEqual(self.client.get('/api/studio').json()['choice'], {'model': '', 'effort': ''})
+
+        choice = self.client.put('/api/studio/model', json={'model': 'big-model', 'effort': 'high'}).json()
+        self.assertEqual(choice, {'model': 'big-model', 'effort': 'high'})
+        self.send('second', thread_id=thread)
+        turn = self.received('turn/start')[-1]
+        self.assertEqual((turn['model'], turn['effort']), ('big-model', 'high'))
+        # The teacher's lessons keep the teacher's model; Studio's is its own.
+        self.assertEqual(self.client.get('/api/settings').json()['model'], 'teacher-model')
+        self.assertEqual(self.client.put('/api/studio/model', json={'effort': 'loud'}).status_code, 409)
+        # A new chat on another model does not take the teacher's Fast tier with it.
+        self.history(thread, lambda h: not h['active_turn'])
+        self.send('third')
+        self.assertNotIn('serviceTier', self.received('thread/start')[-1])
+
     def test_an_approval_waits_for_the_learner_and_returns_their_decision(self):
         thread = self.send('please approve this')['thread']
         history = self.history(thread, lambda h: h['pending'])

@@ -15,7 +15,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Help from './components/Help.svelte';
-  import Toasts from './components/Toasts.svelte';
+  import ErrorToast from './components/ErrorToast.svelte';
   import Library from './components/Library.svelte';
 
   onMount(() => {
@@ -75,7 +75,7 @@
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
-    else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse('memory');
+    else if (event.key === 'm') app.courseOpen && app.coursePart === 'memory' ? (app.courseOpen = false) : app.showCourse('memory');
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.helpOpen = true;
@@ -126,7 +126,7 @@
 <SettingsDialog />
 <CitationPeek />
 <Help />
-<Toasts />
+<ErrorToast />
 
 <style>
   .workspace {

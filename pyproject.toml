@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "throughline"
-version = "0.18.0"
+version = "0.22.1"
 description = "Throughline: guided learning across your documents, taught by Codex"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ dev = ["httpx2>=2,<3"]
 
 [project.scripts]
 guided-learning = "guided_learning.__main__:main"
+throughline = "guided_learning.__main__:throughline"
 guided-learning-web = "guided_learning.web:main"
 
 [tool.setuptools.packages.find]

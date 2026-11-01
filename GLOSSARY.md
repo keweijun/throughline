@@ -115,7 +115,7 @@ _Avoid_: Answer image (it is no longer only for answers), upload.
 **Bookmark**: A learner annotation marking a section or a source location to come back to.
 _Avoid_: Deferred item, mainline restore point.
 
-**Course memory**: What the teacher keeps about one course: confirmed learner preferences (from teaching, or stated when the course was built or in Studio), taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
+**Course memory**: What the teacher keeps about one course: confirmed learner preferences (from teaching, or stated when the course was built or in Studio), taught terms and difficulties, each citing the interactions behind it. The learner sees and edits the confirmed preferences and can tell the teacher what to remember; taught terms and difficulties stay the teacher's working notes (ADR 0010).
 _Avoid_: Learner profile (reported when the course was built), learner annotation, evidence, mastery, chat history.
 
 **Taught term**: A term or notation recorded in course memory with the section, lesson step or side question that defined it; the teacher may use it without defining it again.

@@ -1,9 +1,11 @@
 import json
 import tempfile
+from pathlib import Path
 import unittest
 
 from guided_learning.api import execute
 from guided_learning.server import Host
+from guided_learning.server.settings import TeacherSettings
 from support import host_client, settle
 
 LESSON = ('A plane wave is $e^{ikx}$.\n<course-memory>{"entries":[{"kind":"taught_term","text":"plane wave"},'
@@ -106,6 +108,65 @@ class MemoryFlow(unittest.TestCase):
                 self.assertEqual(client.delete(f'/api/memory/{term["id"]}').status_code, 404)
                 self.assertEqual(client.put(f'/api/memory/{preference["id"]}', json={'text': 'x', 'kind': 'difficulty'}).status_code, 400)
                 self.assertEqual([e['text'] for e in client.get('/api/state').json()['memory']], ['Give the tedious integrals'])
+
+    def test_the_learner_tells_the_teacher_what_to_remember(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            execute(path, {'op': 'memory.note', 'turn_id': 't', 'concept_id': 'state', 'interaction_ids': [],
+                           'note': {'entries': [{'kind': 'preference', 'text': 'Long derivations'}]}})
+            [old] = execute(path, {'op': 'memory.view'})['entries']
+            settings = Answering({'reply': 'I will keep answers short and stop writing out long derivations.',
+                                  'remember': ['Short answers first'], 'forget': [old['id']]})
+            client, host = host_client(path, settings=settings)
+            with client:
+                asked = client.post('/api/memory', json={'text': 'Please keep it short, no long derivations', 'concept_id': 'state'}).json()['request']
+                settle(host)
+                state = client.get('/api/state').json()
+                [request] = state['memory_requests']
+                self.assertEqual((request['id'], request['reply']), (asked['id'], 'I will keep answers short and stop writing out long derivations.'))
+                [entry] = state['memory']
+                self.assertEqual((entry['text'], entry['status'], entry['concept_id']), ('Short answers first', 'confirmed', None))
+                self.assertEqual(entry['interaction_ids'], ['memory-request:' + asked['id']])
+                self.assertEqual(request['remembered'], [entry['id']])
+                self.assertEqual(request['forgotten'], [old['id']])
+            [(small, prompt)] = settings.calls
+            self.assertTrue(small)
+            self.assertIn('Please keep it short', prompt)
+            self.assertIn(old['id'], prompt)
+            self.assertEqual(execute(path, {'op': 'memory.prompt'})['memory']['preferences'], ['Short answers first'])
+            # The request is the learner's message, not a teaching exchange.
+            recent = [i['id'] for i in execute(path, {'op': 'session.resume', 'recent_limit': 20})['recent_interactions']]
+            self.assertNotIn('stream:' + asked['turn_id'], recent)
+
+    def test_a_malformed_memory_reply_changes_nothing_and_says_why(self):
+        for reply in ('not json', {'reply': 'ok', 'remember': 'Short answers'}, {'reply': 'ok', 'forget': ['unknown']}, {'remember': ['x']}):
+            with self.subTest(reply=reply), tempfile.TemporaryDirectory() as path:
+                course(path)
+                client, host = host_client(path, settings=Answering(reply))
+                with client:
+                    client.post('/api/memory', json={'text': 'Short answers please', 'concept_id': 'state'})
+                    settle(host)
+                    state = client.get('/api/state').json()
+                    self.assertEqual(state['memory'], [])
+                    self.assertTrue(state['memory_requests'][0]['error'])
+
+
+class Answering(TeacherSettings):
+    """Answers every turn with `reply` and records whether it ran on the small model."""
+
+    def __init__(self, reply):
+        super().__init__(Path(tempfile.mkdtemp()) / 'settings.json')
+        self.reply, self.calls = reply, []
+
+    def runner(self, small=False):
+        settings = self
+
+        class Run:
+            def run(self, prompt, cwd, emit, cancel):
+                settings.calls.append((small, prompt))
+                emit({'kind': 'final', 'text': settings.reply if isinstance(settings.reply, str) else json.dumps(settings.reply)})
+                emit({'kind': 'complete'})
+        return Run()
 
 
 class Consolidating:

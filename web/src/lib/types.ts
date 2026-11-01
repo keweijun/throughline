@@ -40,7 +40,7 @@ export type Position = {
 export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'failed';
 
 /** A turn's channel, as `CHANNELS` in guided_learning/streaming.py: the learner's own requests, then background work. */
-export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'prepared_step' | 'preparation' | 'build' | 'consolidation';
+export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'prepared_step' | 'preparation' | 'build' | 'consolidation' | 'memory';
 
 /** Why an exercise was skipped, as practice.SKIP_REASONS (ADR 0011). */
 export type SkipReason = 'too_easy' | 'too_tedious' | 'not_relevant';
@@ -264,6 +264,7 @@ export type State = {
   settings: Settings;
   annotations: Annotation[];
   memory: MemoryEntry[];
+  memory_requests: MemoryRequest[];
   skipped: Skipped[];
   builds: ChapterBuild[];
   review: ReviewState;
@@ -302,6 +303,20 @@ export type ReviewState = {
 export type AnnotationSource = Ref & { label?: string; page?: number };
 
 /** A course memory entry (ADR 0010); a preference takes effect only once `confirmed`, a difficulty while `active`. */
+/** What the learner asked the teacher to remember, and the reply once its `memory` turn has answered (ADR 0010). */
+export type MemoryRequest = {
+  id: string;
+  text: string;
+  concept_id: string;
+  turn_id: string;
+  created_at: number;
+  reply?: string;
+  remembered?: string[];
+  forgotten?: string[];
+  /** Why the reply was refused; no entry changed. */
+  error?: string;
+};
+
 export type MemoryEntry = {
   id: string;
   kind: 'preference' | 'taught_term' | 'difficulty';
@@ -389,3 +404,12 @@ export type LibraryCourse = {
 };
 
 export type Library = { root: string | null; active: string | null; courses: LibraryCourse[] };
+
+/** This computer's launcher, as the library card and Settings → About describe it; `darwin-home` is ~/Applications. */
+export type LauncherStatus = { platform: 'nt' | 'darwin' | 'darwin-home' | 'linux'; path: string; exists: boolean; dismissed: boolean };
+
+/** One check that Codex can run Throughline; `label` and `fix` are English, so known ids are worded in the interface. */
+export type CodexCheck = { id: string; ok: boolean; label: string; detail: string; fix: string };
+
+/** The checks so far; `checking` while the once-per-host probe of whether Codex answers runs. */
+export type CodexChecks = { checks: CodexCheck[]; checking: boolean };

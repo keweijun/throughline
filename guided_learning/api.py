@@ -10,7 +10,7 @@ MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background'
 READS = {'annotations.list', 'background.view', 'branch.list', 'branch.read', 'chapter_build.list', 'course.status',
          'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage', 'curriculum.view',
          'deferred.list', 'evidence.unresolved', 'evidence.view', 'interaction.read', 'lesson.list', 'lesson.read',
-         'memory.consolidations', 'memory.prompt', 'memory.view', 'practice.list', 'preferences.view', 'review.context',
+         'memory.consolidations', 'memory.prompt', 'memory.requests', 'memory.view', 'practice.list', 'preferences.view', 'review.context',
          'review.sets', 'review.warm_ups', 'session.resume', 'source.read', 'source.units', 'stream.list', 'stream.read', 'stream.summaries',
          'widgets.list'}
 

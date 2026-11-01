@@ -72,7 +72,7 @@ def _acquire_lease(workspace):
 
 turn_summary = summarize
 # What a finished background turn changes besides itself: the interface reloads only that part of the state.
-FINISHED = {'preparation': 'preparation', 'consolidation': 'memory'}
+FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': 'memory'}
 
 
 class Host:
@@ -118,7 +118,7 @@ class Host:
         return self._runner or self.settings.runner()
 
     def runner_for(self, turn):
-        # Preparation and memory consolidation are background work, so they run on the small model when one is chosen; a
+        # Preparation and memory work are background work, so they run on the small model when one is chosen; a
         # chapter build needs the teacher.
         return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
 
@@ -225,6 +225,8 @@ class Host:
             return self.builds.build_prompt(turn)  # not a teaching turn: none of the teaching additions apply
         if turn['channel'] == 'consolidation':
             return self.memory.consolidation_prompt(turn)
+        if turn['channel'] == 'memory':
+            return self.memory.request_prompt(turn)
         prompt = prompts.base(turn)
         context = turn['prompt_snapshot']['context']
         for feature in self.features:

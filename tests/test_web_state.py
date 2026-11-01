@@ -105,7 +105,7 @@ class SlimState(unittest.TestCase):
                 state = client.get('/api/state').json()
                 self.assertEqual(client.get('/api/state?only=preparation').json(), {'preparation': state['preparation']})
                 self.assertEqual(client.get('/api/state?only=preparation,settings,memory,builds').json(),
-                                 {k: state[k] for k in ('preparation', 'settings', 'memory', 'builds')})
+                                 {k: state[k] for k in ('preparation', 'settings', 'memory', 'memory_requests', 'builds')})
                 self.assertEqual(client.get('/api/state?only=turns').status_code, 400, 'only parts the interface reloads alone')
 
     def test_turn_events_carry_one_text(self):

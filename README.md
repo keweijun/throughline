@@ -15,13 +15,25 @@ The teacher makes instructional judgments from your materials. The program valid
 
 ## Install
 
-You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)), and Python 3.10 or newer. Then paste this into Codex:
+You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)). Then paste this into Codex:
 
 ```text
 Install https://github.com/keweijun/throughline
 ```
 
-Codex reads the steps below, installs the app (no Node.js needed), adds the `$throughline` skill, creates your Throughline folder and a **Throughline** launcher in your app menu, and shows a short welcome guide. To **update**, paste `Update https://github.com/keweijun/throughline`; your courses are kept. **Settings → Check for updates** tells you when a newer version is out and opens that request in Codex.
+Or run the install script in a terminal. It installs [uv](https://docs.astral.sh/uv/) if you don't have it, which brings its own Python:
+
+```sh
+# macOS and Linux
+curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/main/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/keweijun/throughline/main/install.ps1 | iex
+```
+
+Either way the app is installed (no Node.js needed), the `$throughline` skill is added, your Throughline folder and a **Throughline** launcher in your app menu are created, and Throughline opens in your browser with a short welcome guide in the chat or terminal. Afterwards, `throughline` in a terminal opens it too. To **update**, paste `Update https://github.com/keweijun/throughline` into Codex or run the script again; your courses are kept. **Settings → Check for updates** tells you when a newer version is out and opens that request in Codex.
 
 ### For Codex: installing or updating Throughline
 
@@ -35,9 +47,13 @@ When a user asks you to install or update Throughline, run these steps yourself,
    - `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
    - `python -m pip install --user --upgrade "throughline[pdf] @ git+https://github.com/keweijun/throughline"`
 
+   If none of them is available (or Python 3.10 or newer is missing), install uv with its [official installer](https://docs.astral.sh/uv/getting-started/installation/) and use the first line.
+
    If `guided-learning` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
-3. Run `guided-learning setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher and never touches existing courses.
+3. Run `guided-learning setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher, never touches existing courses, and opens Throughline in the browser when it is done.
 4. Show the user the welcome guide that setup prints, as written. After an update, just say which version is installed (`guided-learning --version`).
+
+`install.sh` and `install.ps1` run these same steps with uv; keep them in step with this list.
 
 ### Install or update by hand
 
@@ -49,7 +65,7 @@ uv tool install --reinstall "throughline[pdf] @ git+https://github.com/keweijun/
 guided-learning setup                # add --language zh-CN for the Chinese welcome guide
 ```
 
-With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`. Both forms always fetch the latest version, so the same three lines install and update. Run `guided-learning --version` to see what you have.
+With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline"`. Both forms always fetch the latest version, so the same three lines install and update. Run `guided-learning --version` to see what you have, and `guided-learning doctor` to check that Codex is found and answers (it sends one tiny message to a small model).
 
 Updating from a version before 0.5.1, when the package was named `codex-guided-learning`: run `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`) after `guided-learning stop`, then continue as above.
 
@@ -57,7 +73,7 @@ To uninstall, run `guided-learning stop`, then `uv tool uninstall throughline` (
 
 ## Create your first course
 
-After installing, Codex shows a short welcome guide. From then on, start any Codex chat with **`$throughline`** to work on your courses.
+After installing, Throughline opens in your browser. From then on, start any Codex chat with **`$throughline`** to work on your courses.
 
 1. Type `$throughline make a course from these files`, attach your PDFs or notes (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
 2. Codex asks a few quick questions: your goal and deadline, how well you know each prerequisite it found in the files, and how much detail you want. Then it suggests a course name, copies your files into the Throughline folder, builds a route across them and tells you what still needs checking.

@@ -95,12 +95,13 @@
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelOpen} class:folded={app.folded && !app.libraryOpen}>
+<div class="layout" class:with-panel={app.panelOpen} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
   {#if app.libraryOpen}
     <Library />
   {:else if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
-    <RouteRail />
+    <!-- The course's Overview shows the whole route in its chapter strip, so the rail steps aside for the page. -->
+    {#if !app.courseOpen}<RouteRail />{/if}
     <main id="main">
       {#if app.courseOpen}
         <CoursePage />
@@ -172,10 +173,20 @@
   }
 
   /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
+  .layout.overview {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: calc(var(--measure) + 24rem);
+  }
+
   .layout.folded {
     grid-template-columns: var(--rail-folded) minmax(0, 1fr);
     column-gap: 0;
     max-width: 100vw;
+  }
+
+  .layout.overview.folded {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: calc(var(--measure) + 24rem);
   }
 
   main {

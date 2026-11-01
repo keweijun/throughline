@@ -9,7 +9,7 @@ const python = process.env.TEST_PYTHON ?? path.join(root, '.venv', process.platf
 
 test('the library lists courses, opens one and switches back', async ({ page, course }) => {
   const { errors } = await course('library_browser_fixture');
-  await expect(page.getByRole('heading', { name: 'Your courses' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'All courses', level: 1 })).toBeVisible();
   const courses = page.locator('.courses > li');
   await expect(courses).toHaveCount(3);
   await expect(courses.filter({ hasText: 'Thermodynamics' })).toContainText('Route not built yet');
@@ -19,13 +19,13 @@ test('the library lists courses, opens one and switches back', async ({ page, co
   await expect(page.getByRole('heading', { name: 'Eigenvectors' }).first()).toBeVisible();
   await expect(page.locator('.topbar .course')).toHaveText('Linear Algebra');
 
-  await page.getByRole('button', { name: 'Courses', exact: true }).click();
+  await page.locator('#open-courses').click();
   await expect(courses.filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Continue' })).toBeVisible();
   await courses.filter({ hasText: 'Quantum' }).getByRole('button', { name: 'Open' }).click();
   await expect(page.locator('.topbar .course')).toHaveText('Introductory Quantum Mechanics');
   await expect(page.getByRole('heading', { name: 'Superposition' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Courses', exact: true }).click();
+  await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'Back to Introductory Quantum Mechanics' }).click();
   await expect(page.getByRole('heading', { name: 'Superposition' }).first()).toBeVisible();
   expect(errors).toEqual([]);
@@ -70,10 +70,10 @@ test('the library fits a phone screen', async ({ page, course }) => {
 test('the library remembers the last language before a course is open', async ({ page, course }) => {
   await course('library_browser_fixture');
   await chooseLanguage(page, 'zh-CN');
-  await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '全部课程', level: 1 })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: '我的课程' })).toBeVisible();
-  await expect(page.locator('.topbar .course')).toHaveText('贯学');
+  await expect(page.getByRole('heading', { name: '全部课程', level: 1 })).toBeVisible();
+  await expect(page.locator('#open-courses')).toHaveText('全部课程');
 });
 
 test('course actions open Codex with a $throughline request, and new courses appear on their own', async ({ page, course }) => {

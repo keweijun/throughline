@@ -18,7 +18,7 @@ test('the library says how to open Throughline next time until dismissed', async
   await expect(card).toBeHidden();
   const loaded = page.waitForResponse((response) => response.url().endsWith('/api/launcher'));
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Your courses' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'All courses', level: 1 })).toBeVisible();
   await expect(page.locator('.courses > li')).toHaveCount(1);
   expect((await (await loaded).json()).dismissed).toBe(true);
   await expect(card).toBeHidden();
@@ -57,7 +57,7 @@ test('nothing shows while Codex is being checked', async ({ page, course }) => {
     if (response.url().endsWith('/api/checks') && !(await response.json()).checking) answered = true;
   });
   await course('launcher_browser_fixture');
-  await expect(page.getByRole('heading', { name: 'Your courses' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'All courses', level: 1 })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect.poll(() => answered).toBe(true);
 });

@@ -246,7 +246,7 @@ test('settings hold only what applies to every course; the course page holds the
   await expect(coursePage.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
   await expect(coursePage.getByRole('tabpanel')).toContainText('Every document in the course');
   await expect(coursePage.getByText('No preferences yet', { exact: false })).toBeHidden();
-  await coursePage.getByRole('button', { name: 'Back to reading' }).click();
+  await page.locator('#open-study').click();
   await expect(coursePage).toHaveCount(0);
   await expect(page.locator('main article[aria-labelledby="concept-title"]')).toBeVisible();
 });

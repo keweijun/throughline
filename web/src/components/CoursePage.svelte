@@ -12,11 +12,12 @@
   // Everything here is about the course rather than the section being read, which keeps it out of the side panel.
   const course = $derived(app.libraryCourse);
   const route = $derived(app.state?.curriculum.route ?? []);
-  const studied = $derived(route.filter((id) => app.studied(id)).length);
   const sources = $derived(app.state?.sources.length ?? 0);
   const notes = $derived(app.state?.annotations.length ?? 0);
   const suggested = $derived((app.state?.memory ?? []).some((e) => e.status === 'suggested'));
   const current = $derived(app.chapterOf(app.currentId));
+  const currentNumber = $derived(app.chapters.findIndex((c) => c.id === current?.id) + 1);
+  const currentDone = $derived(current ? current.concept_ids.filter((id) => app.studied(id)).length : 0);
 
   // One segment per chapter, as wide as its sections, filled as they are studied. A course without chapters is one.
   const strip = $derived(
@@ -55,7 +56,7 @@
 <article class="page" aria-labelledby="course-title">
   <header class="head">
     <h1 id="course-title">{app.state?.course.title}</h1>
-    {#if course?.goal}<p class="intro">{course.goal}</p>{/if}
+    {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}
 
     <!-- The whole route at a glance; a segment opens its chapter. -->
     <div class="glance">
@@ -75,8 +76,17 @@
           </li>
         {/each}
       </ol>
+      <!-- Overall progress is in the top bar; here, where in the route you are and how much there is. -->
       <p class="facts">
-        <span>{t('{studied} of {total} sections studied', { studied, total: route.length })}</span>
+        {#if current}
+          <span class="now">
+            {t('{title}: {studied} of {total} sections studied', {
+              title: `${t('Chapter {number}', { number: currentNumber })} · ${current.title}`,
+              studied: currentDone,
+              total: current.concept_ids.length,
+            })}
+          </span>
+        {/if}
         {#if app.chapters.length}<span>{t('Chapters: {count}', { count: app.chapters.length })}</span>{/if}
         <span>{t('Sources: {count}', { count: sources })}</span>
       </p>
@@ -98,7 +108,6 @@
           </button>
         {/each}
       </div>
-      <button class="btn btn-small back" onclick={() => (app.courseOpen = false)}>{t('Back to reading')}</button>
     </div>
   </header>
 
@@ -153,28 +162,34 @@
 
 <style>
   .page {
-    max-width: var(--measure);
+    max-width: calc(var(--measure) + 20rem);
     margin-inline: auto;
     display: grid;
-    gap: 2.5rem;
+    gap: 1.5rem;
   }
 
   .head {
     display: grid;
-    gap: 1rem;
+    gap: 0.75rem;
   }
 
   h1 {
     font-family: var(--serif);
-    font-size: clamp(var(--step-3), 4.2vw, 2.75rem);
+    font-size: var(--step-3);
     font-weight: 600;
-    line-height: 1.1;
+    line-height: 1.15;
   }
 
+  /* A long goal stays two lines; the whole of it is in the tooltip. */
   .intro {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     font-family: var(--serif);
-    font-size: var(--step-1);
-    line-height: 1.45;
+    font-size: var(--step-0);
+    line-height: 1.5;
     color: var(--ink-soft);
   }
 
@@ -237,6 +252,11 @@
     color: var(--pencil);
   }
 
+  .facts .now {
+    color: var(--ink-soft);
+    font-weight: 600;
+  }
+
   .bar {
     display: flex;
     align-items: end;
@@ -280,10 +300,6 @@
     background: var(--marker);
   }
 
-  .back {
-    margin: 0 0 0.4rem auto;
-  }
-
   .part {
     display: grid;
     gap: 0.75rem;
@@ -299,8 +315,10 @@
     font-weight: 600;
   }
 
-  /* Memory brings its own heading from the side panel; on the page its tab already names it. */
-  #course-memory :global(.panel-bar) {
+  /* Memory and Studio bring their own headings; on the page their tabs already name them. */
+  #course-memory :global(.panel-bar),
+  #course-studio :global(.studio > .panel-head > .panel-bar),
+  #course-studio :global(.studio > .panel-head > .panel-intro) {
     display: none;
   }
 
@@ -310,15 +328,17 @@
     color: var(--pencil);
   }
 
+  /* Studio and Memory are built for the side panel: the same surface and padding here keep their raised writing box
+     and its pinned strip (.panel-foot, painted in --sheet) on one ground, aligned with what is listed above it. */
   .frame {
     display: flex;
     flex-direction: column;
     max-height: max(24rem, calc(100vh - var(--topbar) - 22rem));
     overflow-y: auto;
-    padding: 0 0.75rem;
+    padding: 1.1rem 1.1rem 0;
     border: 1px solid var(--rule);
     border-radius: var(--radius);
-    background: var(--raised);
+    background: var(--sheet);
   }
 
   /* Studio's frame keeps one height, which Studio fills with its box at the bottom, so content loading inside it (the

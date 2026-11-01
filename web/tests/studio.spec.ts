@@ -6,8 +6,9 @@ test('Studio sends a message with a skill chip and shows Codex reply', async ({ 
   const { errors } = await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
-  await expect(panel.getByRole('heading', { name: 'Studio' })).toBeVisible();
-  await expect(panel).toContainText('Create and change courses with Codex');
+  // The tab names Studio; an empty chat asks what to change, in the middle of the frame.
+  await expect(page.getByRole('tab', { name: 'Studio' })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.getByRole('heading', { name: 'What would you like to change in this course?' })).toBeVisible();
 
   const box = page.locator('#studio-input');
   await box.click();
@@ -160,7 +161,7 @@ test('a course change the teacher suggests opens in Studio with the request, and
   expect(await editorText(box)).toContain('$throughline Add a section on interference after Wave superposition');
   await expect(page.locator('#course-studio form .origin')).toContainText('Section: Wave superposition');
   // Opened, it is answered: going back to the lesson, it is gone, and a reload does not bring it back.
-  await page.getByRole('button', { name: 'Back to reading' }).click();
+  await page.locator('#open-study').click();
   await expect(page.locator('.lesson-body')).toHaveText('A wave.');
   await expect(suggestion).toHaveCount(0);
   await page.reload();
@@ -197,7 +198,7 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   // While Studio is on screen the transcript says it; elsewhere the top bar does.
   await expect(page.locator('#course-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
   await expect(status).toHaveCount(0);
-  await page.getByRole('button', { name: 'Back to reading' }).click();
+  await page.locator('#open-study').click();
   await expect(status).toHaveText('Studio working…');
   await status.click();
   await expect(page.locator('#course-studio')).toBeVisible();
@@ -208,7 +209,7 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   await box.pressSequentially('please approve this');
   await page.keyboard.press('Control+Enter');
   await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to reading' }).click();
+  await page.locator('#open-study').click();
   await expect(status).toHaveText('Studio needs you');
   await status.click();
   await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();

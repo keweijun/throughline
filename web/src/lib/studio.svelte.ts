@@ -1,5 +1,6 @@
 import { api, ApiError } from './api';
 import { t } from './i18n.svelte';
+import type { CodexModel } from './types';
 
 /**
  * Studio (ADR 0016): course work as a Codex chat. The host forwards the App Server's notifications for the threads it
@@ -55,6 +56,8 @@ export type StudioThread = { id: string; name: string; preview: string; updated_
 export type StudioSkill = { name: string; path: string; title: string; description: string };
 export type StudioFile = { name: string; path: string; absolute: string };
 export type StudioAccess = { full_access: boolean; saved: boolean; forced: boolean };
+/** Studio's own model and effort; empty follows the teacher's (ADR 0016). */
+export type StudioChoice = { model: string; effort: string };
 export type StudioEvent = { type: 'studio'; method: string; params: Record<string, any> };
 
 /** What a message sends besides its text: the spans its chips cover (code-point offsets) and what they name. */
@@ -89,6 +92,9 @@ class StudioStore {
   available = $state<boolean | null>(null);
   error = $state('');
   access = $state<StudioAccess | null>(null);
+  choice = $state<StudioChoice>({ model: '', effort: '' });
+  /** The models Codex offers, so Studio's writing box can name its model; null until Codex has answered. */
+  models = $state<CodexModel[] | null>(null);
   threads = $state<StudioThread[]>([]);
   /** The open thread, or null for a new one that starts with the next message. */
   threadId = $state<string | null>(null);
@@ -154,10 +160,13 @@ class StudioStore {
       this.#loaded = (async () => {
         this.loading = true;
         try {
-          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; threads: StudioThread[] }>(this.url('/api/studio'));
+          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; choice: StudioChoice; threads: StudioThread[] }>(
+            this.url('/api/studio'),
+          );
           this.available = view.available;
           this.error = view.error ?? '';
           this.access = view.access;
+          this.choice = view.choice;
           this.threads = view.threads;
           if (!view.available) return;
           if (!this.#chosen && this.threadId === null && this.turns.length === 0 && view.threads[0]) {
@@ -217,18 +226,40 @@ class StudioStore {
     }
   }
 
+  // Counted, so a read that started before the learner switched access cannot put the old access back.
+  #accessWrites = 0;
+
   async loadAccess() {
+    const written = this.#accessWrites;
     try {
-      this.access = await api.get<StudioAccess>('/api/studio/access');
+      const access = await api.get<StudioAccess>('/api/studio/access');
+      if (written === this.#accessWrites) this.access = access;
     } catch {
-      // Settings shows the switch without the Windows note.
+      // The menu shows the choice without the Windows note.
     }
     return this.access;
   }
 
   async setFullAccess(on: boolean) {
+    this.#accessWrites++;
     this.access = await api.put<StudioAccess>('/api/studio/access', { full_access: on });
     return this.access;
+  }
+
+  /** Studio's model and effort from the next turn on; empty strings follow the teacher's. */
+  async setChoice(choice: StudioChoice) {
+    this.choice = await api.put<StudioChoice>('/api/studio/model', choice);
+    return this.choice;
+  }
+
+  #models: Promise<CodexModel[]> | null = null;
+
+  /** Asks Codex once per visit, since each ask starts Codex; `retry` asks again after a failure. */
+  loadModels(retry = false) {
+    if (!this.#models || (retry && !this.models)) {
+      this.#models = api.get<{ models: CodexModel[] }>('/api/models').then((r) => (this.models = r.models));
+    }
+    return this.#models;
   }
 
   async open(id: string) {

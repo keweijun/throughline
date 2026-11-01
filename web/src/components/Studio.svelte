@@ -11,6 +11,7 @@
   import StudioTurn from './StudioTurn.svelte';
   import StudioRequest from './StudioRequest.svelte';
   import CodexLink from './CodexLink.svelte';
+  import StudioControls from './StudioControls.svelte';
 
   /**
    * Studio (ADR 0016): course work as a Codex chat. `$` suggests skills and `@` the course's files, both left in the
@@ -240,7 +241,6 @@
     if (near) requestAnimationFrame(() => (scroller.scrollTop = scroller.scrollHeight));
   });
 
-  const accessLabel = $derived(studio.access?.full_access ? t('Full access') : t('Library access'));
   const threadLabel = (id: string) => {
     const thread = studio.threads.find((x) => x.id === id);
     return thread?.name || thread?.preview || t('Untitled chat');
@@ -325,16 +325,7 @@
         <span class="square" aria-hidden="true"></span>{t("Stop")}
       </button>
     {/if}
-    <button
-      type="button"
-      class="access"
-      class:full={studio.access?.full_access}
-      title={studio.access?.full_access ? t("Codex can change files anywhere and runs commands without asking.") : t("Codex writes only inside your Throughline folder and asks before anything else.")}
-      onclick={() => {
-        app.settingsPane = 'teacher';
-        app.settingsOpen = true;
-      }}
-    >{accessLabel}</button>
+    <StudioControls />
     {#if studio.context !== null}
       <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
     {/if}
@@ -474,28 +465,24 @@
     background: currentColor;
   }
 
-  .access {
-    padding: 0.1rem 0.5rem;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    background: none;
-    color: var(--pencil);
-    font-size: 0.75rem;
-    cursor: pointer;
-  }
-
-  .access:hover {
-    border-color: var(--pencil);
-  }
-
-  .access.full {
-    border-color: var(--caution);
-    color: var(--caution);
-  }
-
   .context {
+    flex: none;
     font-size: 0.75rem;
     color: var(--pencil);
+    white-space: nowrap;
+  }
+
+  /* One row of tools however much Studio shows in it; its chips give way first (StudioControls). */
+  .studio :global(.composer .bar) {
+    flex-wrap: nowrap;
+  }
+
+  .studio :global(.composer .bar > *) {
+    flex-shrink: 0;
+  }
+
+  .studio :global(.composer .bar > .controls) {
+    flex-shrink: 1;
   }
 
   /* Where a hand-off came from, a chip in the box's header that the learner can take off before sending. */

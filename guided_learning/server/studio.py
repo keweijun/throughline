@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..codex import find_codex
 from ..store import OperationError
-from .settings import default_path
+from .settings import EFFORTS, default_path
 
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
 # Notifications about a thread that the interface draws; moderation, predictions and read state it ignores.
@@ -185,7 +185,7 @@ class Studio:
         self.missing = None  # why this Codex cannot run Studio, once known
         self.forced = None  # True when Windows has no ready sandbox, so Studio runs with full access
 
-    # Per-user record: Full access, and the threads of each course, newest first.
+    # Per-user record: Full access, Studio's own model and effort, and the threads of each course, newest first.
 
     def _config(self):
         try:
@@ -193,7 +193,10 @@ class Studio:
         except (OSError, ValueError):
             data = {}
         courses = data.get('courses') if isinstance(data.get('courses'), dict) else {}
-        return {'full_access': data.get('full_access') is True, 'courses': courses}
+        model, effort = data.get('model'), data.get('effort')
+        return {'full_access': data.get('full_access') is True, 'courses': courses,
+                'model': model.strip() if isinstance(model, str) else '',
+                'effort': effort if effort in EFFORTS else ''}
 
     def _save(self, data):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -318,6 +321,29 @@ class Studio:
             self._save(data)
         return self.access()
 
+    # Model (ADR 0016): Studio's own model and effort, chosen in its writing box; empty means the teacher's.
+
+    def choice(self):
+        data = self._config()
+        return {'model': data['model'], 'effort': data['effort']}
+
+    def set_choice(self, model='', effort=''):
+        model, effort = str(model or '').strip(), str(effort or '').strip()
+        if effort not in ('', *EFFORTS):
+            raise OperationError('invalid_settings', f"Reasoning effort must be one of {', '.join(EFFORTS)}")
+        with self.lock:
+            data = self._config()
+            data['model'], data['effort'] = model, effort
+            self._save(data)
+        return self.choice()
+
+    def _running(self):
+        """The model, effort and speed of the next turn. The teacher's Fast tier applies only to the teacher's model."""
+        teacher, own = self.settings.current(), self._config()
+        model = own['model'] or teacher['model']
+        tier = teacher['service_tier'] if model == teacher['model'] else ''
+        return {'model': model, 'effort': own['effort'] or teacher['effort'], 'service_tier': tier}
+
     def _cwd(self, course):
         return self.root or Path(course)
 
@@ -329,7 +355,7 @@ class Studio:
             'excludeTmpdirEnvVar': False, 'excludeSlashTmp': False}}
 
     def _thread_settings(self, course):
-        current = self.settings.current()
+        current = self._running()
         full = self.access()['full_access']
         params = {'cwd': str(self._cwd(course)), 'approvalPolicy': 'never' if full else 'on-request',
                   'sandbox': 'danger-full-access' if full else 'workspace-write',
@@ -403,7 +429,7 @@ class Studio:
                 return {'thread': thread, 'turn': running, 'steered': True}
             except StudioError:
                 pass  # the turn ended meanwhile: start the next
-        current = self.settings.current()
+        current = self._running()
         params = {'threadId': thread, 'input': items, 'effort': current['effort'], **self._policy(course)}
         if current['model']:
             params['model'] = current['model']

@@ -217,6 +217,11 @@ class StudioAccess(Body):
     full_access: bool
 
 
+class StudioChoice(Body):
+    model: str = ''
+    effort: str = ''
+
+
 class StudioRefile(Body):
     name: str
 
@@ -712,11 +717,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         course = scoped(scope)
         try:
             studio.ready()
-            return {'available': True, 'access': studio.access(), 'threads': studio.threads(course)}
+            return {'available': True, 'access': studio.access(), 'choice': studio.choice(), 'threads': studio.threads(course)}
         except OperationError as exc:
             if exc.code != 'studio_unavailable':
                 raise
-            return {'available': False, 'error': str(exc), 'access': studio.access(), 'threads': []}
+            return {'available': False, 'error': str(exc), 'access': studio.access(), 'choice': studio.choice(), 'threads': []}
 
     @app.get('/api/studio/activity')
     def studio_activity(scope: str = ''):
@@ -775,6 +780,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.put('/api/studio/access')
     def studio_access(body: StudioAccess):
         result = studio.set_full_access(body.full_access)
+        courses.events.publish({'type': 'changed', 'scope': 'settings'})
+        return result
+
+    @app.put('/api/studio/model')
+    def studio_choice(body: StudioChoice):
+        """Studio's own model and effort, from the next turn on; empty follows the teacher's."""
+        result = studio.set_choice(body.model, body.effort)
         courses.events.publish({'type': 'changed', 'scope': 'settings'})
         return result
 

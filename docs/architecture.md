@@ -95,6 +95,7 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | | `?scope=library` | On every Studio route but access and requests, and on `/api/images`: the library page's Studio, before a course is open. Its threads are filed under the library, run in the library folder, search the whole library, and keep attached files and images in the library's `.intake/` (files under a dated folder) |
 | GET | `/api/studio/access` | `{full_access, saved, forced}`; on Windows this asks Codex whether its sandbox is ready |
 | PUT | `/api/studio/access` | `{full_access}`; saved per user |
+| PUT | `/api/studio/model` | `{model, effort}`: Studio's own, from the next turn; empty follows the teacher's. `GET /api/studio` returns it as `choice` |
 | GET | `/api/studio/activity` | `{running, waiting}`: the course's threads Codex works in, and what it waits on; never starts Codex |
 | GET | `/api/studio/skills` | Enabled skills for the `$` picker |
 | GET | `/api/studio/search?q=` | The open course's files matching `q` for the `@` picker (`fuzzyFileSearch`), without the course database |

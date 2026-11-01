@@ -44,7 +44,9 @@ Left out: realtime voice, the terminal, `fs/*`, git, review mode, plugin and MCP
 
 Studio turns run in the library folder with Codex's workspace-write sandbox, the library as the writable root, and approval only on request. Codex reads anywhere, so files outside the library (the learner's own folders of PDFs) need no approval, and it writes courses and runs `guided-learning` without asking; it asks only to write outside the library or reach the network.
 
-**Full access**, a switch in Settings → Teacher, runs Studio turns with no sandbox and no approvals, as many learners run Codex itself. On Windows, where Codex's sandbox needs setting up, the host checks `windowsSandbox/readiness`: if the sandbox is not ready, Studio starts with Full access and says so in Settings, matching how Codex runs there.
+**Full access** runs Studio turns with no sandbox and no approvals, as many learners run Codex itself. On Windows, where Codex's sandbox needs setting up, the host checks `windowsSandbox/readiness`: if the sandbox is not ready, Studio starts with Full access and its access menu says so, matching how Codex runs there.
+
+**Studio's controls sit in its writing box, as in Codex.** Two chips beside the attach buttons open small menus: the model and reasoning effort, and access (Library access or Full access). Access is chosen per task (a chat that needs the learner's Downloads folder), so it belongs where the learner meets the limit; it began as a switch in Settings, behind a chip that only opened Settings. Studio runs on the teacher's model and effort until the learner picks its own, which applies from the next message and is kept per user beside its access. The teacher's model stays in Settings: it runs every lesson and grading turn and is chosen once, while Studio's heavy one-off work (building a route, turning exams into exercises) is where a learner switches model for a job. The teacher's Fast tier carries over only while Studio runs on the teacher's model.
 
 Teaching turns are unchanged: read-only, and the host saves what they return (ADR 0002, 0004).
 

@@ -5,6 +5,12 @@
   import Composer from './Composer.svelte';
   import type { MemoryEntry, MemoryRequest } from '../lib/types';
 
+  /**
+   * Self-contained, so it can sit wherever it is mounted: `active` says it is on screen, and its writing box pins to the
+   * bottom of whatever scrolls it (`.panel-foot` is sticky).
+   */
+  let { active = true }: { active?: boolean } = $props();
+
   // The tab shows the learner's preferences; taught terms and difficulties stay the teacher's working notes (ADR 0010).
   // A suggested preference is asked only where it was suggested, so it is left out here until confirmed.
   const preferences = $derived((app.state?.memory ?? []).filter((e) => e.kind === 'preference' && e.status === 'confirmed'));
@@ -39,6 +45,17 @@
     if (!(await app.askMemory(message, viewing))) return;
     if (app.drafts.get(draftKey).trim() === message) app.drafts.set(draftKey, '');
   }
+
+  // A message just sent, or its reply, comes into view while the learner is looking.
+  let seen: number | null = null;
+  $effect(() => {
+    const count = requests.length;
+    const latest = requests.at(-1);
+    if (active && latest && seen !== null && count > seen) {
+      requestAnimationFrame(() => document.getElementById(`memory-request-${latest.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    }
+    seen = count;
+  });
 
   function progress(request: MemoryRequest) {
     if (request.reply) return 'answered';

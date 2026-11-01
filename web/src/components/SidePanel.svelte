@@ -90,7 +90,7 @@
     <div class="view docked" id="panel-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
     <div class="view" id="panel-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
     <div class="view docked" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
-    <div class="view docked" id="panel-memory" hidden={app.panelTab !== 'memory'}><Memory /></div>
+    <div class="view docked" id="panel-memory" hidden={app.panelTab !== 'memory'}><Memory active={app.panelOpen && app.panelTab === 'memory'} /></div>
   </div>
 </aside>
 

@@ -33,9 +33,11 @@ class StudioTest(unittest.TestCase):
         self.addCleanup(client.__exit__, None, None, None)
         return client
 
-    def received(self, method):
+    def received(self, method, titles=False):
         lines = self.log.read_text(encoding='utf-8').splitlines() if self.log.exists() else []
-        return [json.loads(line)['params'] for line in lines if json.loads(line).get('method') == method]
+        # A new chat's title is written on a side thread of its own, left out unless asked for.
+        found = [json.loads(line)['params'] for line in lines if json.loads(line).get('method') == method]
+        return [p for p in found if titles or not (p.get('ephemeral') or p.get('outputSchema'))]
 
     def send(self, text, **body):
         response = self.client.post('/api/studio/messages', json={'text': text, **body})
@@ -143,11 +145,37 @@ class StudioTest(unittest.TestCase):
         history = self.history(thread, lambda h: not h['active_turn'])
         self.assertEqual(history['turns'][-1]['status'], 'interrupted')
 
+    def named(self, thread):
+        for _ in range(100):
+            found = next((t for t in self.client.get('/api/studio').json()['threads'] if t['id'] == thread), None)
+            if found and found['name']:
+                return found['name']
+            time.sleep(.05)
+        self.fail('The chat was never named')
+
+    def test_a_new_chat_is_titled_from_its_first_message_on_a_side_thread_never_saved(self):
+        thread = self.send('$throughline add a chapter on interference please', context='Chapter 2')['thread']
+        self.assertEqual(self.named(thread), 'Title: add a chapter')
+        side = self.received('thread/start', titles=True)[-1]
+        self.assertEqual((side['ephemeral'], side['sandbox'], side['approvalPolicy']), (True, 'read-only', 'never'))
+        turn = self.received('turn/start', titles=True)[-1]
+        self.assertEqual(turn['effort'], 'low')
+        self.assertIn('add a chapter on interference please', turn['input'][0]['text'])
+        self.assertNotIn('Chapter 2', turn['input'][0]['text'])  # the hand-off's context is not the request
+        self.assertEqual([t['id'] for t in self.client.get('/api/studio').json()['threads']], [thread])
+        # Only a chat's first message names it.
+        self.history(thread, lambda h: self.replies(h))
+        self.send('and exercises', thread_id=thread)
+        time.sleep(.3)
+        self.assertEqual(len(self.received('turn/start', titles=True)), 3)
+
     def test_threads_can_be_renamed_and_archived(self):
         thread = self.send('hello')['thread']
         self.history(thread, lambda h: self.replies(h))
+        self.named(thread)
         self.client.put(f'/api/studio/threads/{thread}', json={'name': '  Chapter 3  '})
-        self.assertEqual(self.received('thread/name/set')[0], {'threadId': thread, 'name': 'Chapter 3'})
+        self.assertEqual(self.received('thread/name/set')[-1], {'threadId': thread, 'name': 'Chapter 3'})
+        self.assertEqual(self.named(thread), 'Chapter 3')
         self.client.delete(f'/api/studio/threads/{thread}')
         self.assertEqual(self.client.get('/api/studio').json()['threads'], [])
         self.assertEqual(self.client.get(f'/api/studio/threads/{thread}').status_code, 404)

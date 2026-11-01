@@ -343,3 +343,41 @@ test("the library page has its own Studio for new courses; a course card's actio
   expect((await (await page.request.get(base + '/api/studio')).json()).threads.map((t: { id: string }) => t.id)).toEqual([thread]);
   expect(errors).toEqual([]);
 });
+
+test('a long turn can be read back while it runs, then folds behind its answer, and the chat gets a title', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  const frame = panel.locator('.studio-frame');
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('$throughline keep busy with the parts');
+  await page.keyboard.press('Control+Enter');
+
+  // While output streams, the transcript follows it; scrolling up stays up, and the page behind the frame stays put.
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await expect.poll(() => frame.evaluate((f) => f.scrollHeight - f.clientHeight)).toBeGreaterThan(300);
+  const fromEnd = () => frame.evaluate((f) => f.scrollHeight - f.scrollTop - f.clientHeight);
+  await expect.poll(fromEnd).toBeLessThan(8);
+  const stage = await page.locator('#stage').evaluate((s) => s.scrollTop);
+  await frame.hover();
+  await page.mouse.wheel(0, -150);
+  await page.waitForTimeout(600);
+  expect(await fromEnd()).toBeGreaterThan(140);
+  expect(await page.locator('#stage').evaluate((s) => s.scrollTop)).toBe(stage);
+
+  // The answer arrives and the work before it folds behind how long it took, as in Codex.
+  await expect(panel.locator('.said-by-codex:not(.commentary)')).toHaveText('All parts are built.', { timeout: 20_000 });
+  const fold = panel.getByRole('button', { name: /^Worked for \d+s$/ });
+  await expect(fold).toHaveAttribute('aria-expanded', 'false');
+  await expect(panel.locator('.commentary')).toHaveCount(0);
+  await fold.click();
+  // Consecutive tool calls are one row, named for what they did; commentary sits between them.
+  await expect(panel.locator('details.group')).toHaveCount(16);
+  await expect(panel.locator('details.group > summary').first()).toContainText('Explored files, ran a command');
+  await expect(panel.locator('.commentary')).toHaveCount(16);
+
+  // The chat is named from its first message by a side turn, in place of the message itself.
+  await expect(panel.getByRole('combobox', { name: 'Studio chats' })).toContainText('Title: keep busy with');
+  expect(errors).toEqual([]);
+});

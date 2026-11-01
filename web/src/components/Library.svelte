@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { api } from '../lib/api';
   import { t, locale } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -70,24 +70,44 @@
     return new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(course.updated * 1000));
   }
 
-  // Studio is the way to make and change courses here (#109); where Codex cannot run it, the buttons open a Codex chat.
+  // Studio is the way to make courses here (#109); where Codex cannot run it, the buttons open a Codex chat.
   const studioHere = $derived(!!library?.root && studio.available !== false);
-  let studioPart = $state<HTMLElement>();
+  // Whether Codex can run Studio decides New course and the cards' actions, so ask once the library is known, as
+  // Studio would on opening; this starts the App Server but asks no model anything.
+  $effect(() => {
+    if (!library?.root || studio.available !== null) return;
+    untrack(() => {
+      studio.setScope('library');
+      void studio.load();
+    });
+  });
 
-  /** A request in the library's Studio: a new chat with it typed in and the caret after it, as a hand-off does. */
+  // The page is the course list, or New course: the library's Studio across the page. With no course yet, New course
+  // is the page.
+  const making = $derived(studioHere && (app.libraryView === 'new' || (!!library && !library.courses.length)));
+
+  /** New course: the library's Studio, a new chat with the request typed in (if any) and the caret after it. */
   function ask(prompt = '') {
+    app.libraryView = 'new';
     studio.newThread();
-    if (prompt) app.drafts.set('studio:library:new', prompt);
+    // A new course starts clean, or with the request it was asked for.
+    app.drafts.set('studio:library:new', prompt);
     studio.focusRequest++;
-    studioPart?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+
+  // A new course still being made, so leaving the chat never loses it: asked without starting Codex.
+  let unfinished = $state<{ running: string[]; waiting: unknown[] } | null>(null);
+  $effect(() => {
+    if (!studioHere || making) return;
+    api.get<{ running: string[]; waiting: unknown[] }>('/api/studio/activity?scope=library').then((a) => (unfinished = a), () => {});
+  });
 
   /** Opens the course at its own Studio with the request filled in; one already open is handed it at once. */
   function courseStudio(name: string, prompt: string) {
     if (app.askCourseStudio(name, prompt)) {
       const handed = app.takeStudioHandoff();
       if (handed) {
-        app.drafts.set('studio:new', studio.handoff(handed));
+        app.drafts.set('studio:new', studio.handoff(handed.prompt));
         app.showStudio({ focus: true });
       }
     } else opening = name;
@@ -100,22 +120,31 @@
   }
 </script>
 
-<section class="library" aria-labelledby="library-title">
+<section class="library" class:making aria-labelledby="library-title">
   <header>
-    <div>
-      <h1 id="library-title">{t('All courses')}</h1>
-      {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
-    </div>
-    <div class="header-actions">
-      {#if studioHere}
-        <button class="btn btn-primary btn-small" onclick={() => ask()}>{t('New course')}</button>
-      {:else}
-        <CodexLink class="btn btn-primary btn-small" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
-      {/if}
-      {#if app.state}
-        <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
-      {/if}
-    </div>
+    {#if making}
+      <div>
+        {#if library?.courses.length}
+          <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.libraryView = 'list')}>← {t('All courses')}</button>
+        {/if}
+        <h1 id="library-title">{t('New course')}</h1>
+      </div>
+    {:else}
+      <div>
+        <h1 id="library-title">{t('All courses')}</h1>
+        {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
+      </div>
+      <div class="header-actions">
+        {#if app.state}
+          <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
+        {/if}
+        {#if studioHere}
+          <button class="btn btn-primary btn-small" onclick={() => ask()}>{t('New course')}</button>
+        {:else}
+          <CodexLink class="btn btn-primary btn-small" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
+        {/if}
+      </div>
+    {/if}
   </header>
 
   {#if failing.length}
@@ -140,22 +169,16 @@
     {/if}
   </dialog>
 
-  <!-- With courses, they come first on a wide screen and Studio stands beside them; otherwise Studio leads. -->
-  <div class="main" class:both={studioHere && !!library?.courses.length}>
-  {#if studioHere}
-    <!-- Studio in the library: where a course begins, and course work on any course by name (ADR 0016, #109). -->
-    <section class="studio-part" class:alone={!library?.courses.length} aria-labelledby="library-studio-title" bind:this={studioPart}>
-      <h2 id="library-studio-title" class="part-title">{t('Studio')} <span>{t('Create and change courses with Codex')}</span></h2>
+  {#if making}
+    <!-- New course: the library's Studio across the page (ADR 0016, #109). When the course it makes is ready, the chat
+         moves into that course's own Studio by itself. -->
+    <section class="studio-part" aria-label={t('Studio')}>
       <div class="frame" data-scroller>
         <Studio scope="library" />
       </div>
     </section>
-  {/if}
-
-  {#if !library}
+  {:else if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
-  {:else if !library.courses.length && studioHere}
-    <!-- With no course yet, Studio above is the way in. -->
   {:else if !library.courses.length}
     <div class="empty">
       <h2>{t('Create your first course')}</h2>
@@ -168,6 +191,18 @@
     </div>
   {:else}
     <ul class="courses">
+      {#if unfinished && (unfinished.running.length || unfinished.waiting.length)}
+        <!-- A new course still being made, so leaving its chat never loses it. -->
+        <li class="unfinished">
+          <div class="summary">
+            <h2>{t('New course')}</h2>
+            <p class="current">{unfinished.waiting.length ? t('Codex is waiting for your answer.') : t('Codex is making it.')}</p>
+          </div>
+          <div class="state">
+            <button class="btn btn-primary btn-small" onclick={() => (app.libraryView = 'new')}>{t('Open the chat')}</button>
+          </div>
+        </li>
+      {/if}
       {#each library.courses as course (course.path)}
         {@const active = course.path === library.active}
         <li class:active>
@@ -227,7 +262,6 @@
       {/each}
     </ul>
   {/if}
-  </div>
 
   <!-- Without a library folder, or with Studio running, there are no Codex buttons for this to explain. -->
   {#if library?.root && !studioHere}
@@ -240,60 +274,11 @@
 </section>
 
 <style>
-  /* Studio here sits on the side panel's surface and padding, as on a course's Overview, so its writing box lines up. */
-  .main {
-    display: grid;
-    gap: 1.75rem;
-    align-items: start;
-  }
-
-  /* A label for the part, in the interface's face; the serif is for the courses' own names. */
-  .part-title {
-    margin-bottom: 0.6rem;
-    font-family: var(--sans);
-    font-size: var(--step-0);
-    font-weight: 600;
-  }
-
-  .part-title span {
-    margin-left: 0.5rem;
-    font-weight: 400;
-    color: var(--pencil);
-  }
-
-  /* Studio's own heading would repeat the section's title. */
-  .studio-part :global(.studio > .panel-head > .panel-bar),
-  .studio-part :global(.studio > .panel-head > .panel-intro) {
-    display: none;
-  }
-
-  /* On a wide screen the courses take the main column and Studio stays in view beside them as the list scrolls. */
-  @media (min-width: 76rem) {
-    .library:has(.main.both) {
-      max-width: 82rem;
-    }
-
-    .main.both {
-      grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
-    }
-
-    .main.both .studio-part {
-      position: sticky;
-      top: 1.5rem;
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    /* Short enough that the box shows below the launcher card at a laptop's height, and once the list scrolls. */
-    .main.both .studio-part .frame {
-      height: min(32rem, calc(100vh - var(--topbar) - 4rem));
-    }
-  }
-
+  /* New course: Studio across the page, on the side panel's surface and padding as on a course's Overview. */
   .studio-part .frame {
     display: flex;
     flex-direction: column;
-    height: 24rem;
+    height: max(26rem, calc(100vh - var(--topbar) - 13rem));
     overflow-y: auto;
     padding: 1.1rem 1.1rem 0;
     border: 1px solid var(--rule);
@@ -301,9 +286,33 @@
     background: var(--sheet);
   }
 
-  /* With no course yet, Studio is the page. */
-  .studio-part.alone .frame {
-    height: max(26rem, calc(100vh - var(--topbar) - 16rem));
+  /* The page's title already names it. */
+  .studio-part :global(.studio > .panel-head > .panel-bar),
+  .studio-part :global(.studio > .panel-head > .panel-intro) {
+    display: none;
+  }
+
+  .back {
+    margin-bottom: 0.4rem;
+  }
+
+  /* A new course still being made reads as a course to come, not a finished one. */
+  .courses > li.unfinished {
+    border-style: dashed;
+    border-color: var(--accent);
+    background: var(--accent-wash);
+  }
+
+  /* On a wide screen the courses sit two by two, so a library of several fits one screen. */
+  @media (min-width: 64rem) {
+    .library:not(.making) {
+      max-width: 72rem;
+    }
+
+    .courses {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+    }
   }
 
   .codex-actions .link {

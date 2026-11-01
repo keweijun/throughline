@@ -192,12 +192,20 @@
       : [],
   );
 
-  // Opening the course files this chat under it, so the course's Overview lists it from then on.
+  // Opening the course files this chat under it and opens the course at its Studio, where the same chat carries on.
+  let moving = false;
   async function openMade(name: string) {
+    if (moving) return;
+    moving = true;
     const thread = studio.threadId;
     if (thread) await app.act(() => api.post(`/api/studio/threads/${encodeURIComponent(thread)}/course`, { name }));
-    await app.openCourse(name);
+    app.askCourseStudio(name, '', thread);
   }
+
+  // Once Codex has finished and the course it made has a route, the chat moves into that course by itself.
+  $effect(() => {
+    if (library && active && made.length === 1) void openMade(made[0].name);
+  });
 
   function recall() {
     const sent = studio.sent;

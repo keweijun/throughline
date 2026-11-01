@@ -3,6 +3,12 @@ export const locale = $state<{ language: Language }>({ language: 'en' });
 
 // Only interface strings belong here. Imported and generated content stays unchanged.
 const messages = {
+  "Codex is waiting for your answer.": "Codex 在等你回答。",
+  "Codex is making it.": "Codex 正在建课。",
+  "Open the chat": "打开对话",
+  "How you're taught": "你的学习方式",
+  "The teacher follows these in every lesson. To add or change one, tell Studio, or confirm one the teacher suggests during a lesson.": "老师在每节课都会遵循这些。要添加或修改，请告诉课程工坊，或在课上确认老师建议的偏好。",
+  "Nothing yet.": "暂时还没有。",
   "Make a course from these files": "用这些文件建一门课",
   "Make a course from these files. I want to learn": "用这些文件建一门课。我想学",
   "Make a course from a folder": "用一个文件夹建课",

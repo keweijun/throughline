@@ -49,8 +49,16 @@
 
   <div class="title">
     <svg class="mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7.5" fill="#24366e" /><path d="M6.5 9.2c3.4-1.5 6.6-1.5 9 0v15.6c-2.4-1.5-5.6-1.5-9 0z" fill="#fbfcfd" opacity=".78" /><path d="M16.5 9.2c2.4-1.5 5.6-1.5 9 0v15.6c-3.4-1.5-6.6-1.5-9 0z" fill="#fbfcfd" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#24366e" stroke-width="4.6" stroke-linecap="round" /><path d="M3.8 20.6c4.6 0 6.3-6.9 12.2-6.9s7.6 6.9 12.2 6.9" fill="none" stroke="#f0d25c" stroke-width="2.5" stroke-linecap="round" /></svg>
+    {#if !studying}<span class="course">{t("Throughline")}</span>{/if}
+    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
+    <button id="open-courses" class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Courses")}</span>
+    </button>
     {#if studying}
-      <!-- The course title opens the Course page: the course as a whole, with Studio and the teacher's memory (ADR 0017). -->
+      <!-- Left to right the bar goes from the app to the course to the section being read (ADR 0017). The course button
+           opens the Course page, so it looks like a button rather than a title. -->
+      <span class="divider" aria-hidden="true"></span>
       <button
         id="open-course"
         class="course course-button"
@@ -58,10 +66,9 @@
         title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
         onclick={() => (app.courseOpen ? (app.courseOpen = false) : app.showCourse())}
       >
-        {app.state!.course.title}{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+        <svg class="page-icon" viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="3" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="3" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /><rect x="11" y="11" width="6" height="6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+        <span class="name">{app.state!.course.title}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
       </button>
-    {:else}
-      <span class="course">{t("Throughline")}</span>
     {/if}
   </div>
 
@@ -71,30 +78,25 @@
       <span class="track" aria-hidden="true"><span style:width="{(studied / route.length) * 100}%"></span></span>
     </div>
   {/if}
+  {#if studying && review}
+    <button
+      id="open-review"
+      class="btn btn-quiet review"
+      aria-pressed={app.reviewOpen}
+      aria-label={t("Review")}
+      title={t("Answer questions from memory on what you have studied")}
+      onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
+    >
+      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <span class="wide-only">{t("Review")}</span>
+    </button>
+  {/if}
 
   <div class="actions">
     {#if app.connection !== 'live'}
       <span class="chip chip-caution" role="status">
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
-    {/if}
-    <!-- Before a course is open the library is the only page, so Courses just shows it is where you are. -->
-    <button id="open-courses" class="btn btn-quiet" aria-pressed={app.libraryOpen} aria-label={t("Courses")} onclick={() => (app.libraryOpen ? app.state && (app.libraryOpen = false) : app.showLibrary())}>
-      <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 3.5h3v13H4zM8.5 3.5h3v13h-3zM13 4.2l2.8-.8 2.2 12.6-2.8.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-      <span class="wide-only">{t("Courses")}</span>
-    </button>
-    {#if studying && review}
-      <button
-        id="open-review"
-        class="btn btn-quiet review"
-        aria-pressed={app.reviewOpen}
-        aria-label={t("Review")}
-        title={t("Answer questions from memory on what you have studied")}
-        onclick={() => (app.reviewOpen ? (app.reviewOpen = false) : app.showReview())}
-      >
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3.4h-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Review")}</span>
-      </button>
     {/if}
     {#if studying}
       <div class="switcher" class:open={app.panelOpen} role="group" aria-label={t("Questions and sources")}>
@@ -189,13 +191,12 @@
   .course-button {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     min-width: 0;
-    margin: 0 -0.45rem;
-    padding: 0.2rem 0.45rem;
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: var(--raised);
     color: inherit;
     font: inherit;
     font-size: var(--step-0);
@@ -206,6 +207,24 @@
   .course-button:hover,
   .course-button[aria-pressed='true'] {
     background: var(--accent-wash);
+  }
+
+  .course-button .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .page-icon {
+    flex: none;
+    color: var(--pencil);
+  }
+
+  .divider {
+    flex: none;
+    width: 1px;
+    height: 1.4rem;
+    background: var(--rule);
   }
 
   .dot {

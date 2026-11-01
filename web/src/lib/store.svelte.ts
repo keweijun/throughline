@@ -7,7 +7,7 @@ import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
-/** A part of the Course page to scroll to when it opens. */
+/** A tab of the Course page. */
 export type CoursePart = 'studio' | 'memory' | 'sources' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
@@ -119,6 +119,8 @@ class AppStore {
   reviewOpen = $state(false);
   /** The Course page replaces the reading column: the course as a whole (ADR 0017). */
   courseOpen = $state(false);
+  /** The Course page's tab; it stays as the learner left it until something asks for another. */
+  coursePart = $state<CoursePart>('studio');
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -730,14 +732,14 @@ class AppStore {
 
   /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
   get studioShown() {
-    return this.courseOpen && !this.libraryOpen;
+    return this.courseOpen && !this.libraryOpen && this.coursePart === 'studio';
   }
 
   /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
    * the box focused when `focus`. */
   showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
-    // Studio is course-level, the first part of the Course page (ADR 0017).
-    if (!this.courseOpen || this.libraryOpen) this.showCourse('studio');
+    // Studio is course-level, the first tab of the Course page (ADR 0017).
+    if (!this.studioShown) this.showCourse('studio');
     if (thread && studio.threadId !== thread) void studio.open(thread);
     if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
   }
@@ -835,14 +837,14 @@ class AppStore {
     scrollStage(0);
   }
 
-  /** Opens the Course page, scrolled to one of its parts when asked. */
+  /** Opens the Course page, at one of its tabs when asked, else at the one the learner last had open. */
   showCourse(part?: CoursePart) {
+    if (part) this.coursePart = part;
     this.courseOpen = true;
     this.reviewOpen = false;
     this.libraryOpen = false;
     this.routeOpen = false;
-    if (part) requestAnimationFrame(() => document.getElementById(`course-${part}`)?.scrollIntoView({ block: 'start' }));
-    else scrollStage(0);
+    scrollStage(0);
   }
 
   /** Ask for a review set (ADR 0014): nothing for Review for me, or a request and scope, or the section a warm-up comes before. */

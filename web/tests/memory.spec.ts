@@ -21,6 +21,7 @@ test('the teacher suggests a preference, and the learner confirms, edits and del
 
   // Memory is on the Course page, opened from the course title (ADR 0017).
   await page.locator('#open-course').click();
+  await page.getByRole('tab', { name: 'Course memory' }).click();
   const memory = page.locator('.memory-panel');
   await expect(memory.locator('#memory-preference')).toContainText('One step at a time');
   await expect(memory.locator('#memory-taught_term')).toContainText('plane wave');

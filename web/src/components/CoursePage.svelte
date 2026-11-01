@@ -15,6 +15,7 @@
   const studied = $derived(route.filter((id) => app.studied(id)).length);
   const sources = $derived(app.state?.sources.length ?? 0);
   const notes = $derived(app.state?.annotations.length ?? 0);
+  const suggested = $derived((app.state?.memory ?? []).some((e) => e.status === 'suggested'));
   const current = $derived(app.chapterOf(app.currentId));
 
   // One segment per chapter, as wide as its sections, filled as they are studied. A course without chapters is one.
@@ -39,8 +40,15 @@
     exporting = false;
   }
 
-  function jump(part: CoursePart) {
-    document.getElementById(`course-${part}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // One tab at a time at full height, so Studio and Memory, each with a writing box, never share the screen.
+  function onTabKey(event: KeyboardEvent) {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const at = parts.findIndex((p) => p.id === app.coursePart);
+    const next = parts[(at + step + parts.length) % parts.length];
+    app.coursePart = next.id;
+    document.getElementById(`course-tab-${next.id}`)?.focus();
   }
 </script>
 
@@ -74,17 +82,29 @@
       </p>
     </div>
 
-    <nav class="parts" aria-label={t('On this page')}>
-      {#each parts as part (part.id)}
-        <button class="btn btn-quiet btn-small" onclick={() => jump(part.id)}>{part.label()}</button>
-      {/each}
+    <div class="bar">
+      <div class="tabs" role="tablist" aria-label={t('This course')} tabindex="-1" onkeydown={onTabKey}>
+        {#each parts as part (part.id)}
+          <button
+            id="course-tab-{part.id}"
+            class="tab"
+            role="tab"
+            aria-selected={app.coursePart === part.id}
+            aria-controls="course-{part.id}"
+            tabindex={app.coursePart === part.id ? 0 : -1}
+            onclick={() => (app.coursePart = part.id)}
+          >
+            {part.label()}{#if part.id === 'memory' && suggested}<span class="dot" aria-hidden="true"></span>{/if}
+          </button>
+        {/each}
+      </div>
       <button class="btn btn-small back" onclick={() => (app.courseOpen = false)}>{t('Back to reading')}</button>
-    </nav>
+    </div>
   </header>
 
-  <!-- Studio is course-level (ADR 0017): the first part of the page. Where Codex cannot run it, the hand-offs open a
-       Codex chat instead (ADR 0016). -->
-  <section class="part" id="course-studio" aria-label={t('Change this course')}>
+  <!-- Studio is course-level (ADR 0017): the first tab. Where Codex cannot run it, the hand-offs open a Codex chat
+       instead (ADR 0016). Hidden tabs stay mounted, so each keeps its place. -->
+  <div class="part" id="course-studio" role="tabpanel" aria-labelledby="course-tab-studio" hidden={app.coursePart !== 'studio'}>
     {#if studio.available === false}
       <h2>{t('Change this course')}</h2>
       <p class="lead">{t('Add files, rebuild the route, check pages or change how the course is taught. Each request opens a Codex chat with it typed in; this page updates when Codex is done.')}</p>
@@ -100,25 +120,23 @@
         </div>
       {/if}
     {:else}
-      <!-- Studio scrolls inside its own frame, so its writing box stays in view and the parts below stay reachable. -->
-      <div class="studio-frame">
+      <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
+      <div class="frame">
         <Studio active={app.courseOpen} />
       </div>
     {/if}
-  </section>
+  </div>
 
-  <section class="part" id="course-memory" aria-label={t('Course memory')}>
+  <div class="part" id="course-memory" role="tabpanel" aria-labelledby="course-tab-memory" hidden={app.coursePart !== 'memory'}>
     <Memory />
-  </section>
+  </div>
 
-  <section class="part" id="course-sources" aria-labelledby="course-sources-title">
-    <h2 id="course-sources-title">{t('Sources')}</h2>
+  <div class="part" id="course-sources" role="tabpanel" aria-labelledby="course-tab-sources" hidden={app.coursePart !== 'sources'}>
     <p class="lead">{t('Every document in the course; choose one to open it in the reader.')}</p>
     <SourceList page />
-  </section>
+  </div>
 
-  <section class="part" id="course-notes" aria-labelledby="course-notes-title">
-    <h2 id="course-notes-title">{t('Your notes')}</h2>
+  <div class="part" id="course-notes" role="tabpanel" aria-labelledby="course-tab-notes" hidden={app.coursePart !== 'notes'}>
     <p class="lead">
       {notes === 1 ? t('1 highlight, note or bookmark') : t('{count} highlights, notes and bookmarks', { count: notes })}.
       {t('Export them as one Markdown file, by chapter and section; notes with images come as a ZIP with an images folder.')}
@@ -127,7 +145,7 @@
       <button class="btn btn-small" onclick={() => app.openPanel('notes')}>{t('Open notes')}</button>
       <button class="btn btn-small" disabled={!notes || exporting} onclick={exportAll}>{exporting ? t('Exporting…') : t('Export notes')}</button>
     </div>
-  </section>
+  </div>
 </article>
 
 <style>
@@ -216,21 +234,60 @@
     color: var(--pencil);
   }
 
-  .parts {
+  .bar {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    align-items: end;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .tabs {
+    display: flex;
     gap: 0.25rem;
   }
 
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: -1px;
+    padding: 0.5rem 0.8rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--ink-soft);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tab:hover {
+    color: var(--ink);
+  }
+
+  .tab[aria-selected='true'] {
+    border-bottom-color: var(--accent);
+    color: var(--ink);
+  }
+
+  .dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--marker);
+  }
+
   .back {
-    margin-left: auto;
+    margin: 0 0 0.4rem auto;
   }
 
   .part {
     display: grid;
     gap: 0.75rem;
-    scroll-margin-top: 1.5rem;
+  }
+
+  .part[hidden] {
+    display: none;
   }
 
   h2 {
@@ -239,10 +296,9 @@
     font-weight: 600;
   }
 
-  /* Memory brings its own heading from the side panel; on the page it reads like the other parts' headings. */
-  #course-memory :global(#memory-title) {
-    font-family: var(--serif);
-    font-size: var(--step-1);
+  /* Memory brings its own heading from the side panel; on the page its tab already names it. */
+  #course-memory :global(.panel-bar) {
+    display: none;
   }
 
   /* The same quiet intro the memory view brings with it, so the parts read alike. */
@@ -251,8 +307,10 @@
     color: var(--pencil);
   }
 
-  .studio-frame {
-    max-height: min(72vh, 46rem);
+  .frame {
+    display: flex;
+    flex-direction: column;
+    max-height: max(24rem, calc(100vh - var(--topbar) - 22rem));
     overflow-y: auto;
     padding: 0 0.75rem;
     border: 1px solid var(--rule);

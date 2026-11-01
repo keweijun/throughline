@@ -47,6 +47,22 @@ LIBRARY_INSTRUCTIONS = PARAGRAPH.join([
     'Keep replies brief and lead with what the learner has to decide.',
 ])
 LINE = chr(10)
+# A new chat's title, written as Codex's own app writes one: from the first message, by a short side turn.
+TITLE_LENGTH = 36
+TITLE_PROMPT = LINE.join([
+    'You are a helpful assistant. You will be presented with a user prompt, and your job is to provide a short title '
+    'for the task it starts. The task is course work in Throughline, an app for learning from your own materials.',
+    f'Generate a concise UI title (up to {TITLE_LENGTH} characters) that names the task: an imperative verb first, '
+    'under 5 words where possible, and the course or subject when the prompt names one. If the prompt is already a '
+    'short clear title, reuse it verbatim. Leave out skill names such as $throughline. Write the title in the language '
+    'of the user prompt.',
+    '',
+    'User prompt:',
+    '{prompt}',
+])
+TITLE_SCHEMA = {'type': 'object', 'properties': {'title': {'type': 'string', 'minLength': 1, 'maxLength': 60}},
+                'required': ['title'], 'additionalProperties': False}
+TITLE_TIMEOUT = 30
 
 
 def config_path():
@@ -182,6 +198,8 @@ class Studio:
         self.active = {}  # thread -> its running turn
         self.ended = {}  # thread -> its last finished turn, which a slow turn/start reply must not mark running again
         self.pending = {}  # request id -> what Codex asked, until the learner answers
+        self.titling = {}  # side thread writing a chat's title -> where its events go
+        self.named = set()  # chats the learner named, which a title written later must not overwrite
         self.missing = None  # why this Codex cannot run Studio, once known
         self.forced = None  # True when Windows has no ready sandbox, so Studio runs with full access
 
@@ -280,6 +298,9 @@ class Studio:
                 self.events.publish({'type': 'studio', 'method': 'studio/resolved', 'params': {'id': resolved[1]['id']}})
             return
         thread = params.get('threadId') or (params.get('thread') or {}).get('id')
+        if thread in self.titling:
+            self.titling[thread].put((method, params))
+            return
         if method == 'turn/started':
             self.active[thread] = params['turn']['id']
         elif method == 'turn/completed':
@@ -418,8 +439,10 @@ class Studio:
         return thread
 
     def send(self, course, thread, items):
-        """Start a turn with the learner's message, or steer the running one with it, as Codex does."""
-        if thread is None:
+        """Start a turn with the learner's message, or steer the running one with it, as Codex does. A new chat's
+        first message also has its title written beside the turn."""
+        fresh = thread is None
+        if fresh:
             thread = self.start(course)
         server = self._load(course, thread)
         running = self.active.get(thread)
@@ -437,7 +460,50 @@ class Studio:
         if self.ended.get(thread) != turn:
             self.active[thread] = turn
         self._record(course, thread)
+        text = next((i['text'] for i in items if i['type'] == 'text' and not i['text'].startswith(CONTEXT)), '')
+        if fresh and text.strip():
+            threading.Thread(target=self._title, args=(course, thread, text), name='studio-title', daemon=True).start()
         return {'thread': thread, 'turn': turn, 'steered': False}
+
+    def _title(self, course, thread, text):
+        """Name a new chat from its first message, as Codex's app does: a short read-only turn on a side thread that
+        is never saved, on the small model at low effort, whose answer becomes the thread's name unless the learner
+        named it first. Without a title the interface goes on showing the start of the first message."""
+        events = queue.Queue()
+        side = None
+        try:
+            server = self._server()
+            settings = self.settings.current()
+            model = settings['small_model'] or self._running()['model']
+            started = server.call('thread/start', {
+                'cwd': str(self._cwd(course)), 'approvalPolicy': 'never', 'sandbox': 'read-only', 'ephemeral': True,
+                'serviceName': CLIENT, 'config': {'model_reasoning_effort': 'low', 'web_search': 'disabled'},
+                **({'model': model} if model else {})})
+            side = started['thread']['id']
+            self.titling[side] = events
+            server.call('turn/start', {'threadId': side, 'effort': 'low', 'outputSchema': TITLE_SCHEMA,
+                                       'input': [{'type': 'text', 'text': TITLE_PROMPT.format(prompt=text[:2000]),
+                                                  'text_elements': []}]})
+            answer = ''
+            while True:
+                method, params = events.get(timeout=TITLE_TIMEOUT)
+                if method == 'item/completed' and params['item'].get('type') == 'agentMessage':
+                    answer = params['item'].get('text') or answer
+                elif method == 'turn/completed':
+                    break
+            title = ' '.join(str(json.loads(answer).get('title') or '').split())[:60]
+            if title and thread not in self.named:
+                server.call('thread/name/set', {'threadId': thread, 'name': title})
+                self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
+        except (StudioError, queue.Empty, ValueError, KeyError, TypeError, AttributeError):
+            pass  # the chat keeps the start of its first message as its label
+        finally:
+            if side:
+                self.titling.pop(side, None)
+                try:
+                    self.server and self.server.call('thread/unsubscribe', {'threadId': side}, timeout=5)
+                except StudioError:
+                    pass
 
     def interrupt(self, course, thread):
         server = self._load(course, thread)
@@ -461,6 +527,7 @@ class Studio:
         return {'thread': thread, 'course': str(course)}
 
     def rename(self, course, thread, name):
+        self.named.add(thread)
         self._load(course, thread).call('thread/name/set', {'threadId': thread, 'name': name.strip()[:120]})
         self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
         return {'thread': thread}

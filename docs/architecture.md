@@ -126,7 +126,9 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | POST | `/api/memory/{id}/confirm` | Confirm a suggested preference so it enters prompts |
 | PUT | `/api/course-changes/{id}` | Answer a course change the teacher suggested (ADR 0016): `status` is `opened` (the learner opened it in Studio) or `dismissed`; `/api/state` lists the open one under `changes` |
 | GET | `/api/about` | The installed version, for Settings' About tab |
-| GET | `/api/update` | The installed version, the version on GitHub `main` and whether it is newer; 502 when GitHub cannot be reached. The interface asks once at launch; a version found in the last six hours is reused unless `fresh=1` (the About pane's Check for updates). Installing it is handed to Codex |
+| GET | `/api/update` | The installed version, the version on GitHub `main` and whether it is newer; 502 when GitHub cannot be reached. The interface asks once at launch; a version found in the last six hours is reused unless `fresh=1` (the About pane's Check for updates) |
+| GET | `/api/update/install` | The update a background Codex is installing (`running`) or could not install (`failed`, with Codex's message), or null; a host running the new version clears it |
+| POST | `/api/update/install` | Starts `codex exec`, detached, to install the latest version and start the host again on this port with the open course (ADR 0016); `language` is the language of its result message. 409 while Studio has a running turn, when already updating, when nothing is newer or Codex is missing |
 | GET | `/api/health` | Process id and launch id; the cheap liveness probe `guided-learning open` and `stop` use |
 
 The browser cannot call domain operations directly; there is no generic operation passthrough. Domain errors return `{error, code}`: 404 for codes starting `unknown_`, 409 for the rest, 400 for invalid request bodies; anything unexpected is logged and returns 500 with code `internal_error`. Besides the Host/Origin guard, any `/api/` request whose `Sec-Fetch-Site` is present and not `same-origin` or `none` is refused.

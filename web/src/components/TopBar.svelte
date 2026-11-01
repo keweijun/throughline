@@ -388,14 +388,17 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.2rem 0.9rem;
+    min-height: 2rem;
+    padding: 0.25rem 0.9rem;
     border: 0;
     border-radius: 999px;
     background: transparent;
-    color: var(--pencil);
+    /* The same text as the side panel's switcher on the right, so the bar's two switches read alike. */
+    color: var(--accent);
     font: inherit;
-    font-size: var(--step--1);
+    font-size: var(--step-0);
     font-weight: 500;
+    line-height: 1.2;
     cursor: pointer;
     transition:
       color var(--quick) ease,
@@ -403,13 +406,13 @@
   }
 
   .place:hover {
-    color: var(--ink);
+    background: var(--accent-wash);
   }
 
   .place[aria-current='page'] {
     /* In the dark, the raised sheet is darker than the track, so the lift is a lighter fill there. */
     background: light-dark(var(--raised), var(--rule-strong));
-    color: var(--ink);
+    font-weight: 600;
     box-shadow: 0 1px 2px var(--shadow-near), 0 0 0 1px color-mix(in srgb, var(--rule) 60%, transparent);
   }
 

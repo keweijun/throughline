@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from guided_learning.api import execute
+from guided_learning.launcher import Launcher
 from guided_learning.server import serve
 from guided_learning.server.settings import TeacherSettings
 
@@ -34,6 +35,8 @@ class Runner:
 try:
     serve(course, port=0, runner=Runner(), settings=TeacherSettings(Path(scratch.name) / 'config' / 'settings.json'),
           library_root=library, studio_command=None if os.environ.get('STUDIO_REAL') else fake,
-          on_ready=lambda port: print(port, flush=True))
+          on_ready=lambda port: print(port, flush=True),
+          # Not this computer's launcher, so its once-only dialog never covers the library in these tests.
+          launcher=Launcher(Path(scratch.name) / 'no-launcher' / 'throughline.desktop', platform='linux'))
 finally:
     scratch.cleanup()

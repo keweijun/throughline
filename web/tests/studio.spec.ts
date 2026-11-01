@@ -228,21 +228,26 @@ test('opening Studio on the course page leaves the page at its top and names the
   await expect(page.locator('#course-studio .target').first()).toContainText('New chat · Waves');
 });
 
-test('the library page has its own Studio: new courses begin there, and course actions ask it', async ({ page, course }) => {
+test("the library page has its own Studio for new courses; a course card's actions go to that course's Studio", async ({ page, course }) => {
   const { base, errors } = await course('studio_browser_fixture');
   await page.locator('#open-courses').click();
+  // On All courses the breadcrumb is just that: the open course is offered by the library itself.
+  await expect(page.locator('#course-switcher')).toHaveCount(0);
   const library = page.locator('.studio-part');
   await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
 
-  // A course card's action asks Studio here, naming the course.
+  // A course card's action is work on that course: it opens the course's own Studio, on its Overview, filled in.
   await page.getByRole('button', { name: 'Add files', exact: true }).click();
   const box = page.locator('#studio-input');
+  await expect(page.locator('#course-studio')).toBeVisible();
   await expect(box).toBeFocused();
   await expect(box).toContainText('$throughline add these files to the course waves:');
+  await expect(page.locator('#course-switcher')).toBeVisible();
 
-  // New course starts a fresh chat; what is sent there is the library's, not the open course's.
+  // New course starts a fresh chat in the library; what is sent there is the library's, not the open course's.
+  await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(box).toBeFocused();
   await box.pressSequentially('hello');

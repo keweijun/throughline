@@ -132,6 +132,21 @@ test('a slow history read from opening Studio never overwrites a message sent me
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
+test('an empty chat suggests a range of course work that fills the box without sending', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  await expect(panel).toContainText('This is Codex itself, working on this course.');
+  // Adding files always shows; three more are drawn from the rest.
+  const suggestions = panel.locator('.examples button');
+  await expect(suggestions).toHaveCount(4);
+  await expect(suggestions.first()).toHaveText('Add files to this course');
+  await suggestions.nth(1).click();
+  const box = page.locator('#studio-input');
+  expect(await editorText(box)).toMatch(/^\$throughline .*waves/);
+  await expect(panel.locator('.user')).toHaveCount(0);
+});
+
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('link', { name: 'Add files in Studio' }).click();

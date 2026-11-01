@@ -238,8 +238,14 @@ test('settings hold only what applies to every course; the course page holds the
   await page.locator('#open-course').click();
   const coursePage = page.locator('main article[aria-labelledby="course-title"]');
   await expect(coursePage.getByRole('heading', { level: 1 })).toBeVisible();
+  // One tab at a time; m opens Memory, and the arrow keys move between tabs.
+  await expect(coursePage.getByRole('tab')).toHaveCount(4);
+  await coursePage.getByRole('tab', { name: 'Course memory' }).click();
   await expect(coursePage.getByText('No preferences yet', { exact: false })).toBeVisible();
-  await expect(coursePage.getByRole('heading', { name: 'Sources' })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(coursePage.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await expect(coursePage.getByRole('tabpanel')).toContainText('Every document in the course');
+  await expect(coursePage.getByText('No preferences yet', { exact: false })).toBeHidden();
   await coursePage.getByRole('button', { name: 'Back to reading' }).click();
   await expect(coursePage).toHaveCount(0);
   await expect(page.locator('main article[aria-labelledby="concept-title"]')).toBeVisible();

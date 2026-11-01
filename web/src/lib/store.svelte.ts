@@ -8,7 +8,7 @@ import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, Check
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
-export type CoursePart = 'studio' | 'memory' | 'sources' | 'notes';
+export type CoursePart = 'studio' | 'sources' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -124,6 +124,8 @@ class AppStore {
   error = $state<string | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
+  /** The library page shows the course list, or New course: the library's Studio across the page. */
+  libraryView = $state<'list' | 'new'>('list');
   /** Teacher settings belong to the learner, so they are available before a course is open. */
   settings = $state<Settings | null>(null);
   /** The latest update check; stays null when GitHub cannot be reached, so a failed launch check shows nothing. */
@@ -401,14 +403,15 @@ class AppStore {
 
   showLibrary() {
     this.libraryOpen = true;
+    this.libraryView = 'list';
     void this.loadLibrary();
   }
 
   /** A request for one course's Studio, from the library: handed over at once when that course is open, or after
    * opening it, which reloads the page, so it waits in this tab's session storage until the course has loaded. */
-  askCourseStudio(name: string, prompt: string) {
+  askCourseStudio(name: string, prompt: string, thread: string | null = null) {
     try {
-      sessionStorage.setItem('studio-handoff', JSON.stringify({ course: name, prompt }));
+      sessionStorage.setItem('studio-handoff', JSON.stringify({ course: name, prompt, thread }));
     } catch {
       // Without session storage the course still opens; the request is not filled in.
     }
@@ -420,13 +423,15 @@ class AppStore {
     return false;
   }
 
-  /** The request a library action stashed for this course, taken once. */
-  takeStudioHandoff(): string | null {
+  /** The request (or the chat, for a course a library chat made) stashed for this course, taken once. */
+  takeStudioHandoff(): { prompt: string; thread: string | null } | null {
     try {
-      const stashed = JSON.parse(sessionStorage.getItem('studio-handoff') ?? 'null') as { course: string; prompt: string } | null;
+      const stashed = JSON.parse(sessionStorage.getItem('studio-handoff') ?? 'null') as
+        | { course: string; prompt: string; thread?: string | null }
+        | null;
       if (!stashed || stashed.course !== this.libraryCourse?.name) return null;
       sessionStorage.removeItem('studio-handoff');
-      return stashed.prompt;
+      return { prompt: stashed.prompt, thread: stashed.thread ?? null };
     } catch {
       return null;
     }

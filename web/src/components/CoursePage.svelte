@@ -3,7 +3,7 @@
   import { app, type CoursePart } from '../lib/store.svelte';
   import { exportNotes } from '../lib/notes';
   import CodexLink from './CodexLink.svelte';
-  import Memory from './Memory.svelte';
+  import TeachingPreferences from './TeachingPreferences.svelte';
   import SourceList from './SourceList.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
@@ -29,7 +29,6 @@
 
   const parts: { id: CoursePart; label: () => string }[] = [
     { id: 'studio', label: () => (studio.available === false ? t('Change this course') : t('Studio')) },
-    { id: 'memory', label: () => t('Course memory') },
     { id: 'sources', label: () => t('Sources') },
     { id: 'notes', label: () => t('Your notes') },
   ];
@@ -104,7 +103,7 @@
             tabindex={app.coursePart === part.id ? 0 : -1}
             onclick={() => (app.coursePart = part.id)}
           >
-            {part.label()}{#if part.id === 'memory' && suggested}<span class="dot" aria-hidden="true"></span>{/if}
+            {part.label()}{#if part.id === 'studio' && suggested}<span class="dot" aria-hidden="true"></span>{/if}
           </button>
         {/each}
       </div>
@@ -114,6 +113,9 @@
   <!-- Studio is course-level (ADR 0017): the first tab. Where Codex cannot run it, the hand-offs open a Codex chat
        instead (ADR 0016). Hidden tabs stay mounted, so each keeps its place. -->
   <div class="part" id="course-studio" role="tabpanel" aria-labelledby="course-tab-studio" hidden={app.coursePart !== 'studio'}>
+    <!-- How the learner is taught sits beside Studio, where it is changed: tell Studio, and it records it here. -->
+    <div class="studio-row">
+    <div class="studio-main">
     {#if studio.available === false}
       <h2>{t('Change this course')}</h2>
       <p class="lead">{t('Add files, rebuild the route, check pages or change how the course is taught. Each request opens a Codex chat with it typed in; this page updates when Codex is done.')}</p>
@@ -134,12 +136,8 @@
         <Studio active={app.courseOpen && app.coursePart === 'studio'} />
       </div>
     {/if}
-  </div>
-
-  <div class="part" id="course-memory" role="tabpanel" aria-labelledby="course-tab-memory" hidden={app.coursePart !== 'memory'}>
-    <!-- Like Studio, Memory scrolls inside its own frame, so its writing box to the teacher stays in view. -->
-    <div class="frame" data-scroller>
-      <Memory active={app.courseOpen && app.coursePart === 'memory'} />
+    </div>
+    <TeachingPreferences />
     </div>
   </div>
 
@@ -309,14 +307,32 @@
     display: none;
   }
 
+  /* Studio takes the room; how the learner is taught stands beside it on a wide screen and below it otherwise. */
+  .studio-row {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  @media (min-width: 72rem) {
+    .studio-row {
+      grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+  }
+
+  .studio-main {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
   h2 {
     font-family: var(--serif);
     font-size: var(--step-1);
     font-weight: 600;
   }
 
-  /* Memory and Studio bring their own headings; on the page their tabs already name them. */
-  #course-memory :global(.panel-bar),
+  /* Studio brings its own heading; on the page its tab already names it. */
   #course-studio :global(.studio > .panel-head > .panel-bar),
   #course-studio :global(.studio > .panel-head > .panel-intro) {
     display: none;

@@ -1,11 +1,18 @@
 import { test as base, expect, type Page } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const python = process.env.TEST_PYTHON ?? path.join(root, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+
+/** Runs one course operation on a course folder, as the skill does, for a test that stands in for Codex's work. */
+export function courseOperation(folder: string, request: Record<string, unknown>) {
+  const result = spawnSync(python, ['-m', 'guided_learning', '--workspace', folder], { cwd: root, input: JSON.stringify(request), encoding: 'utf-8' });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
 
 /** Starts a disposable course host from a Python fixture module and opens it. */
 async function open(page: Page, module: string, children: ChildProcess[]) {

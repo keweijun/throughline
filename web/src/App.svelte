@@ -34,10 +34,14 @@
   });
 
   // A course action in the library asks this course's Studio: fill it in once the course has loaded.
-  function handOver() {
-    const prompt = app.takeStudioHandoff();
-    if (!prompt) return;
-    app.drafts.set('studio:new', studio.handoff(prompt));
+  async function handOver() {
+    // The stash names the course by its folder, which the library knows; it may not have loaded with the course.
+    if (!app.library) await app.loadLibrary(true);
+    const handed = app.takeStudioHandoff();
+    if (!handed) return;
+    // The chat that made this course carries on here; a request starts a new chat with it filled in.
+    if (handed.thread) return app.showStudio({ thread: handed.thread, focus: true });
+    app.drafts.set('studio:new', studio.handoff(handed.prompt));
     app.showStudio({ focus: true });
   }
 
@@ -90,7 +94,7 @@
     else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
-    else if (event.key === 'm') app.courseOpen && app.coursePart === 'memory' ? (app.courseOpen = false) : app.showCourse('memory');
+    else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse();
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.helpOpen = true;

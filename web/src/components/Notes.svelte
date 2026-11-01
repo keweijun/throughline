@@ -176,6 +176,7 @@
         submitLabel={t("Add note")}
         onsubmit={add}
         header={target}
+        compact
         imagesKey={draftKey}
         imagesAlone
       />

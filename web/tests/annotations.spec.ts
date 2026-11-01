@@ -144,6 +144,28 @@ test('a highlight running into a formula is still painted', async ({ page, cours
   expect(errors).toEqual([]);
 });
 
+test('a highlight running across a citation chip is still painted, without the chip label', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  const excerpt = await page.locator('.lesson-body').first().evaluate((body) => {
+    const chip = body.querySelector('.citation')!;
+    const range = document.createRange();
+    range.setStart(chip.closest('p')!.firstChild!, 0);
+    range.setEndAfter(chip);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return window.getSelection()!.toString();
+  });
+  expect(excerpt).toContain('p. 2');
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.locator('#panel-notes').getByRole('radio', { name: /^All/ }).check();
+  await expect(page.locator('#panel-notes .item.highlight')).toContainText('probability amplitudes');
+  await expect(page.locator('#panel-notes .item.highlight')).not.toContainText('p. 2');
+  expect(errors).toEqual([]);
+});
+
 test('a formula on its own is highlighted whole, and Go to lands on it from another section', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   const formula = page.locator('.lesson-body [data-tex]').filter({ has: page.locator('.katex-display') }).first();

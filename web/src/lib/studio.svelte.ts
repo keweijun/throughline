@@ -101,6 +101,10 @@ class StudioStore {
   sent = $state<string[]>([]);
   #loaded: Promise<void> | null = null;
   #reading = 0;
+  /** Reads of a thread still on their way. */
+  #readsOut = 0;
+  /** Whether the learner chose a chat (sent, opened or started one), which the first load must then leave alone. */
+  #chosen = false;
 
   get running() {
     return !!this.activeTurn;
@@ -122,7 +126,11 @@ class StudioStore {
           this.access = view.access;
           this.threads = view.threads;
           if (!view.available) return;
-          if (this.threadId === null && this.turns.length === 0 && view.threads[0]) await this.open(view.threads[0].id);
+          if (!this.#chosen && this.threadId === null && this.turns.length === 0 && view.threads[0]) {
+            // Opening the latest chat is a default; once the learner sent, opened or started one, it is theirs.
+            this.threadId = view.threads[0].id;
+            await this.read(view.threads[0].id);
+          }
           if (!this.skills.length) void this.loadSkills();
         } catch (e) {
           this.available = false;
@@ -190,13 +198,15 @@ class StudioStore {
   }
 
   async open(id: string) {
+    this.#chosen = true;
     this.threadId = id;
     await this.read(id);
   }
 
-  /** Reads a thread's turns and what Codex is waiting on; a read that a later one overtakes is dropped. */
+  /** Reads a thread's turns and what Codex is waiting on; a read that a later one (or a send) overtakes is dropped. */
   async read(id: string) {
     const reading = ++this.#reading;
+    this.#readsOut++;
     try {
       const history = await api.get<History>(`/api/studio/threads/${encodeURIComponent(id)}`);
       if (reading !== this.#reading || this.threadId !== id) return;
@@ -208,10 +218,13 @@ class StudioStore {
       this.waiting = [...this.waiting.filter((p) => p.params.threadId !== id), ...history.pending];
     } catch (e) {
       if (reading === this.#reading) this.error = e instanceof Error ? e.message : String(e);
+    } finally {
+      this.#readsOut--;
     }
   }
 
   newThread() {
+    this.#chosen = true;
     this.#reading++;
     this.threadId = null;
     this.turns = [];
@@ -222,6 +235,10 @@ class StudioStore {
 
   /** Sends a message: a new turn, or while Codex works, more for the running turn (Codex calls it steering). */
   async send(message: StudioMessage) {
+    this.#chosen = true;
+    // A read already on its way may describe the thread from before this message: drop it, and read again after.
+    const stale = this.#readsOut > 0;
+    this.#reading++;
     const origin = this.origin;
     const result = await api.post<{ thread: string; turn: string; steered: boolean }>('/api/studio/messages', {
       thread_id: this.threadId,
@@ -230,11 +247,12 @@ class StudioStore {
     });
     if (this.origin === origin) this.origin = null;
     if (message.text.trim()) this.sent = [...this.sent.filter((s) => s !== message.text), message.text].slice(-50);
-    if (this.threadId !== result.thread) {
+    if (this.threadId !== result.thread || stale) {
       // A new thread's first events can arrive before this reply names it, and were not taken for this chat: read it.
+      const fresh = this.threadId !== result.thread;
       this.threadId = result.thread;
       void this.read(result.thread);
-      void this.refreshThreads();
+      if (fresh) void this.refreshThreads();
     }
     if (!result.steered) this.activeTurn = result.turn;
     if (!this.turns.some((turn) => turn.id === result.turn)) {

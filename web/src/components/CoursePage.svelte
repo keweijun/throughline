@@ -121,15 +121,15 @@
       {/if}
     {:else}
       <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
-      <div class="frame studio-frame">
-        <Studio active={app.courseOpen} />
+      <div class="frame studio-frame" data-scroller>
+        <Studio active={app.courseOpen && app.coursePart === 'studio'} />
       </div>
     {/if}
   </div>
 
   <div class="part" id="course-memory" role="tabpanel" aria-labelledby="course-tab-memory" hidden={app.coursePart !== 'memory'}>
     <!-- Like Studio, Memory scrolls inside its own frame, so its writing box to the teacher stays in view. -->
-    <div class="frame">
+    <div class="frame" data-scroller>
       <Memory active={app.courseOpen && app.coursePart === 'memory'} />
     </div>
   </div>

@@ -38,7 +38,9 @@
     if (active) void studio.load();
   });
 
+  // Requests name the course by its folder, as the skill addresses courses; the learner sees its title.
   const course = $derived(app.libraryCourse?.name ?? app.state?.course?.title ?? '');
+  const title = $derived(app.state?.course?.title ?? course);
   const draftKey = $derived(`studio:${studio.threadId ?? 'new'}`);
   const draft = $derived(app.drafts.get(draftKey));
   const images = $derived(app.drafts.images(draftKey));
@@ -180,8 +182,11 @@
     requestAnimationFrame(() => view?.focus());
   }
 
-  /** The nearest ancestor that scrolls: the side panel's body today, the reading column on a page. */
+  /** What scrolls Studio: the frame its mount marks with `data-scroller`, else the nearest ancestor that scrolls now.
+   * The mark matters while a chat is too short to scroll: otherwise the search would pass the frame and scroll the page. */
   function scrollParent(node: HTMLElement | undefined) {
+    const marked = node?.closest<HTMLElement>('[data-scroller]');
+    if (marked) return marked;
     for (let at = node?.parentElement; at; at = at.parentElement) {
       if (/(auto|scroll)/.test(getComputedStyle(at).overflowY) && at.scrollHeight > at.clientHeight) return at;
     }
@@ -262,7 +267,7 @@
 
   {#snippet target()}
     <span class="target">
-      {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if course}{' · '}{course}{/if}
+      {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if title}{' · '}{title}{/if}
       {#if studio.origin}
         <span class="origin" title={studio.origin.text}>
           <span class="origin-label">{studio.origin.label}</span>

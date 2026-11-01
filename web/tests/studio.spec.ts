@@ -213,3 +213,16 @@ test('the top bar shows that Studio is working or needs the learner, and leads b
   await status.click();
   await expect(page.locator('#course-studio').getByRole('group', { name: 'Codex wants to run a command' })).toBeVisible();
 });
+
+test('opening Studio on the course page leaves the page at its top and names the course by its title', async ({ page, course }) => {
+  // Short enough that the page itself scrolls, so an empty chat could hand its scrolling to the page.
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  await expect(page.locator('#course-studio .welcome')).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(await page.locator('#stage').evaluate((stage) => stage.scrollTop)).toBe(0);
+  await expect(page.locator('#course-title')).toBeInViewport();
+  // The folder is "waves"; the learner sees the course's title.
+  await expect(page.locator('#course-studio .target').first()).toContainText('New chat · Waves');
+});

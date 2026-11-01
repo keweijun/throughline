@@ -742,7 +742,7 @@ class AppStore {
     // Studio is course-level, the first tab of the Course page (ADR 0017).
     if (!this.studioShown) this.showCourse('studio');
     if (thread && studio.threadId !== thread) void studio.open(thread);
-    if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
+    if (focus) studio.focusRequest++;
   }
 
   /** Sets the panel width; a width the learner chose is kept for later visits unless `save` defers that. */

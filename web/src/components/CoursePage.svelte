@@ -121,7 +121,7 @@
       {/if}
     {:else}
       <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
-      <div class="frame">
+      <div class="frame studio-frame">
         <Studio active={app.courseOpen} />
       </div>
     {/if}
@@ -319,6 +319,12 @@
     border: 1px solid var(--rule);
     border-radius: var(--radius);
     background: var(--raised);
+  }
+
+  /* Studio's frame keeps one height, which Studio fills with its box at the bottom, so content loading inside it (the
+     welcome, a reopened chat) never moves the box from under the learner's pointer. */
+  .studio-frame {
+    height: max(24rem, calc(100vh - var(--topbar) - 22rem));
   }
 
   .actions {

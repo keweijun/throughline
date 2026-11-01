@@ -97,6 +97,10 @@ class StudioStore {
   /** Share of the model's context window the thread's last request used. */
   context = $state<number | null>(null);
   loading = $state(false);
+  /** Asks for the caret in Studio's box; Studio takes it once it is on screen, however late it mounts. */
+  focusRequest = $state(0);
+  /** The last request Studio answered; plain, so answering does not rerun what reads it. */
+  focusAnswered = 0;
   /** Messages sent in this tab, newest last, which the up arrow brings back into an empty box. */
   sent = $state<string[]>([]);
   #loaded: Promise<void> | null = null;

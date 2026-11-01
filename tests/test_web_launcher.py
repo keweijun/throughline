@@ -2,6 +2,7 @@
 import json
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -25,7 +26,7 @@ class LauncherCard(unittest.TestCase):
         self.home = Path(scratch.name)
         self.started = []
 
-    def client(self, platform='linux', name='throughline.desktop', make=True, found=None):
+    def client(self, platform='linux', name='throughline.desktop', make=True, status=None):
         folder = self.home / ('Applications' if platform == 'darwin' else 'applications')
         path = folder / name
         if make:
@@ -36,7 +37,8 @@ class LauncherCard(unittest.TestCase):
                 path.write_text('[Desktop Entry]\n', encoding='utf-8')
         launcher = Launcher(path, platform=platform, desktop=self.home / 'Desktop', start=self.started.append, output=lambda c: '')
         app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(self.home / 'config' / 'settings.json'),
-                         library_root=self.home / 'library', launcher=launcher, checks=lambda: found or [])
+                         library_root=self.home / 'library', launcher=launcher,
+                         checks=status or codex_checks.CodexStatus(cheap=lambda: [], probe=lambda: None))
         client = TestClient(app, base_url='http://127.0.0.1:8765')
         client.__enter__()
         self.addCleanup(client.__exit__, None, None, None)
@@ -96,10 +98,46 @@ class LauncherCard(unittest.TestCase):
             self.assertIn('guided-learning setup', refused.json()['error'])
         self.assertEqual(self.started, [])
 
-    def test_checks(self):
-        failing = [codex_checks.result('codex', True, 'codex-cli 1 (/bin/codex)'), codex_checks.result('signed_in', False, 'Not logged in')]
-        client, _ = self.client(found=failing)
-        self.assertEqual(client.get('/api/checks').json(), {'checks': failing})
+    def test_checks_never_wait_for_the_probe_and_run_it_once(self):
+        found = codex_checks.result('codex', True, 'codex-cli 1 (/bin/codex)')
+        release, probed = threading.Event(), []
+
+        def probe():
+            probed.append(1)
+            release.wait(5)
+            return codex_checks.result('answers', len(probed) > 1, '' if len(probed) > 1 else '401 Unauthorized', model='luna', seconds=1.0)
+        client, _ = self.client(status=codex_checks.CodexStatus(cheap=lambda: [found], probe=probe))
+        self.assertEqual(client.get('/api/checks').json(), {'checks': [found], 'checking': True}, 'answers while the probe runs')
+        release.set()
+        failed = wait_for(client, lambda view: not view['checking'])
+        self.assertEqual([(c['id'], c['ok'], c['detail']) for c in failed['checks']], [('codex', True, found['detail']), ('answers', False, '401 Unauthorized')])
+        self.assertEqual(client.get('/api/checks').json(), failed, 'a failure is kept')
+        self.assertEqual(len(probed), 1, 'once per host, not on every library load')
+
+        release.clear()
+        again = client.post('/api/checks').json()
+        self.assertEqual(again, {**failed, 'checking': True}, 'the last answer stays while checking again')
+        release.set()
+        passed = wait_for(client, lambda view: not view['checking'])
+        self.assertEqual([c['ok'] for c in passed['checks']], [True, True])
+        self.assertEqual(len(probed), 2)
+
+    def test_without_codex_nothing_is_probed(self):
+        probed = []
+        missing = codex_checks.result('codex', False)
+        client, _ = self.client(status=codex_checks.CodexStatus(cheap=lambda: [missing], probe=lambda: probed.append(1)))
+        self.assertEqual(client.get('/api/checks').json(), {'checks': [missing], 'checking': False})
+        self.assertEqual(client.post('/api/checks').json(), {'checks': [missing], 'checking': False})
+        self.assertEqual(probed, [])
+
+
+def wait_for(client, done):
+    for _ in range(200):
+        view = client.get('/api/checks').json()
+        if done(view):
+            return view
+        threading.Event().wait(0.02)
+    raise AssertionError(view)
 
 
 if __name__ == '__main__':

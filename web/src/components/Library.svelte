@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { api } from '../lib/api';
   import { t, locale } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import type { CodexCheck, LauncherStatus, LibraryCourse } from '../lib/types';
+  import type { CodexCheck, CodexChecks, LauncherStatus, LibraryCourse } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
 
@@ -14,21 +14,28 @@
 
   const failing = $derived(checks.filter((check) => !check.ok));
 
-  // Neither is needed to use the library, so a failure to load them shows nothing.
-  async function loadChecks() {
-    checking = true;
+  let poll: ReturnType<typeof setTimeout> | undefined;
+
+  // Neither is needed to use the library, so a failure to load them shows nothing. Whether Codex answers is probed once
+  // per host in the background; while it runs `checking` is true and this asks again shortly.
+  async function loadChecks(again = false) {
+    clearTimeout(poll);
     try {
-      checks = (await api.get<{ checks: CodexCheck[] }>('/api/checks')).checks;
+      const view = again ? await api.post<CodexChecks>('/api/checks') : await api.get<CodexChecks>('/api/checks');
+      checks = view.checks;
+      checking = view.checking;
     } catch {
       checks = [];
+      checking = false;
     }
-    checking = false;
+    if (checking) poll = setTimeout(() => void loadChecks(), 1500);
   }
 
   onMount(() => {
     void loadChecks();
     api.get<LauncherStatus>('/api/launcher').then((status) => (launcher = status), () => {});
   });
+  onDestroy(() => clearTimeout(poll));
 
   async function dismissLauncher() {
     if (launcher) launcher = { ...launcher, dismissed: true };
@@ -42,7 +49,7 @@
   /** What failed and what to do about it; a check this version does not know is shown as the host words it. */
   function problem(check: CodexCheck) {
     if (check.id === 'codex') return [t('Codex was not found.'), t('Install Codex (the desktop app or the CLI) and sign in; lessons need it.')];
-    if (check.id === 'signed_in') return [t('Codex is not signed in.'), t('Sign in to Codex: run “codex login” in a terminal, or sign in in the Codex app.')];
+    if (check.id === 'answers') return [t('Codex could not answer:'), `${check.detail.replace(/\.$/, '')}. ${t('Check that “codex” works in a terminal (signed in, or with an API key).')}`];
     return [check.label, check.fix];
   }
 
@@ -83,7 +90,7 @@
           <li><strong>{what}</strong> {fix}</li>
         {/each}
       </ul>
-      <button class="btn btn-small" disabled={checking} onclick={loadChecks}>{checking ? t('Checking…') : t('Check again')}</button>
+      <button class="btn btn-small" disabled={checking} onclick={() => loadChecks(true)}>{checking ? t('Checking…') : t('Check again')}</button>
     </div>
   {/if}
 

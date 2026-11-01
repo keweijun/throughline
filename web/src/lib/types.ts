@@ -393,3 +393,6 @@ export type LauncherStatus = { platform: 'nt' | 'darwin' | 'darwin-home' | 'linu
 
 /** One check that Codex can run Throughline; `label` and `fix` are English, so known ids are worded in the interface. */
 export type CodexCheck = { id: string; ok: boolean; label: string; detail: string; fix: string };
+
+/** The checks so far; `checking` while the once-per-host probe of whether Codex answers runs. */
+export type CodexChecks = { checks: CodexCheck[]; checking: boolean };

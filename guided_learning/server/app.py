@@ -253,11 +253,11 @@ class ActiveHost:
 
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, launcher=None,
                checks=None):
-    """`launcher` and `checks` stand in for this computer's launcher and the Codex checks in tests."""
+    """`launcher` and `checks` (a `CodexStatus`) stand in for this computer's launcher and Codex in tests."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval)
     seen = Seen(courses.settings.path.with_name('seen.json'))
     launcher = launcher or Launcher()
-    checks = checks or codex_checks.codex_checks
+    checks = checks or codex_checks.CodexStatus(courses.settings)
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -567,8 +567,14 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.get('/api/checks')
     def checks_view():
-        """Whether Codex can run Throughline; the library shows the ones that fail (ADR 0017)."""
-        return {'checks': checks()}
+        """Whether Codex can run Throughline; the library shows the ones that fail (ADR 0017). Never waits for the
+        probe of whether Codex answers: it starts once per host, and `checking` says it is still running."""
+        return checks.view()
+
+    @app.post('/api/checks')
+    def check_again():
+        """Check again, the probe included; the answer arrives through GET."""
+        return checks.again()
 
     @app.post('/api/seen')
     def mark_seen(body: SeenRequest):

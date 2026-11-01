@@ -647,8 +647,8 @@ const messages = {
   "Throughline has no launcher on this computer yet. Run `guided-learning setup` to add one.": "这台电脑上还没有贯学启动器。运行 `guided-learning setup` 即可添加。",
   "Codex was not found.": "未找到 Codex。",
   "Install Codex (the desktop app or the CLI) and sign in; lessons need it.": "请安装 Codex（桌面应用或 CLI 均可）并登录；讲课需要它。",
-  "Codex is not signed in.": "Codex 尚未登录。",
-  "Sign in to Codex: run “codex login” in a terminal, or sign in in the Codex app.": "登录 Codex：在终端中运行“codex login”，或在 Codex 应用中登录。",
+  "Codex could not answer:": "Codex 无法回复：",
+  "Check that “codex” works in a terminal (signed in, or with an API key).": "请确认 “codex” 能在终端中正常使用（已登录，或已配置 API 密钥）。",
   "Check again": "重新检查",
 } as const;
 export type MessageKey

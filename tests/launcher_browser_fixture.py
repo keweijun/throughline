@@ -1,7 +1,8 @@
-"""A library with one course, a launcher in a scratch folder and a Codex that is not signed in until checked again:
+"""A library with one course, a launcher in a scratch folder and a Codex that cannot answer until checked again:
 python -m tests.launcher_browser_fixture [port]."""
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from guided_learning import checks
@@ -17,13 +18,15 @@ execute(root / 'library' / 'quantum', {'op': 'curriculum.save', 'concepts': [{'i
 entry = root / 'applications' / 'throughline.desktop'
 entry.parent.mkdir()
 entry.write_text('[Desktop Entry]\nName=Throughline\n', encoding='utf-8')
-asked = []
+probed = []
 
 
-def codex_checks():
-    """The learner signs in between the first check and the next."""
-    asked.append(1)
-    return [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)'), checks.result('signed_in', len(asked) > 1, '')]
+def probe():
+    """Codex cannot answer the first time and can once the learner has fixed it; no real model is asked."""
+    probed.append(1)
+    time.sleep(0.3)
+    error = '' if len(probed) > 1 else 'Codex rejected initialization or generation: 401 Unauthorized'
+    return checks.result('answers', not error, error, model='gpt-6-luna', seconds=0.3)
 
 
 class Runner:
@@ -35,6 +38,6 @@ class Runner:
 try:
     serve(port=int(sys.argv[1]) if len(sys.argv) > 1 else 0, runner=Runner(), settings=TeacherSettings(root / 'config' / 'settings.json'),
           library_root=root / 'library', launcher=Launcher(entry, platform='linux', desktop=root / 'Desktop', start=lambda command: None),
-          checks=codex_checks, on_ready=lambda port: print(port, flush=True))
+          checks=checks.CodexStatus(cheap=lambda: [checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)')], probe=probe), on_ready=lambda port: print(port, flush=True))
 finally:
     scratch.cleanup()

@@ -26,3 +26,7 @@ Exercises written for a section may not suit the learner (too much arithmetic, a
 - **Another like this**, on one exercise, asks for one more exercise of the same kind next to it, without replacing anything.
 - New exercises must still meet the section's objective: the note changes how a problem is posed, not what solving it shows. The teacher sees the replaced exercises, so it does not write them again.
 - A request with a note carries a memory note (ADR 0010): when the note says how the learner wants to practise, the teacher may suggest it as a preference, which the learner confirms as usual.
+
+## Explaining in one's own words
+
+Some sections are about understanding an idea more than carrying out a method. For them the teacher may write an **explanation exercise**: the learner explains an idea in their own words to a stated reader (a classmate who knows the previous section, say), such as why a result holds, what a definition captures or how two ideas connect. It is an ordinary self-created exercise, with one part or one part per idea, and is not a new kind of record. The question asks for the explanation without listing the points it should make. Assessment judges the ideas, not the wording: a part is `correct` when the explanation is right and covers what the idea needs, and `partly_correct` when it is right but misses an essential point, which the feedback names without supplying. The teacher decides when a section calls for one; review apply questions may ask for one too (ADR 0014).

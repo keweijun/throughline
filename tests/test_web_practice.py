@@ -251,6 +251,13 @@ class PartsFlow(unittest.TestCase):
         self.assertEqual((last['parts'],last['outcome'],last['kind']),(['correct']*3,'passed','hinted'),'feedback correcting part 3 was help')
         self.assertFalse(execute(self.path,{'op':'evidence.view','concept_id':'a'})['independently_verified'])
 
+    def test_an_exercise_may_ask_for_an_explanation_assessed_by_its_ideas(self):
+        # Explain it back (#135) is an ordinary exercise: the teacher is told it may write one, and how to assess it.
+        task=self.generate(['Explain why amplitudes add.'])
+        self.assertIn('explain it in their own words',next(p for p in self.runner.prompts if 'Practice only' in p))
+        self.assess(task['id'],'They add because…',['partly_correct'])
+        self.assertIn('assess the ideas, not the wording',self.runner.prompts[-1])
+
     def test_parts_may_carry_short_labels(self):
         for parts in ([{'label':'(a)'}],[{'label':5,'text':'State it.'}],[{'label':'x'*41,'text':'State it.'}],[{'text':'State it.','extra':1}]):
             with self.subTest(parts=parts):

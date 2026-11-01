@@ -28,6 +28,17 @@ Expressions use x, numbers, + - * / ^, parentheses, pi, e and sin, cos, tan, asi
         'subjects': 'chemistry, biochemistry, materials science',
         'guide': r'''Chemistry: inside LaTeX math, write chemical formulas and equations with \ce{...} and quantities with units with \pu{...}, for example $\ce{2H2 + O2 -> 2H2O}$, $\ce{SO4^2-}$, $\ce{A <=> B}$ and $\pu{25 kJ mol-1}$.''',
     },
+    'python': {
+        'summary': 'Python code the learner runs and changes in the lesson or completes in an exercise',
+        'subjects': 'programming, numerical methods, data analysis, statistics, scientific computing, algorithms',
+        'guide': '''Runnable Python: put code the learner should run, change or complete in a fenced code block with the language "python-run"; the app shows it as an editable cell with Run, and in an exercise the learner can add their code and its output to their answer. Use a plain ```python block for code that is only read.
+```python-run
+import numpy as np
+xs = np.linspace(0, 1, 5)
+print(xs ** 2)
+```
+The code runs in the learner's browser (Pyodide, Python 3.14) with the standard library and packages such as numpy, scipy, sympy and pandas, loaded from its imports. Output is text: print what matters; there are no plots, no input(), no files and no network. Keep a cell short and self-contained: cells do not share variables, and each run starts fresh. In an exercise, give starter code that marks what the learner completes with a comment such as `# your code here`, and assess the code and output they submit like any answer.''',
+    },
 }
 
 

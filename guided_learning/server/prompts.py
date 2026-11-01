@@ -179,11 +179,15 @@ PARTS = ('When a question has several parts, write each part on its own line as 
          'Also list the parts in "parts", in order, one entry per part: label is a short label such as "(a)", as the question numbers the part, '
          'and text briefly restates what it asks; a question without subquestions has one part.')
 PART_FIELD = '"parts":[{"label":"(a)","text":"What each part asks"}]'
+# Explain it back (#135): an ordinary self-created exercise, assessed by part like any other (ADR 0011).
+EXPLAIN = ('When understanding an idea matters more than carrying out a method, a question you write may ask the learner to explain it in their own words '
+           'to a stated reader (for example a classmate who knows the previous section but not this one): why a result holds, what a definition captures, '
+           'or how two ideas connect. Ask for the explanation only, without listing the points it should make.')
 
 
 def practice_generate(sources):
     return ('Practice only: return JSON {"questions":[{"question":"Question only, without answers or hints",' + PART_FIELD + ',"origin":"source or self_created","source_refs":[],"exercise":"question of the original exercise used"}]}. '
-            'Choose as many questions as the current goal needs, at most four; one is often enough. ' + PARTS + ' Prefer the original exercises below and cite their sources accurately. '
+            'Choose as many questions as the current goal needs, at most four; one is often enough. ' + PARTS + ' ' + EXPLAIN + ' Prefer the original exercises below and cite their sources accurately. '
             'If none fits, explicitly create a new exercise with origin=self_created. Do not copy answers from the materials. '
             'Check worked examples in recent lessons and supplements; prefer new situations or values requiring transfer. '
             'Do not reuse a just-demonstrated question as independent practice. Choose an undemonstrated original exercise, or create a variant with origin=self_created. '
@@ -233,7 +237,7 @@ def review_set(value, context, excerpts):
             + REVIEW_KINDS[value.get('kind', 'for_me')] + ' '
             'Write as many questions as this review needs, at most eight; a few well-chosen ones are better than many. Mix two kinds: '
             'recall questions, answered by choosing, with 2 to 5 options whose wrong ones are real misconceptions and an explanation for every option; '
-            'and apply questions, answered in writing, that use an idea in a new situation. Prefer apply questions that connect ideas from two or more sections. '
+            'and apply questions, answered in writing, that use an idea in a new situation or explain it. ' + EXPLAIN + ' Prefer apply questions that connect ideas from two or more sections. '
             'tests_concept_ids lists the sections each question tests, and each part of an apply question names the sections it tests, all taken from the sections below. '
             'Review only what these sections taught: if the request reaches beyond them, leave that out and say so in note; otherwise omit note. '
             'Give no hints, steps or answers in a question. Do not repeat or lightly reword an earlier question (data); vary the situation, values or representation. '
@@ -259,7 +263,7 @@ PRACTICE_ACTIONS = {
     'hint': 'Give one minimal conceptual cue or diagnostic question. Leave the requested result and remaining reasoning to the learner',
     'steps': 'Give a short plan with relevant symbolic relationships and one next action for the learner. Leave substitutions, calculations and the requested conclusion for the learner. Do not reveal final values or a complete derivation; reserve those for Full solution',
     'solution': 'Give the complete solution and its conditions',
-    'assess': 'Assess the reasoning and result in the actual learner answer below, identifying specific errors or gaps. Assess each part of the exercise on its own: give each part the answer addresses correct only if it is correct, partly_correct if it is partly right, otherwise not_yet; give not_attempted to a part the answer does not address, and the host keeps its earlier status. The mere presence of text does not justify correct. Consider earlier learner answers together with this correction; parts already correct stay correct unless the answer revisits them. Give no hint or cue for a part the answer does not address; only say that it is still open. For an incorrect or incomplete part, identify the gap and offer one minimal cue, leaving the correction to the learner instead of supplying the full answer. Accept a correct answer even when it repeats earlier help: the host records assisted provenance separately. Do not demand paraphrasing or a ritual restatement. An acknowledgement alone is not an answer; invite a genuine attempt or optional transfer practice without filling in the answer for them.',
+    'assess': 'Assess the reasoning and result in the actual learner answer below, identifying specific errors or gaps. Assess each part of the exercise on its own: give each part the answer addresses correct only if it is correct, partly_correct if it is partly right, otherwise not_yet; give not_attempted to a part the answer does not address, and the host keeps its earlier status. The mere presence of text does not justify correct. Consider earlier learner answers together with this correction; parts already correct stay correct unless the answer revisits them. Give no hint or cue for a part the answer does not address; only say that it is still open. For an incorrect or incomplete part, identify the gap and offer one minimal cue, leaving the correction to the learner instead of supplying the full answer. Accept a correct answer even when it repeats earlier help: the host records assisted provenance separately. Do not demand paraphrasing or a ritual restatement. When a part asks the learner to explain an idea in their own words, assess the ideas, not the wording: correct when the explanation is right and covers what the idea needs, partly_correct when it is right but misses an essential point, which the feedback names as missing without supplying it. An acknowledgement alone is not an answer; invite a genuine attempt or optional transfer practice without filling in the answer for them.',
 }
 
 

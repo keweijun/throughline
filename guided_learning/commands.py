@@ -406,12 +406,19 @@ def doctor(args):
     root = library.default_root()
     launcher = launcher_path()
     host = running()
+    print(f'Throughline {version()}')
+    found = checks.codex_checks()
     rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
-            for check in checks.codex_checks()]
+            for check in found]
+    if all(check['ok'] for check in found):
+        from .server.settings import TeacherSettings
+        print('  Asking Codex for a one-word reply...', flush=True)
+        answer = checks.codex_answers(checks.probe_model(TeacherSettings()))
+        said = f"{answer['model']} replied in {answer['seconds']} s" if answer['ok'] else f"{answer['detail']} ({answer['model']}, {answer['seconds']} s)"
+        rows.append((answer['ok'], answer['label'], said, answer['fix']))
     rows += [(root.is_dir(), 'Course library', str(root), 'Run `guided-learning setup`'),
              (launcher.exists(), 'Launcher', str(launcher), 'Run `guided-learning setup`'),
              (None, 'Throughline', f"running at http://127.0.0.1:{host['port']}/" if host else 'not running', '')]
-    print(f'Throughline {version()}')
     for ok, label, detail, fix in rows:
         print(f"  {'ok  ' if ok else '--  ' if ok is None else 'FAIL'}  {label}: {detail}")
         if ok is False and fix:

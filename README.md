@@ -15,7 +15,7 @@ The teacher makes instructional judgments from your materials. The program valid
 
 ## Install
 
-You need Codex, signed in (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)). Then paste this into Codex:
+You need Codex, signed in or set up with an API key (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)). Then paste this into Codex:
 
 ```text
 Install https://github.com/keweijun/throughline
@@ -73,23 +73,25 @@ To uninstall, run `guided-learning stop`, then `uv tool uninstall throughline` (
 
 ## Create your first course
 
-After installing, Throughline opens in your browser. From then on, start any Codex chat with **`$throughline`** to work on your courses.
+After installing, Throughline opens in your browser on your course library. A new course starts in Codex, which reads your files and asks you a few questions:
 
 1. Type `$throughline make a course from these files`, attach your PDFs or notes (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
 2. Codex asks a few quick questions: your goal and deadline, how well you know each prerequisite it found in the files, and how much detail you want. Then it suggests a course name, copies your files into the Throughline folder, builds a route across them and tells you what still needs checking.
 3. When it is done, the course opens in Throughline in your browser. Next time, open it from the **Throughline** launcher in your app menu.
 
-Later courses work the same way: `$throughline` in any Codex chat, or **New course in Codex** in the Throughline library.
+Later courses work the same way: **New course in Codex** in the library, or `$throughline` in any Codex chat. Once a course exists, you change it from inside Throughline, in **Studio**.
 
 ## How it works
 
-Throughline is where you study; Codex is where courses are built. You move between them in one click.
+Throughline is where you study and where you change a course; a new course starts in Codex.
 
-- **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it). Lessons, questions and practice run Codex in the background, so you never need Codex open to study.
-- **Build courses in Codex.** Start any Codex chat with `$throughline`. In the library, **New course in Codex**, **Add files in Codex** and **Review in Codex** open a new Codex chat with the `$throughline` request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself.
-- **Ask for anything.** `$throughline add this problem set to quantum`, `$throughline make the quantum course more rigorous`, `$throughline open quantum`. Codex asks for permission the first time it starts Throughline, because the app keeps running in the background.
+- **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it), or run `throughline`. Lessons, questions and practice run Codex in the background, so you never need Codex open to study. The library tells you where the launcher is, can add it to your desktop, and says so if Codex can't answer.
+- **Change a course in Studio.** The course button in the top bar opens the course's page; its first tab, **Studio** (or press `d`), is a Codex chat inside Throughline with the same `$throughline` skill. Ask it to add a problem set, rebuild a chapter, check pages or teach a chapter more rigorously; attach or drop files, mention them with `@`, and approve what Codex asks. You can keep studying while it works: the top bar says when Studio needs you. **Add files in Studio** below the route and **Check this location in Studio** in the reader open it with the request filled in, and what you ask it to remember about how you like to be taught goes into the course memory.
+- **Start a course in Codex.** In the library, **New course in Codex** opens a new Codex chat with the `$throughline` request typed in: attach your files and send. Codex reads them, builds the route and opens the course in Throughline when it is done; an open Throughline tab updates by itself. A Codex chat with `$throughline` can also change a course, for example `$throughline add this problem set to quantum`.
 
-![The course library listing three courses with their sources, sections, review backlog and current section](docs/images/library-en.png)
+![Studio on the course page: a Codex chat inside Throughline, asking a question before it adds a problem set](docs/images/studio-en.png)
+
+![The course library listing three courses, with where to find Throughline next time](docs/images/library-en.png)
 
 ## Study
 
@@ -98,6 +100,8 @@ Throughline is where you study; Codex is where courses are built. You move betwe
 - **Side questions.** Select a sentence or formula and ask about it. The lesson keeps going unless you pause it. Questions that a later section answers properly are saved for that section.
 - **Sources.** Hover a citation to see the cited text; click it to open the exact page or line in the built-in reader. Unchecked sources stay marked "Not checked yet".
 - **Practice.** Exercises follow each lesson. Hints and solutions are always available, but help is recorded, so a helped answer is never counted as solved on your own. If the exercises don't suit you, ask for different ones and say what should change, or ask for another like one you just did.
+- **The course page.** The course button in the top bar shows the course as a whole: a strip of its chapters, filled as you study, then **Studio**, **Course memory**, **Sources** and **Your notes** as tabs. In Course memory you tell the teacher, in your own words, how you like to be taught; a preference the teacher suggests is asked right where it comes up.
+- **Help.** `?` shows what you can do in the app, the course and the section you're reading, with **Show me** to point at each control, and the keyboard shortcuts. The first time you meet something you can't see, like selecting a passage, a short tip says how it works.
 - **Review.** Whenever you like, **Review** asks for a few questions to answer from memory: quick ones you answer by choosing and written ones that connect ideas across sections. **Review for me** lets the teacher pick what you have gone longest without practising and what you missed before; or say what you want to review. Nothing comes due. Before a section that builds on something you studied a while ago, you are offered a short warm-up, and each chapter page offers an optional chapter quiz.
 
 <table>
@@ -111,12 +115,12 @@ Throughline is where you study; Codex is where courses are built. You move betwe
   </tr>
 </table>
 
-The interface and new teaching default to English; switch to Simplified Chinese under Language in Settings (the gear in the top bar). Imported materials and earlier records keep their original language. More in [using the interface](docs/learning-ui.md).
+The interface and new teaching default to English; switch to Simplified Chinese under Settings (the gear in the top bar) → Appearance → Language. Imported materials and earlier records keep their original language. More in [using the interface](docs/learning-ui.md).
 
 ## Where things live
 
 - **Courses:** your Throughline folder, `~/Throughline` (`C:\Users\<you>\Throughline` on Windows). It is deliberately outside Documents, which OneDrive and iCloud often sync: a course's database can be corrupted by sync. To use another folder, set `GUIDED_LEARNING_HOME`; if you point it at a synced folder, open each course on only one computer at a time. It holds an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
-- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, and fast mode; the model lists come from your Codex sign-in. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
+- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, fast mode, and Studio's Full access; the model lists come from your Codex sign-in. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).
 

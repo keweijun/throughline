@@ -58,6 +58,8 @@
   const currentChapter = $derived(app.chapterOf(app.currentId)?.id);
 
   const studied = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
+  // The course's bar fills as sections are studied to the end, so starting the last section does not read as finishing.
+  const studiedAll = $derived(studied(route));
   // Folding needs room to unfold into; without it the route stays folded and opens on hover.
   const foldable = $derived(!app.stageNarrow && !app.phone);
 
@@ -163,6 +165,12 @@
         </button>
       {/if}
     </div>
+    {#if route.length && currentIndex >= 0}
+      <div class="progress" title={t("{studied} of {total} sections studied", { studied: studiedAll, total: route.length })}>
+        <span>{t('Section {number} of {total}', { number: currentIndex + 1, total: route.length })}</span>
+        <span class="track" aria-hidden="true"><span style:width="{(studiedAll / route.length) * 100}%"></span></span>
+      </div>
+    {/if}
     {#if chapters.length}
       <ol class="chapters">
         {#each chapters as chapter, number (chapter.id)}
@@ -265,6 +273,29 @@
     font-size: var(--step--1);
     font-weight: 600;
     color: var(--pencil);
+  }
+
+  .progress {
+    display: grid;
+    gap: 0.35rem;
+    margin: -0.35rem 0.55rem 1rem var(--gutter);
+    font-size: var(--step--1);
+    color: var(--pencil);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .track {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--rule);
+    overflow: hidden;
+  }
+
+  .track span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.4s var(--ease-out);
   }
 
   .fold {
@@ -524,6 +555,7 @@
     .rail .full,
     .rail.folded .full,
     .tray::before,
+    .track span,
     .arriving .route-dot {
       animation: none;
       transition: none;

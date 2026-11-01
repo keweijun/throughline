@@ -32,7 +32,7 @@ test('review for me asks recall and apply questions across sections, with no cou
   await expect(page.getByRole('region', { name: 'Current' })).toHaveCount(0);
 
   // Review questions are not a section's exercises.
-  await page.getByRole('button', { name: 'Back to current section' }).click();
+  await page.locator('#open-study').click();
   await page.locator('#route').getByRole('button', { name: /What a state represents/ }).click();
   await expect(page.locator('#practice')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -114,7 +114,9 @@ test('the last section leads to the chapter quiz, which asks an earlier exercise
   await expect(page.getByRole('region', { name: 'Chapter quiz · States' })).toContainText('1 of 3 answered · 1 right');
 
   // The quiz is the chapter's: the section's practice still shows its one exercise, and the position did not move.
-  await page.getByRole('button', { name: 'Back to current section' }).click();
+  // Study returns to the chapter page the quiz was taken from; the section is one click away on the route.
+  await page.locator('#open-study').click();
+  await page.locator('#route .current .entry').click();
   await expect(page.locator('#practice article')).toHaveCount(1);
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.position.concept_id).toBe('superposition');

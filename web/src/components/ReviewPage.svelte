@@ -47,9 +47,6 @@
     <header class="head">
       <h1 id="review-title">{t("Review")}</h1>
       <p class="intro">{t("Answer from memory, without looking back. Ask for questions whenever you like: the teacher picks what you have gone longest without practising and what you missed before, or you say what to review.")}</p>
-      {#if app.currentId}
-        <button class="btn btn-small back" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
-      {/if}
     </header>
 
     {#if !review.reviewable && !shown.length}
@@ -129,10 +126,6 @@
     font-size: var(--step-1);
     line-height: 1.45;
     color: var(--ink-soft);
-  }
-
-  .back {
-    margin-top: 1rem;
   }
 
   h2 {

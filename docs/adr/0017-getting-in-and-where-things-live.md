@@ -46,7 +46,7 @@ Everything in the app belongs to one of three levels, and each level has its pla
 **The Course page** is the course-level place. The course title in the top bar opens it in the reading column, like a chapter page. It holds, in this order:
 
 1. **Studio**, with this course's threads (below), in a frame of its own that scrolls inside the page, so its writing box stays in view and the parts below stay reachable. Above it, a strip of the course's chapters, each filled as its sections are studied, opens a chapter page.
-2. **Memory**, as the side panel showed it. The **Remember …?** banner still appears in the lesson where a preference comes up, and `m` opens the Course page at Memory.
+2. **Memory**, the confirmed preferences and the writing box for telling the teacher, in the learner's own words, what to remember (#114). Like Studio it sits in a frame of its own, so its writing box stays in view. A preference the teacher suggests is still asked inline, right after what suggested it, and `m` opens the Course page at Memory.
 3. **Sources**: every document in the course, with what is not checked yet; choosing one opens it in the reader. Adding files and checking pages are Studio work, offered by Studio itself and below the route.
 4. **Your notes**: exporting them, which moves here from Settings → Course. The learner profile joins the page when it can be shown and corrected (#73).
 
@@ -86,6 +86,7 @@ A hint appears next to what it explains, the first time that thing appears, one 
 - **A native installer** (`.exe`, `.dmg`). It needs signing and notarisation for every release and is a step towards the desktop app ADR 0004 rejected, while Codex is still required. The install script removes the Python prerequisite, which was the real gap.
 - **Making the page an installable web app.** It would give a real Dock or taskbar icon, but when the host is not running the icon opens an error page; the launcher starts the host first.
 - **Studio as a side panel view** (ADR 0016 as first written). It made Studio a peer of Questions, inviting content questions to go there and course changes to go to Questions, and it put a long-running, course-wide conversation in a panel meant for the section being read.
+- **Memory as a side panel view** that the learner talks to while reading (#114 as first written). Telling the teacher how to teach is about the whole course, like Studio, and suggested preferences are already asked inline where they come up, so nothing about Memory needs the section beside it. Keeping it in the panel would also split the course-level things between two places again.
 - **A Study / Studio mode switch.** It separates the two cleanly, but course work is occasional and almost always starts from something in a section; a mode would be one more state to be in.
 - **Keeping flat tabs and only reordering them.** The order would improve; the mixed levels would remain.
 - **An app-wide Studio** with threads filed by course. It would suit work across courses, which learners do not do.

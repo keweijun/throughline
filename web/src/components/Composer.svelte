@@ -35,6 +35,7 @@
     preview = true,
     tools,
     rows = 2,
+    compact = false,
     completions,
     onchips,
     onrecall,
@@ -71,6 +72,8 @@
     /** Switches for how the text is sent, such as pausing the lesson, at the start of the bottom row. */
     tools?: Snippet;
     rows?: number;
+    /** Empty and unfocused, the box rests as one line, its header and tools out of the way of what is listed above it. */
+    compact?: boolean;
     /** Suggestions beside LaTeX, and the chips they leave in the text (see lib/editor). */
     completions?: CompletionSource[];
     onchips?: (chips: ChipRange[]) => void;
@@ -88,6 +91,9 @@
   let dragging = $state(false);
   let picker = $state<HTMLInputElement>();
   const hintId = $derived(`${id ?? 'composer'}-keys`);
+
+  let focused = $state(false);
+  const resting = $derived(compact && !focused && !dragging && !uploading && !value.trim() && !images.length && !quote);
 
   const ready = $derived(!disabled && !uploading && (allowEmpty || value.trim() !== '' || (imagesAlone && images.length > 0)));
 
@@ -161,6 +167,11 @@
 <form
   class="composer"
   class:dragging
+  class:resting
+  onfocusin={() => (focused = true)}
+  onfocusout={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) focused = false;
+  }}
   aria-label={label}
   onsubmit={(event) => {
     event.preventDefault();
@@ -475,6 +486,16 @@
 
   .send {
     flex: none;
+  }
+
+  /* At rest only the text line shows; writing in it brings back where it goes and the tools. */
+  .resting .head,
+  .resting .bar {
+    display: none;
+  }
+
+  .resting .field :global(.cm-content) {
+    min-height: 1.5em;
   }
 
   .keys + .send {

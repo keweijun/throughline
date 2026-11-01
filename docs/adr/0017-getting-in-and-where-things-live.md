@@ -43,12 +43,14 @@ Everything in the app belongs to one of three levels, and each level has its pla
 
 **The side panel holds only what is used while reading a section**, in this order: **Questions** (used most, and it carries the count of open questions), **Source** (opened by citations), **Notes** (the learner's own). Memory leaves the side panel.
 
-**The Course page** is the course-level place. The course title in the top bar opens it in the reading column, like a chapter page. It holds, in this order:
+**The Course page** is the course-level place. A course button in the top bar, an outlined button with the course's name rather than a plain title, which learners would not expect to open anything, opens it in the reading column, like a chapter page. Under a strip of the course's chapters it shows one tab at a time, in this order, so Studio's and Memory's writing boxes never share the screen and nothing scrolls inside something else that scrolls:
 
-1. **Studio**, with this course's threads (below), in a frame of its own that scrolls inside the page, so its writing box stays in view and the parts below stay reachable. Above it, a strip of the course's chapters, each filled as its sections are studied, opens a chapter page.
-2. **Memory**, the confirmed preferences and the writing box for telling the teacher, in the learner's own words, what to remember (#114). Like Studio it sits in a frame of its own, so its writing box stays in view. A preference the teacher suggests is still asked inline, right after what suggested it, and `m` opens the Course page at Memory.
+1. **Studio**, with this course's threads (below), in a frame as tall as the window allows, so its writing box stays in view. The strip of chapters above the tabs fills as sections are studied, and each chapter in it opens its chapter page.
+2. **Memory**, the confirmed preferences and the writing box for telling the teacher, in the learner's own words, what to remember (#114). Like Studio it sits in a frame of its own, so its writing box stays in view. A preference the teacher suggests is still asked inline, right after what suggested it, and `m` opens the Course page at Memory, `d` at Studio; the page reopens at the tab the learner left.
 3. **Sources**: every document in the course, with what is not checked yet; choosing one opens it in the reader. Adding files and checking pages are Studio work, offered by Studio itself and below the route.
 4. **Your notes**: exporting them, which moves here from Settings → Course. The learner profile joins the page when it can be shown and corrected (#73).
+
+**The top bar reads by level**, from left to right: the app (Courses), the course (the course button, progress, Review), the section being read (Questions, Source, Notes), then Settings and Help, which are about the app but are reached rarely, at the far right.
 
 **Settings** keeps only what applies to every course: Appearance, Teacher and About, in that order. Language stays in Settings, under Appearance and shown first, even though a course keeps its own: it also sets the interface, and Settings is where learners look for it. Teaching preferences need no entry of their own, since they are course memory.
 

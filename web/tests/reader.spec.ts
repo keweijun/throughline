@@ -126,7 +126,29 @@ test('keyboard shortcuts move between sections and open the panels', async ({ pa
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wave superposition');
   await page.locator('h1').click();
   await page.keyboard.press('?');
-  await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Help' })).toBeVisible();
+});
+
+test('help maps what the learner can do by level and shows where each thing is', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.locator('#open-help').click();
+  const help = page.getByRole('dialog', { name: 'Help' });
+  await expect(help.getByRole('heading', { level: 3 })).toHaveText(['Throughline', 'This course', 'The section you are reading']);
+  await help.getByText('Keyboard shortcuts').click();
+  await expect(help.locator('kbd', { hasText: 'm' }).first()).toBeVisible();
+
+  // "Show me" closes Help and rings the real control where it is, without opening it.
+  const notes = help.getByRole('listitem').filter({ hasText: 'Only you see them' });
+  await notes.getByRole('button', { name: 'Show me' }).click();
+  await expect(help).toBeHidden();
+  await expect(page.locator('#toggle-notes')).toHaveClass(/spotlit/);
+  await expect(page.locator('#auxiliary')).toBeHidden();
+  await expect(page.locator('#toggle-notes')).not.toHaveClass(/spotlit/, { timeout: 5000 });
+
+  // Studio has no control of its own to point at; Help opens it on the Course page.
+  await page.keyboard.press('?');
+  await help.getByRole('listitem').filter({ hasText: 'Change the course with Codex' }).getByRole('button', { name: 'Open' }).click();
+  await expect(page.locator('#course-studio')).toBeVisible();
 });
 
 test('teacher settings save the Codex model and effort as they change', async ({ page, course }) => {
@@ -201,14 +223,32 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
 });
 
-test('course settings lead to teaching preferences, with no review schedule to set', async ({ page, course }) => {
+test('settings hold only what applies to every course; the course page holds the course', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const categories = page.getByRole('navigation', { name: 'Settings' }).getByRole('button');
+  await expect(categories).toHaveText(['Appearance', 'Teacher', 'About']);
   await expect(page.getByRole('spinbutton', { name: 'Daily reviews' })).toHaveCount(0);
-  await expect(page.getByText('None yet', { exact: false })).toBeVisible();
-  await page.getByRole('button', { name: 'Open course memory' }).click();
-  await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(page.getByText('No preferences yet', { exact: false })).toBeVisible();
+  // Language also sets the interface, so it stays in Settings, first, even though the course keeps it.
+  await expect(page.getByRole('radiogroup', { name: 'Language' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close' }).click();
+
+  // The course title opens the Course page, and the side panel no longer has a Memory view.
+  await expect(page.locator('#toggle-memory')).toHaveCount(0);
+  await page.locator('#open-course').click();
+  const coursePage = page.locator('main article[aria-labelledby="course-title"]');
+  await expect(coursePage.getByRole('heading', { level: 1 })).toBeVisible();
+  // One tab at a time; m opens Memory, and the arrow keys move between tabs.
+  await expect(coursePage.getByRole('tab')).toHaveCount(4);
+  await coursePage.getByRole('tab', { name: 'Course memory' }).click();
+  await expect(coursePage.getByText('No preferences yet', { exact: false })).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  await expect(coursePage.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await expect(coursePage.getByRole('tabpanel')).toContainText('Every document in the course');
+  await expect(coursePage.getByText('No preferences yet', { exact: false })).toBeHidden();
+  await coursePage.getByRole('button', { name: 'Back to reading' }).click();
+  await expect(coursePage).toHaveCount(0);
+  await expect(page.locator('main article[aria-labelledby="concept-title"]')).toBeVisible();
 });
 
 test('appearance offers the theme as cards and applies the choice at once', async ({ page, course }) => {

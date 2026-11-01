@@ -4,7 +4,6 @@
   import Questions from './Questions.svelte';
   import SourceViewer from './SourceViewer.svelte';
   import Notes from './Notes.svelte';
-  import Memory from './Memory.svelte';
 
   // The top bar's toggles are the panel's only navigation; each view keeps its own scroll position between visits.
   const scroll: Record<string, number> = {};
@@ -14,7 +13,6 @@
     questions: () => t('Questions'),
     source: () => t('Source'),
     notes: () => t('Notes'),
-    memory: () => t('Memory'),
   };
 
   let shown = app.panelTab;
@@ -90,7 +88,6 @@
     <div class="view docked" id="panel-questions" hidden={app.panelTab !== 'questions'}><Questions /></div>
     <div class="view" id="panel-source" hidden={app.panelTab !== 'source'}><SourceViewer /></div>
     <div class="view docked" id="panel-notes" hidden={app.panelTab !== 'notes'}><Notes /></div>
-    <div class="view" id="panel-memory" hidden={app.panelTab !== 'memory'}><Memory /></div>
   </div>
 </aside>
 

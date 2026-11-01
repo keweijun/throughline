@@ -79,11 +79,17 @@ _Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks ea
 **Skipped section**: A section deferred when the learner skipped the rest of its chapter or jumped past it to a later section; it stays on the route until a lesson there is studied.
 _Avoid_: Excluded, completed, mastered.
 
-**Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening. The view never edits a course; changes happen in Codex.
-_Avoid_: Course manager, a second store of progress.
+**Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
+_Avoid_: Course manager, a second store of progress, Studio (where courses are changed).
+
+**Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
+_Avoid_: Chat, workshop, side question, teaching.
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
+
+**Course page**: The place for one course as a whole, opened from the course title: Studio with the course's threads, course memory, the course's sources and its own settings (ADR 0017).
+_Avoid_: Chapter page, Settings (app-wide), the side panel (used while reading a section).
 
 **Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.
 _Avoid_: A second course with separate progress, a complete chat mirror.
@@ -109,7 +115,7 @@ _Avoid_: Answer image (it is no longer only for answers), upload.
 **Bookmark**: A learner annotation marking a section or a source location to come back to.
 _Avoid_: Deferred item, mainline restore point.
 
-**Course memory**: What the teacher keeps about one course: confirmed learner preferences (from teaching, or stated when the course was built), taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
+**Course memory**: What the teacher keeps about one course: confirmed learner preferences (from teaching, or stated when the course was built or in Studio), taught terms and difficulties, each citing the interactions behind it. The learner can see and edit it (ADR 0010).
 _Avoid_: Learner profile (reported when the course was built), learner annotation, evidence, mastery, chat history.
 
 **Taught term**: A term or notation recorded in course memory with the section, lesson step or side question that defined it; the teacher may use it without defining it again.

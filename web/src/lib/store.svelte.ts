@@ -3,9 +3,12 @@ import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
 import { locate, occurrences } from './highlight';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
+import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck } from './types';
 
-export type PanelTab = 'questions' | 'source' | 'notes' | 'memory';
+export type PanelTab = 'questions' | 'source' | 'notes';
+/** A tab of the Course page. */
+export type CoursePart = 'studio' | 'memory' | 'sources' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
 
@@ -114,6 +117,10 @@ class AppStore {
   viewingChapter = $state<string | null>(null);
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
+  /** The Course page replaces the reading column: the course as a whole (ADR 0017). */
+  courseOpen = $state(false);
+  /** The Course page's tab; it stays as the learner left it until something asks for another. */
+  coursePart = $state<CoursePart>('studio');
 
   panelOpen = $state(false);
   panelTab = $state<PanelTab>('questions');
@@ -131,7 +138,12 @@ class AppStore {
   /** Set by the app: the reading column has no room beside the full route, and the window is a phone's. */
   stageNarrow = $state(false);
   phone = $state(false);
-  shortcutsOpen = $state(false);
+  /** Help: what the learner can do by level, with the keyboard shortcuts (ADR 0017). */
+  helpOpen = $state(false);
+  /** One-time hints the learner has seen, saved per user (ADR 0017); null until loaded, so none flashes up. */
+  seen = $state<string[] | null>(null);
+  /** The hint on screen: hints show one at a time, and `owner` is the copy that claimed the place. */
+  hint = $state.raw<{ key: string; owner: object } | null>(null);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
   /** Annotation to scroll to and flash in the Notes tab. */
@@ -164,6 +176,11 @@ class AppStore {
   get libraryCourse() {
     const library = this.library;
     return library?.root ? library.courses.find((c) => c.path === library.active) : undefined;
+  }
+
+  /** The review page or the Course page is in the reading column instead of a section or chapter. */
+  get pageOpen() {
+    return this.reviewOpen || this.courseOpen;
   }
 
   get viewingId(): string | null {
@@ -344,6 +361,22 @@ class AppStore {
     }
   }
 
+  async loadSeen() {
+    try {
+      this.seen = (await api.get<{ seen: string[] }>('/api/seen')).seen;
+    } catch {
+      // Without the list no hint shows; nothing else depends on it.
+    }
+  }
+
+  /** Marks a hint seen, when it is dismissed or the learner does what it describes. */
+  markSeen(key: string) {
+    if (!this.seen || this.seen.includes(key)) return;
+    this.seen = [...this.seen, key];
+    if (this.hint?.key === key) this.hint = null;
+    api.post('/api/seen', { id: key }).catch(() => {});
+  }
+
   showLibrary() {
     this.libraryOpen = true;
     void this.loadLibrary();
@@ -416,6 +449,10 @@ class AppStore {
   }
 
   #apply(event: HostEvent) {
+    if (event.type === 'studio') {
+      studio.apply(event);
+      return;
+    }
     if (event.type === 'changed' && event.scope === 'course') {
       location.reload();
       return;
@@ -480,7 +517,7 @@ class AppStore {
 
   view(conceptId: string) {
     this.viewingChapter = null;
-    this.reviewOpen = false;
+    this.reviewOpen = this.courseOpen = false;
     this.viewing = conceptId === this.currentId ? null : conceptId;
     this.routeOpen = false;
     this.#chapterToggles = { at: null, open: {} };
@@ -693,6 +730,20 @@ class AppStore {
     this.panelOpen = true;
   }
 
+  /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
+  get studioShown() {
+    return this.courseOpen && !this.libraryOpen && this.coursePart === 'studio';
+  }
+
+  /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
+   * the box focused when `focus`. */
+  showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
+    // Studio is course-level, the first tab of the Course page (ADR 0017).
+    if (!this.studioShown) this.showCourse('studio');
+    if (thread && studio.threadId !== thread) void studio.open(thread);
+    if (focus) requestAnimationFrame(() => (document.querySelector('#studio-input') as HTMLElement | null)?.focus());
+  }
+
   /** Sets the panel width; a width the learner chose is kept for later visits unless `save` defers that. */
   resizePanel(width: number, chosen = true, save = chosen) {
     this.panelWidth = Math.round(Math.min(Math.max(width, 320), window.innerWidth * 0.62));
@@ -760,7 +811,7 @@ class AppStore {
 
   viewChapter(chapterId: string) {
     this.viewingChapter = chapterId;
-    this.reviewOpen = false;
+    this.reviewOpen = this.courseOpen = false;
     this.routeOpen = false;
     this.#chapterToggles = { at: null, open: {} };
     scrollStage(0);
@@ -768,18 +819,29 @@ class AppStore {
 
   /** Moving the position lands on the new section, unless the learner has gone elsewhere while it was being made. */
   async #move(action: () => Promise<unknown>) {
-    const before = [this.viewing, this.viewingChapter, this.reviewOpen];
+    const before = [this.viewing, this.viewingChapter, this.reviewOpen, this.courseOpen];
     if (await this.act(action)) {
-      const after = [this.viewing, this.viewingChapter, this.reviewOpen];
+      const after = [this.viewing, this.viewingChapter, this.reviewOpen, this.courseOpen];
       if (after.some((value, i) => value !== before[i])) return;
       this.viewing = this.viewingChapter = null;
-      this.reviewOpen = false;
+      this.reviewOpen = this.courseOpen = false;
       scrollStage(0);
     }
   }
 
   showReview() {
     this.reviewOpen = true;
+    this.courseOpen = false;
+    this.libraryOpen = false;
+    this.routeOpen = false;
+    scrollStage(0);
+  }
+
+  /** Opens the Course page, at one of its tabs when asked, else at the one the learner last had open. */
+  showCourse(part?: CoursePart) {
+    if (part) this.coursePart = part;
+    this.courseOpen = true;
+    this.reviewOpen = false;
     this.libraryOpen = false;
     this.routeOpen = false;
     scrollStage(0);

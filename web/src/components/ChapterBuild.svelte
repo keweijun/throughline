@@ -50,8 +50,8 @@
         {status ? t("Try building again") : t("Build this chapter")}
       </button>
       {#if (status === 'failed' || status === 'interrupted') && course}
-        <CodexLink prompt={t('$throughline build the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })}>
-          {t("Build this chapter in Codex")}
+        <CodexLink prompt={t('$throughline build the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })} origin={{ label: t('Chapter: {chapter}', { chapter: chapter.title }), text: `chapter "${chapter.title}" (${chapter.id})` }}>
+          {t("Build this chapter in Studio")}
         </CodexLink>
       {/if}
     </div>

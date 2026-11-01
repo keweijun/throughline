@@ -1,3 +1,5 @@
+import type { StudioEvent } from './studio.svelte';
+
 export type Ref = { source_id: string; revision: string; unit_id: string; detail?: string };
 
 export type Concept = {
@@ -385,7 +387,7 @@ export type DeltaEvent = { type: 'delta'; id: string; attempt: number; sequence:
 
 export type ChangeScope = 'state' | 'course' | 'library' | 'settings' | 'preferences' | 'preparation' | 'builds' | 'memory';
 
-export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope };
+export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope } | StudioEvent;
 
 
 export type LibraryCourse = {
@@ -402,3 +404,12 @@ export type LibraryCourse = {
 };
 
 export type Library = { root: string | null; active: string | null; courses: LibraryCourse[] };
+
+/** This computer's launcher, as the library card and Settings → About describe it; `darwin-home` is ~/Applications. */
+export type LauncherStatus = { platform: 'nt' | 'darwin' | 'darwin-home' | 'linux'; path: string; exists: boolean; dismissed: boolean };
+
+/** One check that Codex can run Throughline; `label` and `fix` are English, so known ids are worded in the interface. */
+export type CodexCheck = { id: string; ok: boolean; label: string; detail: string; fix: string };
+
+/** The checks so far; `checking` while the once-per-host probe of whether Codex answers runs. */
+export type CodexChecks = { checks: CodexCheck[]; checking: boolean };

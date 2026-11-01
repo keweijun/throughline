@@ -1,6 +1,6 @@
 import katex from 'katex';
-import { Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
-import { EditorView, keymap, placeholder as hint } from '@codemirror/view';
+import { Compartment, EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state';
+import { Decoration, EditorView, keymap, placeholder as hint, type DecorationSet } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import {
   acceptCompletion,
@@ -10,6 +10,7 @@ import {
   snippet,
   type Completion,
   type CompletionContext,
+  type CompletionSource,
 } from '@codemirror/autocomplete';
 import { linter, type Diagnostic } from '@codemirror/lint';
 import { inMath, mathSpans } from './markdown';
@@ -148,6 +149,53 @@ const formulaCheck = linter(
   { delay: 500 },
 );
 
+/**
+ * A chip: a skill (`$name`) or a file (`@path`) in Studio's box, as in Codex's own composer. It is one piece of the
+ * text that the cursor steps over and Backspace removes whole, and it remembers what it names, so a file name with
+ * spaces still names one file.
+ */
+export type Chip = { kind: 'skill' | 'mention'; name: string; path: string };
+export type ChipRange = { from: number; to: number; chip: Chip };
+
+const addChip = StateEffect.define<ChipRange>({ map: (value, change) => ({ ...value, from: change.mapPos(value.from), to: change.mapPos(value.to) }) });
+
+const chips = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(set, transaction) {
+    set = set.map(transaction.changes);
+    for (const effect of transaction.effects) {
+      if (effect.is(addChip) && effect.value.to > effect.value.from) {
+        const { from, to, chip } = effect.value;
+        set = set.update({ add: [Decoration.mark({ class: `cm-chip cm-chip-${chip.kind}`, chip }).range(from, to)] });
+      }
+    }
+    return set;
+  },
+  provide: (field) => [EditorView.decorations.from(field), EditorView.atomicRanges.of((view) => view.state.field(field))],
+});
+
+/** The chips in the text, in order. */
+export function chipsOf(state: EditorState): ChipRange[] {
+  const found: ChipRange[] = [];
+  state.field(chips, false)?.between(0, state.doc.length, (from, to, value) => {
+    found.push({ from, to, chip: value.spec.chip as Chip });
+  });
+  return found;
+}
+
+/** Puts a chip with `label` (and a space after it) in place of `from`–`to`, the cursor after it. */
+export function insertChip(view: EditorView, chip: Chip, label: string, from = view.state.selection.main.head, to = from) {
+  const before = from > 0 && !/\s/.test(view.state.sliceDoc(from - 1, from)) ? ' ' : '';
+  const start = from + before.length;
+  view.dispatch({
+    changes: { from, to, insert: `${before}${label} ` },
+    effects: addChip.of({ from: start, to: start + label.length, chip }),
+    selection: { anchor: start + label.length + 1 },
+    userEvent: 'input.complete',
+  });
+  view.focus();
+}
+
 export type EditorOptions = {
   value: string;
   id?: string;
@@ -161,6 +209,14 @@ export type EditorOptions = {
   oncancel?: () => void;
   /** Pasted content; return true when it was taken, such as images being attached. */
   onpaste?: (event: ClipboardEvent) => boolean;
+  /** More suggestions beside LaTeX, fixed when the editor is made: Studio's `$` skills and `@` files. */
+  completions?: CompletionSource[];
+  /** Called with the chips whenever they change. */
+  onchips?: (chips: ChipRange[]) => void;
+  /** The up arrow in an empty box puts back what this returns, as Codex recalls the last message. */
+  onrecall?: () => string | null;
+  /** Hands over the editor, for inserting chips from outside it (an attached file). */
+  onview?: (view: EditorView) => void;
 };
 
 /**
@@ -226,6 +282,11 @@ const look = EditorView.theme({
   '.cm-diagnostic': { padding: '0.35rem 0.6rem', borderLeft: 'none', borderRadius: '6px', fontSize: 'var(--step--1)', whiteSpace: 'normal' },
   '.cm-diagnostic-error': { borderLeft: 'none', backgroundColor: 'var(--danger-wash)', color: 'var(--danger)' },
   '.cm-diagnosticSource': { display: 'block', marginTop: '0.15rem', fontSize: '0.75rem', color: 'var(--pencil)', opacity: '1' },
+
+  // A chip: a skill or file named in the text, set off like a tag; skills take the accent, files the pencil.
+  '.cm-chip': { padding: '0.05rem 0.3rem', borderRadius: '5px', fontFamily: 'var(--mono)', fontSize: '0.92em' },
+  '.cm-chip-skill': { backgroundColor: 'var(--accent-wash)', color: 'var(--accent)' },
+  '.cm-chip-mention': { backgroundColor: 'var(--rule)', color: 'var(--ink-soft)' },
 });
 
 function extensions(options: () => EditorOptions, placeholder: Compartment): Extension[] {
@@ -237,8 +298,9 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
     // Only brackets pair up: quotes and dollar signs are as often prose (an apostrophe, a price) as math.
     EditorState.languageData.of(() => [{ closeBrackets: { brackets: ['(', '[', '{'] } }]),
     closeBrackets(),
-    autocompletion({ override: [latex], icons: false, maxRenderedOptions: 60 }),
+    autocompletion({ override: [latex, ...(initial.completions ?? [])], icons: false, maxRenderedOptions: 60 }),
     formulaCheck,
+    chips,
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', run: () => (options().onsend(), true) },
@@ -246,6 +308,19 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
       ]),
     ),
     Prec.high(keymap.of([{ key: 'Escape', run: () => (options().oncancel ? (options().oncancel!(), true) : false) }])),
+    Prec.high(
+      keymap.of([
+        {
+          key: 'ArrowUp',
+          run: (view) => {
+            const recalled = view.state.doc.length === 0 ? options().onrecall?.() : null;
+            if (!recalled) return false;
+            view.dispatch({ changes: { from: 0, insert: recalled }, selection: { anchor: recalled.length } });
+            return true;
+          },
+        },
+      ]),
+    ),
     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
     EditorView.contentAttributes.of(() => {
       const { id, label, describedBy } = options();
@@ -254,6 +329,9 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
     EditorView.domEventHandlers({ paste: (event) => options().onpaste?.(event) ?? false }),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) options().onchange(update.state.doc.toString());
+      if (options().onchips && (update.docChanged || update.transactions.some((tr) => tr.effects.some((e) => e.is(addChip))))) {
+        options().onchips!(chipsOf(update.state));
+      }
     }),
     look,
     EditorView.theme({ '.cm-content': { minHeight: `${(initial.rows ?? 2) * 1.5}em` } }),
@@ -269,6 +347,7 @@ export function editor(node: HTMLElement, initial: EditorOptions) {
     parent: node,
     state: EditorState.create({ doc: initial.value, extensions: extensions(() => options, placeholder) }),
   });
+  initial.onview?.(view);
   return {
     update(next: EditorOptions) {
       const changed = next.id !== options.id || next.label !== options.label || next.describedBy !== options.describedBy;

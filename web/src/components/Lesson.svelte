@@ -8,6 +8,7 @@
   import TurnControls from './TurnControls.svelte';
   import CheckQuestion from './CheckQuestion.svelte';
   import SuggestedMemory from './SuggestedMemory.svelte';
+  import Hint from './Hint.svelte';
 
   let { turn }: { turn: Turn } = $props();
 
@@ -162,7 +163,7 @@
       class="prose lesson-body"
       bind:clientWidth={width}
       bind:this={body}
-      use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (ref) => app.openSource(ref), streaming: turn.status === 'running' }}
+      use:markdown={{ language: locale.language, text: turn.text, refs: turn.source_refs, onSource: (ref) => (app.markSeen('hint-citation'), app.openSource(ref)), streaming: turn.status === 'running' }}
 
     ></div>
   {:else if turn.status === 'running'}
@@ -170,6 +171,12 @@
   {/if}
 
   <SuggestedMemory entries={app.suggestedBy([turn.id])} />
+  {#if turn.status === 'completed' && turn.text}
+    <Hint id="select-passage">{t('Select any passage in the lesson to ask about it, highlight it or add a note.')}</Hint>
+    {#if turn.source_refs?.length}
+      <Hint id="citation">{t('Point at a citation to see the text it cites; click it to open the page beside the lesson.')}</Hint>
+    {/if}
+  {/if}
 
   {#if check && step && entry}
     <CheckQuestion lessonId={step.lesson.id} turnId={turn.id} {check} answer={entry.answer} more={planned.length > 0} oncorrect={next} />

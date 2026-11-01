@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { sendKeys } from '../lib/keys';
-  import { editor } from '../lib/editor';
+  import { editor, type ChipRange } from '../lib/editor';
+  import type { CompletionSource } from '@codemirror/autocomplete';
+  import type { EditorView } from '@codemirror/view';
   import { markdown, hasMath } from '../lib/markdown';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
@@ -33,6 +35,11 @@
     preview = true,
     tools,
     rows = 2,
+    completions,
+    onchips,
+    onrecall,
+    onview,
+    onfiles,
   }: {
     id?: string;
     value: string;
@@ -63,6 +70,13 @@
     /** Switches for how the text is sent, such as pausing the lesson, at the start of the bottom row. */
     tools?: Snippet;
     rows?: number;
+    /** Suggestions beside LaTeX, and the chips they leave in the text (see lib/editor). */
+    completions?: CompletionSource[];
+    onchips?: (chips: ChipRange[]) => void;
+    onrecall?: () => string | null;
+    onview?: (view: EditorView) => void;
+    /** Takes files that are not images, dropped, pasted or chosen; without it the box takes images only. */
+    onfiles?: (files: File[]) => void;
   } = $props();
 
   const IMAGE_TYPES = 'image/png,image/jpeg,image/gif,image/webp';
@@ -106,28 +120,37 @@
   }
 
   const imageFiles = (data: DataTransfer | null) => [...(data?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+  const otherFiles = (data: DataTransfer | null) => (onfiles ? [...(data?.files ?? [])].filter((f) => !f.type.startsWith('image/')) : []);
+
+  /** Images go to the box's images, other files to `onfiles`; true when anything was taken. */
+  function take(data: DataTransfer | null) {
+    const images = imagesKey ? imageFiles(data) : [];
+    const others = otherFiles(data);
+    if (images.length) void attach(images);
+    if (others.length) onfiles?.(others);
+    return images.length + others.length > 0;
+  }
 
   function paste(event: ClipboardEvent) {
-    const files = imagesKey ? imageFiles(event.clipboardData) : [];
-    if (!files.length) return false;
+    if (!take(event.clipboardData)) return false;
     event.preventDefault();
-    void attach(files);
     return true;
   }
 
   function dragover(event: DragEvent) {
-    if (!imagesKey || !event.dataTransfer?.types.includes('Files')) return;
+    if (!(imagesKey || onfiles) || !event.dataTransfer?.types.includes('Files')) return;
     event.preventDefault();
     dragging = true;
   }
 
   function drop(event: DragEvent) {
     dragging = false;
-    const files = imagesKey ? imageFiles(event.dataTransfer) : [];
-    if (!files.length) return;
+    if (!event.dataTransfer?.files.length) return;
     event.preventDefault();
-    void attach(files);
+    take(event.dataTransfer);
   }
+
+  let filePicker = $state<HTMLInputElement>();
 
   const url = (name: string) => `/api/images/${encodeURIComponent(name)}`;
 </script>
@@ -167,7 +190,7 @@
   {/if}
   <div
     class="field"
-    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, onchange: onvalue, onsend: send, oncancel, onpaste: paste }}
+    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, onchange: onvalue, onsend: send, oncancel, onpaste: paste, completions, onchips, onrecall, onview }}
   ></div>
   {#if math && showPreview && rendered}
     <section class="preview" aria-label={t("Preview")}>
@@ -208,6 +231,30 @@
           <rect x="2.75" y="3.75" width="14.5" height="12.5" rx="2" />
           <circle cx="7.25" cy="8" r="1.5" />
           <path d="M3 14.5l4.25-4 3.25 3 2.5-2.25 4.25 3.75" />
+        </svg>
+      </button>
+    {/if}
+    {#if onfiles}
+      <input
+        bind:this={filePicker}
+        class="visually-hidden"
+        type="file"
+        multiple
+        tabindex="-1"
+        aria-hidden="true"
+        onchange={(e) => {
+          const input = e.currentTarget;
+          const files = [...(input.files ?? [])];
+          const images = files.filter((f) => f.type.startsWith('image/'));
+          if (images.length && imagesKey) void attach(images);
+          const others = files.filter((f) => !f.type.startsWith('image/'));
+          if (others.length) onfiles(others);
+          input.value = '';
+        }}
+      />
+      <button type="button" class="icon" onclick={() => filePicker?.click()} aria-label={t("Attach files")} title={t("Attach files · or drop them here")}>
+        <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M14.5 9.5l-5.3 5.3a3.2 3.2 0 0 1-4.5-4.5l6-6a2.1 2.1 0 0 1 3 3l-6 6a1 1 0 0 1-1.5-1.5l5.3-5.3" />
         </svg>
       </button>
     {/if}

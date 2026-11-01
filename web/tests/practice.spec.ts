@@ -68,10 +68,10 @@ test('skipping two exercises for the same reason suggests a preference to confir
     if (index === 0) await expect(banner).toHaveCount(0);
   }
   await expect(banner).toBeVisible();
-  await expect(page.locator('#toggle-memory .count')).toHaveText('1');
+  await expect(page.locator('#open-course .dot')).toHaveCount(1);
   await banner.getByRole('button', { name: 'Remember', exact: true }).click();
   await expect(banner).toBeHidden();
-  await page.locator('#toggle-memory').click();
+  await page.keyboard.press('m');
   await expect(page.locator('.memory-panel #memory-preference')).toContainText('Fewer long calculations');
 });
 

@@ -132,8 +132,8 @@
         </p>
         <p class="note">{t("From the course plan. A linked location is not a promise that every formula on it was taught.")}</p>
         {#if coverage.review && course}
-          <CodexLink prompt={t('$throughline review the pages that still need review in the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })}>
-            {t("Check this chapter's source locations in Codex")}
+          <CodexLink prompt={t('$throughline review the pages that still need review in the chapter "{chapter}" of the course {course}', { chapter: chapter.title, course: course.name })} origin={{ label: t('Chapter: {chapter}', { chapter: chapter.title }), text: `chapter "${chapter.title}" (${chapter.id})` }}>
+            {t("Check this chapter's source locations in Studio")}
           </CodexLink>
         {/if}
       </section>

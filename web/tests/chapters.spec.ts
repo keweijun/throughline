@@ -226,3 +226,18 @@ test('in a long course the route opens at where the learner is, and folding keep
   await expect(rail.locator('.current .entry')).toBeInViewport();
   expect(errors).toEqual([]);
 });
+
+test('the course page shows every chapter at a glance and opens one', async ({ page, course }) => {
+  const { errors } = await course('chapters_browser_fixture');
+  await page.keyboard.press('m');
+  const strip = page.getByRole('list', { name: 'Chapters' }).getByRole('button');
+  await expect(strip).not.toHaveCount(0);
+  // The chapter being studied is outlined, and each segment says how far it has got.
+  await expect(page.locator('.strip .segment.current')).toHaveCount(1);
+  await expect(strip.first()).toHaveAttribute('aria-label', /of \d+ sections studied/);
+  const title = (await strip.last().getAttribute('aria-label'))!.split(':')[0];
+  await strip.last().click();
+  await expect(page.locator('#chapter-title')).toHaveText(title);
+  await expect(page.locator('main article[aria-labelledby="course-title"]')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

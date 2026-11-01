@@ -3,16 +3,17 @@
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { exportNotes } from '../lib/notes';
-  import type { CodexModel, Settings } from '../lib/types';
+  import { studio } from '../lib/studio.svelte';
+  import type { CodexModel, LauncherStatus, Settings } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
+  import LauncherHelp from './LauncherHelp.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
-  type Pane = 'course' | 'teacher' | 'appearance' | 'about';
+  type Pane = 'teacher' | 'appearance' | 'about';
 
 
   let dialog: HTMLDialogElement | undefined = $state();
-  let pane = $state<Pane>('course');
+  let pane = $state<Pane>('appearance');
   let model = $state('');
   let smallModel = $state('');
   let serviceTier = $state('');
@@ -24,20 +25,33 @@
   let savingTeacher = $state(false);
   let savingLanguage = $state(false);
   let about = $state<{ version: string } | null>(null);
+  let launcher = $state<LauncherStatus | null>(null);
   let updateError = $state('');
   let checking = $state(false);
+  let savingAccess = $state(false);
+  // Studio's access belongs to the learner; read when the Teacher pane opens, since on Windows it depends on Codex.
+  $effect(() => {
+    if (pane === 'teacher' && app.settingsOpen) void studio.loadAccess();
+  });
+
+  async function setFullAccess(on: boolean) {
+    savingAccess = true;
+    try {
+      await studio.setFullAccess(on);
+    } catch (e) {
+      app.error = e instanceof Error ? e.message : String(e);
+    }
+    savingAccess = false;
+  }
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
-  // Without an open course there is nothing course-wide to set; the language then sits under Appearance, shown first.
-  const panes = $derived<{ id: Pane; label: MessageKey }[]>(
-    app.state
-      ? [{ id: 'course', label: 'Course' }, { id: 'teacher', label: 'Teacher' }, { id: 'appearance', label: 'Appearance' }, { id: 'about', label: 'About' }]
-      : [{ id: 'appearance', label: 'Appearance' }, { id: 'teacher', label: 'Teacher' }, { id: 'about', label: 'About' }],
-  );
-  const confirmedPreferences = $derived(
-    app.state?.memory.filter((entry) => entry.kind === 'preference' && entry.status === 'confirmed').length ?? 0,
-  );
+  // Settings hold only what applies to every course; the course's own things are on its Course page (ADR 0017).
+  const panes: { id: Pane; label: MessageKey }[] = [
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'teacher', label: 'Teacher' },
+    { id: 'about', label: 'About' },
+  ];
   // The tier Codex calls Fast for the chosen teacher model (or the Codex default model).
   const fastTier = $derived.by(() => {
     const chosen = models?.find((m) => (model ? m.id === model : m.default));
@@ -92,6 +106,11 @@
     } catch {
       // The pane still works without the version.
     }
+    try {
+      launcher = await api.get<LauncherStatus>('/api/launcher');
+    } catch {
+      // Nor does it need the launcher.
+    }
   }
 
   async function checkForUpdates() {
@@ -136,20 +155,6 @@
     savingLanguage = false;
   }
 
-  const notes = $derived(app.state?.annotations.length ?? 0);
-  let exporting = $state(false);
-
-  async function exportAll() {
-    exporting = true;
-    await exportNotes();
-    exporting = false;
-  }
-
-  function openMemory() {
-    app.settingsOpen = false;
-    app.openPanel('memory');
-  }
-
   function changeTheme(next: Theme) {
     theme = next;
     const root = document.documentElement;
@@ -192,9 +197,7 @@
   <!-- One 24-unit grid and one stroke weight, so the four read as a set. -->
   <span class="glyph" aria-hidden="true">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-      {#if id === 'course'}
-        <path d="M3.5 5.6c3.2-.6 6-.1 8.5 1.8 2.5-1.9 5.3-2.4 8.5-1.8v12.2c-3.2-.6-6-.1-8.5 1.8-2.5-1.9-5.3-2.4-8.5-1.8zM12 7.4v12.2" />
-      {:else if id === 'teacher'}
+      {#if id === 'teacher'}
         <path d="M12 4.5 2.5 9 12 13.5 21.5 9zM6.5 11.2v4.4c1.6 1.6 3.4 2.4 5.5 2.4s3.9-.8 5.5-2.4v-4.4M21.5 9v5.5" />
       {:else if id === 'about'}
         <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.2" /><circle cx="12" cy="7.9" r="1.1" fill="currentColor" stroke="none" />
@@ -241,46 +244,13 @@
       {/each}
       {#if pane !== 'about'}
         <p class="scope">
-          {pane === 'course'
-            ? t("Saved in this course.")
-            : pane === 'teacher'
-              ? t("Saved for your user account, for every course.")
-              : t("Saved in this browser.")}
+          {pane === 'teacher' ? t("Saved for your user account, for every course.") : t("Saved in this browser.")}
         </p>
       {/if}
     </nav>
 
     <div class="pane">
-      {#if pane === 'course' && app.state}
-        <h3>{t("Course")}</h3>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Language")}</span>
-            <p>{t("The interface and new teaching content. Sources and saved lessons keep their language.")}</p>
-          </div>
-          {@render languageChoice()}
-        </div>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Teaching preferences")}</span>
-            <p>
-              {confirmedPreferences ? t("{count} confirmed", { count: confirmedPreferences }) : t("None yet")}.
-              {t("Tell the teacher how you like to be taught; it asks before remembering it.")}
-            </p>
-          </div>
-          <button class="btn btn-small" onclick={openMemory}>{t("Open course memory")}</button>
-        </div>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Your notes")}</span>
-            <p>
-              {notes === 1 ? t("1 highlight, note or bookmark") : t("{count} highlights, notes and bookmarks", { count: notes })}.
-              {t("Export them as one Markdown file, by chapter and section; notes with images come as a ZIP with an images folder.")}
-            </p>
-          </div>
-          <button class="btn btn-small" disabled={!notes || exporting} onclick={exportAll}>{exporting ? t("Exporting…") : t("Export notes")}</button>
-        </div>
-      {:else if pane === 'teacher'}
+      {#if pane === 'teacher'}
         <h3>{t("Teacher")}</h3>
         <p class="lead">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
         {#if settings}
@@ -332,6 +302,30 @@
               />
             </div>
           {/if}
+
+          <h4>{t("Studio")}</h4>
+          <p class="lead">{t("Studio is where Codex creates and changes your courses. It reads any file you point it to and writes inside your Throughline folder without asking.")}</p>
+          <div class="setting">
+            <div class="text">
+              <label class="title" for="full-access">{t("Full access")}</label>
+              <p>
+                {#if studio.access?.forced}
+                  {t("Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.")}
+                {:else}
+                  {t("Let Codex change files anywhere and run commands without asking, as Codex can in its own app. Off, it asks before writing outside your Throughline folder or using the network.")}
+                {/if}
+              </p>
+            </div>
+            <input
+              id="full-access"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={studio.access?.full_access ?? false}
+              disabled={!studio.access || studio.access.forced || savingAccess}
+              onchange={(event) => void setFullAccess(event.currentTarget.checked)}
+            />
+          </div>
 
           <h4>{t("Background work")}</h4>
           <p class="lead">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
@@ -392,11 +386,18 @@
             {/if}
           </div>
           {#if app.update?.available}
-            <CodexLink class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+            <CodexLink chat class="btn btn-primary btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
           {:else}
             <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
           {/if}
         </div>
+
+        {#if launcher}
+          <div class="setting stacked">
+            <div class="text"><span class="title">{t("Opening Throughline next time")}</span></div>
+            <div><LauncherHelp {launcher} /></div>
+          </div>
+        {/if}
 
         <h4>{t("Credits")}</h4>
         <div class="credits">
@@ -409,15 +410,17 @@
         </div>
       {:else}
         <h3>{t("Appearance")}</h3>
-        {#if !app.state}
-          <div class="setting">
-            <div class="text">
-              <span class="title">{t("Language")}</span>
-              <p>{t("For this page. Each course keeps its own language once it is open.")}</p>
-            </div>
-            {@render languageChoice()}
+        <div class="setting">
+          <div class="text">
+            <span class="title">{t("Language")}</span>
+            <p>
+              {app.state
+                ? t("The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.")
+                : t("For this page. Each course keeps its own language once it is open.")}
+            </p>
           </div>
-        {/if}
+          {@render languageChoice()}
+        </div>
         <div class="setting stacked">
           <div class="text"><span class="title">{t("Theme")}</span></div>
           <div class="themes" role="radiogroup" aria-label={t("Theme")}>

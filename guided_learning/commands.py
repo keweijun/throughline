@@ -1,4 +1,4 @@
-"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop and courses."""
+"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop, courses and doctor."""
 import argparse
 import json
 import os
@@ -23,85 +23,49 @@ LIBRARY_MARKER = '<!-- Written by guided-learning setup; rerunning setup replace
 LANGUAGES = ('en', 'zh-CN')
 LAUNCHER_HINTS = {
     'nt': {'en': 'search for "Throughline" in the Start menu', 'zh-CN': '在开始菜单中搜索“Throughline”'},
-    'darwin': {'en': 'open Throughline from Launchpad, Spotlight, or Applications in your home folder', 'zh-CN': '从启动台、聚焦搜索或个人文件夹中的“应用程序”打开 Throughline'},
+    'darwin': {'en': 'open Throughline from Launchpad, Spotlight or the Applications folder', 'zh-CN': '从启动台、聚焦搜索或“应用程序”文件夹打开 Throughline'},
+    'darwin-home': {'en': 'open Throughline from Launchpad, Spotlight, or Applications in your home folder', 'zh-CN': '从启动台、聚焦搜索或个人文件夹中的“应用程序”打开 Throughline'},
     'linux': {'en': 'open Throughline from your app menu', 'zh-CN': '从应用菜单中打开 Throughline'},
-    None: {'en': 'ask Codex "$throughline open"', 'zh-CN': '在 Codex 中输入“$throughline 打开”'},
+    None: {'en': 'run `throughline` in a terminal, or ask Codex "$throughline open"', 'zh-CN': '在终端运行 `throughline`，或在 Codex 中输入“$throughline 打开”'},
 }
+# Where a macOS launcher goes when the shared Applications folder is writable; tests point it elsewhere.
+APPLICATIONS = Path('/Applications')
+BUNDLE_ID = 'io.github.keweijun.throughline'
 
 
-def welcome(root, launcher, language):
-    """The guide setup prints for Codex to show the learner in the install chat."""
-    platform = None if not launcher else 'nt' if os.name == 'nt' else 'darwin' if sys.platform == 'darwin' else 'linux'
-    hint = LAUNCHER_HINTS[platform][language]
+def platform():
+    return 'nt' if os.name == 'nt' else 'darwin' if sys.platform == 'darwin' else 'linux'
+
+
+def launcher_hint(launcher, language):
+    """How to open Throughline next time, in the words of this platform."""
+    kind = platform() if launcher else None
+    if kind == 'darwin' and Path(launcher).parent != APPLICATIONS:
+        kind = 'darwin-home'
+    return LAUNCHER_HINTS[kind][language]
+
+
+def welcome(root, launcher, language, opened=False):
+    """The short guide setup prints for Codex to show the learner; the app explains the rest itself."""
+    hint = launcher_hint(launcher, language)
+    # "New course" names the library's button both before and after Studio (#109 settles the final wording).
     if language == 'zh-CN':
-        return f"""## 欢迎使用贯学（Throughline）
+        first = ('贯学已在浏览器中打开：在课程库中选择“New course”（新建课程），建你的第一门课。' if opened
+                 else '现在打开贯学，在课程库中选择“New course”（新建课程），建你的第一门课。')
+        return f"""## 贯学（Throughline）{version()} 已安装
 
-贯学把你自己的 PDF、Markdown 笔记和习题集变成一门有引导的课程，并在浏览器中讲授。讲课由 Codex 在后台完成，学习时不需要打开 Codex。
+- 贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
+- 以后打开贯学：{hint}。
 
-**学习是什么样的**
-- **学习路线**：材料被整理成章和节，每节回答一个核心问题，先修内容排在前面，多份文件按同一条主线讲。
-- **分步讲解**：每次讲一小步，可能附一道快速检查题；讲解旁边就是引用的原文页面。
-- **随时提问**：选中任意段落即可提问，回答完回到原来的位置。
-- **练习**：优先使用你自己的习题，按小问逐一批改；太简单或不相关的题可以跳过。
-- **复习**：学过的小节会按逐渐拉长的间隔出现复习题，每章还有可选的章节小测。
-- **记住你**：高亮、笔记和书签随课程保存；老师会记住你的学习偏好、已讲过的术语和反复出错的地方，你可以查看和修改。
+{first}"""
+    first = ('Throughline is open in your browser: make your first course from the library with **New course**.' if opened
+             else 'Open Throughline now and make your first course from the library with **New course**.')
+    return f"""## Throughline {version()} is installed
 
-**在 Codex 里用 `$throughline` 建课**
-在任意 Codex 对话中以 `$throughline` 开头，例如：
-- `$throughline 用这些文件建一门课`（再附上文件，或写出它们所在的文件夹）
-- `$throughline 用 ~/Documents/量子力学 建一门课，1 月 15 日期末考试`
-- `$throughline 把这份习题加入 quantum`
-- `$throughline 打开 quantum`
+- Your Throughline folder: `{root}`. Each course is a folder inside it.
+- To open Throughline next time, {hint}.
 
-**建课时 Codex 会做什么**
-Codex 先读你的文件，告诉你它看到了什么，然后问几个问题，每个问题都给出选项并标出推荐：你的目标和截止时间、各项先修知识掌握得怎样（可以做几道快速检查题来确认）、希望讲多细、哪些内容要侧重或跳过、你喜欢怎样学习。回一个词就行；回“好”表示都按推荐，回“直接建”就跳过剩下的问题。之后它给出学习路线供你调整，建好后在贯学中打开课程，并说明哪些页面还需核对。
-
-**准备什么材料**
-- 文字可选中的 PDF 或 Markdown 笔记效果最好；扫描页也能用，但会标记为待核对。
-- 有习题集和答案的话一起带上，练习会用到它们。
-- 不必一次带齐，之后随时可以加文件。
-
-**文件在哪里**
-贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
-
-**之后怎么学习**
-{hint}。课程库会列出所有课程，“在 Codex 中…”按钮会打开一段已经写好请求的 Codex 对话。界面顶部可以在 English 和简体中文之间切换。想更新贯学时，对 Codex 说 `Update https://github.com/keweijun/throughline`，课程会保留。
-
-想现在就建第一门课吗？在这里输入 `$throughline`，附上你的文件，说一句你想学到什么程度。"""
-    return f"""## Welcome to Throughline
-
-Throughline turns your own PDFs, Markdown notes and problem sets into a guided course and teaches it in your browser. Codex teaches in the background, so you don't need Codex open to study.
-
-**What studying looks like**
-- **A route** through your materials: chapters and sections, each answering one core question, prerequisites first, one line of teaching across all your files.
-- **Lessons in short steps**, sometimes with a quick check question, and the cited page of your source beside each explanation.
-- **Questions about any passage**: select it and ask, then pick up where you were.
-- **Practice** from your own problem sets where you have them, marked part by part; skip what is too easy or off topic.
-- **Reviews** of sections you've passed at growing intervals, and an optional quiz for each chapter.
-- **It remembers**: your highlights, notes and bookmarks, and a course memory of how you like to learn, the terms already explained and what keeps tripping you up, which you can see and edit.
-
-**Build a course in Codex with `$throughline`**
-Start any Codex chat with `$throughline`, for example:
-- `$throughline make a course from these files` (then attach them, or name the folder they're in)
-- `$throughline make a course from ~/Documents/quantum for my final on 15 January`
-- `$throughline add this problem set to quantum`
-- `$throughline open quantum`
-
-**What Codex does while building**
-Codex reads your files first and tells you what it found. Then it asks a few questions, each with options and a recommendation: your goal and deadline, how well you know each prerequisite (with an optional quick check), how much detail you want, what to emphasize or skip, and how you like to learn. Answer in a word, reply "ok" to take the recommendations, or "just build it" to skip the rest. It then proposes a route for you to adjust, builds it, opens the course in Throughline and says which pages still need checking.
-
-**What to bring**
-- PDFs with selectable text, or Markdown notes, work best; scanned pages work too but are flagged for review.
-- Problem sets, and their solutions if you have them: practice draws on them.
-- You don't need everything now; you can add files to a course later.
-
-**Where things are**
-Your Throughline folder: `{root}`. Each course is a folder inside it.
-
-**Study afterwards**
-To open Throughline, {hint}. The library lists every course; its "in Codex" buttons open a Codex chat with the request already written. Switch between English and Simplified Chinese at the top. To update Throughline, tell Codex `Update https://github.com/keweijun/throughline`; your courses are kept.
-
-Want to build your first course now? Type `$throughline` here, attach your files and say in a sentence what you want to learn."""
+{first}"""
 
 
 LIBRARY_AGENTS = LIBRARY_MARKER + '''
@@ -124,7 +88,7 @@ New learners often start with a bare request such as "help me create my first co
 
 If they are unsure what to learn, suggest goals that fit their files. Then wait for the files and the goal before building, and follow the `$throughline` skill's intake once both are clear.
 '''
-COMMANDS = ('setup', 'open', 'stop', 'courses')
+COMMANDS = ('setup', 'open', 'stop', 'courses', 'doctor')
 
 
 def version():
@@ -162,13 +126,37 @@ def write_library_agents(root):
     return True
 
 
+def mac_applications():
+    """The shared Applications folder when this user can write to it, otherwise Applications in the home folder."""
+    return APPLICATIONS if os.access(APPLICATIONS, os.W_OK) else Path.home() / 'Applications'
+
+
+def launcher_path():
+    """Where this platform's launcher is, or would be once setup adds it."""
+    kind = platform()
+    if kind == 'nt':
+        return Path(os.environ.get('APPDATA', Path.home())) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Throughline.lnk'
+    if kind == 'darwin':
+        for folder in (APPLICATIONS, Path.home() / 'Applications'):
+            if (folder / 'Throughline.app').is_dir():
+                return folder / 'Throughline.app'
+        return mac_applications() / 'Throughline.app'
+    return Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'applications' / 'throughline.desktop'
+
+
+def _ours_on_mac(app):
+    try:
+        return BUNDLE_ID in (app / 'Contents' / 'Info.plist').read_text(encoding='utf-8')
+    except OSError:
+        return False
+
+
 def install_launcher():
     """An app-menu entry that runs `guided-learning open`; returns where it was put, or None."""
-    if os.name == 'nt':
+    if platform() == 'nt':
         executable = windowless_python()
-        folder = Path(os.environ.get('APPDATA', Path.home())) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs'
-        folder.mkdir(parents=True, exist_ok=True)
-        target = folder / 'Throughline.lnk'
+        target = launcher_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
         script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:GL_LNK);"
                   "$s.TargetPath=$env:GL_EXE;$s.Arguments='-m guided_learning open';$s.Description='Throughline';"
                   "$s.IconLocation=$env:GL_ICON+',0';$s.Save()")
@@ -177,14 +165,18 @@ def install_launcher():
                                 creationflags=subprocess.CREATE_NO_WINDOW)
         return target if result.returncode == 0 else None
     command = f'"{sys.executable}" -m guided_learning open'
-    if sys.platform == 'darwin':
-        app = Path.home() / 'Applications' / 'Throughline.app' / 'Contents'
+    if platform() == 'darwin':
+        bundle = mac_applications() / 'Throughline.app'
+        for other in (APPLICATIONS / 'Throughline.app', Path.home() / 'Applications' / 'Throughline.app'):
+            if other != bundle and _ours_on_mac(other):  # one launcher only, so Spotlight finds one Throughline
+                shutil.rmtree(other, ignore_errors=True)
+        app = bundle / 'Contents'
         (app / 'MacOS').mkdir(parents=True, exist_ok=True)
-        (app / 'Info.plist').write_text('''<?xml version="1.0" encoding="UTF-8"?>
+        (app / 'Info.plist').write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>Throughline</string>
-<key>CFBundleIdentifier</key><string>io.github.keweijun.throughline</string>
+<key>CFBundleIdentifier</key><string>{BUNDLE_ID}</string>
 <key>CFBundleExecutable</key><string>Throughline</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>throughline</string>
@@ -195,10 +187,9 @@ def install_launcher():
         launcher = app / 'MacOS' / 'Throughline'
         launcher.write_text(f'#!/bin/sh\nexec {command}\n', encoding='utf-8')
         launcher.chmod(0o755)
-        return app.parent
-    folder = Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'applications'
-    folder.mkdir(parents=True, exist_ok=True)
-    target = folder / 'throughline.desktop'
+        return bundle
+    target = launcher_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
     icon = ICONS / 'throughline.png'
     target.write_text(f'[Desktop Entry]\nType=Application\nName=Throughline\nComment=Study your courses\n'
                       f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Education;\n', encoding='utf-8')
@@ -279,11 +270,30 @@ def setup(args):
         import pypdf  # noqa: F401
     except ImportError:
         print('Warning: PDF support is missing; install the package with the [pdf] extra to read PDFs.')
+    opened = False if args.no_open else open_app()
     print()
     print('Show the learner this welcome guide as written:')
     print()
-    print(welcome(root, launcher, args.language))
+    print(welcome(root, launcher, args.language, opened))
     return 0
+
+
+def open_app():
+    """Start the host and open the library in the browser, as setup's last step. Never fails setup."""
+    try:
+        record = running() or _spawn(8765) or _spawn(0)
+        if not record:
+            print(f'Throughline did not start; see {library.state_dir() / "host.log"}.')
+            return False
+        url = f"http://127.0.0.1:{record['port']}/"
+        print(f'Throughline is open at {url}')
+        # With no display, webbrowser would pick a console browser and take over the terminal Codex is reading.
+        if platform() == 'linux' and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+            return False
+        return bool(webbrowser.open(url))
+    except Exception as exc:  # setup has done its work; opening the app is a convenience
+        print(f'Throughline could not be opened ({exc}); open it with the launcher.')
+        return False
 
 
 def _call(port, method, path, body=None, timeout=2):
@@ -390,11 +400,38 @@ def courses(args):
     return 0
 
 
+def doctor(args):
+    """A readable check of the install, for the learner or Codex; exits 1 when something needs fixing."""
+    from . import checks
+    root = library.default_root()
+    launcher = launcher_path()
+    host = running()
+    print(f'Throughline {version()}')
+    found = checks.codex_checks()
+    rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
+            for check in found]
+    if all(check['ok'] for check in found):
+        from .server.settings import TeacherSettings
+        print('  Asking Codex for a one-word reply...', flush=True)
+        answer = checks.codex_answers(checks.probe_model(TeacherSettings()))
+        said = f"{answer['model']} replied in {answer['seconds']} s" if answer['ok'] else f"{answer['detail']} ({answer['model']}, {answer['seconds']} s)"
+        rows.append((answer['ok'], answer['label'], said, answer['fix']))
+    rows += [(root.is_dir(), 'Course library', str(root), 'Run `guided-learning setup`'),
+             (launcher.exists(), 'Launcher', str(launcher), 'Run `guided-learning setup`'),
+             (None, 'Throughline', f"running at http://127.0.0.1:{host['port']}/" if host else 'not running', '')]
+    for ok, label, detail, fix in rows:
+        print(f"  {'ok  ' if ok else '--  ' if ok is None else 'FAIL'}  {label}: {detail}")
+        if ok is False and fix:
+            print(f'        {fix}')
+    return 1 if any(ok is False for ok, *_ in rows) else 0
+
+
 def main(argv):
     parser = argparse.ArgumentParser(prog='guided-learning')
     commands = parser.add_subparsers(dest='command', required=True)
     setup_parser = commands.add_parser('setup', help='Install or update the Codex skill, the course library and the launcher')
     setup_parser.add_argument('--no-launcher', action='store_true')
+    setup_parser.add_argument('--no-open', action='store_true', help='Do not open Throughline when setup is done')
     setup_parser.add_argument('--language', choices=LANGUAGES, default='en', help='Language of the welcome guide')
     opener = commands.add_parser('open', help='Start the learning interface in the background and open it')
     opener.add_argument('course', nargs='?', help='Course name in the library')
@@ -402,5 +439,6 @@ def main(argv):
     opener.add_argument('--no-browser', action='store_true')
     commands.add_parser('stop', help='Stop the background learning interface')
     commands.add_parser('courses', help='List the courses in the library as JSON')
+    commands.add_parser('doctor', help='Check that Throughline and Codex are ready')
     args = parser.parse_args(argv)
-    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses}[args.command](args)
+    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor}[args.command](args)

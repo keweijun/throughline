@@ -30,7 +30,7 @@ test('the library lists courses, opens one and switches back', async ({ page, co
   expect(errors).toEqual([]);
 });
 
-test('Codex actions copy their request, and an open course links back to Codex', async ({ page, course }) => {
+test('Codex actions copy their request, and an open course links to Studio with a Codex chat as fallback', async ({ page, course }) => {
   // Clicking a codex: link would leave the test page; the copy still runs.
   await page.addInitScript(() => {
     (window as unknown as { copied: string[] }).copied = [];
@@ -52,7 +52,8 @@ test('Codex actions copy their request, and an open course links back to Codex',
 
   await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
   const rail = page.getByRole('navigation', { name: 'Course route' });
-  const add = new URL(await rail.getByRole('link', { name: 'Add files in Codex' }).getAttribute('href') ?? '');
+  // In a course the link opens Studio; its address stays the Codex chat it falls back to where Studio cannot run.
+  const add = new URL(await rail.getByRole('link', { name: 'Add files in Studio' }).getAttribute('href') ?? '');
   expect(add.searchParams.get('prompt')).toBe('$throughline add these files to the course linear-algebra: ');
   expect(add.searchParams.get('path')).toBe(library.root);
   expect(errors).toEqual([]);

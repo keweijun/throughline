@@ -8,6 +8,8 @@
   import FoldedRoute from './FoldedRoute.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
+  // The section on the page, which Add files names as where the request came from.
+  const viewedSection = $derived(app.viewingId ? app.concept(app.viewingId) : undefined);
   const currentIndex = $derived(app.routeIndex(app.currentId));
   const saved = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -110,7 +112,7 @@
     });
   }
   $effect(() => {
-    void [app.viewingId, app.viewingChapter, app.reviewOpen, app.currentId, app.folded, app.routeOpen, nav, full];
+    void [app.viewingId, app.viewingChapter, app.pageOpen, app.currentId, app.folded, app.routeOpen, nav, full];
     reveal();
     const settled = setTimeout(reveal, 260);
     return () => clearTimeout(settled);
@@ -125,7 +127,7 @@
   {@const waiting = saved.get(id)}
   {@const skipped = app.isSkipped(id)}
   {@const step = status === 'current' ? app.stepProgress(id) : null}
-  {@const viewing = id === app.viewingId && !app.viewingChapter && !app.reviewOpen}
+  {@const viewing = id === app.viewingId && !app.viewingChapter && !app.pageOpen}
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
     <span class="node" aria-hidden="true"><span class="route-dot {status}" class:viewing class:skipped></span></span>
     <button class="entry" class:viewing aria-current={viewing ? 'page' : undefined} onclick={() => app.view(id)}>
@@ -186,8 +188,8 @@
               ><span aria-hidden="true">{number + 1}</span></button>
               <button
                 class="entry chapter-name"
-                class:viewing={app.viewingChapter === chapter.id && !app.reviewOpen}
-                aria-current={app.viewingChapter === chapter.id && !app.reviewOpen ? 'page' : undefined}
+                class:viewing={app.viewingChapter === chapter.id && !app.pageOpen}
+                aria-current={app.viewingChapter === chapter.id && !app.pageOpen ? 'page' : undefined}
                 onclick={() => app.viewChapter(chapter.id)}
               >
                 <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>
@@ -221,11 +223,11 @@
     {/if}
     {#if course}
       <section class="codex" aria-labelledby="codex-title">
-        <h3 id="codex-title">{t('Change this course in Codex')}</h3>
-        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
+        <h3 id="codex-title">{t('Change this course in Studio')}</h3>
+        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })} origin={viewedSection ? { label: t('Section: {section}', { section: viewedSection.title }), text: `section "${viewedSection.title}" (${viewedSection.id})` } : null}>{t('Add files in Studio')}</CodexLink>
         {#if course.needs_review}
           <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
-            {t('Check {count} source locations in Codex', { count: course.needs_review })}
+            {t('Check {count} source locations in Studio', { count: course.needs_review })}
           </CodexLink>
         {/if}
       </section>

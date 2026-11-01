@@ -61,7 +61,7 @@
     <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.sourceList = false)}>← {t("Back to {title}", { title: app.source.title })}</button>
   {/if}
   {#if !entries.length}
-    <p class="muted">{t("No documents are registered in this course yet. Add files from Codex.")}</p>
+    <p class="muted">{t("No documents are registered in this course yet. Add files in Studio.")}</p>
   {/if}
   {#each [
     { title: t("Used in this section"), items: here },

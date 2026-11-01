@@ -17,7 +17,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import images as attached, library, updates
+from .. import checks as codex_checks, images as attached, library, updates
+from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
 from . import state as public_state
@@ -291,9 +292,13 @@ class ActiveHost:
         return getattr(self._courses.require(), name)
 
 
-def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None):
+def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None,
+               launcher=None, checks=None):
+    """`launcher` and `checks` (a `CodexStatus`) stand in for this computer's launcher and Codex in tests."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     seen = Seen(courses.settings.path.with_name('seen.json'))
+    launcher = launcher or Launcher()
+    checks = checks or codex_checks.CodexStatus(courses.settings)
     if workspace:
         courses.open(workspace)
     host = ActiveHost(courses)
@@ -599,6 +604,29 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         except OperationError as exc:
             return JSONResponse({'error': str(exc), 'code': exc.code}, 502)
 
+    @app.get('/api/launcher')
+    def launcher_view():
+        return {**launcher.status(), 'dismissed': 'launcher' in seen.all()}
+
+    @app.post('/api/launcher/desktop')
+    def launcher_to_desktop():
+        return launcher.add_to_desktop()
+
+    @app.post('/api/launcher/show')
+    def show_launcher():
+        return launcher.show()
+
+    @app.get('/api/checks')
+    def checks_view():
+        """Whether Codex can run Throughline; the library shows the ones that fail (ADR 0017). Never waits for the
+        probe of whether Codex answers: it starts once per host, and `checking` says it is still running."""
+        return checks.view()
+
+    @app.post('/api/checks')
+    def check_again():
+        """Check again, the probe included; the answer arrives through GET."""
+        return checks.again()
+
     @app.get('/api/health')
     def health():
         """A cheap liveness probe for `guided-learning open` and `stop`."""
@@ -715,7 +743,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     return app
 
 
-def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None):
+def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None,
+          launcher=None, checks=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -723,7 +752,8 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
-    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root, studio_command=studio_command)
+    app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
+                     studio_command=studio_command, launcher=launcher, checks=checks)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

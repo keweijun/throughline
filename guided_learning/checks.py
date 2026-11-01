@@ -83,3 +83,45 @@ def codex_checks(checks=None, runner=run):
     context = {'run': runner}
     found = (check(context) for check in (CODEX_CHECKS if checks is None else checks))
     return [outcome for outcome in found if outcome]
+
+
+class CodexStatus:
+    """What the library shows about Codex. The cheap checks run on every request; the probe runs in the background at
+    most once per host, the first time the library asks, and its result, a failure too, is kept until `again()`."""
+
+    def __init__(self, settings=None, cheap=codex_checks, probe=None):
+        self.cheap = cheap
+        self.probe = probe or (lambda: codex_answers(probe_model(settings)))
+        self.lock = threading.Lock()
+        self.answer = None
+        self.checking = False
+        self.started = False
+
+    def _start(self):
+        with self.lock:
+            if self.checking:
+                return
+            self.checking = self.started = True
+        threading.Thread(target=self._probe, name='codex-probe', daemon=True).start()
+
+    def _probe(self):
+        try:
+            answer = self.probe()
+        except Exception as exc:  # a bug in the probe must not leave the library checking forever
+            answer = result('answers', False, f'{exc.__class__.__name__}: {exc}')
+        with self.lock:
+            self.answer, self.checking = answer, False
+
+    def view(self):
+        """Never waits for the probe: while it runs, `checking` is true and the last answer, if any, is kept."""
+        found = self.cheap()
+        if all(check['ok'] for check in found) and not self.started:
+            self._start()
+        with self.lock:
+            answer = [self.answer] if self.answer and all(check['ok'] for check in found) else []
+            return {'checks': found + answer, 'checking': self.checking}
+
+    def again(self):
+        if all(check['ok'] for check in self.cheap()):
+            self._start()
+        return self.view()

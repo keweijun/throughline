@@ -213,3 +213,13 @@ export function highlights(node: HTMLElement, params: { passages: Passage[]; tex
     },
   };
 }
+
+let fading: ReturnType<typeof setTimeout> | undefined;
+
+/** Marks for a moment the passage a search took the learner to. */
+export function flash(range: Range) {
+  if (!('highlights' in CSS)) return;
+  CSS.highlights.set('found', new Highlight(range));
+  clearTimeout(fading);
+  fading = setTimeout(() => CSS.highlights.delete('found'), 2400);
+}

@@ -1,7 +1,8 @@
 import { tick } from 'svelte';
 import { locale, t, type Language } from './i18n.svelte';
 import { api, ApiError, newId } from './api';
-import { locate, occurrences } from './highlight';
+import { flash, locate, occurrences } from './highlight';
+import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
@@ -176,6 +177,8 @@ class AppStore {
   phone = $state(false);
   /** Help: what the learner can do by level, with the keyboard shortcuts (ADR 0017). */
   helpOpen = $state(false);
+  /** Search across the course (Shift Shift, Ctrl+K). */
+  searchOpen = $state(false);
   /** One-time hints the learner has seen, saved per user (ADR 0017); null until loaded, so none flashes up. */
   seen = $state<string[] | null>(null);
   /** The hint on screen: hints show one at a time, and `owner` is the copy that claimed the place. */
@@ -649,12 +652,12 @@ class AppStore {
 
   /**
    * Once the reading column has re-rendered, scrolls to a passage in a lesson, else to `fallback` (a page offset),
-   * else to the lesson itself. `occurrence`, or else `near`, picks between repeats of the passage.
+   * else to the lesson itself. `occurrence`, or else `near`, picks between repeats of the passage; `flash` marks it.
    */
   async #scrollToLesson(
     turnId: string | null | undefined,
     passage: string | null | undefined,
-    options: { near?: number; fallback?: number; occurrence?: number } = {},
+    options: { near?: number; fallback?: number; occurrence?: number; flash?: boolean } = {},
   ) {
     await tick();
     requestAnimationFrame(() => {
@@ -668,6 +671,7 @@ class AppStore {
       else if (options.fallback !== undefined) top = options.fallback;
       else if (lesson) top = stageOffset(lesson.getBoundingClientRect().top) - 24;
       if (top !== null) scrollStage(Math.max(0, top));
+      if (range && options.flash) flash(range);
     });
   }
 
@@ -812,8 +816,11 @@ class AppStore {
     this.openPanel('notes');
   }
 
-  /** Brings an annotation's lesson passage or source back into view. */
-  async goTo(annotation: Annotation) {
+  /** Brings an annotation's lesson passage or source back into view, or a passage a search found (`flash` marks it). */
+  async goTo(
+    annotation: Pick<Annotation, 'concept_id' | 'turn_id' | 'passage'> & Partial<Pick<Annotation, 'task_id' | 'occurrence' | 'source'>>,
+    { flash: marked = false } = {},
+  ) {
     if (annotation.source) {
       void this.openSource({ ...annotation.source });
       return;
@@ -843,10 +850,29 @@ class AppStore {
           : undefined;
         if (range) scrollStage(Math.max(0, stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3));
         else exercise.scrollIntoView({ block: 'center', behavior: 'instant' });
+        if (range && marked) flash(range);
       });
       return;
     }
-    if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0 });
+    if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0, flash: marked });
+  }
+
+  /** Opens what a search hit points to (`search.ts`). */
+  async reveal(target: Target) {
+    this.searchOpen = false;
+    if (target.kind === 'chapter') this.viewChapter(target.id);
+    else if (target.kind === 'section') this.view(target.id);
+    else if (target.kind === 'passage') await this.goTo(target, { flash: true });
+    else if (target.kind === 'question') {
+      this.focusThread = target.id;
+      this.openPanel('questions');
+    } else if (target.kind === 'note') this.showAnnotation(target.id);
+    else if (target.kind === 'source') await this.openSource(target.ref);
+    else {
+      this.showReview();
+      await tick();
+      requestAnimationFrame(() => document.getElementById(`exercise-${target.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    }
   }
 
   /** A section's own exercises, oldest first, each variant right after the exercise it was written like; chapter quiz

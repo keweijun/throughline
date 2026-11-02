@@ -16,6 +16,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Help from './components/Help.svelte';
+  import Search from './components/Search.svelte';
   import ErrorToast from './components/ErrorToast.svelte';
   import Library from './components/Library.svelte';
 
@@ -74,7 +75,28 @@
     if (next) app.view(next);
   }
 
+  // Search opens with Shift pressed twice on its own, as in JetBrains IDEs, or with Ctrl+K (⌘K on a Mac).
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  let shiftAlone = false;
+  let shiftAt = 0;
+  const searchable = () => !!app.state && !app.libraryOpen && !app.searchOpen;
+
+  function onKeyUp(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !shiftAlone) return;
+    shiftAlone = false;
+    if (event.timeStamp - shiftAt < 400 && searchable()) {
+      shiftAt = 0;
+      app.searchOpen = true;
+    } else shiftAt = event.timeStamp;
+  }
+
   function onKey(event: KeyboardEvent) {
+    shiftAlone = event.key === 'Shift' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (event.key.toLowerCase() === 'k' && (mac ? event.metaKey : event.ctrlKey) && !event.altKey && !event.shiftKey && searchable()) {
+      event.preventDefault();
+      app.searchOpen = true;
+      return;
+    }
     if (event.key === 'Escape') {
       if (app.routeOpen) app.routeOpen = false;
       else if (app.libraryOpen && app.state && !(event.target as HTMLElement).closest('dialog')) app.libraryOpen = false;
@@ -101,7 +123,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} onkeyup={onKeyUp} onpointerdown={() => (shiftAlone = false)} />
 
 <TopBar />
 
@@ -146,6 +168,7 @@
 <SettingsDialog />
 <CitationPeek />
 <Help />
+<Search />
 <ErrorToast />
 
 <style>

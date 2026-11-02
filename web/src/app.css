@@ -137,6 +137,11 @@ a {
   background-color: var(--mine-wash);
 }
 
+/* The passage a search opened, marked for a moment. */
+::highlight(found) {
+  background-color: var(--marker-wash);
+}
+
 /* A formula inside a highlighted or asked passage is painted whole: KaTeX's glyph boxes would leave gaps. */
 [data-highlight-mine] > .katex,
 [data-highlight-mine] > .katex-display > .katex {

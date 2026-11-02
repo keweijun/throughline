@@ -30,6 +30,7 @@
               { title: 'Overview', text: 'The course as a whole: Studio, what the teacher remembers, sources and your notes. Overview, Learn and Review are the course\'s three places.', target: '#open-course', key: 'm' },
               { title: 'Studio', text: 'Codex itself, working on your course. If you can describe a change, it can probably make it: new sections or exercises, added files, a different way of teaching.', key: 'd', open: () => app.showStudio({ focus: true }) },
               { title: 'Review', text: 'Questions to answer from memory on what you have studied, whenever you ask for them.', target: '#open-review' },
+              { title: 'Search', text: 'Find any section, lesson passage, question, exercise, note or source page in this course.', target: '#open-search', key: 'Shift Shift' },
             ] as Item[],
           },
           {
@@ -46,6 +47,7 @@
   ]);
 
   const keys: [string, MessageKey][] = [
+    ['Shift Shift', 'Search this course'],
     ['c', 'Continue the lesson'],
     ['/', 'Ask a side question'],
     ['[', 'Previous section'],
@@ -208,7 +210,7 @@
 
   dl div {
     display: grid;
-    grid-template-columns: 3rem 1fr;
+    grid-template-columns: 6rem 1fr;
     align-items: center;
     font-size: var(--step--1);
   }

@@ -47,6 +47,24 @@ class CourseCLI(unittest.TestCase):
         self.assertEqual(len(self.call('course.status')['sources']), 1)
 
 
+    def test_source_search_finds_every_word_in_the_current_revision(self):
+        self.call('course.init', title='Quantum')
+        path = self.base / 'notes.md'
+        path.write_text('Wave functions\n' + 'filler ' * 40 + 'The Schrödinger equation governs the wave function.\nNothing here', encoding='utf-8')
+        source = self.call('source.register', path=str(path))['source']
+        found = self.call('source.search', query='schrödinger WAVE')
+        self.assertEqual([u['unit_id'] for u in found['units']], ['line-2'])
+        unit = found['units'][0]
+        self.assertEqual((unit['source_id'], unit['revision'], unit['path'], unit['matches']), (source['id'], source['revision'], str(path), 1))
+        self.assertTrue(unit['excerpt'].startswith('…'), 'the excerpt is cut before the match')
+        self.assertIn('The Schrödinger equation governs', unit['excerpt'])
+        self.assertEqual(self.call('source.search', query='wave', limit=1), {'units': [found['units'][0] | {'unit_id': 'line-1', 'locator': {'line': 1}, 'excerpt': 'Wave functions', 'matches': 1}], 'more': True})
+        path.write_text('Only particles now', encoding='utf-8')
+        self.call('source.register', path=str(path))
+        self.assertEqual(self.call('source.search', query='schrödinger')['units'], [], 'an earlier revision is not searched')
+        self.assertEqual(self.call('source.search', query='   ')['units'], [])
+        self.call('source.search', query=3, error='invalid_request')
+
     def test_missing_and_corrupt_sources_are_visible_without_losing_previous_revision(self):
         self.call('course.init', title='Quantum')
         path = self.base / 'missing.md'

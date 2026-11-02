@@ -122,4 +122,40 @@ def units(store, request):
         raise OperationError('invalid_request', 'refs must be a list')
     return {'sources': [{**ref, 'unit': source_unit(store, ref)} for ref in refs]}
 
-OPERATIONS = {'source.register': register, 'source.read': read, 'source.units': units}
+def search(store, request):
+    """Units of each source's current revision whose text holds every word of `query`, ignoring case, in source and
+    unit order: each with an excerpt around its first match and how many times the first word occurs. At most `limit`."""
+    query = request.get('query')
+    if not isinstance(query, str):
+        raise OperationError('invalid_request', 'query must be a string')
+    terms = query.lower().split()
+    limit = request.get('limit', 50)
+    if not isinstance(limit, int) or limit < 1:
+        raise OperationError('invalid_request', 'limit must be a positive integer')
+    found = []
+    for source in store.list('sources') if terms else []:
+        snapshot = store.shared('source_revisions', source['id'] + ':' + str(source['revision'])) or {'units': []}
+        for unit in snapshot['units']:
+            text = unit.get('text') or ''
+            lowered = text.lower()
+            if len(lowered) != len(text) or not all(term in lowered for term in terms):
+                continue
+            found.append({'source_id': source['id'], 'revision': source['revision'], 'unit_id': unit['id'], 'path': source['path'],
+                          'locator': unit.get('locator'), 'excerpt': excerpt(text, lowered.find(terms[0]), len(terms[0])),
+                          'matches': lowered.count(terms[0])})
+            if len(found) == limit:
+                return {'units': found, 'more': True}
+    return {'units': found, 'more': False}
+
+def excerpt(text, at, length, before=60, after=160):
+    """The text around a match, cut at spaces, with ellipses where it was cut."""
+    start, end = max(0, at - before), min(len(text), at + length + after)
+    if start:
+        space = text.find(' ', start, at)
+        start = space + 1 if space >= 0 else start
+    if end < len(text):
+        space = text.rfind(' ', at + length, end)
+        end = space if space >= 0 else end
+    return ('…' if start else '') + ' '.join(text[start:end].split()) + ('…' if end < len(text) else '')
+
+OPERATIONS = {'source.register': register, 'source.read': read, 'source.units': units, 'source.search': search}

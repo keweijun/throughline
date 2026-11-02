@@ -69,9 +69,24 @@ def stamp(path):
     return stat(database), stat(database.with_name('course.sqlite3-wal'))
 
 
+# Each course's summary and the database stamp it was read at: the library lists every course on each visit, and most
+# have not changed since the last one.
+_summaries = {}
+
+
 def summary(path):
     """What the library shows for one course; reads through operations, never edits."""
     path = Path(path).resolve()
+    taken = stamp(path)  # before reading, so a write during the read is seen next time
+    cached = _summaries.get(path)
+    if cached and cached[0] == taken:
+        return dict(cached[1])
+    value = _summary(path)
+    _summaries[path] = (taken, value)
+    return dict(value)
+
+
+def _summary(path):
     status = execute(path, {'op': 'course.status'})
     curriculum = execute(path, {'op': 'curriculum.view'})
     coverage = execute(path, {'op': 'curriculum.coverage'})

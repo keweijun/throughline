@@ -51,6 +51,12 @@ class Store:
     def list(self, namespace):
         return [json.loads(row[0]) for row in self.db.execute('SELECT value FROM documents WHERE namespace=? ORDER BY key', (namespace,))]
 
+    def matching(self, namespace, field, value):
+        """Documents whose top-level `field` equals `value`, ordered by key. SQLite reads the field, so documents that
+        do not match are never decoded."""
+        return [json.loads(row[0]) for row in self.db.execute(
+            'SELECT value FROM documents WHERE namespace=? AND json_extract(value, ?)=? ORDER BY key', (namespace, '$.' + field, value))]
+
     def delete(self, namespace, key):
         self.db.execute('DELETE FROM documents WHERE namespace=? AND key=?', (namespace, key))
 

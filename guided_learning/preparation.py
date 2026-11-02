@@ -26,8 +26,8 @@ def target(store):
 
 
 def brief(job):
-    """A job without its snapshot and material."""
-    return {k: v for k, v in job.items() if k not in ('snapshot', 'content')}
+    """A job without its snapshot and material, keeping the snapshot's teaching language."""
+    return {**{k: v for k, v in job.items() if k not in ('snapshot', 'content')}, 'language': job['snapshot'].get('language', 'en')}
 
 
 def reconcile(store, request):
@@ -76,8 +76,8 @@ def view(store, request):
     return {'jobs':jobs,'next_concept_id':target(store),'ready':ready}
 
 def recover(store, request):
-    for job in store.list('preparation_jobs'):
-        if job['status']=='running' and store.get('streams',job['id']) is None:
+    for job in store.matching('preparation_jobs', 'status', 'running'):
+        if store.get('streams',job['id']) is None:
             job.update(status='failed',reason='Preparation startup interrupted; the main teacher will prepare independently')
             store.put('preparation_jobs',job['id'],job)
     return reconcile(store,{})

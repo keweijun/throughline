@@ -258,11 +258,13 @@ class Courses:
     def watch(self, seen):
         """Tell open tabs when Codex changes a course or the library from outside the app."""
         while not self.stopping.wait(self.watch_interval):
+            host = self.host
             current = self._fingerprints()
+            # The host announces its own writes; only a change made outside it, by Codex say, reloads the course.
+            outside = host is not None and not host.own_change(self._stamps.get(host.workspace, (None,))[0])
             if current != seen:
                 self.events.publish({'type': 'changed', 'scope': 'library'})
-                host = self.host
-                if host and current.get(host.workspace) != seen.get(host.workspace):
+                if host and outside and current.get(host.workspace) != seen.get(host.workspace):
                     self.events.publish({'type': 'changed', 'scope': 'state'})
                     host._wake_background()
             seen = current
@@ -809,8 +811,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/library/open')
     def open_course(body: OpenCourseRequest):
-        courses.open_named(body.name)
-        return courses.view()
+        # The interface reloads after opening a course, so the library listing is left for it to ask for.
+        return {'active': str(courses.open_named(body.name).workspace)}
 
     @app.post('/api/shutdown')
     def shutdown():

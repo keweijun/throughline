@@ -231,11 +231,13 @@ def resume(store, request):
 
 
 def recover(store, request):
-    for turn in store.list('streams'):
-        if turn['status'] == 'running':
-            turn['status'] = 'interrupted'
-            turn['error'] = 'Learning server stopped; regenerate to resume this lesson'
-            store.put('streams',turn['id'],turn)
-    return OPERATIONS['stream.list'](store,request)
+    """Mark turns left running by a stopped host as interrupted; returns their IDs."""
+    recovered = []
+    for turn in store.matching('streams', 'status', 'running'):
+        turn['status'] = 'interrupted'
+        turn['error'] = 'Learning server stopped; regenerate to resume this lesson'
+        store.put('streams',turn['id'],turn)
+        recovered.append(turn['id'])
+    return {'recovered': recovered}
 
 OPERATIONS.update({'stream.pause':pause,'stream.resume':resume,'stream.recover':recover})

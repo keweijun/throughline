@@ -12,3 +12,5 @@ Each course workspace stores `course/schema` = `{"version": N}`. `guided_learnin
 Copying a course to a computer with an older Throughline now gives a clear "update Throughline" error instead of silent misreads. The cost is one small read per operation and the discipline of writing a migration plus a test with an old-format fixture whenever stored data changes shape.
 
 The first migration (version 2) replaces the whole lesson record that each side question copied into `selected_lecture`, and into every answer's prompt snapshot, with the lesson's id, section, title, text and source references.
+
+Migration 7 moves frozen prompt snapshots and prepared material out of the turn and preparation job records into records of their own (ADR 0018).

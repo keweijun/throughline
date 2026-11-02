@@ -4,7 +4,7 @@ recorded as an interaction, never as evidence. Lessons saved before this module 
 import random
 import time
 from .memory import from_check
-from .streaming import PREPARED_STEP, reveal
+from .streaming import PREPARED_STEP, load, reveal
 from .store import OperationError
 from .teaching import record_interaction, require_text, validate_concept
 
@@ -139,7 +139,7 @@ def prepare(store, request):
     if turn_id is None:
         lesson.pop('prepared', None)
     else:
-        turn = store.get('streams', require_text(request, 'turn_id'))
+        turn = load(store, require_text(request, 'turn_id'))
         ahead = (turn or {}).get('prompt_snapshot', {}).get('lesson_step') or {}
         if not turn or turn['channel'] != PREPARED_STEP or ahead.get('lesson_id') != lesson['id']:
             raise OperationError('not_prepared', 'Prepare a step with a prepared_step turn of this lesson')

@@ -329,7 +329,8 @@ class Host:
             if event['kind'] in ('complete', 'failed'):
                 self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
-                    self.completed(result['turn'])
+                    # Stored text comes back without the turn's prompt snapshot, which completion hooks read.
+                    self.completed(self.operation({'op': 'stream.read', 'id': identifier})['turn'])
                 self.changed(FINISHED.get(result['turn']['channel'], 'state'))
         emit.sequence = 0
 

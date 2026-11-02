@@ -141,7 +141,22 @@ def review_sets(store):
         store.put('course', 'preferences', {k: v for k, v in preferences.items() if k != 'daily_reviews'})
 
 
-MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments, chapter_owned_recaps, review_sets]
+def separate_frozen_payloads(store):
+    """A turn's prompt snapshots and a preparation job's snapshot and material move out of the records listed every few
+    seconds, into `stream_snapshots` and `preparation_payloads` (ADR 0018). A turn keeps its section's title, which
+    listings show, and a job keeps its snapshot's fingerprint and language, which scheduling compares."""
+    from . import preparation, streaming
+    for turn in store.list('streams'):
+        if 'prompt_snapshot' in turn or any('prompt_snapshot' in a for a in turn.get('attempts', [])):
+            if streaming.title(turn):
+                turn.setdefault('title', streaming.title(turn))
+            streaming.save(store, turn)
+    for job in store.list('preparation_jobs'):
+        if any(k in job for k in preparation.PAYLOAD):
+            preparation.save(store, job)
+
+
+MIGRATIONS = [slim_selected_lectures, group_flat_routes, date_assessments, chapter_owned_recaps, review_sets, separate_frozen_payloads]
 VERSION = len(MIGRATIONS) + 1
 
 

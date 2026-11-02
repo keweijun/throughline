@@ -113,7 +113,9 @@ class Migrations(unittest.TestCase):
         self.assertEqual(self.stored_version(), migrations.VERSION)
         stored = lambda ns: {json.loads(v)['id']: json.loads(v) for (v,) in self.raw('SELECT value FROM documents WHERE namespace=?', ns)}
         turns, jobs, migrated = stored('streams'), stored('practice_jobs'), stored('practice_tasks')
-        self.assertEqual(turns['recap:1'], {**recap, 'chapter_id': 'one'}, 'owned by the chapter, still anchored to its last section')
+        read = execute(self.workspace, {'op': 'stream.read', 'id': 'recap:1'})['turn']
+        self.assertEqual(read, {**recap, 'chapter_id': 'one'}, 'owned by the chapter, still anchored to its last section')
+        self.assertNotIn('prompt_snapshot', turns['recap:1'], 'from version 7 the snapshot is kept apart')
         self.assertEqual(turns['recap:2'], moved, 'a recap whose section left every chapter stays anchored to it')
         self.assertEqual(turns['lesson-1'], lesson)
         self.assertEqual(jobs['practice-1'], {**job, 'purpose': 'chapter_quiz', 'chapter_id': 'one', 'quiz_id': 'practice-1', 'earlier': []})
@@ -177,6 +179,56 @@ class Migrations(unittest.TestCase):
             migrations.review_sets(store)  # idempotent on an already migrated course
             self.assertEqual({t['id']: t for t in store.list('practice_tasks')}, tasks)
             self.assertEqual({s['id']: s for s in store.list('review_sets')}, sets)
+        finally:
+            store.db.close()
+
+    def test_snapshots_and_prepared_material_move_apart_from_a_version_6_course(self):
+        import json
+        from guided_learning.store import Store
+        execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
+        execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
+        execute(self.workspace, {'op': 'mainline.enter', 'request_id': 'enter', 'concept_id': 'a', 'goal': 'Learn A', 'next_step': 'Start'})
+        self.put('course', 'schema', {'version': 6})
+        snapshot = {'context': {'concept': {'id': 'a', 'title': 'Amplitudes'}}, 'route': ['big'] * 50, 'language': 'en'}
+        # A lesson resumed once: the attempt it replaced kept its own snapshot.
+        lesson = {'id': 'lesson', 'concept_id': 'a', 'channel': 'mainline', 'status': 'completed', 'started_at': 1, 'attempt': 2,
+                  'text': 'Amplitudes add.', 'final_text': 'Amplitudes add.', 'sequence': 3, 'prompt_snapshot': snapshot, 'resume_requests': ['r'],
+                  'attempts': [{'attempt': 1, 'text': 'Ampl', 'status': 'interrupted', 'prompt_snapshot': {**snapshot, 'language': 'zh-CN'}}]}
+        bare = {'id': 'bare', 'concept_id': 'a', 'channel': 'mainline', 'status': 'completed', 'started_at': 2}
+        self.put('streams', 'lesson', lesson)
+        self.put('streams', 'bare', bare)
+        store = Store(self.workspace)
+        try:
+            from guided_learning.preparation import capture
+            prepared = capture(store, 'b')
+        finally:
+            store.db.close()
+        ready = {'id': 'ready', 'concept_id': 'b', 'status': 'ready', 'created_at': 3, 'snapshot': prepared, 'content': 'Prepared notes'}
+        stale = {'id': 'stale', 'concept_id': 'a', 'status': 'stale', 'created_at': 4, 'reason': 'Route changed', 'snapshot': {**prepared, 'fingerprint': 'old'}}
+        self.put('preparation_jobs', 'ready', ready)
+        self.put('preparation_jobs', 'stale', stale)
+
+        execute(self.workspace, {'op': 'course.status'})
+
+        self.assertEqual(self.stored_version(), migrations.VERSION)
+        stored = lambda ns: {k: json.loads(v) for (k, v) in self.raw('SELECT key, value FROM documents WHERE namespace=?', ns)}
+        turns, jobs = stored('streams'), stored('preparation_jobs')
+        self.assertNotIn('prompt_snapshot', json.dumps(turns), 'listed turns carry no snapshot, nor do their attempts')
+        self.assertFalse({'snapshot', 'content'} & (set(jobs['ready']) | set(jobs['stale'])))
+        self.assertEqual(execute(self.workspace, {'op': 'stream.read', 'id': 'lesson'})['turn'], {**lesson, 'title': 'Amplitudes'},
+                         'a turn reads as it did, and keeps the title listings show')
+        self.assertEqual(execute(self.workspace, {'op': 'stream.read', 'id': 'bare'})['turn'], bare)
+        self.assertEqual({t['id']: t['title'] for t in execute(self.workspace, {'op': 'stream.summaries'})['turns']}, {'lesson': 'Amplitudes', 'bare': None})
+        full = {j['id']: j for j in execute(self.workspace, {'op': 'preparation.view'})['jobs']}
+        self.assertEqual(full['ready'], {**ready, 'fingerprint': prepared['fingerprint'], 'language': 'en'})
+        self.assertEqual(full['stale'], {**stale, 'fingerprint': 'old', 'language': 'en'})
+        self.assertEqual(execute(self.workspace, {'op': 'preparation.view', 'concept_id': 'b', 'brief': True})['ready'],
+                         {'id': 'ready', 'concept_id': 'b', 'status': 'ready', 'created_at': 3, 'language': 'en'}, 'the ready job is still ready')
+        store = Store(self.workspace)
+        try:
+            migrations.separate_frozen_payloads(store)  # idempotent on an already migrated course
+            self.assertEqual({t['id']: t for t in store.list('streams')}, turns)
+            self.assertEqual({j['id']: j for j in store.list('preparation_jobs')}, jobs)
         finally:
             store.db.close()
 

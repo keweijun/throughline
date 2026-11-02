@@ -13,6 +13,28 @@ class StreamingCourse(unittest.TestCase):
     def call(self, op, **kwargs):
         return execute(self.workspace, {'op':op, **kwargs})
 
+    def test_streamed_text_is_stored_without_rewriting_the_frozen_snapshot(self):
+        import sqlite3
+        from pathlib import Path
+
+        def stored(namespace):
+            db = sqlite3.connect(Path(self.workspace) / 'course.sqlite3')
+            try:
+                return db.execute('SELECT value FROM documents WHERE namespace=? AND key=?', (namespace, 'lecture')).fetchone()[0]
+            finally:
+                db.close()
+        started = self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')['turn']
+        self.assertEqual(started['title'], 'States')
+        snapshot = stored('stream_snapshots')
+        self.assertNotIn('prompt_snapshot', stored('streams'))
+        self.call('stream.events', id='lecture', attempt=1, events=[{'sequence': 1, 'kind': 'delta', 'text': 'part'}])
+        self.call('stream.pause', id='lecture')
+        self.assertEqual(stored('stream_snapshots'), snapshot, 'streamed text and pausing leave the snapshot alone')
+        resumed = self.call('stream.resume', id='lecture', request_id='again', language='zh-CN')['turn']
+        self.assertEqual(resumed['attempts'][0]['prompt_snapshot'], started['prompt_snapshot'])
+        self.assertEqual(self.call('stream.read', id='lecture')['turn'], resumed)
+        self.assertEqual(resumed['prompt_snapshot'], {**started['prompt_snapshot'], 'language': 'zh-CN'})
+
     def test_only_authoritative_completed_turn_becomes_one_interaction(self):
         turn = self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')['turn']
         self.call('stream.event', id='lecture', attempt=1, sequence=1, kind='delta', text='partial')

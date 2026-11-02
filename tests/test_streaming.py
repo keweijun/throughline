@@ -47,7 +47,8 @@ class StreamingCourse(unittest.TestCase):
         self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')
         with self.assertRaises(OperationError):
             self.call('stream.event', id='lecture', attempt=1, sequence=2, kind='delta', text='gap')
-        self.call('stream.recover')
+        self.assertEqual(self.call('stream.recover'), {'recovered': ['lecture']})
+        self.assertEqual(self.call('stream.recover'), {'recovered': []})
         self.assertEqual(self.call('stream.read',id='lecture')['turn']['status'],'interrupted')
         self.assertEqual([i for i in self.call('session.resume')['recent_interactions'] if i['role']=='assistant'],[])
 

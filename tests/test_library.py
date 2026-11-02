@@ -115,6 +115,40 @@ class CourseLibrary(unittest.TestCase):
                 execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
                 self.assertTrue(wait_for('state'), events)
 
+    def test_the_hosts_own_writes_do_not_reload_its_tabs(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
+                             library_root=root, watch_interval=0.05)
+            with TestClient(app, base_url='http://127.0.0.1:8765'):
+                events = []
+                app.state.courses.events.publish = events.append
+
+                def wait_for(scope):
+                    for _ in range(100):
+                        if {'type': 'changed', 'scope': scope} in events:
+                            return True
+                        time.sleep(0.05)
+                    return False
+                route = {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []}
+                app.state.courses.host.operation(route)
+                self.assertTrue(wait_for('library'), events)
+                time.sleep(0.2)
+                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'the host announces its own changes')
+                execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
+                self.assertTrue(wait_for('state'), events)
+
+    def test_a_course_summary_is_read_again_only_after_the_course_changes(self):
+        from guided_learning import library
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'alpha'
+            course(path, 'Alpha')
+            self.assertEqual(library.summary(path)['concepts'], 1)
+            with mock.patch.object(library, '_summary', side_effect=AssertionError('read again')):
+                self.assertEqual(library.summary(path)['title'], 'Alpha')
+            execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
+            self.assertEqual(library.summary(path)['concepts'], 2)
+
     def test_the_watcher_reads_only_courses_whose_files_changed(self):
         from guided_learning import library
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:

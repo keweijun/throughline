@@ -67,8 +67,9 @@ class SlimState(unittest.TestCase):
                 full = op(op='preparation.view', concept_id='b')
                 self.assertIn('snapshot', full['jobs'][0], 'the operation itself is unchanged')
                 brief = op(op='preparation.view', concept_id='b', brief=True)
-                self.assertEqual(brief, {**full, 'jobs': [{k: v for k, v in j.items() if k not in ('snapshot', 'content')} for j in full['jobs']],
-                                         'ready': {k: v for k, v in full['ready'].items() if k not in ('snapshot', 'content')}})
+                # A brief job keeps only its snapshot's teaching language, which background scheduling compares.
+                slim = lambda j: {**{k: v for k, v in j.items() if k not in ('snapshot', 'content')}, 'language': j['snapshot']['language']}
+                self.assertEqual(brief, {**full, 'jobs': [slim(j) for j in full['jobs']], 'ready': slim(full['ready'])})
 
                 lesson = next(t for t in state['turns'] if t['id'] == 'lesson')
                 self.assertEqual(lesson['text'], 'Amplitudes add.')

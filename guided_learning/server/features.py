@@ -426,10 +426,12 @@ class Navigation(Feature):
 
     def recover(self):
         """Read the plans of steps completed just before a crash, without a model call."""
+        turns = None
         for lesson in self.operation({'op': 'lesson.list'})['lessons']:
             for step in lesson['steps']:
                 if step.get('turn_id') and not step.get('replied'):
-                    turn = next((t for t in self.host.brief_turns() if t['id'] == step['turn_id']), None)
+                    turns = turns if turns is not None else {t['id']: t for t in self.host.brief_turns()}
+                    turn = turns.get(step['turn_id'])
                     if turn and turn['status'] == 'completed':
                         self._record_step(lesson, self.operation({'op': 'stream.read', 'id': turn['id']})['turn'])
 
@@ -590,9 +592,9 @@ class Questions(Feature):
 
     def recover(self):
         """Close the gap between a saved completion and its decision after a crash, without a model call."""
-        for turn in self.host.turns():
-            if turn['status'] == 'completed':
-                self.on_complete(turn)
+        for brief in self.host.brief_turns():
+            if brief['id'].startswith('branch:') and brief['status'] == 'completed':
+                self.on_complete(self.operation({'op': 'stream.read', 'id': brief['id']})['turn'])
 
 
 class Practice(Feature):
@@ -1020,8 +1022,9 @@ class Preparation(Feature):
         if self._thread.is_alive():
             self._thread.join(timeout)
 
-    def state(self, concept_id=None):
-        request = {'op': 'preparation.view'}
+    def state(self, concept_id=None, brief=False):
+        """Preparation jobs; `brief` leaves out each job's snapshot and material, which only prompts need."""
+        request = {'op': 'preparation.view', 'brief': brief}
         if concept_id:
             request['concept_id'] = concept_id
         return self.operation(request)
@@ -1048,7 +1051,7 @@ class Preparation(Feature):
         with self.host.lock:
             if self.host.closing:
                 return {'scheduled': False, 'reason': 'host_closing'}
-            stale = {j['id'] for j in self.state()['jobs'] if j['status'] == 'stale'}
+            stale = {j['id'] for j in self.state(brief=True)['jobs'] if j['status'] == 'stale'}
             for turn in self.host.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':
                     self.host.pause_turn(turn['id'])
@@ -1056,12 +1059,12 @@ class Preparation(Feature):
             # A paused process can still be shutting down; never start a second preparation process.
             if any(t['status'] == 'running' and t['channel'] != 'build' for t in turns) or any(t['channel'] == 'preparation' and self.host.worker_alive(t) for t in turns):
                 return {'scheduled': False, 'reason': 'foreground_or_worker_active'}
-            values = self.state()
+            values = self.state(brief=True)
             concept_id = values['next_concept_id']
             if not concept_id:
                 return {'scheduled': False, 'reason': 'no_next_section'}
             language = self.operation({'op': 'preferences.view'})['preferences']['language']
-            relevant = [j for j in values['jobs'] if j['concept_id'] == concept_id and j['snapshot'].get('language', 'en') == language]
+            relevant = [j for j in values['jobs'] if j['concept_id'] == concept_id and j['language'] == language]
             if any(j['status'] == 'ready' for j in relevant):
                 return {'scheduled': False, 'reason': 'ready'}
             # Failed attempts need an explicit retry rather than an unbounded model loop.
@@ -1093,7 +1096,7 @@ class Preparation(Feature):
                 # With nothing to prepare and nothing running, write the Review for me set ahead (ADR 0014).
                 if result.get('reason') in ('no_next_section', 'ready', 'failed', 'existing') and self.host.review.ahead:
                     self.host.review.prepare()
-                summary = [(j['id'], j['status']) for j in self.state()['jobs']]
+                summary = [(j['id'], j['status']) for j in self.state(brief=True)['jobs']]
                 if summary != self._last:
                     self._last = summary
                     # Publish directly: host.changed() would wake this loop again.

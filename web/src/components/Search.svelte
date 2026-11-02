@@ -8,20 +8,25 @@
   import type { Ref } from '../lib/types';
 
   // Search across the course, opened with Shift twice as in JetBrains IDEs, or Ctrl+K. Everything but source text is
-  // searched in the state as the learner types; source text is searched by the host a moment after they stop.
+  // searched in the state as the learner types; source text is searched by the host a moment after they stop. As in
+  // JetBrains' Search Everywhere, All shows the best hits of every category and a category's tab shows all of its own;
+  // Tab moves between them.
 
-  const SHOWN = 5; // hits per group until the learner asks for the rest
+  const SHOWN = 5; // hits per category under All
   const NAMES = { sections: 'Sections', lessons: 'Lessons', questions: 'Questions', exercises: 'Exercises', notes: 'Notes', sources: 'Sources' } as const;
   const mac = /Mac|iPhone|iPad/.test(navigator.platform);
 
   type SourceUnit = Ref & { path: string; excerpt: string };
   type Row = { id: string } & ({ hit: Hit } | { group: Group; count: number });
+  type Category = 'all' | Group;
+  const CATEGORIES: Category[] = ['all', ...GROUPS];
 
   let dialog = $state<HTMLDialogElement>();
   let input = $state<HTMLInputElement>();
   let query = $state('');
   let active = $state(0);
-  let expanded = $state<Group[]>([]);
+  // The category stays between searches, as the last query does.
+  let category = $state<Category>('all');
   let sources = $state.raw<{ query: string; hits: Hit[]; more: boolean } | null>(null);
   let searching = $state(false);
 
@@ -29,10 +34,11 @@
   const items = $derived(app.searchOpen && app.state ? index(app.state) : []);
   const words = $derived(query.trim());
   const hits = $derived([...search(items, words), ...(sources?.query === words ? sources.hits : [])]);
+  const counts = $derived(Object.fromEntries(GROUPS.map((g) => [g, hits.filter((h) => h.group === g).length])) as Record<Group, number>);
   const groups = $derived(
-    GROUPS.map((group) => {
+    GROUPS.filter((group) => category === 'all' || category === group).map((group) => {
       const all = hits.filter((h) => h.group === group);
-      const shown = expanded.includes(group) ? all : all.slice(0, SHOWN);
+      const shown = category === 'all' ? all.slice(0, SHOWN) : all;
       const rows: Row[] = shown.map((hit) => ({ id: hit.key, hit }));
       if (all.length > shown.length) rows.push({ id: `more:${group}`, group, count: all.length - shown.length });
       return { group, rows };
@@ -49,11 +55,12 @@
     } else if (!app.searchOpen && dialog.open) dialog.close();
   });
 
-  // A new query starts at its best hit, with every group folded.
+  // A new query or category starts at its best hit.
   $effect(() => {
     void words;
+    void category;
     active = 0;
-    expanded = [];
+    document.getElementById('search-results')?.scrollTo({ top: 0 });
   });
 
   $effect(() => {
@@ -86,10 +93,12 @@
   function choose(row: Row | undefined) {
     if (!row) return;
     if ('hit' in row) void app.reveal(row.hit.target);
-    else {
-      expanded = [...expanded, row.group];
-      input?.focus();
-    }
+    else select(row.group);
+  }
+
+  function select(next: Category) {
+    category = next;
+    input?.focus();
   }
 
   function onKey(event: KeyboardEvent) {
@@ -103,6 +112,10 @@
     } else if (event.key === 'Enter') {
       event.preventDefault();
       choose(rows[active]);
+    } else if (event.key === 'Tab') {
+      event.preventDefault();
+      const at = CATEGORIES.indexOf(category) + (event.shiftKey ? -1 : 1);
+      category = CATEGORIES[(at + CATEGORIES.length) % CATEGORIES.length];
     }
   }
 
@@ -125,9 +138,21 @@
   bind:this={dialog}
   class="search"
   aria-label={t('Search this course')}
-  onclose={() => (app.searchOpen = false)}
+  onclose={() => {
+    // The close event comes a moment after closing; by then search may have been opened again.
+    if (!dialog?.open) app.searchOpen = false;
+  }}
   onclick={(event) => event.target === dialog && (app.searchOpen = false)}
 >
+  <div class="tabs" role="tablist" aria-label={t('Search in')}>
+    {#each CATEGORIES as each (each)}
+      {@const count = each === 'all' ? hits.length : counts[each]}
+      <button role="tab" tabindex="-1" aria-selected={category === each} aria-controls="search-results" onclick={() => select(each)}>
+        {t(each === 'all' ? 'All' : NAMES[each])}{#if words && count}<span class="count">{(each === 'sources' || each === 'all') && sources?.query === words && sources.more ? `${count}+` : count}</span>{/if}
+      </button>
+    {/each}
+  </div>
+
   <div class="field">
     <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.6" fill="none" stroke="currentColor" stroke-width="1.6" /><path d="m12.8 12.8 4.4 4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
     <input
@@ -148,8 +173,8 @@
 
   <div class="results" id="search-results" role="listbox" aria-label={t('Search results')}>
     {#each groups as group (group.group)}
-      <div class="group" role="group" aria-labelledby="search-group-{group.group}">
-        <h3 id="search-group-{group.group}">{t(NAMES[group.group])}</h3>
+      <div class="group" role="group" aria-label={t(NAMES[group.group])}>
+        {#if category === 'all'}<h3>{t(NAMES[group.group])}</h3>{/if}
         {#each group.rows as row (row.id)}
           {@const at = position(row)}
           <!-- svelte-ignore a11y_click_events_have_key_events (the input moves through the rows and opens them) -->
@@ -185,7 +210,9 @@
     {#if !words}
       <p class="note">{t('Section and chapter titles, lessons, your questions and their answers, exercises with your answers, notes and sources.')}</p>
     {:else if !rows.length && !searching}
-      <p class="note">{t('Nothing in this course matches “{query}”.', { query: words })}</p>
+      <p class="note">
+        {category === 'all' ? t('Nothing in this course matches “{query}”.', { query: words }) : t('Nothing in {category} matches “{query}”.', { category: t(NAMES[category]), query: words })}
+      </p>
     {/if}
     {#if searching}
       <p class="note" role="status">{t('Searching sources…')}</p>
@@ -195,6 +222,7 @@
   <footer>
     <span><kbd>↑</kbd><kbd>↓</kbd> {t('to move')}</span>
     <span><kbd>Enter</kbd> {t('to open')}</span>
+    <span><kbd>Tab</kbd> {t('to switch category')}</span>
     <span><kbd>Esc</kbd> {t('to close')}</span>
     <span class="shortcut">Shift Shift · {mac ? '⌘K' : 'Ctrl+K'}</span>
   </footer>
@@ -221,6 +249,46 @@
 
   dialog::backdrop {
     background: rgb(17 20 27 / 0.35);
+  }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    padding: 0.55rem 0.8rem 0.45rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .tabs button {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+
+  .tabs button:hover {
+    color: var(--ink);
+    background: var(--raised);
+  }
+
+  .tabs button[aria-selected='true'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .count {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--pencil);
   }
 
   .field {

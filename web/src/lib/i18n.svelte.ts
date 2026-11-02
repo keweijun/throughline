@@ -883,6 +883,9 @@ const messages = {
   "to move": "选择",
   "to open": "打开",
   "to close": "关闭",
+  "to switch category": "切换类别",
+  "Search in": "搜索范围",
+  "Nothing in {category} matches “{query}”.": "{category}中没有与“{query}”匹配的内容。",
 } as const;
 export type MessageKey
  = keyof typeof messages;

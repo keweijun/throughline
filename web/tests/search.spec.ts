@@ -38,6 +38,26 @@ test('Shift twice searches the course: a section opens, a lesson opens on the pa
   await source.click();
   await expect(page.locator('#auxiliary')).toContainText('Normalization condition');
 
+  // Tab moves between categories, as in JetBrains' Search Everywhere: All shows every category, a tab only its own.
+  await page.keyboard.press('Control+k');
+  await field.fill('superposition');
+  const tabs = search.getByRole('tab');
+  await expect(search.getByRole('tab', { selected: true })).toHaveText(/^All/);
+  await expect(search.getByRole('tab', { name: /^Sections/ })).toHaveText('Sections1');
+  await expect(search.locator('h3')).toHaveText(['Sections', 'Lessons']);
+  await field.press('Tab');
+  await expect(search.getByRole('tab', { selected: true })).toHaveText(/^Sections/);
+  await expect(search.locator('h3')).toHaveCount(0);
+  await expect(search.getByRole('option')).toHaveCount(1);
+  await expect(search.getByRole('option')).toContainText('Wave superposition');
+  await field.press('Shift+Tab');
+  await expect(search.getByRole('tab', { selected: true })).toHaveText(/^All/);
+  await tabs.filter({ hasText: /^Notes/ }).click();
+  await expect(search.getByText('Nothing in Notes matches “superposition”.')).toBeVisible();
+  await expect(field).toBeFocused();
+  await tabs.first().click();
+
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Control+k');
   await field.fill('zebra crossing');
   await expect(search.getByText('Nothing in this course matches “zebra crossing”.')).toBeVisible();

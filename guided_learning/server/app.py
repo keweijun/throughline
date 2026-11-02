@@ -454,6 +454,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return Response(result[0], media_type=result[1])
         return result
 
+    @app.get('/api/search/sources')
+    def search_sources(q: str):
+        """Search covers the course in the browser, from the state; source text is not part of it, so it is searched here."""
+        return host.operation({'op': 'source.search', 'query': q})
+
     @app.post('/api/questions')
     def ask(body: QuestionRequest):
         result = host.questions.ask(body.model_dump(exclude_none=True))

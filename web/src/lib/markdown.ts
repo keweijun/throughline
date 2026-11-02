@@ -16,6 +16,11 @@ const MEMORY = /\s*<(course-memory|course-change)>[\s\S]*?(<\/\1>|$)/g;
 // Delimiters, by the group of MATH that holds a formula's TeX: $$…$$, \[…\], \(…\) and $…$.
 const DELIMITER = { 3: 2, 4: 2, 5: 2, 6: 1 } as const;
 
+/** What a teacher reply shows the learner: without the structured blocks the host reads. */
+export function shownText(text: string) {
+  return text.replace(MEMORY, '').replace(DECISION, '');
+}
+
 /** The closed formulas in a text, as the renderer finds them: each one's TeX, where it sits, and whether it is display math. */
 export function mathSpans(text: string) {
   const spans: { from: number; tex: string; display: boolean }[] = [];
@@ -189,7 +194,7 @@ export const RENDERED = 'markdown-rendered';
 export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource }: MarkdownOptions) {
   const key = locale.language + breaks + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
   if (node.dataset.key === key) return;
-  const fragment = parse(text.replace(MEMORY, '').replace(DECISION, ''), breaks);
+  const fragment = parse(shownText(text), breaks);
   linkCitations(fragment, refs, onSource);
   const scrollY = stageScroll();
   const incoming = [...fragment.childNodes];

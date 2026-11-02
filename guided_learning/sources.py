@@ -122,4 +122,41 @@ def units(store, request):
         raise OperationError('invalid_request', 'refs must be a list')
     return {'sources': [{**ref, 'unit': source_unit(store, ref)} for ref in refs]}
 
-OPERATIONS = {'source.register': register, 'source.read': read, 'source.units': units}
+def search(store, request):
+    """Units of each source's current revision whose text holds every word of `query`, ignoring case: each with an
+    excerpt around its first match and how many times the words occur (`matches`). The `limit` units with the most
+    matches are returned, in source and unit order between equals; `more` says whether others were left out."""
+    query = request.get('query')
+    if not isinstance(query, str):
+        raise OperationError('invalid_request', 'query must be a string')
+    terms = query.lower().split()
+    limit = request.get('limit', 50)
+    if not isinstance(limit, int) or limit < 1:
+        raise OperationError('invalid_request', 'limit must be a positive integer')
+    found = []
+    for source in store.list('sources') if terms else []:
+        snapshot = store.shared('source_revisions', source['id'] + ':' + str(source['revision'])) or {'units': []}
+        for unit in snapshot['units']:
+            text = unit.get('text') or ''
+            lowered = text.lower()
+            if len(lowered) != len(text) or not all(term in lowered for term in terms):
+                continue
+            found.append((sum(lowered.count(term) for term in terms), source, unit, text, lowered))
+    found.sort(key=lambda f: -f[0])  # stable: source and unit order between equals
+    return {'units': [{'source_id': source['id'], 'revision': source['revision'], 'unit_id': unit['id'], 'path': source['path'],
+                       'locator': unit.get('locator'), 'excerpt': excerpt(text, lowered.find(terms[0]), len(terms[0])), 'matches': matches}
+                      for matches, source, unit, text, lowered in found[:limit]],
+            'more': len(found) > limit}
+
+def excerpt(text, at, length, before=60, after=160):
+    """The text around a match, cut at spaces, with ellipses where it was cut."""
+    start, end = max(0, at - before), min(len(text), at + length + after)
+    if start:
+        space = text.find(' ', start, at)
+        start = space + 1 if space >= 0 else start
+    if end < len(text):
+        space = text.rfind(' ', at + length, end)
+        end = space if space >= 0 else end
+    return ('…' if start else '') + ' '.join(text[start:end].split()) + ('…' if end < len(text) else '')
+
+OPERATIONS = {'source.register': register, 'source.read': read, 'source.units': units, 'source.search': search}

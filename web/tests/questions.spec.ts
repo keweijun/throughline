@@ -60,9 +60,16 @@ test('a formula selection keeps its original TeX and the quote can be removed', 
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const formula = page.locator('.lesson-body .katex-display .katex').first();
   await expect(formula).toBeVisible();
-  // The "Writing" chip above the lesson disappears on completion and shifts the text; measure after that.
+  // The "Writing" chip above the lesson disappears on completion and shifts the text, later still on a busy machine;
+  // measure once the formula has stopped moving.
   await expect(page.getByText('Ask for another pass')).toBeVisible();
-  const box = (await formula.boundingBox())!;
+  let box = (await formula.boundingBox())!;
+  await expect.poll(async () => {
+    const previous = box;
+    await page.waitForTimeout(100);
+    box = (await formula.boundingBox())!;
+    return box.y === previous.y;
+  }).toBe(true);
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 10 });

@@ -80,6 +80,7 @@
     const area = scope(selection.anchorNode);
     if (!area || area !== scope(selection.focusNode)) return;
     const text = selectionMarkdown(selection, area);
+    if (!text) return;
     const anchor = selection.anchorNode instanceof Element ? selection.anchorNode : selection.anchorNode?.parentElement;
     const range = selection.getRangeAt(0);
     // Which repeat of the passage was selected, counted in the element its highlight is painted in (a PDF page's text).

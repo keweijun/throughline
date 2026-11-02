@@ -7,6 +7,8 @@ export function selectionMarkdown(selection: Selection, area: HTMLElement): stri
   if (first?.contains(range.startContainer)) range.setStartBefore(first);
   if (last?.contains(range.endContainer)) range.setEndAfter(last);
   const fragment = range.cloneContents();
+  // A citation chip's label is not part of the text, and highlights are found with chips skipped.
+  for (const chip of fragment.querySelectorAll('.citation')) chip.remove();
   for (const formula of fragment.querySelectorAll<HTMLElement>('[data-tex]')) {
     const tex = formula.dataset.tex ?? '';
     const delimiter = formula.querySelector('.katex-display') || tex.includes('\n') ? '$$' : '$';

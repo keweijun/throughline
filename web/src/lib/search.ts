@@ -34,6 +34,9 @@ type Item = {
   context: string;
   /** Searched in order; the first holds the title, so a title that matches ranks first. */
   fields: Field[];
+  /** The sections it belongs to, so the chapter the learner is in can rank first. */
+  concepts: string[];
+  /** Course order, or newest first, between hits that rank the same. */
   order: number;
   target: (field: Field, at: number, length: number) => Target;
 };
@@ -87,12 +90,12 @@ export function index(state: State): Item[] {
 
   chapters.forEach((chapter, i) => {
     items.push({ key: `chapter:${chapter.id}`, group: 'sections', title: chapter.title, context: t('Chapter {number}', { number: i + 1 }),
-      fields: [field(chapter.title), field(chapter.summary)], order: place(chapter.concept_ids[0]) - 0.5, target: () => ({ kind: 'chapter', id: chapter.id }) });
+      fields: [field(chapter.title), field(chapter.summary)], concepts: chapter.concept_ids, order: place(chapter.concept_ids[0]) - 0.5, target: () => ({ kind: 'chapter', id: chapter.id }) });
   });
   for (const concept of state.curriculum.concepts) {
     if (!route.includes(concept.id)) continue;
     items.push({ key: `section:${concept.id}`, group: 'sections', title: concept.title, context: chapterTitle(concept.id),
-      fields: [field(concept.title), field(concept.objective), field(concept.goal)], order: place(concept.id), target: () => ({ kind: 'section', id: concept.id }) });
+      fields: [field(concept.title), field(concept.objective), field(concept.goal)], concepts: [concept.id], order: place(concept.id), target: () => ({ kind: 'section', id: concept.id }) });
   }
 
   const steps = new Map<string, { number: number; check?: string }>();
@@ -109,7 +112,7 @@ export function index(state: State): Item[] {
     const chapter = turn.chapter_id ? chapters.find((c) => c.id === turn.chapter_id) : undefined;
     const title = chapter ? `${chapter.title} · ${t('Chapter recap')}` : step ? `${sectionTitle(turn.concept_id)} · ${t('Step {number}', { number: step.number })}` : sectionTitle(turn.concept_id);
     items.push({ key: `lesson:${turn.id}`, group: 'lessons', title, context: chapter ? '' : chapterTitle(turn.concept_id),
-      fields: [field(plain(turn.text)), field(step?.check)], order: place(turn.concept_id) + (step?.number ?? 0) / 100,
+      fields: [field(plain(turn.text)), field(step?.check)], concepts: chapter ? chapter.concept_ids : [turn.concept_id], order: place(turn.concept_id) + (step?.number ?? 0) / 100,
       target: passage(turn.concept_id, turn.id) });
   }
 
@@ -117,9 +120,10 @@ export function index(state: State): Item[] {
   const answer = (id: string | null | undefined) => field(plain(turns.get(id ?? '')?.text ?? ''));
   for (const question of state.questions) {
     const replies = question.replies ?? [];
-    items.push({ key: `question:${question.id}`, group: 'questions', title: question.question, context: sectionTitle(question.anchor?.concept_id ?? question.restore_point?.concept_id),
+    const section = question.anchor?.concept_id ?? question.restore_point?.concept_id;
+    items.push({ key: `question:${question.id}`, group: 'questions', title: question.question, context: sectionTitle(section),
       fields: [field(question.question), answer(question.turn_id), answer(question.supplement_turn_id), ...replies.flatMap((r) => [field(r.question), answer(r.turn_id)])],
-      order: -(question.created_at ?? 0), target: () => ({ kind: 'question', id: question.id }) });
+      concepts: section ? [section] : [], order: -(question.created_at ?? 0), target: () => ({ kind: 'question', id: question.id }) });
   }
 
   for (const task of [...state.practice.tasks, ...state.review.tasks]) {
@@ -129,14 +133,14 @@ export function index(state: State): Item[] {
     const label = review ? t('Review question') : task.origin === 'chapter_quiz' ? t('Quiz question') : t('Exercise');
     items.push({ key: `task:${task.id}`, group: 'exercises', title: `${label} · ${task.chapter_id ? (chapters.find((c) => c.id === task.chapter_id)?.title ?? '') : sectionTitle(task.concept_id)}`,
       context: '', fields: [field(plain(task.question)), ...parts.map((p) => field(plain(p))), ...history],
-      order: review ? route.length + 1 - (task.created_at ?? 0) / 1e12 : place(task.concept_id) + (task.created_at ?? 0) / 1e12,
+      concepts: task.tests_concept_ids?.length ? task.tests_concept_ids : [task.concept_id], order: review ? route.length + 1 - (task.created_at ?? 0) / 1e12 : place(task.concept_id) + (task.created_at ?? 0) / 1e12,
       target: review ? () => ({ kind: 'review', task_id: task.id }) : passage(task.concept_id, null, task.id) });
   }
 
   for (const note of state.annotations) {
     if (note.kind !== 'note') continue;
     items.push({ key: `note:${note.id}`, group: 'notes', title: note.note.split('\n')[0] || note.passage, context: sectionTitle(note.concept_id),
-      fields: [field(note.note), field(note.passage)], order: -note.updated_at, target: () => ({ kind: 'note', id: note.id }) });
+      fields: [field(note.note), field(note.passage)], concepts: [note.concept_id], order: -note.updated_at, target: () => ({ kind: 'note', id: note.id }) });
   }
   return items;
 }
@@ -172,13 +176,27 @@ export function snippet(text: string, at: number, words: string[], before = 40, 
   return { text: shown, marks: merged };
 }
 
-/** The items holding every word of the query, best first within each group: title matches, then course order. */
-export function search(items: Item[], query: string): Hit[] {
+/** How many times a word occurs in a text. */
+function occurrences(text: string, word: string) {
+  let count = 0;
+  for (let i = text.indexOf(word); i >= 0; i = text.indexOf(word, i + word.length)) count++;
+  return count;
+}
+
+/**
+ * The items holding every word of the query, best first within each group: those whose title (a question's own text,
+ * an exercise's question) holds every word, then by score, then in course order. The score grows with how often the
+ * words occur, slowly, so a long lesson does not win on length alone, and by one for items in `near`, the sections of
+ * the chapter the learner is in: about what doubling the mentions earns.
+ */
+export function search(items: Item[], query: string, near: ReadonlySet<string> = new Set()): Hit[] {
   const words = terms(query);
   if (!words.length) return [];
-  const hits: (Hit & { rank: number; order: number })[] = [];
+  const hits: (Hit & { rank: number; score: number; order: number })[] = [];
   for (const item of items) {
     if (!words.every((w) => item.fields.some((f) => f.lower.includes(w)))) continue;
+    const mentions = item.fields.reduce((sum, f) => sum + words.reduce((n, w) => n + occurrences(f.lower, w), 0), 0);
+    const score = Math.log2(1 + mentions) + (item.concepts.some((c) => near.has(c)) ? 1 : 0);
     const first = item.fields.find((f) => f.lower.includes(words[0]))!;
     // The page lands on the whole query where it reads as a phrase, else on its first word.
     const phrase = words.join(' ');
@@ -191,11 +209,11 @@ export function search(items: Item[], query: string): Hit[] {
     hits.push({
       key: item.key, group: item.group, title: item.title, context: item.context,
       snippet: shown === found ? snippet(found.text, at, words) : snippet(shown.text, 0, words),
-      target: item.target(found, at, whole ? phrase.length : words[0].length), rank: titled ? 0 : 1, order: item.order,
+      target: item.target(found, at, whole ? phrase.length : words[0].length), rank: titled ? 0 : 1, score, order: item.order,
     });
   }
-  return hits.sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.rank - b.rank || a.order - b.order)
-    .map(({ rank, order, ...hit }) => hit);
+  return hits.sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || a.rank - b.rank || b.score - a.score || a.order - b.order)
+    .map(({ rank, score, order, ...hit }) => hit);
 }
 
 /** A source page the host found, as a hit. */

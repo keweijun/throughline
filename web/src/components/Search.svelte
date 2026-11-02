@@ -33,7 +33,9 @@
   // The course is indexed while search is open, so a closed search costs nothing as the state changes.
   const items = $derived(app.searchOpen && app.state ? index(app.state) : []);
   const words = $derived(query.trim());
-  const hits = $derived([...search(items, words), ...(sources?.query === words ? sources.hits : [])]);
+  // The chapter on the page ranks first among hits that are otherwise alike.
+  const near = $derived(new Set(app.chapters.find((c) => c.id === app.chapterInView)?.concept_ids ?? []));
+  const hits = $derived([...search(items, words, near), ...(sources?.query === words ? sources.hits : [])]);
   const counts = $derived(Object.fromEntries(GROUPS.map((g) => [g, hits.filter((h) => h.group === g).length])) as Record<Group, number>);
   const groups = $derived(
     GROUPS.filter((group) => category === 'all' || category === group).map((group) => {

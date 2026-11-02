@@ -123,8 +123,9 @@ def units(store, request):
     return {'sources': [{**ref, 'unit': source_unit(store, ref)} for ref in refs]}
 
 def search(store, request):
-    """Units of each source's current revision whose text holds every word of `query`, ignoring case, in source and
-    unit order: each with an excerpt around its first match and how many times the first word occurs. At most `limit`."""
+    """Units of each source's current revision whose text holds every word of `query`, ignoring case: each with an
+    excerpt around its first match and how many times the words occur (`matches`). The `limit` units with the most
+    matches are returned, in source and unit order between equals; `more` says whether others were left out."""
     query = request.get('query')
     if not isinstance(query, str):
         raise OperationError('invalid_request', 'query must be a string')
@@ -140,12 +141,12 @@ def search(store, request):
             lowered = text.lower()
             if len(lowered) != len(text) or not all(term in lowered for term in terms):
                 continue
-            found.append({'source_id': source['id'], 'revision': source['revision'], 'unit_id': unit['id'], 'path': source['path'],
-                          'locator': unit.get('locator'), 'excerpt': excerpt(text, lowered.find(terms[0]), len(terms[0])),
-                          'matches': lowered.count(terms[0])})
-            if len(found) == limit:
-                return {'units': found, 'more': True}
-    return {'units': found, 'more': False}
+            found.append((sum(lowered.count(term) for term in terms), source, unit, text, lowered))
+    found.sort(key=lambda f: -f[0])  # stable: source and unit order between equals
+    return {'units': [{'source_id': source['id'], 'revision': source['revision'], 'unit_id': unit['id'], 'path': source['path'],
+                       'locator': unit.get('locator'), 'excerpt': excerpt(text, lowered.find(terms[0]), len(terms[0])), 'matches': matches}
+                      for matches, source, unit, text, lowered in found[:limit]],
+            'more': len(found) > limit}
 
 def excerpt(text, at, length, before=60, after=160):
     """The text around a match, cut at spaces, with ellipses where it was cut."""

@@ -38,6 +38,33 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   expect(errors).toEqual([]);
 });
 
+test('a citation preview typesets the formulas in its excerpt and keeps long ones inside the card', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  // Text extracted from a PDF keeps its formulas as TeX, delimited \( \) and \[ \].
+  const text = 'Vibrations in molecules follow the harmonic oscillator. Two masses \\(m_1,m_2\\) joined by a spring of constant \\(k_f\\): '
+    + '\\[\\hat H=-\\frac{\\hbar^2}{2m_1}\\frac{\\partial^2}{\\partial x_1^2}-\\frac{\\hbar^2}{2m_2}\\frac{\\partial^2}{\\partial x_2^2}+\\frac12k_f(x_1-x_2-x_0)^2.\\] '
+    + 'With reduced-mass coordinates \\[M=m_1+m_2,\\quad\\frac1\\mu=\\frac1{m_1}+\\frac1{m_2},\\quad X=\\frac{m_1x_1+m_2x_2}{M},\\quad x=x_1-x_2-x_0\\] the problem separates.';
+  await page.route('**/api/sources/**/page-2', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), text } });
+  });
+  const citation = page.getByRole('button', { name: 'View source p. 2' }).first();
+  const excerpt = page.getByRole('tooltip').locator('blockquote');
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await citation.hover();
+    await expect(excerpt).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(excerpt.locator('.katex').first()).toBeVisible();
+  // The limit falls inside the second display formula, so the excerpt stops before it and no raw TeX is left over.
+  await expect(excerpt).toContainText('With reduced-mass coordinates');
+  await expect(excerpt).not.toContainText('\\[');
+  await expect(excerpt).not.toContainText('\\quad');
+  expect(await excerpt.evaluate((node) => node.scrollWidth <= node.clientWidth
+    && node.getBoundingClientRect().right <= node.closest('[role=tooltip]')!.getBoundingClientRect().right)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('another citation into the same PDF moves the open reader and keeps its zoom', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   await page.getByRole('button', { name: 'View source p. 2' }).first().click();

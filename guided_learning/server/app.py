@@ -59,6 +59,7 @@ class QuestionRequest(Body):
     question: str
     selection: Optional[str] = None
     selected_turn_id: Optional[str] = None
+    selected_task_id: Optional[str] = None
     main_turn_id: Optional[str] = None
     anchor: Optional[dict] = None
     pause: bool = False

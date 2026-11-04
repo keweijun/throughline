@@ -62,9 +62,11 @@
         more={false}
         label={t('Review question {number}', { number: i + 1 }) + ' · ' + t("tests {sections}", { sections: titles(task.tests_concept_ids) })}
         onanswer={(choice) => app.answerRecall(task.id, choice)}
+        taskId={task.id}
+        section={task.concept_id}
       >
         {#snippet after(right: boolean)}
-          {#if !right}<button class="btn btn-quiet btn-small revisit" onclick={() => app.revisit(task.question)}>{t("Revisit")}</button>{/if}
+          {#if !right}<button class="btn btn-quiet btn-small revisit" onclick={() => app.revisit(task)}>{t("Revisit")}</button>{/if}
         {/snippet}
       </CheckQuestion>
     {:else}

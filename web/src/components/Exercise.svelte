@@ -46,11 +46,8 @@
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
   const working = $derived(jobs.some((j) => app.isRunning(j.id)));
-  // Preferences suggested in feedback on this exercise, or from repeated skips that ended with it (ADR 0011).
-  const suggestions = $derived([
-    ...app.suggestedBy(jobs.map((j) => j.id)),
-    ...(app.state?.memory ?? []).filter((e) => e.status === 'suggested' && e.skip_ids?.at(-1) === task.id),
-  ]);
+  // Preferences suggested in feedback on this exercise; one suggested from repeated skips is asked in Practice.
+  const suggestions = $derived(app.suggestedBy(jobs.map((j) => j.id)));
   const latestJob = $derived([...jobs].sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1));
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);
@@ -175,7 +172,7 @@
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" data-exercise={task.id} data-section={task.concept_id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if homework}
     <div class="homework">
       <p>{t('{part}, a part of {question}', { part: homework.question!, question: homework.part_of! })}</p>
@@ -239,7 +236,7 @@
           <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
             <!-- The summary already names feedback and help; only an answer needs telling apart from the question above it. -->
             {#if entry.action === 'ask'}<p class="answer-label">{t("Teacher's answer")}</p>{/if}
-            <div class="prose feedback" data-exercise={task.id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+            <div class="prose feedback" data-exercise={task.id} data-section={task.concept_id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
           </section>
         </details>
       {/each}
@@ -316,7 +313,7 @@
       </span>
       <span class="aside">
         {#if missed}
-          <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task.question)}>{t("Revisit")}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task)}>{t("Revisit")}</button>
         {/if}
         {#if variantable}
           <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>

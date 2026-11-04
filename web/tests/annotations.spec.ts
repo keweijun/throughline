@@ -124,7 +124,7 @@ test('highlight and note an exercise', async ({ page, course }) => {
   const question = page.locator('#practice article').first().locator('.question');
   await expect(question).toBeVisible();
   expect((await dragSelect(page, question, 120)).trim().length).toBeGreaterThan(3);
-  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toBeVisible();
   await page.getByRole('button', { name: 'Note', exact: true }).click();
   await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Watch the sign');
   await page.getByRole('button', { name: 'Save note' }).click();

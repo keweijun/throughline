@@ -55,6 +55,24 @@ test('ask about a selected passage, then return to that passage', async ({ page,
   await expect(paragraph).toBeInViewport();
 });
 
+test('a passage in an exercise is asked about in the side questions, with its exercise', async ({ page, course }) => {
+  const { errors } = await course('practice_continuity_browser_fixture');
+  const question = page.locator('#practice article').first().locator('.question');
+  await expect(question).toBeVisible();
+  const excerpt = await dragSelect(page, question, 120);
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await expect(page.locator('#branch-selection')).toHaveText(excerpt.trim());
+  await expect(page.locator('#branch-panel .panel-foot')).toContainText(/New question\s*· Original section/);
+  await page.getByRole('textbox', { name: 'Side question' }).fill('What does this exercise want?');
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/questions') && r.method() === 'POST');
+  await page.locator('#branch-panel').getByRole('button', { name: 'Ask', exact: true }).click();
+  const body = (await sent).postDataJSON();
+  expect(body.selected_task_id).toBe('questions:0');
+  expect(body.anchor.concept_id).toBe('a');
+  await expect(page.locator('#branch-panel article').first()).toContainText('What does this exercise want?');
+  expect(errors).toEqual([]);
+});
+
 test('a formula selection keeps its original TeX and the quote can be removed', async ({ page, course }) => {
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();

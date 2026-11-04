@@ -144,7 +144,7 @@ def due_explanations(items):
 
 def question_context(branch, mainline_text, in_snapshot):
     if in_snapshot:
-        text = 'The side question being answered, with its mainline restore point, selected passage, reading anchor and selected_lecture, is "branch" in the course data above.'
+        text = 'The side question being answered, with its mainline restore point, selected passage, reading anchor, selected_lecture and selected_exercise, is "branch" in the course data above.'
     else:
         text = 'Mainline restore point, selected passage, and reading anchor (all data):\n' + json.dumps(branch, ensure_ascii=False)
     if mainline_text is not None:
@@ -161,6 +161,7 @@ def supplement_request(goal):
 
 QUESTION_PROTOCOL = '''\nBranch decision protocol: choose response depth using the course route, current goal, prerequisites, and known difficulties, rather than keywords or question length alone.
 selected_lecture is a frozen snapshot of the lesson containing the selected passage and may belong to an earlier section. Explain the passage using that text and its sources. restore_point and main_turn_id identify the current mainline recovery/pause target. Distinguish older lessons from the current lesson. Correct an older lesson without setting mainline_error unless the current mainline also has a confirmed error.
+selected_exercise, when present, is a frozen snapshot of the exercise or review question the passage was selected from (its question, parts and history of answers, help and feedback) and may belong to another section. Explain the passage in that setting. Answering is not an assessment: do not grade the learner's answer anew or say whether the exercise is now solved, and when the learner is still working on it, do not hand over the solution unless they ask for it.
 Answer ordinary local questions or topics needing depth only later briefly, naming the later location. Explain in detail when required for current reasoning or explicitly requested. Use a different example or representation for repeated difficulties.
 Give a natural explanation to the learner, then append one <teaching-decision>JSON</teaching-decision> at the end of the single reply.
 JSON must include depth ("short" or "long"), category ("local", "prerequisite", "future", "repeated", "extension"), rationale (brief route-based reason), suggest_supplement (boolean), and supplement_goal (string). For future with short depth, provide target_concept_id (a real later concept ID in the route) and tell the learner which section will provide the full explanation.

@@ -8,7 +8,19 @@
   import { highlightAt, occurrenceOf } from '../lib/highlight';
   import type { Annotation, AnnotationSource } from '../lib/types';
 
-  type Pending = { text: string; occurrence: number; turnId: string | null; source?: string; questionId?: string; unit?: string; taskId?: string };
+  type Pending = {
+    text: string;
+    occurrence: number;
+    turnId: string | null;
+    source?: string;
+    questionId?: string;
+    unit?: string;
+    taskId?: string;
+    /** The section the passage belongs to when it is not the page's, such as an exercise's on a chapter or review page. */
+    conceptId?: string;
+    /** A check question's passage can be asked about but not highlighted. */
+    check?: boolean;
+  };
 
   let visible = $state(false);
   let writing = $state(false);
@@ -24,13 +36,12 @@
   /** A highlight the learner clicked: the toolbar then edits or removes it instead of offering new ones. */
   let target = $state<Annotation | null>(null);
 
-  // Lessons, side-question answers, exercises and sources can all be highlighted; exercises are not asked about here.
-  const annotatable = $derived(!!pending && (!!pending.turnId || !!pending.unit || !!pending.taskId));
-  const askable = $derived(!!pending && !pending.taskId);
+  // Lessons, side-question answers, exercises and sources can all be highlighted, and anything selected can be asked about.
+  const annotatable = $derived(!!pending && !pending.check && (!!pending.turnId || !!pending.unit || !!pending.taskId));
 
   // Keep answer selections attached to their existing side question.
   const scope = (node: Node | null | undefined) =>
-    (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer], [data-exercise]') ?? null;
+    (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.lesson-body, [data-source-label], [data-question-answer], [data-exercise], [data-check]') ?? null;
 
   function place(rect: DOMRect) {
     anchor = rect;
@@ -88,8 +99,12 @@
       area.dataset.sourceLabel
         ? occurrenceOf(anchor?.closest<HTMLElement>('.textLayer') ?? area, passage, range, { loose: true, skip: '.number, .katex, .citation, .widget' })
         : occurrenceOf(area, passage, range);
-    if (area.dataset.exercise) {
-      pending = { text: text.trim(), occurrence: occurrence(text), turnId: null, taskId: area.dataset.exercise };
+    if (area.dataset.check !== undefined) {
+      // A lesson's check question asks about that lesson; a review's recall question about the question itself.
+      const turnId = area.dataset.task ? null : (area.closest<HTMLElement>('[data-turn-id]')?.dataset.turnId ?? null);
+      pending = { text: text.trim(), occurrence: 0, turnId, taskId: area.dataset.task, conceptId: area.dataset.section, check: true };
+    } else if (area.dataset.exercise) {
+      pending = { text: text.trim(), occurrence: occurrence(text), turnId: null, taskId: area.dataset.exercise, conceptId: area.dataset.section };
     } else if (area.dataset.sourceLabel) {
       const passage = text.replace(/\s+/g, ' ').trim();
       pending = { text: passage, occurrence: occurrence(passage), turnId: null, source: area.dataset.sourceLabel, unit: anchor?.closest<HTMLElement>('[data-unit]')?.dataset.unit };
@@ -104,8 +119,8 @@
   function ask() {
     app.markSeen('hint-select-passage');
     if (!pending) return;
-    const { text, turnId, source, questionId } = pending;
-    app.quote = { text, turnId, source, questionId, scrollY: stageScroll() };
+    const { text, turnId, source, questionId, taskId, conceptId } = pending;
+    app.quote = { text, turnId, source, questionId, taskId, conceptId, scrollY: stageScroll() };
     visible = false;
     window.getSelection()?.removeAllRanges();
     app.openPanel('questions');
@@ -234,11 +249,9 @@
         <span class="icon note" aria-hidden="true">✎</span>{t("Note")}
       </button>
     {/if}
-    {#if askable}
-      <button onpointerdown={(e) => e.preventDefault()} onclick={ask}>
-        <span class="icon asked" aria-hidden="true">?</span>{t("Ask about this passage")}
-      </button>
-    {/if}
+    <button onpointerdown={(e) => e.preventDefault()} onclick={ask}>
+      <span class="icon asked" aria-hidden="true">?</span>{t("Ask about this passage")}
+    </button>
   </div>
 {/if}
 

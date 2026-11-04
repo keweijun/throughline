@@ -175,7 +175,7 @@
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
   </header>
 
-  <div class="prose question" data-exercise={task.id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+  <div class="prose question" data-exercise={task.id} data-section={task.concept_id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
   {#if homework}
     <div class="homework">
       <p>{t('{part}, a part of {question}', { part: homework.question!, question: homework.part_of! })}</p>
@@ -239,7 +239,7 @@
           <section class="teacher-feedback" aria-label={entry.action === 'ask' ? t("Teacher's answer") : t("Teacher feedback")}>
             <!-- The summary already names feedback and help; only an answer needs telling apart from the question above it. -->
             {#if entry.action === 'ask'}<p class="answer-label">{t("Teacher's answer")}</p>{/if}
-            <div class="prose feedback" data-exercise={task.id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
+            <div class="prose feedback" data-exercise={task.id} data-section={task.concept_id} use:highlights={{ passages, text: entry.feedback }} use:markdown={{ language: locale.language, text: entry.feedback, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
           </section>
         </details>
       {/each}
@@ -316,7 +316,7 @@
       </span>
       <span class="aside">
         {#if missed}
-          <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task.question)}>{t("Revisit")}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task)}>{t("Revisit")}</button>
         {/if}
         {#if variantable}
           <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>

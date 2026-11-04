@@ -194,7 +194,7 @@ const messages = {
   "Back to cited page": "回到引用页",
   "This PDF could not be displayed here. Open the original instead.": "此处无法显示该 PDF，请打开原文件。",
   "Cited page": "引用页",
-  "Select a sentence or formula in a lesson or the source reader to ask about it. The lesson keeps going unless you pause it.": "在课程或来源阅读器中选中句子或公式即可提问。除非你暂停，课程会继续生成。",
+  "Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.": "在课程、练习或来源阅读器中选中句子或公式即可提问。除非你暂停，课程会继续生成。",
   "From {source}": "出自 {source}",
   "{solved}/{total} exercises solved": "已完成 {solved}/{total} 道练习",
   "Saved. New lessons, answers and feedback use these settings.": "已保存。新的课程、回答和反馈将使用这些设置。",

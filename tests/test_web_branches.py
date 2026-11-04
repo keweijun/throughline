@@ -148,6 +148,46 @@ class Branches(unittest.TestCase):
                 self.assertEqual(app.operation({'op':'branch.read','id':'q'})['branch']['selected_lecture'],branch['selected_lecture'])
             finally:app.close()
 
+    def test_selected_exercise_freezes_its_question_and_feedback_for_the_answer(self):
+        from pathlib import Path
+        from guided_learning.server import Host
+        from guided_learning.store import Store
+        class Runner:
+            def run(self,prompt,cwd,emit,cancel):
+                emit({'kind':'final','text':'About the feedback'});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as tmp:
+            execute(tmp,{'op':'course.init','title':'Q'})
+            p=Path(tmp)/'problems.md';p.write_text('problem sheet text',encoding='utf-8')
+            source=execute(tmp,{'op':'source.register','path':str(p)})['source']
+            ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'line-1'}
+            execute(tmp,{'op':'curriculum.save','concepts':[{'id':'a','title':'Old'},{'id':'b','title':'New'}],'route':['a','b'],'coverage':[]})
+            execute(tmp,{'op':'mainline.enter','concept_id':'b','goal':'b','next_step':'practice','request_id':'b'})
+            store=Store(tmp)
+            with store.db:
+                store.put('practice_tasks','t',{'id':'t','concept_id':'a','origin':'self_created','question':'Integrate x','status':'pending','source_refs':[ref],
+                    'history':[{'action':'assess','answer':'x','feedback':'You dropped the constant','outcome':'needs_work','evidence_id':'e1','kind':'independent'}]})
+            store.db.close()
+            app=Host(tmp,runner=Runner())
+            try:
+                ask=app.questions.ask
+                branch=ask({'id':'q','question':'Which constant?','selection':'You dropped the constant','selected_task_id':'t'})['branch']
+                app.wait('branch:q',3)
+                exercise=branch['selected_exercise']
+                self.assertEqual((exercise['concept_id'],exercise['question']),('a','Integrate x'))
+                self.assertEqual(exercise['history'],[{'action':'assess','answer':'x','feedback':'You dropped the constant','outcome':'needs_work'}])
+                self.assertEqual(branch['restore_point']['concept_id'],'b')
+                turn=app.operation({'op':'stream.read','id':'branch:q'})['turn']
+                prompt=app.build_prompt(turn)
+                self.assertIn('Integrate x',prompt)
+                self.assertIn('problem sheet text',prompt)
+                self.assertIn(ref,turn['source_refs'])
+                # The interface has the exercise already; it is not sent back in every question.
+                from guided_learning.server import state
+                self.assertNotIn('selected_exercise',state.build(app)['questions'][0])
+                with self.assertRaises(ValueError):ask({'id':'bad','question':'?','selected_task_id':'missing'})
+                with self.assertRaises(ValueError):ask({'id':'q','question':'Which constant?','selection':'You dropped the constant'})
+            finally:app.close()
+
     def test_interrupted_supplement_reopens_and_completes_once(self):
         from guided_learning.server import Host
         class Runner:

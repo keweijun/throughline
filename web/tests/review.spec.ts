@@ -1,4 +1,4 @@
-import { test, expect, editorText } from './fixture';
+import { test, expect, dragSelect, editorText } from './fixture';
 
 test('review for me asks recall and apply questions across sections, with no count and nothing due', async ({ page, course }) => {
   const { errors } = await course('review_browser_fixture');
@@ -53,6 +53,25 @@ test('a wrong recall answer offers Revisit, a side question quoting it', async (
   // A set can be left with questions unanswered.
   await page.getByRole('button', { name: 'Done for now' }).click();
   await expect(page.getByRole('region', { name: 'Earlier' })).toContainText('1 of 2 answered · 0 right');
+  expect(errors).toEqual([]);
+});
+
+test('a passage in a recall question or its explanation can be asked about, with the question', async ({ page, course }) => {
+  const { errors } = await course('review_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  await page.getByRole('button', { name: 'Review for me' }).click();
+  const recall = page.getByRole('group', { name: /Review question 1/ });
+  await recall.getByRole('button', { name: 'Yes, they all flip sign' }).click();
+  await expect(recall).toContainText('Not quite.');
+  const explanation = recall.locator('.feedback .prose').first();
+  expect((await dragSelect(page, explanation)).trim().length).toBeGreaterThan(3);
+  // A check question is not highlighted, only asked about.
+  await expect(page.getByRole('button', { name: 'Highlight' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await page.getByRole('textbox', { name: 'Side question' }).fill('Why not?');
+  const sent = page.waitForRequest((r) => r.url().endsWith('/api/questions') && r.method() === 'POST');
+  await page.locator('#branch-panel').getByRole('button', { name: 'Ask', exact: true }).click();
+  expect((await sent).postDataJSON().selected_task_id).toBeTruthy();
   expect(errors).toEqual([]);
 });
 

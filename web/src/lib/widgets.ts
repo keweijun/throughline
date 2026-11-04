@@ -3,8 +3,10 @@
 // Libraries load on first use, so a course that never draws a diagram never downloads Mermaid. Drawing is synchronous
 // from caches: when a library or an asynchronous drawing becomes ready, subscribers render again.
 import DOMPurify from 'dompurify';
+import { api } from './api';
 import { locale } from './i18n.svelte';
 import { drawPlot } from './plot';
+import type { Ref } from './types';
 import './python-cell';
 
 type HighlightJs = typeof import('highlight.js').default;
@@ -107,6 +109,52 @@ function diagram(source: string): Drawing | undefined {
   return undefined;
 }
 
+/** A figure from a source page (ADR 0019), as the host describes it. */
+type Figure = { id: string; label: string; caption: string; description: string; page: number; ref: Ref; title: string; image_url: string | null };
+const figures = new Map<string, Figure | { error: string }>();
+const FIGURE = /^fig-[0-9a-f]{10}$/;
+
+function sourceFigure(id: string): Figure | { error: string } | undefined {
+  const known = figures.get(id);
+  if (known) return known;
+  figures.set(id, { error: '' }); // loading: shown as source until ready, never requested twice
+  api.get<Figure>(`/api/figures/${id}`).then(
+    (figure) => figures.set(id, figure),
+    (error) => figures.set(id, { error: String((error as Error)?.message ?? error) }),
+  ).then(changed);
+  return undefined;
+}
+
+/** The figure cropped from its page, with its label, caption and a citation button that opens the page (wired by the caller). */
+function drawFigure(figure: Figure, page: string) {
+  const box = document.createElement('figure');
+  box.className = 'widget widget-figure';
+  if (figure.image_url) {
+    const image = document.createElement('img');
+    image.src = figure.image_url;
+    image.alt = figure.description;
+    image.loading = 'lazy';
+    box.append(image);
+  }
+  const caption = document.createElement('figcaption');
+  if (figure.label) {
+    const label = document.createElement('strong');
+    label.textContent = figure.label;
+    caption.append(label, ' ');
+  }
+  // Without the crop, the description stands in for the picture.
+  caption.append(figure.caption || (figure.image_url ? '' : figure.description), ' ');
+  const cite = document.createElement('button');
+  cite.type = 'button';
+  cite.className = 'citation';
+  cite.dataset.ref = JSON.stringify(figure.ref);
+  cite.textContent = page;
+  cite.title = figure.title;
+  caption.append(cite);
+  box.append(caption);
+  return box;
+}
+
 function failed(kind: string, source: string, detail: string, note: string) {
   const box = document.createElement('div');
   box.className = `widget widget-${kind} widget-failed`;
@@ -126,10 +174,11 @@ function figure(kind: string, html: string) {
   return box;
 }
 
-export type Notes = { diagram: string; plot: string };
+export type Notes = { diagram: string; plot: string; figure: string; page: (n: number) => string };
 
 /**
- * Replaces each finished fenced code block in `root` with its widget: a Mermaid diagram, a plot, or highlighted code.
+ * Replaces each finished fenced code block in `root` with its widget: a Mermaid diagram, a plot, a source figure, or
+ * highlighted code.
  * `open` is true when the text ends inside a fence that is still streaming; its block stays plain until it closes.
  */
 export function drawWidgets(root: DocumentFragment, open: boolean, notes: Notes) {
@@ -151,6 +200,16 @@ export function drawWidgets(root: DocumentFragment, open: boolean, notes: Notes)
       } catch (error) {
         pre.replaceWith(failed('plot', source, (error as Error).message, notes.plot));
       }
+    } else if (language === 'figure') {
+      if (streaming) return;
+      const id = source.trim();
+      if (!FIGURE.test(id)) {
+        pre.replaceWith(failed('figure', source, '', notes.figure));
+        return;
+      }
+      const figure = sourceFigure(id);
+      if (figure && 'id' in figure) pre.replaceWith(drawFigure(figure, notes.page(figure.page)));
+      else if (figure?.error) pre.replaceWith(failed('figure', source, figure.error, notes.figure));
     } else if (language === 'python-run') {
       if (streaming) return;
       // The cell keeps its editor in a shadow root; the language attribute redraws its labels when the language changes.

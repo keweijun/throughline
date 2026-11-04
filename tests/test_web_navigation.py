@@ -92,7 +92,7 @@ class Navigation(unittest.TestCase):
         with path.open('wb') as file:writer.write(file)
         source=execute(self.root,{'op':'source.register','path':str(path)})['source']
         ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'page-1'}
-        with patch('guided_learning.server.features.importlib.util.find_spec',return_value=None):
+        with patch('guided_learning.pages.importlib.util.find_spec',return_value=None):
             view=self.get(source_path(ref))
             self.assertIsNone(view['image_url']);self.assertIn('unavailable',view['render_message'])
             self.assertEqual(self.client.get(view['pdf_url'].split('#')[0]).content,path.read_bytes())

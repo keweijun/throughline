@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from .store import OperationError
 from .curriculum import source_unit
+from . import readings
 
 # Documents that are not text: Codex converts them to PDF and registers the PDF with `converted_from` (ADR 0015).
 CONVERTED = {'.doc', '.docx', '.dot', '.dotx', '.odt', '.rtf', '.pages', '.ppt', '.pptx', '.pps', '.ppsx', '.odp', '.key',
@@ -113,7 +114,7 @@ def read(store, request):
     snapshot = store.get('source_revisions', source_id + ':' + str(revision))
     if snapshot is None:
         raise OperationError('unknown_revision', str(revision))
-    return snapshot
+    return readings.source_view(store, snapshot)
 
 def units(store, request):
     """The exact source units behind a list of {source_id, revision, unit_id} references."""

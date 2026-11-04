@@ -59,7 +59,7 @@ Coverage dispositions:
 - `deferred`: explicit reason, preserving the content for later teaching.
 - `needs_review`: explicit reason for uncertain extraction, mapping or interpretation.
 
-Default `verification` is `pending`. Set `verified` only after checking the contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
+Default `verification` is `pending`. A page reading verifies the page's text (see [reading the pages](course-operations.md#reading-the-pages)); a coverage entry's `verification` is about its mapping. Set `verified` only after checking that the mapped concepts teach the unit's contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
 
 ## Revising and reordering
 

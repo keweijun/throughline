@@ -39,6 +39,15 @@ print(xs ** 2)
 ```
 The code runs in the learner's browser (Pyodide, Python 3.14) with the standard library and packages such as numpy, scipy, sympy and pandas, loaded from its imports. Output is text: print what matters; there are no plots, no input(), no files and no network. Keep a cell short and self-contained: cells do not share variables, and each run starts fresh. In an exercise, give starter code that marks what the learner completes with a comment such as `# your code here`, and assess the code and output they submit like any answer.''',
     },
+    'figure': {
+        'summary': 'Figures from the source pages, drawn in a lesson as crops of the page with their caption',
+        'subjects': 'any course whose sources have diagrams, charts, plots, photographs or schematics',
+        'guide': '''Source figures: a source page read as an image lists its `figures`, each with an `id`, label, caption and description. To show one, put its id alone in a fenced code block with the language "figure":
+```figure
+fig-3f2a9c01b7
+```
+The app draws the figure cropped from its page, with its label, caption and page. Show a figure where the explanation refers to it and say what to look at in it; copy the id exactly, never invent one, and describe in words a figure that is not listed.''',
+    },
 }
 
 

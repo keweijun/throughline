@@ -303,6 +303,14 @@ def preparation_task(context):
             + json.dumps(context, ensure_ascii=False))
 
 
+def source_images(shown):
+    """A prompt line naming the images of source figures and pages sent with a turn (ADR 0019), or nothing."""
+    if not shown:
+        return ''
+    return ('\nImage inputs, in order: ' + '; '.join(shown) + '. They show what the page readings in the sources cannot carry: '
+            'look at the figures you will explain or show, and check the pages whose readings list problems against their text.')
+
+
 PREPARATION_MISSING = 'No valid preparation material is available. Complete the necessary source checks and teaching preparation independently, without waiting for background work.'
 
 

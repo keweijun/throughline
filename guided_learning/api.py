@@ -4,14 +4,14 @@ from . import migrations
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
-MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons', 'widgets', 'course_changes')
+MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons', 'widgets', 'course_changes', 'readings')
 
 # Operations that only read run without the write lock, beside a writer. One that writes after all is run again as a write.
 READS = {'annotations.list', 'background.view', 'branch.list', 'branch.read', 'chapter_build.list', 'course.status',
          'course_change.history', 'course_change.list', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage', 'curriculum.view',
          'deferred.list', 'evidence.unresolved', 'evidence.view', 'interaction.read', 'lesson.list', 'lesson.read',
          'memory.consolidations', 'memory.prompt', 'memory.requests', 'memory.view', 'practice.list', 'preferences.view', 'preparation.view', 'review.context',
-         'review.sets', 'review.warm_ups', 'session.resume', 'source.read', 'source.search', 'source.units', 'stream.list', 'stream.read', 'stream.summaries',
+         'review.sets', 'review.warm_ups', 'session.resume', 'source.figure', 'source.read', 'source.render', 'source.search', 'source.units', 'stream.list', 'stream.read', 'stream.summaries',
          'widgets.list'}
 
 

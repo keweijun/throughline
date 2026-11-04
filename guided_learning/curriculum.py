@@ -1,5 +1,6 @@
 """Auditable curriculum mappings; teaching judgments remain with the teacher."""
 from copy import deepcopy
+from . import readings
 from .store import OperationError
 
 EMPTY = {'chapters': [], 'concepts': [], 'route': [], 'coverage': []}
@@ -19,7 +20,7 @@ def source_unit(store, ref):
     if snapshot:
         for unit in snapshot['units']:
             if unit['id'] == ref['unit_id']:
-                return deepcopy(unit)
+                return deepcopy(readings.overlay(unit, readings.unit_reading(store, ref['source_id'], ref['revision'], unit)))
     raise OperationError('invalid_reference', 'Unknown source revision or unit')
 
 def whole_course_chapter(store, route):
@@ -300,15 +301,18 @@ def coverage(store, request):
         mappings.setdefault((item.get('source_id'), item.get('revision'), item.get('unit_id')), item)
         by_unit.setdefault((item.get('source_id'), item.get('unit_id')), []).append(item)
     sources = store.list('sources')
+    read = readings.read_pages(store)
     for source in sources:
         snapshot = store.get('source_revisions', source['id'] + ':' + str(source['revision']), {'units': []})
+        done = read.get((source['id'], source['revision']), {})
         for unit in snapshot['units']:
             ref = {'source_id': source['id'], 'revision': source['revision'], 'unit_id': unit['id']}
             mapping = mappings.get((source['id'], source['revision'], unit['id']), {})
             prior = next((item for item in by_unit.get((source['id'], unit['id']), []) if item['revision'] != source['revision']), None)
             if not mapping and prior:
                 mapping = {'disposition': 'needs_review', 'reason': 'Source revision changed', 'verification': 'pending', 'concept_ids': prior.get('concept_ids', [])}
-            if source['status'] == 'failed' or unit.get('status') in ('failed', 'needs_review'):
+            # A page Codex has read is no longer judged by what its text extraction found (ADR 0019).
+            if source['status'] == 'failed' or (unit.get('status') in ('failed', 'needs_review') and unit['locator'].get('page') not in done):
                 mapping = {**mapping, 'disposition': 'needs_review', 'reason': 'Source extraction requires review', 'verification': 'pending'}
             units.append({**ref, 'locator': unit['locator'], 'disposition': mapping.get('disposition', 'unmapped'), 'concept_ids': mapping.get('concept_ids', []), 'reason': mapping.get('reason', ''), 'verification': mapping.get('verification', 'pending')})
     by_id = {source['id']: source for source in sources}

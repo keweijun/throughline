@@ -81,7 +81,10 @@ function parse(text: string, breaks = false): DocumentFragment {
     }
     return span;
   });
-  drawWidgets(fragment, endsInFence(text), { diagram: t("Couldn't draw this diagram"), plot: t("Couldn't draw this plot") });
+  drawWidgets(fragment, endsInFence(text), {
+    diagram: t("Couldn't draw this diagram"), plot: t("Couldn't draw this plot"), figure: t("Couldn't show this figure"),
+    page: (number) => t('p. {number}', { number }),
+  });
   markCallouts(fragment);
   // Only web links stay live, opening in a new tab; in-page anchors have no targets because ids are stripped.
   for (const link of fragment.querySelectorAll('a')) {
@@ -144,6 +147,22 @@ function replaceText(root: Node, pattern: RegExp, build: (match: RegExpExecArray
   }
 }
 
+/** A source figure's page opens in the reader; where nothing can open it, the page stays a plain label. */
+function linkFigures(fragment: DocumentFragment, onSource?: (ref: Ref) => void) {
+  for (const button of fragment.querySelectorAll<HTMLButtonElement>('.widget-figure button.citation')) {
+    const ref = JSON.parse(button.dataset.ref!) as Ref;
+    if (!onSource) {
+      const label = document.createElement('span');
+      label.className = 'figure-page';
+      label.textContent = button.textContent;
+      button.replaceWith(label);
+      continue;
+    }
+    button.setAttribute('aria-label', t('View source {location}', { location: labelFor(ref) }));
+    button.addEventListener('click', () => onSource(ref));
+  }
+}
+
 function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref: Ref) => void) {
   replaceText(fragment, CITATION, (match) => {
     const ref = refs.find((r) => r.source_id === match[1] && r.unit_id === match[2]);
@@ -196,6 +215,7 @@ export function render(node: HTMLElement, { text, breaks = false, refs = [], onS
   if (node.dataset.key === key) return;
   const fragment = parse(shownText(text), breaks);
   linkCitations(fragment, refs, onSource);
+  linkFigures(fragment, onSource);
   const scrollY = stageScroll();
   const incoming = [...fragment.childNodes];
   incoming.forEach((child, index) => {

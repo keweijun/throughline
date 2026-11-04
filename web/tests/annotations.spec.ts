@@ -49,6 +49,20 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   expect(errors).toEqual([]);
 });
 
+test('a highlight of a couple of characters is painted', async ({ page, course }) => {
+  const { errors } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
+
+  expect((await dragSelect(page, paragraph, 14)).trim().length).toBeLessThan(3);
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('highlight text in the PDF reader and bookmark the page', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   await page.getByRole('button', { name: 'View source p. 2' }).first().click();

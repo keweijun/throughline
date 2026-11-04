@@ -3,6 +3,7 @@
   import { app, type PanelTab } from '../lib/store.svelte';
   import { studio } from '../lib/studio.svelte';
   import type { LibraryCourse } from '../lib/types';
+  import { pop } from '../lib/motion';
 
   const studying = $derived(!!app.state && !app.libraryOpen);
   // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
@@ -99,7 +100,7 @@
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         {#if menuOpen}
-          <ul class="course-menu" role="menu" aria-label={t("Switch course")}>
+          <ul class="course-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t("Switch course")}>
             {#each others as course (course.path)}
               <li role="none">
                 <button role="menuitem" class:active={course.path === app.library?.active} onclick={() => switchTo(course)}>

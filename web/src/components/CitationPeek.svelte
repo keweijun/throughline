@@ -3,6 +3,7 @@
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
   import { markdown, mathSpans } from '../lib/markdown';
+  import { pop } from '../lib/motion';
   import type { Ref, SourceView } from '../lib/types';
 
   let view = $state<SourceView | null>(null);
@@ -77,6 +78,7 @@
   <div
     class="peek"
     class:above
+    transition:pop={{ from: above ? 'above' : 'below' }}
     style:left="{left}px"
     style:top="{top}px"
     role="tooltip"
@@ -113,26 +115,10 @@
     background: var(--raised);
     box-shadow: var(--shadow);
     font-size: var(--step--1);
-    animation: rise 0.14s ease-out;
   }
 
   .peek.above {
     transform: translateY(-100%);
-    animation-name: drop;
-  }
-
-  @keyframes rise {
-    from {
-      opacity: 0;
-      translate: 0 4px;
-    }
-  }
-
-  @keyframes drop {
-    from {
-      opacity: 0;
-      translate: 0 -4px;
-    }
   }
 
   .head {

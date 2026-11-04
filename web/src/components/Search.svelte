@@ -6,6 +6,7 @@
   import { labelFor } from '../lib/markdown';
   import { GROUPS, index, search, sourceHit, type Group, type Hit, type Snippet } from '../lib/search';
   import type { Ref } from '../lib/types';
+  import { lightDismiss } from '../lib/dialog';
 
   // Search across the course, opened with Shift twice as in JetBrains IDEs, or Ctrl+K. Everything but source text is
   // searched in the state as the learner types; source text is searched by the host a moment after they stop. As in
@@ -138,13 +139,13 @@
 
 <dialog
   bind:this={dialog}
+  use:lightDismiss
   class="search"
   aria-label={t('Search this course')}
   onclose={() => {
     // The close event comes a moment after closing; by then search may have been opened again.
     if (!dialog?.open) app.searchOpen = false;
   }}
-  onclick={(event) => event.target === dialog && (app.searchOpen = false)}
 >
   <div class="tabs" role="tablist" aria-label={t('Search in')}>
     {#each CATEGORIES as each (each)}

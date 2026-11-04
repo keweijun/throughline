@@ -92,8 +92,9 @@
 </aside>
 
 <style>
+  /* Docked, the panel slides in from the window's edge and makes room as it comes, and slides back out the same way;
+     as an overlay it slides over the page. Hidden, it stays on screen until it has left. */
   .panel {
-    animation: enter-slide var(--settle) var(--ease-out);
     position: relative;
     display: flex;
     flex: none;
@@ -101,6 +102,20 @@
     width: var(--panel);
     border-left: 1px solid var(--rule);
     background: var(--sheet);
+    transition:
+      margin-right var(--move) var(--ease-in-out),
+      translate var(--move) var(--ease-in-out),
+      display var(--move) allow-discrete;
+  }
+
+  .panel[hidden] {
+    margin-right: calc(-1 * var(--panel));
+  }
+
+  @starting-style {
+    .panel {
+      margin-right: calc(-1 * var(--panel));
+    }
   }
 
   .panel:focus {
@@ -197,6 +212,18 @@
       width: min(var(--panel), 100vw);
       height: auto;
       box-shadow: var(--shadow);
+    }
+
+    .panel[hidden] {
+      margin-right: 0;
+      translate: 102% 0;
+    }
+
+    @starting-style {
+      .panel {
+        margin-right: 0;
+        translate: 102% 0;
+      }
     }
   }
 

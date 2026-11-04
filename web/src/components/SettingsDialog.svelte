@@ -6,6 +6,7 @@
   import type { CodexModel, LauncherStatus, Settings, UpdateProgress } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
+  import { lightDismiss } from '../lib/dialog';
 
   type Theme = 'system' | 'light' | 'dark';
   type Pane = 'teacher' | 'appearance' | 'about';
@@ -229,7 +230,7 @@
   </div>
 {/snippet}
 
-<dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
+<dialog bind:this={dialog} use:lightDismiss onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
     <h2 id="settings-title">{t("Settings")}</h2>
     <button class="btn btn-quiet close" onclick={() => (app.settingsOpen = false)} aria-label={t("Close")}>

@@ -17,6 +17,8 @@
     onanswer,
     label,
     after,
+    taskId,
+    section,
   }: {
     lessonId?: string;
     turnId?: string;
@@ -28,6 +30,9 @@
     label?: string;
     /** Shown under the feedback once answered, such as Revisit after a miss. */
     after?: Snippet<[boolean]>;
+    /** A recall question's task and the section it is filed under, so a passage asked about brings the question along. */
+    taskId?: string;
+    section?: string;
   } = $props();
 
   // Shown at once, before the host has recorded the choice.
@@ -48,7 +53,7 @@
   const md = (text: string) => ({ language: locale.language, text });
 </script>
 
-<div class="check" role="group" aria-label={label ?? t('Check question')}>
+<div class="check" role="group" aria-label={label ?? t('Check question')} data-check data-task={taskId} data-section={section}>
   <p class="label">{label ?? t('Check question')}</p>
   <div class="prose question" use:markdown={md(check.question)}></div>
   <div class="options">

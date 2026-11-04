@@ -79,6 +79,8 @@
     if (quote) openId = quote.questionId ?? null;
   });
   const quote = $derived(app.quote && (app.quote.questionId ?? null) === (thread?.id ?? null) ? app.quote : null);
+  // A passage from an exercise belongs to the exercise's section, wherever the exercise was shown.
+  const section = $derived(quote?.conceptId ?? app.viewingId);
 
   function setOpen(q: Question, value: boolean) {
     if (value) openId = q.id;
@@ -113,8 +115,9 @@
           ...withImages,
           selection: quote ? (quote.source ? `${quote.text}\n(${quote.source})` : quote.text) : '',
           selected_turn_id: quote?.turnId ?? null,
+          selected_task_id: quote?.taskId ?? null,
           main_turn_id: currentLesson?.id ?? null,
-          anchor: { scroll_y: quote?.scrollY ?? stageScroll(), concept_id: app.viewingId },
+          anchor: { scroll_y: quote?.scrollY ?? stageScroll(), concept_id: section },
           pause,
         }),
     );
@@ -148,7 +151,7 @@
 <section id="branch-panel" class="panel-view" aria-labelledby="questions-title">
   <header class="panel-head">
     <div class="panel-bar"><h2 id="questions-title">{t("Your questions")}</h2></div>
-    <p class="panel-intro">{t("Select a sentence or formula in a lesson or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
+    <p class="panel-intro">{t("Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
     {#if questions.length}
       <PanelScope bind:scope {counts} label={t("Show questions from")} onchoose={() => (scopeChosen = true)} />
     {/if}
@@ -176,7 +179,7 @@
     {#if thread}
       <span aria-hidden="true">↳</span> {t("Follow-up")} · <span class="target-title" use:markdown={{ language: locale.language, text: thread.question }}></span>
     {:else}
-      {t("New question")}{#if app.viewingId} · {app.concept(app.viewingId)?.title}{/if}
+      {t("New question")}{#if section} · {app.concept(section)?.title}{/if}
     {/if}
   {/snippet}
   {#snippet tools()}

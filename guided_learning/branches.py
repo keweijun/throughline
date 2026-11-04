@@ -7,6 +7,13 @@ from .teaching import require_text, create_deferred
 from .streaming import brief
 
 
+def exercise_excerpt(task):
+    """What a side question keeps of the exercise or review question its passage came from: the question and what was written on it."""
+    keep = ('id', 'concept_id', 'origin', 'kind', 'tests_concept_ids', 'question', 'parts', 'options', 'correct', 'answer', 'source_refs')
+    history = [{k: entry[k] for k in ('action', 'question', 'answer', 'feedback', 'outcome', 'parts') if k in entry} for entry in task.get('history', [])]
+    return {**{k: task[k] for k in keep if k in task}, 'history': history}
+
+
 def read(store, request):
     branch=store.get('web_branches',require_text(request,'id'))
     if branch is None: raise OperationError('unknown_branch',request['id'])
@@ -20,7 +27,7 @@ def begin(store, request):
     previous=store.get('web_branches',identifier)
     if previous:
         if (previous['question'] != question or previous['selection'] != request.get('selection','') or previous.get('selected_turn_id') != request.get('selected_turn_id')
-                or previous.get('images',[]) != images):
+                or previous.get('selected_task_id') != request.get('selected_task_id') or previous.get('images',[]) != images):
             raise OperationError('id_conflict',identifier)
         return {'branch':previous}
     position=store.get('course','position')
@@ -29,6 +36,11 @@ def begin(store, request):
     selected=store.get('streams',selected_id) if selected_id else None
     if selected_id and (not selected or selected['channel']!='mainline'):
         raise OperationError('invalid_selection','Selected passage must belong to a lecture')
+    # A passage from an exercise, its feedback or a review question brings that question along.
+    task_id=request.get('selected_task_id')
+    task=store.get('practice_tasks',task_id) if task_id else None
+    if task_id and not task:
+        raise OperationError('invalid_selection','Selected passage must belong to an exercise')
     # The current lecture is the section's own lesson; a chapter recap anchored there is not the mainline.
     mains=sorted((t for t in store.digest('streams',brief) if t['channel']=='mainline' and t['concept_id']==position.get('concept_id') and not t.get('chapter_id')),key=lambda t:t['started_at'])
     current_id=mains[-1]['id'] if mains else None
@@ -40,6 +52,7 @@ def begin(store, request):
             'restore_point':position,'main_turn_id':current_id,
             'selected_turn_id':selected_id,'selected_lecture':lecture_excerpt(selected) if selected else None, 'turn_id':'branch:'+identifier,
             'status':'unanswered','decision':None,'choice':None,'created_at':time.time(),'replies':[]}
+    if task: branch.update(selected_task_id=task_id, selected_exercise=exercise_excerpt(task))
     if images: branch['images']=images
     store.put('web_branches',identifier,branch)
     return {'branch':branch}

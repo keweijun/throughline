@@ -88,6 +88,9 @@
           {page}
           {label}
           bind:current={shown}
+          pageImages={s.image_url && s.pages
+            ? { count: s.pages, url: (n) => `/api/sources/${s.source_id}/${s.revision}/page-${n}?format=image` }
+            : null}
           highlights={mine.map((a) => ({ page: Number(a.source!.unit_id.replace('page-', '')), passage: annotationPassage(a) }))}
         />
       {/key}

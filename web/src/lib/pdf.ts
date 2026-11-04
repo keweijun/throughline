@@ -23,7 +23,9 @@ export function openPdf(url: string, key = url): Promise<PDFDocumentProxy> {
   let doc = documents.get(key);
   if (doc) documents.delete(key);
   else {
-    doc = pdfjs().then((pdf) => pdf.getDocument({ url }).promise);
+    // Only the byte ranges of the pages being shown are fetched: a large PDF never has to download, or fit in
+    // memory, whole before its first page appears.
+    doc = pdfjs().then((pdf) => pdf.getDocument({ url, disableStream: true, disableAutoFetch: true }).promise);
     doc.catch(() => documents.get(key) === doc && documents.delete(key));
   }
   documents.set(key, doc);

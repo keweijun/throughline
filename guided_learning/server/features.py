@@ -26,20 +26,37 @@ DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s
 STEP_REPLY = re.compile(r'<lesson-step>\s*(\{.*?\})\s*</lesson-step>', re.S)
 STEP_BLOCK = re.compile(r'\s*<lesson-step>.*$', re.S)
 _PDF_LOCK = threading.Lock()
+_VERIFIED = {}
+_VERIFY_LOCK = threading.Lock()
 
 
 def renderer_available():
     return importlib.util.find_spec('pypdfium2') is not None and importlib.util.find_spec('PIL') is not None
 
 
-def render_pdf_page(data, page_number):
+def verified_snapshot(path, revision):
+    """Whether a snapshot's bytes still hash to its revision. Hashed in chunks so a large PDF never sits in memory, and
+    once per version of the file: a reader fetches a large PDF range by range and would otherwise rehash it each time."""
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ino)
+    with _VERIFY_LOCK:
+        if key not in _VERIFIED:
+            digest = hashlib.sha256()
+            with path.open('rb') as file:
+                for chunk in iter(lambda: file.read(1024 * 1024), b''):
+                    digest.update(chunk)
+            _VERIFIED[key] = digest.hexdigest() == revision
+        return _VERIFIED[key]
+
+
+def render_pdf_page(path, page_number):
     if not renderer_available():
         raise OperationError('renderer_unavailable', 'Original page image unavailable: install the project pdf extra, or use the original PDF link.')
     # PDFium forbids concurrent API calls, even for different documents.
     with _PDF_LOCK:
         import pypdfium2
         try:
-            with pypdfium2.PdfDocument(data) as document:
+            with pypdfium2.PdfDocument(str(path)) as document:
                 if not isinstance(page_number, int) or not 1 <= page_number <= len(document):
                     raise OperationError('invalid_reference', 'Invalid PDF page')
                 page = document[page_number - 1]
@@ -203,19 +220,18 @@ class Navigation(Feature):
         path = (root / source_id / revision).resolve()
         if not path.is_relative_to(root) or not path.is_file():
             raise OperationError('unavailable_source', 'Source snapshot unavailable')
-        data = path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != revision:
+        if not verified_snapshot(path, revision):
             raise OperationError('unavailable_source', 'Source snapshot integrity check failed')
         kind = Path(snapshot['path']).suffix.lower()
         page = unit.get('locator', {}).get('page')
         if fmt == 'image':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only PDF pages have rendered previews')
-            return render_pdf_page(data, page), 'image/png'
+            return render_pdf_page(path, page), 'image/png'
         if fmt == 'pdf':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only registered PDF snapshots can be opened directly')
-            return data, 'application/pdf'
+            return path, 'application/pdf'  # a file, so the reader can fetch a large PDF range by range
         if fmt:
             raise OperationError('invalid_reference', 'Unknown source format')
         model = self.operation({'op': 'curriculum.view'})
@@ -229,6 +245,7 @@ class Navigation(Feature):
                 'image_url': source_url(ref, 'image') if kind == '.pdf' and page and available else None,
                 'render_message': None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.',
                 'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
+                'pages': len(snapshot['units']) if kind == '.pdf' else None,
                 'document': None if kind == '.pdf' else [{'id': u['id'], 'text': u.get('text', '')} for u in snapshot['units']]}
 
     def _due(self, turn):

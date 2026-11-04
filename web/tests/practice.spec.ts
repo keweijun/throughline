@@ -27,10 +27,13 @@ test('deferred and unfinished exercises follow the learner into the next section
   await expect(page.locator('#practice article')).toHaveCount(4);
 });
 
-test('a skipped exercise is closed and does not follow the learner', async ({ page, course }) => {
+test('a skipped exercise is closed, folded under Skipped and does not follow the learner', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
-  const exercises = page.locator('#practice article');
+  const exercises = page.locator('#practice > article');
+  const skipped = page.locator('#practice .skipped');
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('3 exercises stay open');
+  await expect(page.locator('#practice .tally')).toContainText('1 of 4 solved');
+  await expect(skipped).toHaveCount(0);
   await expect(exercises.nth(3).getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
 
   const first = exercises.first();
@@ -42,13 +45,21 @@ test('a skipped exercise is closed and does not follow the learner', async ({ pa
 
   await first.getByRole('button', { name: 'Skip', exact: true }).click();
   await reasons.getByRole('button', { name: 'Too easy' }).click();
-  await expect(first).toContainText('Skipped · Too easy');
-  await expect(first.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+  // It leaves the list, which is numbered again without it, and is not counted.
+  await expect(exercises).toHaveCount(3);
+  await expect(exercises.first().locator('header .label')).toContainText('Exercise 1');
+  await expect(page.locator('#practice .tally')).toContainText('1 of 3 solved');
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('2 exercises stay open');
+  await expect(skipped.locator('summary')).toHaveText('Skipped (1)');
+  await expect(skipped.locator('article')).not.toBeVisible();
+  await skipped.locator('summary').click();
+  await expect(skipped.locator('article')).toContainText('Skipped · Too easy');
+  await expect(skipped.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
 
-  await exercises.nth(1).getByRole('button', { name: 'Skip', exact: true }).click();
-  await exercises.nth(1).getByRole('button', { name: 'Skip without a reason' }).click();
-  await expect(exercises.nth(1).locator('header .chip')).toHaveText('Skipped');
+  await exercises.first().getByRole('button', { name: 'Skip', exact: true }).click();
+  await exercises.first().getByRole('button', { name: 'Skip without a reason' }).click();
+  await expect(skipped.locator('summary')).toHaveText('Skipped (2)');
+  await expect(skipped.locator('article').nth(1).locator('header .chip')).toHaveText('Skipped');
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('1 exercise stays open');
 
   await page.getByRole('button', { name: 'Enter next section' }).click();
@@ -58,14 +69,14 @@ test('a skipped exercise is closed and does not follow the learner', async ({ pa
 
 test('skipping two exercises for the same reason suggests a preference to confirm', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
-  const exercises = page.locator('#practice article');
-  // It is asked on the exercise whose skip suggested it.
-  const banner = exercises.nth(1).getByRole('group', { name: 'Suggested preference' }).filter({ hasText: 'Remember: Fewer long calculations?' });
-  for (const index of [0, 1]) {
-    await exercises.nth(index).getByRole('button', { name: 'Skip', exact: true }).click();
-    await exercises.nth(index).getByRole('button', { name: 'Too tedious' }).click();
-    await expect(exercises.nth(index)).toContainText('Skipped · Too tedious');
-    if (index === 0) await expect(banner).toHaveCount(0);
+  const exercises = page.locator('#practice > article');
+  // It is asked in Practice, where the skipped exercises were, not inside the folded list.
+  const banner = page.locator('#practice').getByRole('group', { name: 'Suggested preference' }).filter({ hasText: 'Remember: Fewer long calculations?' });
+  for (const count of [1, 2]) {
+    await exercises.first().getByRole('button', { name: 'Skip', exact: true }).click();
+    await exercises.first().getByRole('button', { name: 'Too tedious' }).click();
+    await expect(page.locator('#practice .skipped summary')).toHaveText(`Skipped (${count})`);
+    if (count === 1) await expect(banner).toHaveCount(0);
   }
   await expect(banner).toBeVisible();
   await expect(page.locator('#open-course .dot')).toHaveCount(1);

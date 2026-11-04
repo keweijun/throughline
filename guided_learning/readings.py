@@ -235,7 +235,8 @@ def render(store, request):
     for source_id, revision, page, box, fid in targets:
         if (source_id, revision) not in snapshots:
             snapshots[source_id, revision] = snapshot_path(store.workspace, source_id, revision)
-        part = fid or ('box-' + hashlib.sha256(repr(box).encode()).hexdigest()[:8] if box else 'page')
+        # The box is part of the name: a page read again keeps its figures' ids but may move their boxes.
+        part = (f'{fid}-' if fid else '') + ('box-' + hashlib.sha256(repr(box).encode()).hexdigest()[:8] if box else 'page')
         path = folder / f'{source_id}-{revision[:12]}-p{page:04d}-{part}-{size}.png'
         if not path.is_file():
             partial = path.with_name(f'.{path.name}.{os.getpid()}.partial')

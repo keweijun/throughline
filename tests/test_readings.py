@@ -151,6 +151,13 @@ class PageReadings(unittest.TestCase):
         with Image.open(drawn['path']) as crop:
             self.assertAlmostEqual(crop.size[0] / crop.size[1], (612 * 0.8) / (792 * 0.4), places=1)
 
+        # Reading the page again keeps the figure's id; its new box draws a new crop, not the one drawn before.
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[{**self.LENS, 'box': [0.1, 0.2, 0.5, 0.6]}])])
+        redrawn = self.call('source.render', figures=[fid])['images'][0]
+        self.assertNotEqual(redrawn['path'], drawn['path'])
+        with Image.open(redrawn['path']) as crop:
+            self.assertAlmostEqual(crop.size[0] / crop.size[1], (612 * 0.4) / (792 * 0.4), places=1)
+
         self.call('source.render', error='invalid_request', **self.ref, pages=[5])
         self.call('source.render', error='invalid_request', **self.ref, page=1, box=[0, 0, 0, 1])
         self.call('source.render', error='invalid_request', **self.ref, page=1, size=50)

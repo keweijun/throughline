@@ -46,11 +46,8 @@
 
   const jobs = $derived((app.state?.practice.jobs ?? []).filter((j) => j.task_id === task.id));
   const working = $derived(jobs.some((j) => app.isRunning(j.id)));
-  // Preferences suggested in feedback on this exercise, or from repeated skips that ended with it (ADR 0011).
-  const suggestions = $derived([
-    ...app.suggestedBy(jobs.map((j) => j.id)),
-    ...(app.state?.memory ?? []).filter((e) => e.status === 'suggested' && e.skip_ids?.at(-1) === task.id),
-  ]);
+  // Preferences suggested in feedback on this exercise; one suggested from repeated skips is asked in Practice.
+  const suggestions = $derived(app.suggestedBy(jobs.map((j) => j.id)));
   const latestJob = $derived([...jobs].sort((a, b) => (app.turn(a.id)?.started_at ?? 0) - (app.turn(b.id)?.started_at ?? 0)).at(-1));
   const latestTurn = $derived(latestJob ? app.turn(latestJob.id) : undefined);
   const failedJob = $derived(latestJob && (latestJob.error || (latestTurn && ['failed', 'interrupted', 'paused'].includes(latestTurn.status))) ? latestJob : undefined);

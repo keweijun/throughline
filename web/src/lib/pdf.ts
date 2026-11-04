@@ -23,9 +23,9 @@ export function openPdf(url: string, key = url): Promise<PDFDocumentProxy> {
   let doc = documents.get(key);
   if (doc) documents.delete(key);
   else {
-    // Only the byte ranges of the pages being shown are fetched: a large PDF never has to download, or fit in
-    // memory, whole before its first page appears.
-    doc = pdfjs().then((pdf) => pdf.getDocument({ url, disableStream: true, disableAutoFetch: true }).promise);
+    // The host answers Range requests, so pdf.js fetches the pages being shown at once while the rest streams in: a large
+    // PDF shows its first page without waiting for the whole file, and a small one still loads in one request.
+    doc = pdfjs().then((pdf) => pdf.getDocument({ url }).promise);
     doc.catch(() => documents.get(key) === doc && documents.delete(key));
   }
   documents.set(key, doc);

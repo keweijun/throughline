@@ -127,8 +127,7 @@ def start(store, request):
             for tid in history_ids if tid and tid != identifier
             for prior in [store.get('streams', tid)] if prior and prior['status'] == 'completed'
         ]
-        selected=branch.get('selected_lecture')
-        if selected:
+        for selected in filter(None, (branch.get('selected_lecture'), branch.get('selected_exercise'))):
             for ref in selected.get('source_refs',[]):
                 if ref not in source_refs:
                     source_refs.append(ref)

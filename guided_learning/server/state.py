@@ -58,7 +58,10 @@ def curriculum(model):
 
 def public_question(branch):
     selected = branch.get('selected_lecture')
-    return {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
+    slim = {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
+    # The interface already holds the exercise; only the host's prompt needs the frozen copy.
+    slim.pop('selected_exercise', None)
+    return slim
 
 
 def _course(host):

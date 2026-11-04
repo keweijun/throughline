@@ -1,5 +1,4 @@
 """Course features served by the host. Each may add prompt text and react to turn lifecycle."""
-import hashlib
 import json
 import logging
 import re
@@ -168,19 +167,18 @@ class Navigation(Feature):
         path = (root / source_id / revision).resolve()
         if not path.is_relative_to(root) or not path.is_file():
             raise OperationError('unavailable_source', 'Source snapshot unavailable')
-        data = path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != revision:
+        if not readings.verified_snapshot(path, revision):
             raise OperationError('unavailable_source', 'Source snapshot integrity check failed')
         kind = Path(snapshot['path']).suffix.lower()
         page = unit.get('locator', {}).get('page')
         if fmt == 'image':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only PDF pages have rendered previews')
-            return pages.render(data, page), 'image/png'
+            return pages.render(path, page), 'image/png'
         if fmt == 'pdf':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only registered PDF snapshots can be opened directly')
-            return data, 'application/pdf'
+            return path, 'application/pdf'  # a file, so the reader can fetch a large PDF range by range
         if fmt:
             raise OperationError('invalid_reference', 'Unknown source format')
         model = self.operation({'op': 'curriculum.view'})
@@ -194,6 +192,7 @@ class Navigation(Feature):
                 'image_url': source_url(ref, 'image') if kind == '.pdf' and page and available else None,
                 'render_message': None if available else 'Original page image unavailable: install the project pdf extra. You can still open the original PDF.',
                 'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
+                'pages': len(snapshot['units']) if kind == '.pdf' else None,
                 'document': None if kind == '.pdf' else [{'id': u['id'], 'text': u.get('text', '')} for u in snapshot['units']]}
 
     def figure(self, figure_id, fmt=None):
@@ -201,8 +200,8 @@ class Navigation(Feature):
         found = self.operation({'op': 'source.figure', 'id': figure_id})['figure']
         ref = {k: found[k] for k in ('source_id', 'revision', 'unit_id')}
         if fmt == 'image':
-            data = readings.snapshot_bytes(self.host.workspace, found['source_id'], found['revision'])
-            return pages.render(data, found['page'], found['box'], FIGURE_SIZE), 'image/png'
+            path = readings.snapshot_path(self.host.workspace, found['source_id'], found['revision'])
+            return pages.render(path, found['page'], found['box'], FIGURE_SIZE), 'image/png'
         if fmt:
             raise OperationError('invalid_reference', 'Unknown figure format')
         snapshot = self.operation({'op': 'source.read', 'source_id': found['source_id'], 'revision': found['revision']})

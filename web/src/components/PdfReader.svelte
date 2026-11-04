@@ -11,6 +11,7 @@
     page: target,
     label,
     highlights = [],
+    pageImages = null,
     current = $bindable(target),
   }: {
     url: string;
@@ -19,12 +20,16 @@
     page: number;
     label: string;
     highlights?: { page: number; passage: Passage }[];
+    /** Pages rendered by the host, shown when the browser cannot open the PDF itself (one of 2 GB or more, say). */
+    pageImages?: { count: number; url: (page: number) => string } | null;
     current?: number;
   } = $props();
 
   let scroller: HTMLDivElement | undefined = $state();
   let doc = $state<PDFDocumentProxy | null>(null);
   let failed = $state(false);
+  /** Showing the host's page images: no text layer, so no selecting or highlights. */
+  let images = $state(false);
   let fit = $state(true);
   let zoom = $state(1);
   let base = $state({ width: 612, height: 792 });
@@ -32,7 +37,8 @@
   let width = $state(0);
 
   const scale = $derived(fit && width ? Math.max(0.4, (width - 32) / base.width) : zoom);
-  const pages = $derived(doc ? Array.from({ length: doc.numPages }, (_, i) => i + 1) : []);
+  const count = $derived(doc ? doc.numPages : images ? pageImages!.count : 0);
+  const pages = $derived(Array.from({ length: count }, (_, i) => i + 1));
 
   type Rendering = { scale: number; task?: RenderTask; page?: PDFPageProxy };
   const rendered = new Map<number, Rendering>();
@@ -52,13 +58,28 @@
 
   onMount(async () => {
     try {
-      doc = await openPdf(url, documentKey);
-      const first = await doc.getPage(1);
+      const opened = await openPdf(url, documentKey);
+      const first = await opened.getPage(1);
       const viewport = first.getViewport({ scale: 1 });
       base = { width: viewport.width, height: viewport.height };
+      doc = opened;
     } catch {
-      failed = true;
-      return;
+      if (!pageImages) {
+        failed = true;
+        return;
+      }
+      // The browser holds a PDF in one buffer, which it refuses past about 2 GB; the host can still render its pages.
+      images = true;
+      const probe = new Image();
+      probe.src = pageImages.url(target);
+      try {
+        await probe.decode();
+        base = { width: 612, height: (612 * probe.naturalHeight) / probe.naturalWidth }; // the shape; points are unknown
+      } catch {
+        failed = true; // the host cannot render it either
+        images = false;
+        return;
+      }
     }
     await tick();
     if (!scroller) return; // unmounted while loading
@@ -139,9 +160,10 @@
     r.page?.cleanup();
   }
 
-  // Redraw visible pages when the scale changes (zoom, or the panel being resized in fit mode).
+  // Redraw visible pages when the scale changes (zoom, or the panel being resized in fit mode). Page images just stretch.
   $effect(() => {
     const s = scale;
+    if (images) return;
     for (const [number, r] of rendered) {
       if (r.scale === s) continue;
       const element = elements.get(number);
@@ -168,12 +190,26 @@
   }
 
   async function draw(number: number) {
-    if (!doc || rendered.has(number)) return;
+    if (!(doc || images) || rendered.has(number)) return;
     const s = scale;
     const entry: Rendering = { scale: s };
     rendered.set(number, entry);
     const element = elements.get(number);
     if (!element) return;
+    if (!doc) {
+      // The host renders each image, one at a time: skip pages only passed on the way to another.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (rendered.get(number) !== entry) return;
+      if (!visible(element)) {
+        rendered.delete(number); // coming near again draws it
+        return;
+      }
+      const image = document.createElement('img');
+      image.alt = '';
+      image.src = pageImages!.url(number);
+      element.querySelector('.layers')!.replaceChildren(image);
+      return;
+    }
     const pdf = await pdfjs();
     const page = await doc.getPage(number);
     if (rendered.get(number) !== entry) return; // freed or rescaled meanwhile
@@ -250,12 +286,12 @@
   }
 
   function go(number: number, behavior: ScrollBehavior = 'smooth') {
-    if (!doc) return;
+    if (!count) return;
     if (!Number.isInteger(number)) {
       pageInput = String(current); // not a page number: show where the reader is again
       return;
     }
-    const n = Math.min(Math.max(1, number), doc.numPages);
+    const n = Math.min(Math.max(1, number), count);
     const element = elements.get(n);
     if (!element || !scroller) return;
     current = n;
@@ -287,9 +323,9 @@
       <button class="btn btn-quiet btn-small" onclick={() => go(current - 1)} disabled={current <= 1} aria-label={t("Previous page")}>‹</button>
       <form class="page" onsubmit={(e) => (e.preventDefault(), go(/^\s*\d+\s*$/.test(pageInput) ? Number(pageInput) : NaN))}>
         <input aria-label={t("Page number")} inputmode="numeric" pattern="[0-9]*" bind:value={pageInput} onblur={() => (pageInput = String(current))} />
-        <span>{t("of {count}", { count: doc?.numPages ?? '…' })}</span>
+        <span>{t("of {count}", { count: count || '…' })}</span>
       </form>
-      <button class="btn btn-quiet btn-small" onclick={() => go(current + 1)} disabled={!doc || current >= doc.numPages} aria-label={t("Next page")}>›</button>
+      <button class="btn btn-quiet btn-small" onclick={() => go(current + 1)} disabled={current >= count} aria-label={t("Next page")}>›</button>
     </div>
     <div class="group">
       <button class="btn btn-quiet btn-small" onclick={() => setZoom(scale - 0.15)} aria-label={t("Zoom out")}>−</button>
@@ -308,6 +344,8 @@
 
     {#if failed}
       <p class="problem">{t("This PDF could not be displayed here. Open the original instead.")}</p>
+    {:else if images}
+      <p class="note">{t("The browser cannot open this PDF itself, usually because it is very large, so its pages are shown as pictures. Their text cannot be selected.")}</p>
     {/if}
     {#each pages as number (number)}
       <section
@@ -422,18 +460,19 @@
     line-height: 1.4rem;
   }
 
-  .layers :global(canvas) {
+  .layers :global(canvas),
+  .layers :global(img) {
     display: block;
     width: 100%;
     height: 100%;
   }
 
-  :global([data-theme='dark']) .layers :global(canvas) {
+  :global([data-theme='dark']) .layers :global(:is(canvas, img)) {
     filter: brightness(0.88) contrast(1.05);
   }
 
   @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .layers :global(canvas) {
+    :global(:root:not([data-theme='light'])) .layers :global(:is(canvas, img)) {
       filter: brightness(0.88) contrast(1.05);
     }
   }
@@ -441,6 +480,14 @@
   .problem {
     color: var(--danger);
     font-size: var(--step-0);
+  }
+
+  .note {
+    flex: none;
+    max-width: 40rem;
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: var(--step--1);
   }
 
   /* pdf.js text layer: transparent text positioned over the canvas so it can be selected. */

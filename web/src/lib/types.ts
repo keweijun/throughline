@@ -396,6 +396,8 @@ export type SourceView = Ref & {
   stale: boolean;
   image_url: string | null;
   pdf_url: string | null;
+  /** A PDF's page count. */
+  pages: number | null;
   render_message: string | null;
   document: { id: string; text: string }[] | null;
 };

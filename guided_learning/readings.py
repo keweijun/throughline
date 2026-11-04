@@ -8,6 +8,7 @@ belongs to one revision, page and position on the page, so the crop it draws nev
 """
 import hashlib
 import os
+import threading
 import time
 from pathlib import Path
 from . import pages
@@ -177,15 +178,34 @@ def figure(store, request):
     return {'figure': {**found, 'unit_id': f"page-{found['page']}"}}
 
 
-def snapshot_bytes(workspace, source_id, revision):
+_VERIFIED = {}
+_VERIFY_LOCK = threading.Lock()
+
+
+def verified_snapshot(path, revision):
+    """Whether a snapshot's bytes still hash to its revision. Hashed in chunks so a large PDF never sits in memory, and
+    once per version of the file: a reader fetches a large PDF range by range and would otherwise rehash it each time."""
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ino)
+    with _VERIFY_LOCK:
+        if key not in _VERIFIED:
+            digest = hashlib.sha256()
+            with path.open('rb') as file:
+                for chunk in iter(lambda: file.read(1024 * 1024), b''):
+                    digest.update(chunk)
+            _VERIFIED[key] = digest.hexdigest() == revision
+        return _VERIFIED[key]
+
+
+def snapshot_path(workspace, source_id, revision):
+    """The stored snapshot of a source revision, checked against its revision."""
     root = (Path(workspace) / 'sources').resolve()
     path = (root / source_id / revision).resolve()
     if not path.is_relative_to(root) or not path.is_file():
         raise OperationError('unavailable_source', 'Source snapshot unavailable')
-    data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != revision:
+    if not verified_snapshot(path, revision):
         raise OperationError('unavailable_source', 'Source snapshot integrity check failed')
-    return data
+    return path
 
 
 def render(store, request):
@@ -211,15 +231,15 @@ def render(store, request):
         targets = [(source_id, revision, n, box, None) for n in numbers]
     folder = Path(request['out']).resolve() if isinstance(request.get('out'), str) and request['out'] else store.workspace / RENDERS
     folder.mkdir(parents=True, exist_ok=True)
-    data, images = {}, []
+    snapshots, images = {}, []
     for source_id, revision, page, box, fid in targets:
-        if (source_id, revision) not in data:
-            data[source_id, revision] = snapshot_bytes(store.workspace, source_id, revision)
+        if (source_id, revision) not in snapshots:
+            snapshots[source_id, revision] = snapshot_path(store.workspace, source_id, revision)
         part = fid or ('box-' + hashlib.sha256(repr(box).encode()).hexdigest()[:8] if box else 'page')
         path = folder / f'{source_id}-{revision[:12]}-p{page:04d}-{part}-{size}.png'
         if not path.is_file():
             partial = path.with_name(f'.{path.name}.{os.getpid()}.partial')
-            partial.write_bytes(pages.render(data[source_id, revision], page, box, size))
+            partial.write_bytes(pages.render(snapshots[source_id, revision], page, box, size))
             partial.replace(path)
         images.append({'source_id': source_id, 'revision': revision, 'page': page, **({'figure': fid} if fid else {}), 'path': str(path)})
     return {'images': images}

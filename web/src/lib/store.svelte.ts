@@ -11,7 +11,16 @@ export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
 export type CoursePart = 'studio' | 'sources' | 'notes';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
-export type Quote = { text: string; turnId: string | null; scrollY: number; source?: string; questionId?: string };
+export type Quote = {
+  text: string;
+  turnId: string | null;
+  scrollY: number;
+  source?: string;
+  questionId?: string;
+  /** The exercise or review question the passage was selected in, and its section. */
+  taskId?: string;
+  conceptId?: string;
+};
 
 const DEFAULT_PANEL = 400;
 
@@ -1040,8 +1049,8 @@ class AppStore {
   }
 
   /** Revisit a missed review question: a new side question quoting it, ready to send (ADR 0014). */
-  revisit(question: string) {
-    this.quote = { text: question, turnId: null, scrollY: stageScroll() };
+  revisit(task: Task) {
+    this.quote = { text: task.question, turnId: null, taskId: task.id, conceptId: task.concept_id, scrollY: stageScroll() };
     if (!this.drafts.get('question').trim()) this.drafts.set('question', t("I missed this in review. Can you go over the idea again?"));
     this.openPanel('questions');
     requestAnimationFrame(() => document.getElementById('question-input')?.focus());

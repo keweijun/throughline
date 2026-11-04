@@ -452,7 +452,9 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def source(source_id: str, revision: str, unit_id: str, format: Optional[str] = None):
         result = host.navigation.source(source_id, revision, unit_id, format)
         if isinstance(result, tuple):
-            return Response(result[0], media_type=result[1])
+            content, media_type = result
+            # A file answers Range requests, so a PDF too large for one response still opens.
+            return FileResponse(content, media_type=media_type) if isinstance(content, Path) else Response(content, media_type=media_type)
         return result
 
     @app.get('/api/search/sources')

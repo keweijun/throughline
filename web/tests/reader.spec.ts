@@ -38,6 +38,24 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   expect(errors).toEqual([]);
 });
 
+test('a PDF the browser cannot open, such as one of 2 GB or more, shows the pages the host renders', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.route('**/api/sources/**format=pdf', (route) => route.fulfill({ contentType: 'application/pdf', body: 'not a pdf' }));
+  await page.getByRole('button', { name: 'View source p. 2' }).first().click();
+
+  const cited = page.locator('.pdf-page.cited');
+  await expect(cited.locator('img')).toHaveJSProperty('complete', true);
+  expect(await cited.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByText('its pages are shown as pictures')).toBeVisible();
+  await expect(page.getByText('could not be displayed')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('2');
+  await expect(page.locator('.pdf-page')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await expect(page.locator('.pdf-page[data-page="3"] img')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('3');
+  expect(errors).toEqual([]);
+});
+
 test('a citation preview typesets the formulas in its excerpt and keeps long ones inside the card', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   // Text extracted from a PDF keeps its formulas as TeX, delimited \( \) and \[ \].

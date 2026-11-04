@@ -193,6 +193,7 @@ const messages = {
   "Fit width": "适应宽度",
   "Back to cited page": "回到引用页",
   "This PDF could not be displayed here. Open the original instead.": "此处无法显示该 PDF，请打开原文件。",
+  "The browser cannot open this PDF itself, usually because it is very large, so its pages are shown as pictures. Their text cannot be selected.": "浏览器无法直接打开这个 PDF（通常是因为文件太大），所以页面以图片显示，其中的文字无法选中。",
   "Cited page": "引用页",
   "Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.": "在课程、练习或来源阅读器中选中句子或公式即可提问。除非你暂停，课程会继续生成。",
   "From {source}": "出自 {source}",

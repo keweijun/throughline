@@ -65,6 +65,10 @@ class Navigation(unittest.TestCase):
         response=self.client.get(view['pdf_url'].split('#')[0])
         self.assertEqual(response.headers['content-type'],'application/pdf')
         self.assertEqual(response.content,original)
+        # Ranges let the reader open a PDF too large to download whole.
+        response=self.client.get(view['pdf_url'].split('#')[0],headers={'Range':'bytes=5-14'})
+        self.assertEqual((response.status_code,response.content),(206,original[5:15]))
+        self.assertEqual(view['pages'],1)
         self.assertIsNotNone(view['image_url'])
         response=self.client.get(view['image_url'])
         self.assertEqual(response.headers['content-type'],'image/png')

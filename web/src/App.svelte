@@ -48,12 +48,16 @@
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a
   // drawer on a phone. The stage is measured rather than queried in CSS so the rail, its capsule and the grid agree.
+  // It is measured for the width it is heading to: a docked side panel counts at its full width while it slides in or
+  // out, so the route folds or unfolds as the panel starts to move rather than partway through.
   let stage = $state<HTMLElement>();
+  let room = $state(Infinity);
   $effect(() => {
     if (!stage) return;
-    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const observer = new ResizeObserver(([entry]) => (app.stageNarrow = entry.contentRect.width < 68.5 * rem));
-    observer.observe(stage);
+    const workspace = stage.parentElement!;
+    const scrollbar = () => stage!.offsetWidth - stage!.clientWidth;
+    const observer = new ResizeObserver(() => (room = workspace.clientWidth - scrollbar()));
+    observer.observe(workspace);
     const phone = matchMedia('(max-width: 56rem)');
     const update = () => (app.phone = phone.matches);
     update();
@@ -62,6 +66,11 @@
       observer.disconnect();
       phone.removeEventListener('change', update);
     };
+  });
+  $effect(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const docked = app.state && !app.libraryOpen && app.panelShown && !panelCoversLesson();
+    app.stageNarrow = room - (docked ? app.panelWidth : 0) < 68.5 * rem;
   });
 
   $effect(() => {
@@ -172,10 +181,12 @@
 <ErrorToast />
 
 <style>
+  /* The side panel slides in and out past the window's edge, which must not scroll the window sideways. */
   .workspace {
     display: flex;
     flex: 1;
     min-height: 0;
+    overflow: clip;
   }
 
   /* The stable gutter keeps the centred layout from shifting when a page is too short to scroll. */
@@ -197,9 +208,9 @@
     max-width: calc(var(--rail) + var(--measure) + 12rem);
     margin-inline: auto;
     transition:
-      grid-template-columns var(--settle) var(--ease-out),
-      column-gap var(--settle) var(--ease-out),
-      max-width var(--settle) var(--ease-out);
+      grid-template-columns var(--move) var(--ease-in-out),
+      column-gap var(--move) var(--ease-in-out),
+      max-width var(--move) var(--ease-in-out);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -250,12 +261,25 @@
       padding-top: 1.5rem;
     }
 
-    .scrim.visible {
+    .scrim {
       display: block;
       position: fixed;
       inset: var(--topbar) 0 0;
       z-index: 30;
       background: rgb(17 20 27 / 0.4);
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity var(--move) ease,
+        visibility 0s linear var(--move);
+    }
+
+    .scrim.visible {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity var(--move) ease,
+        visibility 0s;
     }
   }
 </style>

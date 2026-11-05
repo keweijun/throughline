@@ -2,6 +2,7 @@
   import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { spotlight, shown } from '../lib/spotlight';
+  import { lightDismiss } from '../lib/dialog';
 
   // Help is a map of what the learner can do, by level (ADR 0017): the app, the course, the section being read.
   // "Show me" closes Help and rings the real control where it sits, so the map teaches where things live.
@@ -76,7 +77,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={() => (app.helpOpen = false)} aria-labelledby="help-title">
+<dialog bind:this={dialog} use:lightDismiss onclose={() => (app.helpOpen = false)} aria-labelledby="help-title">
   <header>
     <h2 id="help-title">{t('Help')}</h2>
     <p class="lead">{t('What you can do, from the whole app down to the section you are reading.')}</p>

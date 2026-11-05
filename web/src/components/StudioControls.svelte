@@ -2,6 +2,7 @@
   import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { studio } from '../lib/studio.svelte';
+  import { pop } from '../lib/motion';
 
   /**
    * How Studio runs, chosen where it is used, as in Codex (ADR 0016): its model and reasoning effort, the teacher's
@@ -116,7 +117,7 @@
 
   {#if open === 'model'}
     <!-- Effort first: it is switched more often than the model, and stays in view above a long list of models. -->
-    <div class="menu" role="group" aria-label={t("Studio's model and reasoning effort")}>
+    <div class="menu" role="group" transition:pop aria-label={t("Studio's model and reasoning effort")}>
       <p class="label">{t("Reasoning effort")}</p>
       <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
         {#each efforts as option (option.id)}
@@ -151,7 +152,7 @@
       </div>
     </div>
   {:else if open === 'access'}
-    <div class="menu" role="group" aria-label={t("Access")}>
+    <div class="menu" role="group" transition:pop aria-label={t("Access")}>
       {#if studio.access?.forced}
         <p class="note">{t("Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.")}</p>
       {/if}

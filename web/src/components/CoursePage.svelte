@@ -89,7 +89,7 @@
   }
 </script>
 
-<article class="page" aria-labelledby="course-title">
+<article class="page still" aria-labelledby="course-title">
   <header class="head">
     <h1 id="course-title">{app.state?.course.title}</h1>
     {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}

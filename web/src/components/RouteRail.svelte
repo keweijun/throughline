@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { slide } from 'svelte/transition';
-  import { prefersReducedMotion } from 'svelte/motion';
+  import { fold } from '../lib/motion';
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
@@ -213,7 +212,7 @@
               </button>
             </div>
             {#if open && total}
-              <ol class="tray" id="chapter-{chapter.id}" transition:slide={{ duration: prefersReducedMotion.current ? 0 : 220 }}>
+              <ol class="tray" id="chapter-{chapter.id}" transition:fold>
                 {#each chapter.concept_ids as id (id)}
                   {@render section(id)}
                 {/each}
@@ -593,13 +592,18 @@
       border-right: 1px solid var(--rule);
       box-shadow: var(--shadow);
       transform: translateX(-102%);
-      transition: transform 0.2s ease;
       visibility: hidden;
+      transition:
+        transform var(--move) var(--ease-in-out),
+        visibility 0s linear var(--move);
     }
 
     .rail.open {
       transform: none;
       visibility: visible;
+      transition:
+        transform var(--move) var(--ease-in-out),
+        visibility 0s;
     }
   }
 </style>

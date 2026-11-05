@@ -4,6 +4,8 @@
 
   let toast = $state<HTMLElement>();
   let shown: string | null = null;
+  // The last error stays written in the toast while it fades out after being dismissed.
+  let message = $state<string | null>(null);
 
   // An error floats just below the top bar rather than pushing the page down, and stays until dismissed. A manual
   // popover sits in the top layer, so it also shows above the Settings dialog; reopening it when a new error arrives
@@ -15,6 +17,7 @@
     if (!error) {
       if (open) toast.hidePopover();
     } else if (error !== shown) {
+      message = error;
       if (open) toast.hidePopover();
       toast.showPopover();
     }
@@ -23,11 +26,11 @@
 </script>
 
 <div class="toast" popover="manual" role="alert" bind:this={toast}>
-  {#if app.error}
+  {#if message}
     <span class="mark" aria-hidden="true">
       <svg viewBox="0 0 20 20" width="12" height="12"><path d="M10 5v6M10 14.5v.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg>
     </span>
-    <p class="text">{diagnostic(app.error)}</p>
+    <p class="text">{diagnostic(message)}</p>
     <button class="close" onclick={() => (app.error = null)} aria-label={t('Dismiss')}>
       <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
     </button>

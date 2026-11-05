@@ -956,14 +956,22 @@ summary:focus-visible {
 }
 
 /*
- * Motion: short and purposeful. Controls ease between states; things that appear arrive from where they come
- * from. Keyframes animate `translate` and `scale`, never `transform`, so they never undo an element's positioning.
- * Reduced motion turns all of it off (above).
+ * Motion: short and purposeful, from one set of tokens.
+ * - Things that appear arrive from where they come from (`--settle`, `--ease-out`) with one of the enter-* keyframes,
+ *   and leave the way they came, a little faster (`--leave`, `--ease-in`): a popup does not outstay the click.
+ * - Surfaces that move the layout, the side panel and the route, glide between places (`--move`, `--ease-in-out`).
+ * - Controls ease between states (`--quick`).
+ * Keyframes animate `translate` and `scale`, never `transform`, so they never undo an element's positioning. Svelte
+ * transitions for blocks that come and go use the same tokens (lib/motion.ts). Reduced motion turns all of it off (above).
  */
 :root {
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0.2);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.2, 1);
   --quick: 0.14s;
   --settle: 0.22s;
+  --leave: 0.15s;
+  --move: 0.28s;
 }
 
 button,
@@ -1022,17 +1030,83 @@ textarea {
   }
 }
 
-/* What a disclosure reveals settles into place under its summary. */
+/* A page arrives the same way whichever page it is: a section, a chapter, review. The course page holds Studio's
+   writing box, which takes the caret as the page opens, so it fades in rather than moving under the learner. */
+#main > .page {
+  animation: enter-rise var(--settle) var(--ease-out);
+}
+
+#main > .page.still {
+  animation-name: enter-fade;
+}
+
+/* What a disclosure reveals settles into place under its summary. Where the browser can animate a disclosure's
+   height, opening grows it and closing folds it away; its content is clipped only while it folds, so a focus ring or a
+   menu inside an open one is never cut off. */
 details[open] > :not(summary) {
   animation: enter-rise var(--settle) var(--ease-out);
 }
 
+@supports selector(::details-content) and (interpolate-size: allow-keywords) {
+  details {
+    interpolate-size: allow-keywords;
+  }
+
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--leave) var(--ease-in),
+      content-visibility var(--leave) allow-discrete,
+      overflow 0s;
+  }
+
+  details[open]::details-content {
+    block-size: auto;
+    overflow: visible;
+    transition:
+      block-size var(--settle) var(--ease-out),
+      content-visibility var(--settle) allow-discrete,
+      overflow 0s var(--settle) allow-discrete;
+  }
+}
+
+/* Modals pop in over a fading backdrop. Where the browser can keep a closing dialog in the top layer (`overlay`), it
+   settles back out the same way; elsewhere it closes at once. The error toast, a popover, does the same. */
 dialog[open] {
   animation: enter-pop var(--settle) var(--ease-out);
 }
 
 dialog[open]::backdrop {
   animation: enter-fade var(--settle) ease;
+}
+
+@supports (overlay: auto) {
+  dialog,
+  dialog::backdrop,
+  [popover] {
+    transition:
+      opacity var(--leave) var(--ease-in),
+      scale var(--leave) var(--ease-in),
+      translate var(--leave) var(--ease-in),
+      display var(--leave) allow-discrete,
+      overlay var(--leave) allow-discrete;
+  }
+
+  dialog:not([open]) {
+    opacity: 0;
+    scale: 0.97;
+    translate: 0 4px;
+  }
+
+  dialog:not([open])::backdrop {
+    opacity: 0;
+  }
+
+  [popover]:not(:popover-open) {
+    opacity: 0;
+    translate: 0 -6px;
+  }
 }
 
 /* Thin scrollbars that take the theme's colours instead of the platform default. */

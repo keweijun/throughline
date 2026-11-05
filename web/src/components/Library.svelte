@@ -8,6 +8,7 @@
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
+  import { lightDismiss } from '../lib/dialog';
 
   let opening = $state<string | null>(null);
   let launcher = $state<LauncherStatus | null>(null);
@@ -160,7 +161,7 @@
   {/if}
 
   <!-- Shown once, the first time the library opens after installing, as Settings is: centred, over the page. -->
-  <dialog class="next-time" bind:this={nextTime} onclose={dismissLauncher} aria-labelledby="next-time-title">
+  <dialog class="next-time" bind:this={nextTime} use:lightDismiss onclose={dismissLauncher} aria-labelledby="next-time-title">
     {#if launcher}
       <h2 id="next-time-title">{t('Opening Throughline next time')}</h2>
       <LauncherHelp {launcher} />

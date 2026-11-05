@@ -847,6 +847,33 @@ summary:focus-visible {
   margin-bottom: 0.4em;
 }
 
+/* Source figures: a crop of the page as printed, so it keeps the page's own white in both schemes. */
+.prose .widget-figure {
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+.prose .widget-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 34rem;
+  margin-inline: auto;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.prose .widget-figure figcaption {
+  margin-top: 0.5em;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.prose .widget-figure .figure-page {
+  color: var(--pencil);
+}
+
 /* Highlighted code: token colors from the theme, readable in both schemes. */
 .prose .hljs-keyword,
 .prose .hljs-selector-tag,

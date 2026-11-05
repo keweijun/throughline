@@ -1,7 +1,4 @@
 """Course features served by the host. Each may add prompt text and react to turn lifecycle."""
-import hashlib
-import importlib.util
-import io
 import json
 import logging
 import re
@@ -12,6 +9,8 @@ from pathlib import Path
 from .. import lessons
 from .. import practice
 from .. import images as attached
+from .. import pages
+from .. import readings
 from .. import review
 from ..store import OperationError
 from .. import memory
@@ -25,60 +24,8 @@ RETRIEVAL_ORIGINS = ('review', 'chapter_quiz')
 DECISION = re.compile(r'<teaching-decision>\s*(\{.*?\})\s*</teaching-decision>\s*$', re.S)
 STEP_REPLY = re.compile(r'<lesson-step>\s*(\{.*?\})\s*</lesson-step>', re.S)
 STEP_BLOCK = re.compile(r'\s*<lesson-step>.*$', re.S)
-_PDF_LOCK = threading.Lock()
-_VERIFIED = {}
-_VERIFY_LOCK = threading.Lock()
-
-
-def renderer_available():
-    return importlib.util.find_spec('pypdfium2') is not None and importlib.util.find_spec('PIL') is not None
-
-
-def verified_snapshot(path, revision):
-    """Whether a snapshot's bytes still hash to its revision. Hashed in chunks so a large PDF never sits in memory, and
-    once per version of the file: a reader fetches a large PDF range by range and would otherwise rehash it each time."""
-    stat = path.stat()
-    key = (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ino)
-    with _VERIFY_LOCK:
-        if key not in _VERIFIED:
-            digest = hashlib.sha256()
-            with path.open('rb') as file:
-                for chunk in iter(lambda: file.read(1024 * 1024), b''):
-                    digest.update(chunk)
-            _VERIFIED[key] = digest.hexdigest() == revision
-        return _VERIFIED[key]
-
-
-def render_pdf_page(path, page_number):
-    if not renderer_available():
-        raise OperationError('renderer_unavailable', 'Original page image unavailable: install the project pdf extra, or use the original PDF link.')
-    # PDFium forbids concurrent API calls, even for different documents.
-    with _PDF_LOCK:
-        import pypdfium2
-        try:
-            with pypdfium2.PdfDocument(str(path)) as document:
-                if not isinstance(page_number, int) or not 1 <= page_number <= len(document):
-                    raise OperationError('invalid_reference', 'Invalid PDF page')
-                page = document[page_number - 1]
-                try:
-                    width, height = page.get_size()
-                    bitmap = page.render(scale=min(2.0, 1800 / max(width, height)))
-                    try:
-                        image = bitmap.to_pil()
-                        try:
-                            output = io.BytesIO()
-                            image.save(output, format='PNG')
-                            return output.getvalue()
-                        finally:
-                            image.close()
-                    finally:
-                        bitmap.close()
-                finally:
-                    page.close()
-        except OperationError:
-            raise
-        except Exception as exc:
-            raise OperationError('render_failed', 'Original page rendering failed; check the original PDF link.') from exc
+FIGURE_SIZE = 1400  # pixels on the long side of a figure drawn in a lesson
+MAX_SOURCE_IMAGES = 12  # figures and pages sent with one turn, a sanity limit
 
 
 def source_url(ref, fmt=None):
@@ -220,14 +167,14 @@ class Navigation(Feature):
         path = (root / source_id / revision).resolve()
         if not path.is_relative_to(root) or not path.is_file():
             raise OperationError('unavailable_source', 'Source snapshot unavailable')
-        if not verified_snapshot(path, revision):
+        if not readings.verified_snapshot(path, revision):
             raise OperationError('unavailable_source', 'Source snapshot integrity check failed')
         kind = Path(snapshot['path']).suffix.lower()
         page = unit.get('locator', {}).get('page')
         if fmt == 'image':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only PDF pages have rendered previews')
-            return render_pdf_page(path, page), 'image/png'
+            return pages.render(path, page), 'image/png'
         if fmt == 'pdf':
             if kind != '.pdf':
                 raise OperationError('invalid_reference', 'Only registered PDF snapshots can be opened directly')
@@ -237,7 +184,7 @@ class Navigation(Feature):
         model = self.operation({'op': 'curriculum.view'})
         mapping = next((m for m in model['coverage'] if matching_ref(m, ref)), {})
         current = next((s for s in self.operation({'op': 'course.status'})['sources'] if s['id'] == source_id), {})
-        available = renderer_available()
+        available = pages.available()
         original = snapshot.get('converted_from')
         return {**ref, **unit, 'title': Path(snapshot['path']).name, 'kind': kind,
                 'converted_from': Path(original['path']).name if original else None,
@@ -247,6 +194,20 @@ class Navigation(Feature):
                 'pdf_url': source_url(ref, 'pdf') + f'#page={page}' if kind == '.pdf' and page else None,
                 'pages': len(snapshot['units']) if kind == '.pdf' else None,
                 'document': None if kind == '.pdf' else [{'id': u['id'], 'text': u.get('text', '')} for u in snapshot['units']]}
+
+    def figure(self, figure_id, fmt=None):
+        """A figure a lesson shows (ADR 0019): its caption and source page, or with `image` its crop of the page."""
+        found = self.operation({'op': 'source.figure', 'id': figure_id})['figure']
+        ref = {k: found[k] for k in ('source_id', 'revision', 'unit_id')}
+        if fmt == 'image':
+            path = readings.snapshot_path(self.host.workspace, found['source_id'], found['revision'])
+            return pages.render(path, found['page'], found['box'], FIGURE_SIZE), 'image/png'
+        if fmt:
+            raise OperationError('invalid_reference', 'Unknown figure format')
+        snapshot = self.operation({'op': 'source.read', 'source_id': found['source_id'], 'revision': found['revision']})
+        return {'id': found['id'], 'label': found['label'], 'caption': found['caption'], 'description': found['description'],
+                'page': found['page'], 'ref': ref, 'title': Path(snapshot['path']).name,
+                'image_url': f'/api/figures/{found["id"]}?format=image' if pages.available() else None}
 
     def _due(self, turn):
         # The explanations frozen into this turn's snapshot are the ones this lesson was asked to give.
@@ -1056,13 +1017,50 @@ class Preparation(Feature):
         self.operation({'op': 'preparation.reconcile', 'brief': True})
 
     def prompt(self, turn, context):
+        shown = prompts.source_images([what for what, _ in self._source_images(turn)]) if self._sends_images(turn) else ''
         if turn['channel'] == 'preparation':
             job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
-            return prompts.preparation_task(job['snapshot']['context'])
+            return prompts.preparation_task(job['snapshot']['context']) + shown
+        material = self._material(turn)
+        return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING + shown
+
+    def _material(self, turn):
         material = self.state(turn['concept_id'])['ready']
-        if material and material['snapshot'].get('language', 'en') != turn.get('language', 'en'):
-            material = None
-        return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING
+        return material if material and material['snapshot'].get('language', 'en') == turn.get('language', 'en') else None
+
+    def _sends_images(self, turn):
+        """Preparation looks at a section's figures and problem pages (ADR 0019), and so does the first lesson of a section
+        taught without preparation material, which prepares it itself."""
+        if turn['channel'] == 'preparation':
+            return True
+        if turn['channel'] != 'mainline' or is_recap(turn) or chapter_owned(turn):
+            return False
+        taught = any(t['id'] != turn['id'] and t['channel'] == 'mainline' and t['concept_id'] == turn['concept_id'] and not chapter_owned(t)
+                     for t in self.host.brief_turns())
+        return not taught and self._material(turn) is None
+
+    def _source_images(self, turn):
+        """What the readings of a turn's source pages cannot carry: crops of their figures and the whole pages whose readings
+        list problems, as (what it is, source.render request) in the order they are sent."""
+        found, seen = [], set()
+        for unit in (turn.get('prompt_snapshot') or {}).get('context', {}).get('sources', []):
+            page = unit.get('locator', {}).get('page')
+            where = (unit['source_id'], unit['revision'], page)
+            if not unit.get('reading') or where in seen:
+                continue
+            seen.add(where)
+            for figure in unit.get('figures', []):
+                label = f" ({figure['label']})" if figure.get('label') else ''
+                found.append((f"figure {figure['id']}{label} on page {page}", {'figures': [figure['id']]}))
+            if unit.get('problems'):
+                found.append((f"page {page} of source {unit['source_id']}, whose reading lists problems",
+                              {'source_id': unit['source_id'], 'revision': unit['revision'], 'page': page}))
+        return found[:MAX_SOURCE_IMAGES]
+
+    def images(self, turn):
+        if not self._sends_images(turn):
+            return []
+        return [self.operation({'op': 'source.render', **request})['images'][0]['path'] for _, request in self._source_images(turn)]
 
     def schedule(self, retry=False):
         with self.host.lock:

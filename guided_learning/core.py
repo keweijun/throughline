@@ -1,4 +1,5 @@
 import uuid
+from . import readings
 from .store import OperationError
 
 DEPTHS = ('overview', 'standard', 'rigorous')
@@ -6,7 +7,7 @@ LEVELS = ('none', 'some', 'solid')
 
 
 def status(store, request):
-    return {'course': store.get('course', 'metadata'), 'position': store.get('course', 'position'), 'sources': store.list('sources'),
+    return {'course': store.get('course', 'metadata'), 'position': store.get('course', 'position'), 'sources': readings.annotate(store, store.list('sources')),
             'profile': store.get('course', 'profile')}
 
 

@@ -14,7 +14,7 @@ REF = ('source_id', 'revision', 'unit_id')
 CONCEPT = ('id', 'title', 'prerequisites', 'objective', 'goal')
 COVERAGE = REF + ('concept_ids', 'disposition', 'verification')
 JOB = ('id', 'concept_id', 'status', 'reason', 'created_at')
-SOURCE = ('id', 'path', 'revision', 'status', 'converted_from')
+SOURCE = ('id', 'path', 'revision', 'status', 'converted_from', 'pages', 'pages_read', 'problem_pages')
 INTERACTION = ('id', 'role', 'text', 'concept_id')
 
 

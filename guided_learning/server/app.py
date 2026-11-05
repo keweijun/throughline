@@ -457,6 +457,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             return FileResponse(content, media_type=media_type) if isinstance(content, Path) else Response(content, media_type=media_type)
         return result
 
+    @app.get('/api/figures/{figure_id}')
+    def figure(figure_id: str, format: Optional[str] = None):
+        result = host.navigation.figure(figure_id, format)
+        if isinstance(result, tuple):
+            return Response(result[0], media_type=result[1])
+        return result
+
     @app.get('/api/search/sources')
     def search_sources(q: str):
         """Search covers the course in the browser, from the state; source text is not part of it, so it is searched here."""

@@ -21,4 +21,4 @@ Speaker notes are lost in a PDF export of slides, and in lecture decks they ofte
 
 ## Consequences
 
-A converted source is a PDF in every other respect: citations, highlights, coverage and verification work unchanged, and a course made before needs no migration, since `converted_from` is optional. The host does not watch originals, as it does not watch any source: when the learner updates one, Codex converts and registers again, and `converted_from.revision` tells it whether a conversion is out of date. A learner without Office or LibreOffice needs one install or a PDF exported by hand.
+A converted source is a PDF in every other respect: citations, highlights, coverage and verification work unchanged (and its pages are read like any other PDF, ADR 0019), and a course made before needs no migration, since `converted_from` is optional. The host does not watch originals, as it does not watch any source: when the learner updates one, Codex converts and registers again, and `converted_from.revision` tells it whether a conversion is out of date. A learner without Office or LibreOffice needs one install or a PDF exported by hand.

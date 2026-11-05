@@ -255,7 +255,11 @@ export type State = {
   preferences: Preferences;
   course:{ id: string; title: string };
   position: Position | null;
-  sources: { id: string; path: string; revision: string; status: string; converted_from?: { path: string; revision: string } }[];
+  sources: {
+    id: string; path: string; revision: string; status: string; converted_from?: { path: string; revision: string };
+    /** A PDF's pages, how many Codex has read as images and how many readings list problems (ADR 0019). */
+    pages?: number; pages_read?: number; problem_pages?: number;
+  }[];
   /** `version` changes with any part of the course plan, including fields left out here. */
   curriculum: { version: string; concepts: Concept[]; route: string[]; coverage?: Coverage[]; chapters?: Chapter[] };
   session: { recent_interactions: Interaction[] };

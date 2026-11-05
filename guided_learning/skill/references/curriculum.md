@@ -4,7 +4,7 @@ Use the same JSON entrypoint as [course operations](course-operations.md). The t
 
 ## Chapters and sections
 
-Group the route into chapters, the course's table of contents. A chapter is never taught as one block; each concept in it is one learning section that answers one core question. Explain closely related ideas in the same section, and give a prerequisite its own earlier section when several sections rely on it. Take the number of chapters and sections from the materials and the learner's goal; there is no target count. Follow the materials' own chapters where they fit the learning order.
+Group the route into chapters, the course's table of contents. A chapter is never taught as one block; each concept in it is one learning section that answers one core question. Explain closely related ideas in the same section, and give a prerequisite its own earlier section when several sections rely on it. A section is a **sitting**: what a learner studies in one go, through a lesson of a few steps, its check questions and its exercises. Group the pages that answer one question into it, so a single slide or a page that only continues an argument is rarely a section of its own, and a worked example belongs to the section whose method it shows. Take the number of chapters and sections from the materials and the learner's goal; there is no target count. Follow the materials' own chapters where they fit the learning order.
 
 ## Build a course chapter by chapter
 
@@ -45,6 +45,8 @@ Use stable concept IDs across edits. Merge duplicate concepts with multiple link
 
 ## Exercise placement
 
+Register as exercises only the problems the materials set for the learner to solve: homework, problem sets, end-of-chapter questions, past exams. A worked example printed with its solution is teaching material: link its page to the section whose method it shows, and the lesson works it.
+
 An exercise part goes in the latest section among the concepts it requires, never earlier, so a lesson never has to teach ahead of the route. Give every exercise `required_concepts`: the IDs of all sections the part needs, its own section included. A save rejects an exercise it sends without a nonempty `required_concepts` (`invalid_request`); exercises stored earlier in concepts the save does not send may still lack it. A save is also rejected (`exercise_placement`, naming the exercise and the concept) when a required concept comes later in the route or is not in it; reordering chapters or moving a concept that would leave an exercise too early is rejected the same way. Deadlines do not change this: a learner who needs a part sooner can study the sections it needs, or ask a side question.
 
 Split homework by part. When the parts of a question need different sections, map each part (`7(a)`, `7(b)`) as its own exercise on the latest section it requires, with `part_of` naming the original question (`7`) and `other_parts` listing the other parts with the `concept_id` of the section that teaches each. When building chapter by chapter, a part that needs a chapter not built yet waits: list it in `other_parts` without `concept_id`, map it when you build that chapter, and then add its `concept_id` to the earlier part. The app's own chapter builds receive such waiting parts with their source text.
@@ -59,7 +61,7 @@ Coverage dispositions:
 - `deferred`: explicit reason, preserving the content for later teaching.
 - `needs_review`: explicit reason for uncertain extraction, mapping or interpretation.
 
-Default `verification` is `pending`. Set `verified` only after checking the contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
+Default `verification` is `pending`. A page reading verifies the page's text (see [reading the pages](course-operations.md#reading-the-pages)); a coverage entry's `verification` is about its mapping, so a read page can show `verification: pending` in `curriculum.coverage`, whose units say whether their page is `read`. Set `verified` only after checking that the mapped concepts teach the unit's contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
 
 ## Revising and reordering
 

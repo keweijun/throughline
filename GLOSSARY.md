@@ -91,6 +91,12 @@ _Avoid_: Chat, workshop, side question, teaching.
 **Suggested course change**: A change to the course itself that the teacher proposes under a lesson reply or side-question answer, which the learner opens in Studio with the request filled in or dismisses. One is open at a time (ADR 0016).
 _Avoid_: Suggested preference (course memory), a Studio hand-off button, supplement (taught in the side question itself).
 
+**Page reading**: Codex's transcription of one PDF page read as an image: its text with formulas and tables, its figures and what could not be read. A page with a reading is verified (ADR 0019).
+_Avoid_: Extracted text (what pypdf returns), OCR, coverage (whether the page is taught).
+
+**Figure**: A region of a source page that a lesson can show, recorded in the page reading by its box on the page, label, caption and description; the interface crops it from the page (ADR 0019).
+_Avoid_: An extracted image file, an image from the web, a drawing the teacher writes (a teaching widget).
+
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
 

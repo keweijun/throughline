@@ -67,11 +67,12 @@ class PageReadings(unittest.TestCase):
         self.call('curriculum.save', concepts=[concept], route=['refraction'],
                   coverage=[{**self.ref, 'unit_id': 'page-3', 'disposition': 'mapped', 'concept_ids': ['refraction']}])
         page3 = next(u for u in self.call('curriculum.coverage')['units'] if u['unit_id'] == 'page-3')
-        self.assertEqual(page3['disposition'], 'needs_review')
+        self.assertEqual((page3['disposition'], page3['read']), ('needs_review', False))
 
         self.call('source.readings.save', **self.ref, readings=[self.reading(n) for n in (1, 2, 4)] + [self.reading(3, problems=['The bottom margin is cut off'])])
         page3 = next(u for u in self.call('curriculum.coverage')['units'] if u['unit_id'] == 'page-3')
-        self.assertEqual(page3['disposition'], 'mapped')
+        # The page is read; the mapping's own review is still pending.
+        self.assertEqual((page3['disposition'], page3['read'], page3['verification']), ('mapped', True, 'pending'))
         context = self.call('curriculum.context', concept_id='refraction')['sources'][0]
         self.assertEqual((context['text'], context['problems']), ('Reading of page 3', ['The bottom margin is cut off']))
 

@@ -314,7 +314,9 @@ def coverage(store, request):
             # A page Codex has read is no longer judged by what its text extraction found (ADR 0019).
             if source['status'] == 'failed' or (unit.get('status') in ('failed', 'needs_review') and unit['locator'].get('page') not in done):
                 mapping = {**mapping, 'disposition': 'needs_review', 'reason': 'Source extraction requires review', 'verification': 'pending'}
-            units.append({**ref, 'locator': unit['locator'], 'disposition': mapping.get('disposition', 'unmapped'), 'concept_ids': mapping.get('concept_ids', []), 'reason': mapping.get('reason', ''), 'verification': mapping.get('verification', 'pending')})
+            units.append({**ref, 'locator': unit['locator'], 'disposition': mapping.get('disposition', 'unmapped'), 'concept_ids': mapping.get('concept_ids', []), 'reason': mapping.get('reason', ''), 'verification': mapping.get('verification', 'pending'),
+                          # A page's own verification is its reading (ADR 0019); `verification` above is the mapping's review.
+                          **({'read': unit['locator']['page'] in done} if 'page' in unit['locator'] else {})})
     by_id = {source['id']: source for source in sources}
     stale = [entry for entry in model['coverage'] if _stale(by_id.get(entry['source_id'], {}), entry)]
     return {'units': units, 'stale_mappings': stale, 'sources': sources, 'semantic_completeness': 'requires_teacher_review'}

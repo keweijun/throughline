@@ -3,7 +3,8 @@
 It logs every message it receives to <log> as JSON lines. A turn's text picks its script: "approve" asks to run a
 command and replies with the learner's decision, "ask" asks a question and replies with the answer, "wait" keeps
 running until it is steered or interrupted, "busy" works through a long turn with lots of output, "interview" asks
-two questions in its answer as newer Codex does, and a reply to them is read back; anything else replies "done". A
+two questions in its answer as newer Codex does, and a reply to them is read back; "links" answers with links to files
+in the library folder, the Studio fixture's course, the web and the page; anything else replies "done". A
 turn with an output schema writes a chat's title from the first words of its prompt. With `old` it lacks
 `turn/steer`, as an older Codex would."""
 import json
@@ -142,6 +143,10 @@ for line in sys.stdin:
             note('item/started', {'threadId': tid, 'turnId': turn, 'item': {**entry, 'text': '', 'questions': None}})
             note('item/completed', {'threadId': tid, 'turnId': turn, 'item': entry})
             turns[turn]['items'].append(entry)
+            finish(tid, turn)
+        elif 'links' in text:
+            message(tid, turn, 'Updated [outline.md](waves/outline.md) from [the reading](waves/inputs/reading.md:3); '
+                               'see [Codex](https://example.com/codex) and [the top](#top).')
             finish(tid, turn)
         elif 'approve' in text:
             ask = next(asked)

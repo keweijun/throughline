@@ -12,9 +12,47 @@ const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
 const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
 // The teacher's course memory note (ADR 0010), wherever it is and while it is still streaming.
 const MEMORY = /\s*<(course-memory|course-change)>[\s\S]*?(<\/\1>|$)/g;
+// DOMPurify's own rule for link targets, which also lets through the file links Codex writes (`file:` URLs and Windows
+// drive paths); every link but a web link is taken apart after sanitizing, so none stays a link the browser follows.
+const URI = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|file):|[a-z]:[\\/]|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;
+// A line after a file's path, as Codex writes one: `notes.md:12`, `notes.md:12:3-14` or `notes.md#L12`.
+const FILE_LINE = [/^(.*?):(\d+)(?::\d+)?(?:[-–]\d+(?::\d+)?)?$/, /^(.*?)#L(\d+)(?:C\d+)?(?:-L\d+(?:C\d+)?)?$/];
 
 // Delimiters, by the group of MATH that holds a formula's TeX: $$…$$, \[…\], \(…\) and $…$.
 const DELIMITER = { 3: 2, 4: 2, 5: 2, 6: 1 } as const;
+
+/** A file on this computer that a link names, as Codex links one in a reply. */
+export type FileLink = { path: string; line?: number };
+
+/** The file a link's target names, by Codex's own rules; null for a web link, an anchor or anything else. */
+export function fileLink(href: string): FileLink | null {
+  let path = href.trim();
+  if (/^file:/i.test(path)) {
+    try {
+      const url = new URL(path);
+      path = (url.host ? `//${url.host}` : '') + url.pathname.replace(/^\/(?=[a-z]:)/i, '');
+    } catch {
+      return null;
+    }
+  } else if (/^[a-z][a-z0-9+.-]+:|^(?:www\.|#|\?)/i.test(path)) return null;
+  let line: number | undefined;
+  for (const pattern of FILE_LINE) {
+    const match = path.match(pattern);
+    if (match?.[1]) {
+      [path, line] = [match[1], Number(match[2])];
+      break;
+    }
+  }
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  const absolute = /^\/(?!\/)|^[a-z]:[\\/]|^(?:\\\\|\/\/)[^\\/]+[\\/]|^~[\\/]/i.test(path);
+  // Without a line or a full path, only a name with an extension reads as a file (not `Overview` or `v1.2`).
+  if (!absolute && !line && !/(?:^|[\\/])[^\\/]+\.(?!\d+$)[^\\/.]+$/.test(path)) return null;
+  return line ? { path, line } : { path };
+}
 
 /** What a teacher reply shows the learner: without the structured blocks the host reads. */
 export function shownText(text: string) {
@@ -67,6 +105,7 @@ function parse(text: string, breaks = false): DocumentFragment {
     FORBID_TAGS: ['img', 'style', 'iframe', 'form', 'input', 'button', 'video', 'audio'],
     FORBID_ATTR: ['style', 'id'],
     ALLOW_DATA_ATTR: false,
+    ALLOWED_URI_REGEXP: URI,
   });
   replaceText(fragment, new RegExp(token + '(\\d+)END', 'g'), (match) => {
     const item = math[Number(match[1])];
@@ -86,14 +125,26 @@ function parse(text: string, breaks = false): DocumentFragment {
     page: (number) => t('p. {number}', { number }),
   });
   markCallouts(fragment);
-  // Only web links stay live, opening in a new tab; in-page anchors have no targets because ids are stripped.
+  // Web links open in a new tab. A link to a file keeps its path for a view that can open it (`onFile`); any other link
+  // (an in-page anchor, whose ids are stripped, or mail) has nowhere to go, so it reads as the plain text it is.
   for (const link of fragment.querySelectorAll('a')) {
     const href = link.getAttribute('href') ?? '';
-    if (!/^https?:\/\//i.test(href)) link.removeAttribute('href');
-    else {
+    if (/^https?:\/\//i.test(href)) {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
+      continue;
     }
+    const file = fileLink(href);
+    if (!file) {
+      link.replaceWith(...link.childNodes);
+      continue;
+    }
+    const span = document.createElement('span');
+    span.className = 'file-link';
+    span.dataset.file = JSON.stringify(file);
+    span.title = file.line ? t('{path}, line {line}', { path: file.path, line: file.line }) : file.path;
+    span.append(...link.childNodes);
+    link.replaceWith(span);
   }
   return fragment;
 }
@@ -163,6 +214,21 @@ function linkFigures(fragment: DocumentFragment, onSource?: (ref: Ref) => void) 
   }
 }
 
+/** A link to a file becomes a button that opens it, where the view can; elsewhere it stays text naming the file. */
+function linkFiles(fragment: DocumentFragment, onFile?: (file: FileLink, button: HTMLElement) => void) {
+  if (!onFile) return;
+  for (const span of fragment.querySelectorAll<HTMLElement>('span.file-link')) {
+    const file = JSON.parse(span.dataset.file!) as FileLink;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'file-link';
+    button.title = span.title;
+    button.append(...span.childNodes);
+    button.addEventListener('click', () => onFile(file, button));
+    span.replaceWith(button);
+  }
+}
+
 function linkCitations(fragment: DocumentFragment, refs: Ref[], onSource?: (ref: Ref) => void) {
   replaceText(fragment, CITATION, (match) => {
     const ref = refs.find((r) => r.source_id === match[1] && r.unit_id === match[2]);
@@ -202,6 +268,8 @@ export type MarkdownOptions = {
   breaks?: boolean;
   refs?: Ref[];
   onSource?: (ref: Ref) => void;
+  /** Opens a file the text links to; without it, file links read as text. */
+  onFile?: (file: FileLink, button: HTMLElement) => void;
   /** The text is still streaming: re-render at most once per animation frame. */
   streaming?: boolean;
 };
@@ -210,12 +278,13 @@ export type MarkdownOptions = {
 export const RENDERED = 'markdown-rendered';
 
 /** Renders sanitized Markdown, patching only changed blocks so streaming keeps selections and scroll. */
-export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource }: MarkdownOptions) {
+export function render(node: HTMLElement, { text, breaks = false, refs = [], onSource, onFile }: MarkdownOptions) {
   const key = locale.language + breaks + text + '\u0000' + refs.map((r) => r.source_id + r.unit_id).join();
   if (node.dataset.key === key) return;
   const fragment = parse(shownText(text), breaks);
   linkCitations(fragment, refs, onSource);
   linkFigures(fragment, onSource);
+  linkFiles(fragment, onFile);
   const scrollY = stageScroll();
   const incoming = [...fragment.childNodes];
   incoming.forEach((child, index) => {

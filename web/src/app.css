@@ -945,6 +945,28 @@ summary:focus-visible {
   border-style: dashed;
 }
 
+/* A file Codex links to in Studio, which opens like a link; Studio's handler adds a note when it opened elsewhere. */
+button.file-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+button.file-link:hover {
+  text-decoration: underline;
+}
+
+.file-note {
+  margin-left: 0.4em;
+  color: var(--pencil);
+  font-family: var(--sans);
+  font-size: 0.8em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

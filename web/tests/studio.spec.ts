@@ -2,6 +2,36 @@ import { test, expect, editorText, courseOperation } from './fixture';
 
 /** Studio (ADR 0016) against the scripted App Server in tests/fake_studio_server.py. */
 
+test('files Codex links to open: a course source in the reader, any other file on the computer', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const panel = page.locator('#course-studio');
+  const box = page.locator('#studio-input');
+  await box.click();
+  await box.pressSequentially('show me the links');
+  await page.keyboard.press('Control+Enter');
+  const reply = panel.locator('.said-by-codex');
+  await expect(reply).toContainText('Updated outline.md from the reading');
+
+  // A link to the page goes nowhere here, so it is plain text; a web link opens in a new tab.
+  await expect(reply.locator('a')).toHaveCount(1);
+  await expect(reply.getByRole('link', { name: 'Codex' })).toHaveAttribute('target', '_blank');
+
+  // A file that is not a source opens in its own app, which the link notes, since that window may open behind this one.
+  const outline = reply.getByRole('button', { name: 'outline.md' });
+  await expect(outline).toHaveAttribute('title', 'waves/outline.md');
+  await outline.click();
+  await expect(reply.getByRole('status')).toHaveText('Opened.');
+
+  // A course source opens in the reader at the line Codex named.
+  const reading = reply.getByRole('button', { name: 'the reading' });
+  await expect(reading).toHaveAttribute('title', 'waves/inputs/reading.md, line 3');
+  await reading.click();
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  await expect(page.locator('.source-view .line.cited')).toHaveText(/The line Codex links to\./);
+  expect(errors).toEqual([]);
+});
+
 test('Studio sends a message with a skill chip and shows Codex reply', async ({ page, course }) => {
   const { errors } = await course('studio_browser_fixture');
   await page.locator('#open-course').click();

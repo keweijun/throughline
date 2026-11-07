@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from guided_learning.api import execute
+from guided_learning.files import Opener
 from guided_learning.launcher import Launcher
 from guided_learning.server import serve
 from guided_learning.server.settings import TeacherSettings
@@ -18,6 +19,10 @@ execute(course, {'op': 'course.init', 'title': 'Waves'})
 execute(course, {'op': 'curriculum.save', 'concepts': [{'id': 'wave', 'title': 'Wave superposition'}], 'route': ['wave'], 'coverage': []})
 (course / 'inputs').mkdir()
 (course / 'inputs' / 'waves.md').write_text('# Waves\n', encoding='utf-8')
+# A source Codex links to opens in the reader; any other file it links to opens on the computer (here, nowhere).
+(course / 'inputs' / 'reading.md').write_text('# Reading\nFirst line.\nThe line Codex links to.\n', encoding='utf-8')
+execute(course, {'op': 'source.register', 'path': str(course / 'inputs' / 'reading.md')})
+(course / 'outline.md').write_text('# Outline\n', encoding='utf-8')
 fake = [sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), str(Path(scratch.name) / 'studio.log')]
 
 
@@ -37,6 +42,7 @@ try:
           library_root=library, studio_command=None if os.environ.get('STUDIO_REAL') else fake,
           on_ready=lambda port: print(port, flush=True),
           # Not this computer's launcher, so its once-only dialog never covers the library in these tests.
-          launcher=Launcher(Path(scratch.name) / 'no-launcher' / 'throughline.desktop', platform='linux'))
+          launcher=Launcher(Path(scratch.name) / 'no-launcher' / 'throughline.desktop', platform='linux'),
+          opener=Opener(platform='linux', start=lambda command: None))
 finally:
     scratch.cleanup()

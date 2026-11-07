@@ -1,6 +1,6 @@
 import { api, ApiError } from './api';
 import { t } from './i18n.svelte';
-import type { CodexModel } from './types';
+import type { CodexModel, Ref } from './types';
 
 /**
  * Studio (ADR 0016): course work as a Codex chat. The host forwards the App Server's notifications for the threads it
@@ -436,6 +436,11 @@ class StudioStore {
 
   upload(file: File) {
     return api.upload<StudioFile>(this.url(`/api/studio/files?name=${encodeURIComponent(file.name)}`), file);
+  }
+
+  /** Opens a file Codex linked: a course source comes back to open in the reader; the host opens anything else. */
+  openFile(file: { path: string; line?: number }) {
+    return api.post<{ source: Ref } | { opened: string; shown: boolean }>(this.url('/api/studio/files/open'), file);
   }
 
   #turn(id: string) {

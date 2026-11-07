@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import checks as codex_checks, images as attached, library, updates
+from .. import checks as codex_checks, files, images as attached, library, updates
 from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
@@ -227,6 +227,11 @@ class StudioRefile(Body):
     name: str
 
 
+class StudioFile(Body):
+    path: str = Field(min_length=1, max_length=4096)
+    line: Optional[int] = Field(default=None, ge=1)
+
+
 class Courses:
     """The course library this host serves and the one course it owns at a time."""
 
@@ -322,11 +327,13 @@ class ActiveHost:
 
 
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None,
-               launcher=None, checks=None):
-    """`launcher` and `checks` (a `CodexStatus`) stand in for this computer's launcher and Codex in tests."""
+               launcher=None, checks=None, opener=None):
+    """`launcher`, `checks` (a `CodexStatus`) and `opener` (a `files.Opener`) stand in for this computer's launcher,
+    Codex and file manager in tests."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     seen = Seen(courses.settings.path.with_name('seen.json'))
     launcher = launcher or Launcher()
+    opener = opener or files.Opener()
     checks = checks or codex_checks.CodexStatus(courses.settings)
     if workspace:
         courses.open(workspace)
@@ -776,6 +783,21 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             raise OperationError('unknown_course', f'No course named {body.name} in the library')
         return studio.refile(thread_id, path.resolve())
 
+    @app.post('/api/studio/files/open')
+    def studio_open_file(body: StudioFile, scope: str = ''):
+        """A file Codex linked in a reply: a source of the open course opens in its reader, anything else on this computer."""
+        path = files.resolve(body.path, courses.root or course_folder())
+        course = courses.host if scope != 'library' else None
+        if course is not None:
+            ref = files.source_location(course.operation({'op': 'course.status'})['sources'], path, body.line)
+            if ref and ref['unit_id'] not in ('page-1', 'line-1'):
+                units = course.operation({'op': 'source.read', **ref})['units']
+                if not any(u['id'] == ref['unit_id'] for u in units):
+                    ref['unit_id'] = 'line-1'
+            if ref:
+                return {'source': ref}
+        return opener.open(path)
+
     @app.post('/api/studio/messages')
     def studio_send(body: StudioMessage, scope: str = ''):
         course = scoped(scope)
@@ -853,7 +875,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
 
 def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None,
-          launcher=None, checks=None):
+          launcher=None, checks=None, opener=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -862,7 +884,7 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
     app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
-                     studio_command=studio_command, launcher=launcher, checks=checks)
+                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

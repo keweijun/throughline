@@ -106,6 +106,7 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | GET | `/api/studio/skills` | Enabled skills for the `$` picker |
 | GET | `/api/studio/search?q=` | The open course's files matching `q` for the `@` picker (`fuzzyFileSearch`), without the course database |
 | POST | `/api/studio/files?name=` | Copy a raw body of any type (up to 200 MB) into the course's `inputs/`, never overwriting; returns `{name, path, absolute}` |
+| POST | `/api/studio/files/open` | `{path, line?}`: a file Codex linked, relative to the library folder unless absolute. A source of the open course returns `{source}` (a reference the reader opens); any other file is opened on this computer, a document in its own app and anything else shown in the file manager, returning `{opened, shown}` |
 | POST | `/api/studio/messages` | `{thread_id?, text, elements, skills, mentions, images, context?}`: start a thread and turn, or steer the running turn; returns `{thread, turn, steered}` |
 | GET | `/api/studio/threads/{id}` | A thread's turns, its running turn and what Codex is waiting on |
 | PUT | `/api/studio/threads/{id}` | `{name}`: rename a thread |

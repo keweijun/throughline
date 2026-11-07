@@ -1,11 +1,31 @@
 <script lang="ts">
-  import { markdown } from '../lib/markdown';
+  import { markdown, type FileLink } from '../lib/markdown';
   import StudioQuestions from './StudioQuestions.svelte';
   import { locale, t } from '../lib/i18n.svelte';
-  import { CONTEXT, outputTail, parseReply, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
+  import { app } from '../lib/store.svelte';
+  import { CONTEXT, outputTail, parseReply, studio, type CommandAction, type StudioItem, type StudioTurn, type StudioUserInput } from '../lib/studio.svelte';
 
   /** One Studio turn as Codex draws it: the learner's message, then what Codex said and did, in order. */
   let { turn, last = false }: { turn: StudioTurn; last?: boolean } = $props();
+
+  /** A file Codex linked: a course source opens in the reader; anything else opens on this computer, which the link
+   * notes for a moment, since its window may open behind the browser. */
+  async function openFile(file: FileLink, button: HTMLElement) {
+    try {
+      const result = await studio.openFile(file);
+      if ('source' in result) return void app.openSource(result.source);
+      button.parentElement?.querySelector(`.file-note[data-for="${CSS.escape(file.path)}"]`)?.remove();
+      const note = document.createElement('span');
+      note.className = 'file-note';
+      note.dataset.for = file.path;
+      note.setAttribute('role', 'status');
+      note.textContent = result.shown ? t('Shown in its folder.') : t('Opened.');
+      button.after(note);
+      setTimeout(() => note.remove(), 2500);
+    } catch (e) {
+      app.error = e instanceof Error ? e.message : String(e);
+    }
+  }
 
   type Text = Extract<StudioUserInput, { type: 'text' }>;
   type Command = Extract<StudioItem, { type: 'commandExecution' }>;
@@ -227,7 +247,7 @@
 
 {#snippet message(item: Extract<StudioItem, { type: 'agentMessage' }>)}
   {#if item.text}
-    <div class="prose said-by-codex" class:commentary={item.phase === 'commentary' && item !== answer} use:markdown={{ language: locale.language, text: item.text }}></div>
+    <div class="prose said-by-codex" class:commentary={item.phase === 'commentary' && item !== answer} use:markdown={{ language: locale.language, text: item.text, onFile: openFile }}></div>
   {/if}
   {#if item.questions?.length}
     <StudioQuestions item={item.id} questions={item.questions} current={last} />
@@ -257,7 +277,7 @@
   {:else if row.item.type === 'contextCompaction'}
     <p class="compacted">{t("Earlier messages were summarized to make room")}</p>
   {:else if row.item.type === 'plan'}
-    <div class="prose plan-text" use:markdown={{ language: locale.language, text: (row.item as { text: string }).text }}></div>
+    <div class="prose plan-text" use:markdown={{ language: locale.language, text: (row.item as { text: string }).text, onFile: openFile }}></div>
   {/if}
 {/snippet}
 

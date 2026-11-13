@@ -111,7 +111,7 @@ class AttachedImages(unittest.TestCase):
                 reply = client.post('/api/questions/q/replies', json={'id': 'r', 'question': 'And here?', 'images': [second, first]})
                 self.assertEqual(reply.status_code, 200, reply.text)
                 host.wait(reply.json()['reply']['turn_id'], 5)
-                self.assertEqual(runner.images, [str(attached.path(path, n)) for n in (second, first)])
+                self.assertEqual(runner.images, [str(attached.path(Path(path).resolve(), n)) for n in (second, first)])
                 self.assertIn('2 images to this follow-up', runner.prompt)
                 again = client.post('/api/questions/q/replies', json={'id': 'r', 'question': 'And here?', 'images': [first]})
                 self.assertEqual(again.status_code, 409, 'the same reply id with other images is a different reply')

@@ -12,6 +12,8 @@ Each course workspace stores `course/schema` = `{"version": N}`. `guided_learnin
 
 Since migrations only move forward and an older Throughline refuses a migrated course, the backup is the way back from a migration that went wrong. To restore one: stop Throughline (`guided-learning stop`), install the Throughline version that wrote that format, replace the course's `course.sqlite3` with the backup (renamed to `course.sqlite3`), and delete `course.sqlite3-wal` and `course.sqlite3-shm` beside it if they exist. Whatever was studied after the migration is lost with it.
 
+Each format from 7 on keeps a real course as a fixture, `tests/fixtures/courses/format-<N>.sql`: a course studied through the host with a scripted teacher by `tests/fixtures/make_course.py`, written by the code of that format and dumped as SQL. A test opens every fixture with the current code and checks that it migrates, loads and keeps its learning records, so a migration is tested against courses as learners left them, not only against records edited by hand. A change that adds a migration generates the fixture for the new format.
+
 Copying a course to a computer with an older Throughline now gives a clear "update Throughline" error instead of silent misreads. The cost is one small read per operation and the discipline of writing a migration plus a test with an old-format fixture whenever stored data changes shape.
 
 The first migration (version 2) replaces the whole lesson record that each side question copied into `selected_lecture`, and into every answer's prompt snapshot, with the lesson's id, section, title, text and source references.

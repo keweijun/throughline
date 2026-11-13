@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -150,6 +151,32 @@ class CourseLibrary(unittest.TestCase):
                 self.assertEqual(library.summary(path)['title'], 'Alpha')
             execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
             self.assertEqual(library.summary(path)['concepts'], 2)
+
+    def test_one_broken_course_is_listed_with_its_error_beside_the_others(self):
+        from guided_learning import library, migrations
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            course(Path(root) / 'beta', 'Beta')
+            (Path(root) / 'corrupt').mkdir()
+            (Path(root) / 'corrupt' / 'course.sqlite3').write_bytes(b'not a database' * 100)
+            # Beta is an older format whose migration fails.
+            old = sqlite3.connect(Path(root) / 'beta' / 'course.sqlite3')
+            old.execute("UPDATE documents SET value=? WHERE namespace='course' AND key='schema'", (json.dumps({'version': 6}),))
+            old.commit()
+            old.close()
+            failing = [*migrations.MIGRATIONS[:-1], mock.Mock(side_effect=KeyError('chapters'))]
+            app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'), library_root=root)
+            with TestClient(app, base_url='http://127.0.0.1:8765') as client, mock.patch.object(migrations, 'MIGRATIONS', failing), \
+                    self.assertLogs('guided_learning.library', 'ERROR') as logged:
+                response = client.get('/api/library')
+                self.assertEqual(response.status_code, 200)
+                listed = {c['name']: c for c in response.json()['courses']}
+            self.assertEqual(listed['alpha']['title'], 'Alpha')
+            self.assertIn('DatabaseError', listed['corrupt']['error'])
+            self.assertIn("KeyError: 'chapters'", listed['beta']['error'])
+            self.assertEqual(len(logged.records), 2)
+            self.assertTrue(all(record.exc_info for record in logged.records), 'logged with the traceback')
+            self.assertEqual(library.summary(Path(root) / 'beta')['title'], 'Beta', 'the course reads once its migration works')
 
     def test_the_watcher_reads_only_courses_whose_files_changed(self):
         from guided_learning import library

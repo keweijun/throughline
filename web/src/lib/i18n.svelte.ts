@@ -519,6 +519,8 @@ const messages = {
   "Back to {course}": "返回{course}",
   "Loading your courses…": "正在加载课程…",
   "This course could not be read: {error}": "无法读取此课程：{error}",
+  "Your courses could not be loaded: {error}": "无法加载课程列表：{error}",
+  "This course could not be opened: {error}": "无法打开此课程：{error}",
   "Sources: {count}": "来源：{count}",
   "Sections: {count}": "小节：{count}",
   "Updated {date}": "更新于 {date}",

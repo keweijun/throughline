@@ -132,6 +132,9 @@ class AppStore {
   state = $state<State | null>(null);
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
+  /** Why the course or the library could not be loaded at all: said in place of the page, with a way to try again. */
+  stateError = $state<string | null>(null);
+  libraryError = $state<string | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** The library page shows the course list, or New course: the library's Studio across the page. */
@@ -381,10 +384,12 @@ class AppStore {
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
       this.error = null;
+      this.stateError = null;
       if (!this.library) void this.loadLibrary(true);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_course') {
         this.state = null;
+        this.stateError = null;
         this.libraryOpen = true;
         locale.language = rememberLanguage() ?? locale.language;
         try {
@@ -393,7 +398,8 @@ class AppStore {
         } catch (error) {
           this.error = (error as Error).message;
         }
-      } else this.error = (e as Error).message;
+      } else if (this.state) this.error = (e as Error).message;
+      else this.stateError = (e as Error).message;
     } finally {
       this.#inflight = null;
     }
@@ -403,8 +409,23 @@ class AppStore {
   async loadLibrary(quiet = false) {
     try {
       this.library = await api.get<Library>('/api/library');
+      this.libraryError = null;
     } catch (e) {
-      if (!quiet) this.error = (e as Error).message;
+      if (quiet) return;
+      // Without a listing the library page has nothing to show, so it says why there instead.
+      if (this.library) this.error = (e as Error).message;
+      else this.libraryError = (e as Error).message;
+    }
+  }
+
+  /** Try again after the course, or the library, could not be loaded. */
+  retryLoad() {
+    if (this.libraryOpen) {
+      this.libraryError = null;
+      void this.loadLibrary();
+    } else {
+      this.stateError = null;
+      void this.sync();
     }
   }
 

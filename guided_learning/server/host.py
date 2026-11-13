@@ -399,6 +399,10 @@ class Host:
             if previous['channel'] == PREPARED_STEP:
                 raise OperationError('invalid_transition', 'A prepared step that stopped is discarded, not regenerated')
             if previous['channel'] == 'mainline':
+                # A section's lesson is taught at the position, like Continue; a chapter recap is started from anywhere.
+                position = self.operation({'op': 'course.status'})['position'] or {}
+                if not previous.get('chapter_id') and previous['concept_id'] != position.get('concept_id'):
+                    raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
                 self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))
             if worker and worker[0].is_alive():

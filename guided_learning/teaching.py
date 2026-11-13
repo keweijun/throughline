@@ -99,6 +99,10 @@ def enter(store, request):
     if active_branch(store):
         raise OperationError('active_branch', 'Continue or answer the active sidequestion first')
     position = {'concept_id': concept_id, 'goal': require_text(request, 'goal'), 'next_step': require_text(request, 'next_step'), 'progress': request.get('progress', '')}
+    # The section the learner comes back to after studying this one out of route order (ADR 0006).
+    if request.get('return_to') is not None:
+        validate_concept(store, request['return_to'])
+        position['return_to'] = request['return_to']
     store.put('course', 'position', position)
     return {'position': position, 'due_explanations': due(store)}
 

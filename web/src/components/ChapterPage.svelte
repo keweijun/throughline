@@ -22,9 +22,9 @@
 
   function stateOf(id: string) {
     if (id === app.currentId) return { label: t("You are here"), tone: 'accent' };
-    if (app.isSkipped(id)) return { label: t("Skipped"), tone: 'caution' };
     if (app.studied(id)) return { label: t("Studied"), tone: 'good' };
     if (app.hasLesson(id)) return { label: t("In progress"), tone: 'plain' };
+    if (app.notStudied(id)) return { label: t("Not studied"), tone: 'caution' };
     // The same word the route uses for a lesson written ahead in the background.
     if ((app.state?.preparation.jobs ?? []).some((j) => j.concept_id === id && j.status === 'ready')) return { label: t("Lesson ready"), tone: 'plain' };
     return { label: t("Not started"), tone: 'plain' };
@@ -70,10 +70,10 @@
 
   function skip() {
     const warning = dependents.length
-      ? t("Later sections build on this chapter: {titles}. Skip it anyway? Its sections stay on the route, marked as skipped.", {
+      ? t("Later sections build on this chapter: {titles}. Skip it anyway? Its sections stay on the route, and you can study them at any time.", {
           titles: dependents.map((c) => c!.title).join(', '),
         })
-      : t("Skip to the next chapter? This chapter's remaining sections stay on the route, marked as skipped.");
+      : t("Skip to the next chapter? This chapter's remaining sections stay on the route, and you can study them at any time.");
     if (confirm(warning)) void app.skipChapter(chapterId);
   }
 </script>
@@ -149,7 +149,7 @@
         <section class="actions" aria-label={t("Chapter actions")}>
           <div>
             <button class="btn" onclick={skip}>{t("Skip to the next chapter")}</button>
-            <p class="note">{t("Skipped sections stay on the route. You can come back and study them at any time.")}</p>
+            <p class="note">{t("Sections you skip stay on the route. You can come back and study them at any time.")}</p>
           </div>
         </section>
       {/if}

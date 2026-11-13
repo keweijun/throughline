@@ -527,7 +527,7 @@ summary:focus-visible {
   background: var(--accent);
 }
 
-.route-dot.skipped {
+.route-dot.unstudied {
   border-color: var(--caution);
   background: var(--marker-ground, var(--sheet));
 }

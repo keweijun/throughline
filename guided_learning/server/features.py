@@ -771,8 +771,11 @@ class Practice(Feature):
                 if concept_id == current:
                     return self._enter(concept_id, request_id)
                 raise OperationError('not_ahead', 'Only a later section can be jumped to')
+            # Studied means a finished lesson: a stepped lesson with steps left still waits there, so it is skipped too.
             studied = {t['concept_id'] for t in self.host.brief_turns()
                        if t['channel'] == 'mainline' and t['status'] == 'completed' and not t.get('chapter_id')}
+            studied -= {l['concept_id'] for l in self.operation({'op': 'lesson.list'})['lessons']
+                        if any(not s.get('turn_id') for s in l['steps'])}
             chapters = {cid: c['id'] for c in model['chapters'] for cid in c['concept_ids']}
             for cid in route[start:end]:
                 if cid in studied:

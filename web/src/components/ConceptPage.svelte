@@ -60,11 +60,11 @@
     return last ? t("Review this section. It is the last one on the route.") : t("Enter the next section when you are ready.");
   });
 
-  // Jumping ahead marks the sections passed over that have no finished lesson as skipped, the current one included,
+  // Jumping ahead marks the sections passed over without a finished lesson as skipped, the current one included,
   // exactly as the host does; a prerequisite not studied yet is named so the learner chooses knowingly.
   function jump() {
     const route = app.state?.curriculum.route ?? [];
-    const finished = (id: string) => app.lessons(id).some((l) => l.status === 'completed');
+    const finished = (id: string) => app.studied(id);
     const passed = route.slice(app.routeIndex(app.currentId), index).filter((id) => !finished(id));
     const missing = (concept?.prerequisites ?? []).filter((id) => !finished(id)).map((id) => app.concept(id)?.title ?? id);
     const parts = [

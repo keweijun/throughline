@@ -1,4 +1,5 @@
-"""A section taught in lesson steps (ADR 0009), after a section whose lesson was saved as one reply before steps."""
+"""A section taught in lesson steps (ADR 0009), after a section whose lesson was saved as one reply before steps and before
+a section not studied yet."""
 import json
 import re
 import tempfile
@@ -10,11 +11,12 @@ from guided_learning.server import serve
 scratch = tempfile.TemporaryDirectory()
 root = Path(scratch.name)
 execute(root, {'op': 'course.init', 'title': 'Quantum · Steps acceptance'})
-execute(root, {'op': 'curriculum.save', 'route': ['old', 'wave'], 'coverage': [], 'concepts': [
+execute(root, {'op': 'curriculum.save', 'route': ['old', 'wave', 'state'], 'coverage': [], 'concepts': [
     {'id': 'old', 'title': 'Classical waves'},
     {'id': 'wave', 'title': 'Wave superposition', 'prerequisites': ['old'],
      'overview': {'core_problem': 'Why do two paths sometimes cancel?', 'steps': ['Path amplitudes', 'Adding amplitudes', 'Probability'],
-                  'prior': 'Classical waves', 'next': 'States', 'target_ability': 'Predict interference'}}]})
+                  'prior': 'Classical waves', 'next': 'States', 'target_ability': 'Predict interference'}},
+    {'id': 'state', 'title': 'Quantum states'}]})
 execute(root, {'op': 'mainline.enter', 'concept_id': 'old', 'goal': 'Waves', 'next_step': 'Read', 'request_id': 'o'})
 execute(root, {'op': 'stream.start', 'id': 'old-lesson', 'concept_id': 'old', 'prompt': 'Teach', 'channel': 'mainline'})
 execute(root, {'op': 'stream.event', 'id': 'old-lesson', 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': '## Classical waves\n\nA long lesson saved as one reply.'})

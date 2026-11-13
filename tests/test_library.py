@@ -171,6 +171,8 @@ class CourseLibrary(unittest.TestCase):
                 response = client.get('/api/library')
                 self.assertEqual(response.status_code, 200)
                 listed = {c['name']: c for c in response.json()['courses']}
+                # Nothing keeps the broken file open, so the learner can replace it while Throughline runs (Windows).
+                (Path(root) / 'corrupt' / 'course.sqlite3').unlink()
             self.assertEqual(listed['alpha']['title'], 'Alpha')
             self.assertIn('DatabaseError', listed['corrupt']['error'])
             self.assertIn("KeyError: 'chapters'", listed['beta']['error'])

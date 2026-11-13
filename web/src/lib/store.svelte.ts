@@ -277,8 +277,18 @@ class AppStore {
     return (this.state?.builds ?? []).find((b) => b.status === 'queued' || b.status === 'building');
   }
 
-  isSkipped(conceptId: string | null | undefined) {
-    return (this.state?.skipped ?? []).some((s) => s.concept_id === conceptId);
+  /** Where the learner comes back to after studying a section out of route order, while it is still on the route. */
+  get returnSection(): string | null {
+    const back = this.state?.position?.return_to;
+    return back && back !== this.currentId && this.routeIndex(back) >= 0 ? back : null;
+  }
+
+  /** A section the learner has gone past without a lesson there, worked out from lessons rather than stored (ADR 0006):
+   * before the position, or before the section a detour returns to. */
+  notStudied(conceptId: string | null | undefined) {
+    const index = this.routeIndex(conceptId);
+    const reach = Math.max(this.routeIndex(this.currentId), this.routeIndex(this.returnSection));
+    return index >= 0 && index < reach && conceptId !== this.currentId && conceptId !== this.returnSection && !this.hasLesson(conceptId ?? null);
   }
 
   routeIndex(id: string | null | undefined) {
@@ -1073,13 +1083,10 @@ class AppStore {
     return this.#move(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/skip`, { request_id: newId() }));
   }
 
-  /** Study a later section now; the unstudied sections passed over stay on the route as skipped (ADR 0006). */
-  jumpTo(conceptId: string) {
-    return this.#move(() => api.post('/api/sections/jump', { concept_id: conceptId, request_id: newId() }));
-  }
-
-  studySkipped(conceptId: string) {
-    return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId() }));
+  /** Study any section now (ADR 0006): from here on, or, with `thenReturn`, coming back afterwards to where the learner
+   * is now (or to where an earlier detour returns). */
+  enter(conceptId: string, thenReturn = false) {
+    return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId(), then_return: thenReturn }));
   }
 
   startLesson(prompt: string) {

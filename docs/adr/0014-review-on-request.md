@@ -17,7 +17,7 @@ A **review set** is a group of questions written for one request. The review pag
 
 - **Review for me** asks with no request; the teacher chooses what to review from the review context.
 - A **review request** is free text ("the variational method, not the derivations", "chapter 3 before my exam"), optionally with a scope of chapters or sections ticked from the route.
-- A set may test only **studied sections** (a completed lesson or any learning evidence, not skipped; as for the chapter quiz in ADR 0008). Reviewing unstudied material is teaching, not review: when a request reaches beyond studied sections the teacher limits the set and says what it left out, in a short note the page shows with the set.
+- A set may test only **studied sections** (a completed lesson or any learning evidence; as for the chapter quiz in ADR 0008). Reviewing unstudied material is teaching, not review: when a request reaches beyond studied sections the teacher limits the set and says what it left out, in a short note the page shows with the set.
 - The teacher decides how many questions a set has and of which kinds; the host enforces only a sanity cap.
 
 Each question names the sections it tests (`tests_concept_ids`), and so does each part of a multi-part question, so a question can and usually should connect ideas from different sections while a miss still points at the section behind it. A question is one of two kinds:

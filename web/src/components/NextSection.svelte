@@ -28,6 +28,8 @@
   // Until the lesson is finished, moving on stays possible but is not the suggested next step.
   const studied = $derived(app.studied(conceptId));
   const activeSupplement = $derived((app.state?.questions ?? []).some((q) => q.choice === 'accept' && !q.returned));
+  // After studying a section out of route order, going back comes first; moving on stays possible (ADR 0006).
+  const back = $derived(app.concept(app.returnSection));
 
   // Stays busy until the refreshed state shows the move, so a second click cannot repeat it.
   async function advance() {
@@ -37,12 +39,29 @@
     busy = false;
     if (moved) scrollStage(0);
   }
+
+  async function goBack() {
+    if (busy || !back) return;
+    busy = true;
+    await app.enter(back.id);
+    busy = false;
+  }
 </script>
 
 {#if endsChapter && chapter && studied}
   <p class="chapter-end">
     <button class="link" onclick={() => app.viewChapter(chapter.id)}>{t("End of chapter: recap and quiz →")}</button>
   </p>
+{/if}
+
+{#if back}
+  <section class="next" aria-label={t("Go back")}>
+    <div>
+      <p class="label">{t("Go back to where you were")}</p>
+      <p class="title">{back.title}</p>
+    </div>
+    <button class="btn" class:btn-primary={studied} disabled={busy || activeSupplement} onclick={goBack}>{t("Go back")}</button>
+  </section>
 {/if}
 
 {#if next}
@@ -64,7 +83,7 @@
       {/if}
       <Preparation />
     </div>
-    <button class="btn" class:btn-primary={studied} disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
+    <button class="btn" class:btn-primary={studied && !back} disabled={busy || activeSupplement} onclick={advance}>{t("Enter next section")}</button>
   </section>
 {:else if unbuilt}
   <section class="next done" aria-label={t("Next chapter")}>
@@ -73,7 +92,7 @@
       <ChapterBuild chapter={unbuilt} compact />
     </div>
   </section>
-{:else if !next && studied}
+{:else if !next && studied && !back}
   <section class="next done" aria-label={t("End of route")}>
     <p class="title">{t("This is the last section on the route.")}</p>
   </section>
@@ -90,6 +109,10 @@
     padding: 1.25rem 1.35rem;
     border-radius: var(--radius);
     background: var(--accent-wash);
+  }
+
+  .next + .next {
+    margin-top: 0.75rem;
   }
 
   .label {

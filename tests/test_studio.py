@@ -180,7 +180,7 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.client.get('/api/studio').json()['threads'], [])
         self.assertEqual(self.client.get(f'/api/studio/threads/{thread}').status_code, 404)
 
-    def test_the_composer_lists_enabled_skills_and_course_files_but_not_the_course_database(self):
+    def test_the_composer_lists_enabled_skills_and_course_files_but_not_the_course_database_or_its_backups(self):
         skills = self.client.get('/api/studio/skills').json()['skills']
         self.assertEqual(skills, [{'name': 'throughline', 'path': '/skills/throughline/SKILL.md', 'title': 'Throughline',
                                    'description': 'Build a course'}])

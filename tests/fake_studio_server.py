@@ -184,7 +184,8 @@ for line in sys.stdin:
             {'name': 'off', 'path': '/skills/off/SKILL.md', 'description': 'Disabled', 'enabled': False, 'scope': 'user'}]}]}
     elif method == 'fuzzyFileSearch':
         reply = {'files': [{'root': params['roots'][0], 'path': 'inputs/waves.md', 'file_name': 'waves.md', 'score': 9},
-                           {'root': params['roots'][0], 'path': 'course.sqlite3', 'file_name': 'course.sqlite3', 'score': 1}]}
+                           {'root': params['roots'][0], 'path': 'course.sqlite3', 'file_name': 'course.sqlite3', 'score': 1},
+                           {'root': params['roots'][0], 'path': 'backups/course-format-6.sqlite3', 'file_name': 'course-format-6.sqlite3', 'score': 1}]}
     elif method == 'windowsSandbox/readiness':
         reply = {'status': 'ready'}  # so the tests see the same sandboxed turns on Windows
     send({'id': rid, 'result': reply})

@@ -130,6 +130,7 @@ class NextSectionRequest(Body):
 class EnterSectionRequest(Body):
     concept_id: str
     request_id: str
+    then_return: bool = False
 
 
 class SkipChapterRequest(Body):
@@ -603,11 +604,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/sections/enter')
     def enter_section(body: EnterSectionRequest):
-        return host.practice.enter_skipped(body.concept_id, body.request_id)
-
-    @app.post('/api/sections/jump')
-    def jump_to_section(body: EnterSectionRequest):
-        return host.practice.jump(body.concept_id, body.request_id)
+        return host.practice.enter(body.concept_id, body.request_id, body.then_return)
 
     @app.post('/api/chapters/{chapter_id}/skip')
     def skip_chapter(chapter_id: str, body: SkipChapterRequest):

@@ -47,7 +47,7 @@ _Avoid_: Step (a lesson step), a separate exercise.
 _Avoid_: Paraphrase, ritual restatement, a separate kind of record.
 
 **Skipped exercise**: An exercise the learner closed as too easy, too tedious or not relevant; it records no outcome and is never reminded.
-_Avoid_: Deferred item ("Do later" stays in scope and enters the review context), replaced exercise, failed, skipped section.
+_Avoid_: Deferred item ("Do later" stays in scope and enters the review context), replaced exercise, failed, a section not studied.
 
 **Replaced exercise**: An exercise the teacher wrote that the learner had not touched, replaced when they asked for different exercises; it is kept for the record but no longer shown. The course's own exercises are never replaced.
 _Avoid_: Skipped exercise, deleted, regenerated homework.
@@ -79,8 +79,11 @@ _Avoid_: Pre-test, gate, the chapter overview.
 **Retrieval question**: A review question answered from memory, without new material or hints in the question: a recall question (multiple choice or a short answer, with instant feedback, not evidence) or an apply question (a written answer to a new situation, assessed by part like an exercise).
 _Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks earlier exercises again as such, not as new questions).
 
-**Skipped section**: A section deferred when the learner skipped the rest of its chapter or jumped past it to a later section; it stays on the route until a lesson there is studied.
-_Avoid_: Excluded, completed, mastered.
+**Not studied**: A section before the learner's position, or before the section they return to, that has no lesson; worked out from lessons, never stored, and studiable at any time (ADR 0006).
+_Avoid_: Skipped section (retired: passed-over sections are no longer marked), excluded, deferred item.
+
+**Return section**: The section the learner comes back to after choosing to study another section out of route order, kept with the position as `return_to` until they go back to it or move past it (ADR 0006).
+_Avoid_: Mainline restore point (where a side question returns to), bookmark, skipped section.
 
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
 _Avoid_: Course manager, a second store of progress, Studio (where courses are changed).

@@ -27,14 +27,13 @@ export type Coverage = Ref & {
 /** A table-of-contents grouping of route sections; a chapter with no sections is not built yet. */
 export type Chapter = { id: string; title: string; summary?: string; concept_ids: string[] };
 
-/** A section deferred when the learner skipped its chapter, until a lesson there is studied. */
-export type Skipped = { id: string; concept_id: string; section_id: string; target_concept_id?: string };
-
 export type Position = {
   concept_id?: string;
   goal?: string;
   next_step?: string;
   progress?: string;
+  /** The section to come back to after studying this one out of route order (ADR 0006). */
+  return_to?: string;
 };
 
 export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'failed';
@@ -273,7 +272,6 @@ export type State = {
   annotations: Annotation[];
   memory: MemoryEntry[];
   memory_requests: MemoryRequest[];
-  skipped: Skipped[];
   /** The open course change the teacher suggested, if any (ADR 0016). */
   changes: CourseChange[];
   builds: ChapterBuild[];

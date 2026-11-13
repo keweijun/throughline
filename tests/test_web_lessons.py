@@ -240,21 +240,20 @@ class SteppedLessons(LessonHost):
         self.host.practice.next_section('wave', 'next')
         self.assertEqual(self.post('/api/lessons/one/steps', {'id': 'two'}, 409)['code'], 'stale_position')
 
-    def test_a_lesson_with_steps_left_is_skipped_when_jumped_away_from_and_goes_on_once_back(self):
+    def test_a_lesson_left_with_steps_to_go_goes_on_once_the_learner_is_back(self):
         self.runner.replies = [step_reply('One.', [{'title': 'Two'}])]
         self.post('/api/lessons', {'id': 'one'})
         self.finish('one')
         settle(self.host)
-        self.post('/api/sections/jump', {'concept_id': 'state', 'request_id': 'jump'})
-        self.assertEqual([d['concept_id'] for d in self.state()['skipped']], ['wave'], 'its lesson is not finished')
+        self.post('/api/sections/enter', {'concept_id': 'state', 'request_id': 'away', 'then_return': True})
+        self.assertEqual(self.state()['position']['return_to'], 'wave')
         self.post('/api/sections/enter', {'concept_id': 'wave', 'request_id': 'back'})
         self.finish(self.proceed('two')['turn']['id'])
-        self.assertEqual(self.state()['skipped'], [])
 
     def test_regenerating_a_lesson_belongs_to_the_current_section(self):
         self.runner.hold.set()
         self.post('/api/lessons', {'id': 'one'})
-        self.post('/api/sections/jump', {'concept_id': 'state', 'request_id': 'jump'})  # pauses the step being written
+        self.post('/api/sections/enter', {'concept_id': 'state', 'request_id': 'away'})  # pauses the step being written
         self.runner.hold.clear()
         self.assertEqual(self.host.wait('one', 5)['status'], 'paused')
         self.assertEqual(self.post('/api/turns/one/resume', {'request_id': 'again'}, 409)['code'], 'stale_position')

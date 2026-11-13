@@ -84,7 +84,8 @@ class SlimState(unittest.TestCase):
                 self.assertEqual({'id', 'role', 'text', 'concept_id'}, set(state['session']['recent_interactions'][-1]))
                 self.assertNotIn('profile', state)
                 self.assertTrue({'course', 'position', 'sources', 'preferences', 'deferred_explanations', 'lessons', 'questions',
-                                 'practice', 'review', 'settings', 'annotations', 'memory', 'skipped', 'builds'} <= set(state))
+                                 'practice', 'review', 'settings', 'annotations', 'memory', 'builds'} <= set(state))
+                self.assertNotIn('skipped', state, 'sections passed over are worked out from lessons (ADR 0006)')
 
     def test_curriculum_version_follows_fields_the_projection_leaves_out(self):
         with tempfile.TemporaryDirectory() as tmp:

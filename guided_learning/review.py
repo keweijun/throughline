@@ -17,14 +17,6 @@ MISSES = ('partly_correct', 'not_yet')
 RECENT_MISSES = 3
 EARLIER_QUESTIONS = 20
 
-# A section is skipped by skipping the rest of its chapter or by jumping past it to a later section (ADR 0006).
-SKIP_PREFIXES = ('chapter-skip:', 'route-skip:')
-
-
-def skipped(store):
-    resolved = {r['deferred_id'] for r in store.list('evidence_resolutions')}
-    return {d['concept_id'] for d in store.list('evidence_deferred') if d['id'].startswith(SKIP_PREFIXES) and d['id'] not in resolved}
-
 
 def studied_sections(store):
     """Sections with a completed lesson of their own (a chapter recap is not one) or any learning evidence, such as
@@ -34,8 +26,10 @@ def studied_sections(store):
 
 
 def reviewable(store):
-    """Studied sections still on the route and not skipped, in route order: what a review may test."""
-    studied = studied_sections(store) - skipped(store)
+    """Studied sections still on the route, in route order: what a review may test. Sections skipped before the learner
+    could go back to any section were recorded as deferrals (`chapter-skip:`, `route-skip:`); they are history now and
+    no longer leave a studied section out (ADR 0006)."""
+    studied = studied_sections(store)
     return [cid for cid in curriculum.model(store)['route'] if cid in studied]
 
 

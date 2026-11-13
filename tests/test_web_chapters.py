@@ -98,40 +98,64 @@ class Chapters(unittest.TestCase):
         self.host.wait(running['id'], 5)
         self.post('/api/chapters/one/recap', {})
 
-    def test_skipping_a_chapter_defers_its_sections_until_the_learner_returns(self):
+    def position(self):
+        return self.client.get('/api/state').json()['position']
+
+    def enter(self, concept_id, request_id, then_return=False, status=200):
+        return self.post('/api/sections/enter', {'concept_id': concept_id, 'request_id': request_id, 'then_return': then_return}, status)
+
+    def test_skipping_a_chapter_moves_on_and_marks_nothing(self):
         self.post('/api/chapters/two/skip', {'request_id': 'skip-0'}, status=409)
         self.post('/api/chapters/one/skip', {'request_id': 'skip-1'})
         state = self.client.get('/api/state').json()
         self.assertEqual(state['position']['concept_id'], 'c')
-        self.assertEqual({d['concept_id'] for d in state['skipped']}, {'a', 'b'})
-        self.post('/api/sections/enter', {'concept_id': 'c', 'request_id': 'enter-0'}, status=409)
-        self.post('/api/sections/enter', {'concept_id': 'b', 'request_id': 'enter-1'})
-        self.lesson()
-        self.assertEqual([d['concept_id'] for d in self.client.get('/api/state').json()['skipped']], ['a'])
+        self.assertNotIn('skipped', state)
+        self.assertEqual(self.host.operation({'op': 'evidence.unresolved'})['deferred'], [], 'no section is deferred')
+        self.enter('b', 'enter-1')
+        self.assertEqual(self.position()['concept_id'], 'b')
         self.post('/api/chapters/two/skip', {'request_id': 'skip-2'}, status=409)
 
-    def test_jumping_to_a_later_section_skips_the_unstudied_ones_passed_over(self):
-        self.lesson()  # a is studied, so jumping past it does not mark it skipped
-        self.post('/api/sections/jump', {'concept_id': 'c', 'request_id': 'jump-1'})
-        state = self.client.get('/api/state').json()
-        self.assertEqual(state['position']['concept_id'], 'c')
-        self.assertEqual([(d['concept_id'], d['target_concept_id'], d['section_id']) for d in state['skipped']], [('b', 'c', 'one')])
-        # A retry of the same jump lands where the first did and skips nothing more.
-        self.post('/api/sections/jump', {'concept_id': 'c', 'request_id': 'jump-1'})
-        self.assertEqual(len(self.client.get('/api/state').json()['skipped']), 1)
-        self.assertEqual(self.post('/api/sections/jump', {'concept_id': 'a', 'request_id': 'jump-2'}, status=409)['code'], 'not_ahead')
-        self.post('/api/sections/jump', {'concept_id': 'nope', 'request_id': 'jump-3'}, status=404)
-        # A section jumped past is studied like one skipped with its chapter, which clears the mark.
-        self.post('/api/sections/enter', {'concept_id': 'b', 'request_id': 'enter-1'})
+    def test_any_section_can_be_studied_from_here_earlier_or_later(self):
         self.lesson()
-        self.assertEqual(self.client.get('/api/state').json()['skipped'], [])
+        self.enter('c', 'enter-1')
+        self.assertEqual(self.position()['concept_id'], 'c')
+        self.assertNotIn('return_to', self.position())
+        self.enter('a', 'enter-2')  # studied before: it can be studied again
+        self.assertEqual(self.position()['concept_id'], 'a')
+        self.assertTrue(self.enter('a', 'enter-2')['replayed'], 'a retried move finds the learner there already')
+        self.enter('nope', 'enter-3', status=404)
+        self.assertEqual(self.host.operation({'op': 'evidence.unresolved'})['deferred'], [], 'no section is deferred')
 
-    def test_jumping_from_an_unstarted_section_skips_it_too(self):
-        self.post('/api/sections/jump', {'concept_id': 'b', 'request_id': 'jump-1'})
-        state = self.client.get('/api/state').json()
-        self.assertEqual(state['position']['concept_id'], 'b')
-        self.assertEqual([d['concept_id'] for d in state['skipped']], ['a'])
+    def test_a_detour_remembers_where_to_come_back_to(self):
+        self.enter('c', 'detour', then_return=True)
+        self.assertEqual((self.position()['concept_id'], self.position()['return_to']), ('c', 'a'))
+        self.enter('b', 'further', then_return=True)
+        self.assertEqual(self.position()['return_to'], 'a', 'a detour from a detour keeps the first section')
+        self.enter('a', 'back')
+        self.assertNotIn('return_to', self.position(), 'reaching it forgets it')
 
+    def test_next_section_forgets_the_return_once_it_reaches_or_passes_it(self):
+        self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-1'})
+        self.enter('a', 'again', then_return=True)  # back to an earlier section, to return to b
+        self.assertEqual(self.position()['return_to'], 'b')
+        self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-2'})
+        self.assertEqual(self.position()['concept_id'], 'b')
+        self.assertNotIn('return_to', self.position())
+
+        # Ahead of the section to come back to, moving on keeps it.
+        self.enter('a', 'start-over')
+        self.enter('b', 'ahead', then_return=True)
+        self.post('/api/sections/next', {'concept_id': 'b', 'request_id': 'next-3'})
+        self.assertEqual((self.position()['concept_id'], self.position()['return_to']), ('c', 'a'))
+
+    def test_a_side_question_keeps_the_section_to_come_back_to(self):
+        self.enter('c', 'detour', then_return=True)
+        execute(self.root, {'op': 'interaction.record', 'id': 'q', 'role': 'user', 'text': 'Why?', 'concept_id': 'c'})
+        execute(self.root, {'op': 'sidequestion.open', 'id': 'side', 'interaction_id': 'q', 'category': 'local', 'depth': 'short',
+                            'rationale': 'r', 'strategy': 's'})
+        execute(self.root, {'op': 'interaction.record', 'id': 'q-answer', 'role': 'assistant', 'text': 'Because.', 'concept_id': 'c'})
+        execute(self.root, {'op': 'sidequestion.answer', 'id': 'side', 'answer_interaction_id': 'q-answer'})
+        self.assertEqual(self.position()['return_to'], 'a')
 
 if __name__ == '__main__':
     unittest.main()

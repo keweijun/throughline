@@ -106,7 +106,7 @@ class AttachedImages(unittest.TestCase):
                 asked = client.post('/api/questions', json={'id': 'q', 'question': 'Why this sign?', 'images': [first]})
                 self.assertEqual(asked.status_code, 200, asked.text)
                 host.wait('branch:q', 5)
-                self.assertEqual(runner.images, [str(attached.path(path, first))])
+                self.assertEqual(runner.images, [str(attached.path(Path(path).resolve(), first))])
                 self.assertIn('1 image to this question', runner.prompt)
                 reply = client.post('/api/questions/q/replies', json={'id': 'r', 'question': 'And here?', 'images': [second, first]})
                 self.assertEqual(reply.status_code, 200, reply.text)
@@ -138,7 +138,7 @@ class AttachedImages(unittest.TestCase):
                 asked = client.post(f'/api/practice/tasks/{tid}/ask', json={'question': 'What is this figure?', 'images': [name]})
                 self.assertEqual(asked.status_code, 200, asked.text)
                 host.wait(asked.json()['turn']['id'], 5)
-                self.assertEqual(runner.images, [str(attached.path(path, name))])
+                self.assertEqual(runner.images, [str(attached.path(Path(path).resolve(), name))])
                 self.assertIn('1 image to the question', runner.prompt)
                 entry = client.get('/api/state').json()['practice']['tasks'][0]['history'][-1]
                 self.assertEqual((entry['action'], entry['images']), ('ask', [name]))

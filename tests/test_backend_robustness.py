@@ -401,7 +401,8 @@ class SessionAndLanguage(unittest.TestCase):
 class Storage(unittest.TestCase):
     def test_fingerprint_reads_courses_whose_path_needs_quoting(self):
         with tempfile.TemporaryDirectory() as root:
-            path = Path(root) / 'odd ?name#%20' / 'course'
+            # Windows forbids '?' in names; '#' and '%' still need quoting there.
+            path = Path(root) / ('odd name#%20' if sys.platform == 'win32' else 'odd ?name#%20') / 'course'
             course(path, ('a',))
             self.assertIsNotNone(library.fingerprint(path))
 

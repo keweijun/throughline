@@ -553,7 +553,7 @@ class PreparedSteps(LessonHost):
     def test_continue_reveals_a_written_step_at_once(self):
         """Timing with a model that takes DELAY seconds per step: reading for longer than that, Continue shows the next
         step complete; with nothing prepared, the learner waits the whole step."""
-        DELAY = .4
+        DELAY = .8  # long enough that a slow CI runner still tells a shown step from a written one
         self.runner.delay = DELAY
         self.begin()
         time.sleep(DELAY + .2)  # the learner reads step one

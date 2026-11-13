@@ -17,8 +17,17 @@ def saved_teacher_models():
         return {}
 
 
+def utf8_output():
+    """Write UTF-8 even where the locale's encoding is narrower. On Windows, output piped to Codex is otherwise in the
+    system code page, and printing the Chinese welcome guide or a course title it cannot encode stops the command."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    utf8_output()
     if argv and argv[0] in commands.COMMANDS:
         return commands.main(argv)
     background.teacher_models = saved_teacher_models

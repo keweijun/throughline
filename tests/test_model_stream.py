@@ -128,12 +128,15 @@ class FindCodex(unittest.TestCase):
                 self.assertEqual(codex.find_codex(), str(bundled))
 
 
-SAVED_SERVER = '''import sys,json
-log=open(%r,'a'); mode=%r
+# Each call is its own file: the teaching turn and the thread sweep run servers at once, and Windows does not append atomically.
+SAVED_SERVER = '''import sys,json,os,time
+log=%r; mode=%r; n=0
+os.makedirs(log,exist_ok=True)
 def out(v): print(json.dumps(v),flush=True)
 for line in sys.stdin:
  r=json.loads(line); m=r.get('method'); i=r.get('id'); p=r.get('params',{})
- if m: log.write(json.dumps([m,p])+'\\n'); log.flush()
+ if m:
+  n+=1; name=os.path.join(log,'%%d-%%d-%%06d'%%(time.time_ns(),os.getpid(),n)); open(name+'.tmp','w').write(json.dumps([m,p])); os.replace(name+'.tmp',name+'.json')
  if m=='initialize': out({'id':i,'result':{}})
  if m=='thread/list': out({'id':i,'result':{'data':[{'id':'old','originator':'guided_learning','createdAt':0}]*2 if p.get('archived') else []}})
  if m=='thread/archive': out({'id':i,'result':{}})
@@ -165,15 +168,18 @@ class SavedThreads(unittest.TestCase):
         codex.THREADS = codex.SavedThreads()
 
     def turns(self, tmp, prompts, mode='ok'):
-        log = Path(tmp)/'calls.jsonl'
         script = Path(tmp)/'server.py'
-        script.write_text(SAVED_SERVER % (str(log), mode), encoding='utf-8')
+        script.write_text(SAVED_SERVER % (str(Path(tmp)/'calls'), mode), encoding='utf-8')
         runner = self.codex.CodexRunner(command=[sys.executable, str(script)], model='m')
         for prompt in prompts:
             events = []
             runner.run(prompt, tmp, events.append, threading.Event())
             self.assertEqual(events[-1], {'kind':'complete'})
-        return [json.loads(line) for line in log.read_text().splitlines()]
+        return self.calls(tmp)
+
+    def calls(self, tmp):
+        folder = Path(tmp)/'calls'
+        return [json.loads(f.read_text()) for f in sorted(folder.glob('*.json'))] if folder.is_dir() else []
 
     def teaching(self, request):
         from guided_learning.server.prompts import Prompt
@@ -213,16 +219,15 @@ class SavedThreads(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.turns(tmp, [self.teaching('one')])
             self.codex.THREADS.close(tmp, [sys.executable, str(Path(tmp)/'server.py')])
-            calls = [json.loads(line) for line in (Path(tmp)/'calls.jsonl').read_text().splitlines()]
+            calls = self.calls(tmp)
             self.assertIn(['thread/delete', {'threadId': 'new'}], calls)
             self.assertEqual(self.codex.THREADS.idle, {})
 
     def test_the_first_turn_in_a_folder_deletes_threads_an_earlier_run_left_archived(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.turns(tmp, [self.teaching('one')])
-            log = Path(tmp)/'calls.jsonl'
             for _ in range(50):
-                calls = [json.loads(line) for line in log.read_text().splitlines()]
+                calls = self.calls(tmp)
                 if ['thread/delete', {'threadId': 'old'}] in calls: break
                 time.sleep(.1)
             self.assertEqual([p.get('archived') for m, p in calls if m == 'thread/list'], [False, True])

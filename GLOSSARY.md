@@ -85,6 +85,12 @@ _Avoid_: Excluded, completed, mastered.
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
 _Avoid_: Course manager, a second store of progress, Studio (where courses are changed).
 
+**Course package**: One file holding a copy of a course at a share level, with its sources, to give to someone else or to move or back up one's own. Importing it makes a new course; nothing syncs back (ADR 0020).
+_Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never read back).
+
+**Share level**: How much of a course a package holds: Route (the route and sources), Route and lessons (adds lessons and exercises without the sender's answers) or Everything. The recipient takes at most that much when importing.
+_Avoid_: Privacy setting, export format.
+
 **Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
 _Avoid_: Chat, workshop, side question, teaching.
 

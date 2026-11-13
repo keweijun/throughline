@@ -4,6 +4,7 @@ The MIT license at the repository root covers this project's own code. The built
 
 | Package | Version checked | License | Included text |
 | --- | --- | --- | --- |
+| `@codemirror/*` (autocomplete, commands, language, lint, state, streamparser, view) and its dependencies (`@lezer/*`, crelt, style-mod, w3c-keyname, `@marijn/find-cluster-break`) | as locked | MIT | [`licenses/codemirror.LICENSE`](licenses/codemirror.LICENSE) |
 | `@fontsource-variable/source-serif-4` | 5.3.1 | OFL-1.1 | [`licenses/source-serif-4.LICENSE`](licenses/source-serif-4.LICENSE) |
 | `@fontsource/ibm-plex-sans` | 5.3.0 | OFL-1.1 | [`licenses/ibm-plex-sans.LICENSE`](licenses/ibm-plex-sans.LICENSE) |
 | `dompurify` | 3.4.17 | MPL-2.0 OR Apache-2.0 | [`licenses/dompurify.LICENSE`](licenses/dompurify.LICENSE), [`LICENSE-MPL`](licenses/dompurify.LICENSE-MPL) |
@@ -16,4 +17,4 @@ The MIT license at the repository root covers this project's own code. The built
 
 Mermaid's optional ELK layout (`elkjs`, EPL-2.0) is not shipped: the build replaces it with Mermaid's default layout (`web/vite.config.ts`).
 
-When frontend dependencies change, update the versions and copied notices alongside the rebuilt `guided_learning/web_dist` assets.
+When frontend dependencies change, update the versions and copied notices alongside the rebuilt `guided_learning/web_dist` assets; `npm run licenses` in `web/` (run by CI) fails while a bundled package has no notice. These files are shipped inside the installed package, beside `LICENSE`.

@@ -8,6 +8,7 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "vocabulary": "node scripts/latex-vocabulary.mjs",
+    "licenses": "node scripts/check-licenses.mjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {

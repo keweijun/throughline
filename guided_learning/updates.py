@@ -17,8 +17,8 @@ from .codex import find_codex
 from .commands import detached, version
 from .store import OperationError
 
-# The install command fetches main, so main's declared version is the latest one.
-LATEST = 'https://raw.githubusercontent.com/keweijun/throughline/main/pyproject.toml'
+# Installs fetch the stable branch, which CI moves to each release (ADR 0020), so its declared version is the latest one.
+LATEST = 'https://raw.githubusercontent.com/keweijun/throughline/stable/pyproject.toml'
 VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 # The interface checks on every launch, so a found version is kept for a while rather than asked of GitHub each time.
 KEEP = 6 * 3600
@@ -51,7 +51,7 @@ def latest_version(timeout=10):
 
 
 def check(fresh=False):
-    """Compares with main's version; a version found in the last few hours is reused unless `fresh`. Failures are not kept."""
+    """Compares with the latest release's version; a version found in the last few hours is reused unless `fresh`. Failures are not kept."""
     with _lock:
         if fresh or time.monotonic() - _found.get('at', -KEEP) >= KEEP:
             _found.update(latest=latest_version(), at=time.monotonic())

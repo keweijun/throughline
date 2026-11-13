@@ -1,19 +1,19 @@
 # Install or update Throughline on Windows, in PowerShell:
-#   irm https://raw.githubusercontent.com/keweijun/throughline/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/keweijun/throughline/stable/install.ps1 | iex
 # For the Chinese welcome guide, first run $env:THROUGHLINE_LANGUAGE = 'zh-CN'.
-# With options: & ([scriptblock]::Create((irm https://raw.githubusercontent.com/keweijun/throughline/main/install.ps1))) -Language zh-CN -NoOpen
+# With options: & ([scriptblock]::Create((irm https://raw.githubusercontent.com/keweijun/throughline/stable/install.ps1))) -Language zh-CN -NoOpen
 #
 # The steps, the same as README "For Codex", install.sh and the one-click updater (#110); change them together:
 #   1. install uv if it is missing (uv brings its own Python)
 #   2. stop a running Throughline: on Windows it locks its own files
 #   3. remove the pre-0.5.1 package name, codex-guided-learning
-#   4. install the latest version from main
+#   4. install the latest release (the stable branch, which CI moves to each release)
 #   5. run setup: the skill, the course library, the launcher, then open the app
 # Courses are never touched. Codex is checked for, not installed.
 param([string]$Language = $env:THROUGHLINE_LANGUAGE, [switch]$NoOpen)
 # No $ErrorActionPreference = 'Stop': under iex it would stay set in the learner's shell, and in Windows PowerShell 5.1
 # it turns uv's progress on stderr into errors. Failures are checked where they matter.
-$Package = 'throughline[pdf] @ git+https://github.com/keweijun/throughline'
+$Package = 'throughline[pdf] @ git+https://github.com/keweijun/throughline@stable'
 
 # 1.
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {

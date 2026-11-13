@@ -1,6 +1,6 @@
 # Releases are tagged from main, and learners install the latest release
 
-Until 0.42.0 a release was only a version bump on `main`: the installers, the README's steps and the one-click update installed whatever `main` held at that moment, and the update check read `main`'s `pyproject.toml` (ADR 0004). So a commit merged without a bump still reached every new install, the version announced could differ from the one installed, there was nothing to go back to, and no test ran on Windows or macOS before learners got the code.
+Until 0.43.0 a release was only a version bump on `main`: the installers, the README's steps and the one-click update installed whatever `main` held at that moment, and the update check read `main`'s `pyproject.toml` (ADR 0004). So a commit merged without a bump still reached every new install, the version announced could differ from the one installed, there was nothing to go back to, and no test ran on Windows or macOS before learners got the code.
 
 ## Decision
 
@@ -18,4 +18,4 @@ The bump rules stay as AGENTS.md states them; what changes is that a merged bump
 
 ## Consequences
 
-Installs from before 0.42.0 read `main`'s version to find updates; they still update correctly, because the update follows the README, which now installs `stable`. If CI fails on `main`, nothing is released until a fix is merged. Going back to an older tag cannot open a course a newer version has already migrated (ADR 0007).
+Installs from before 0.43.0 read `main`'s version to find updates; they still update correctly, because the update follows the README, which now installs `stable`. If CI fails on `main`, nothing is released until a fix is merged. Going back to an older tag cannot open a course a newer version has already migrated (ADR 0007).

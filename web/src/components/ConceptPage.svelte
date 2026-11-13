@@ -34,7 +34,11 @@
   const explanations = $derived(app.explanationsFor(conceptId));
   const bookmarked = $derived(!!app.bookmark(conceptId));
   const chapter = $derived(app.chapterOf(conceptId));
-  const skipped = $derived(app.isSkipped(conceptId));
+  // Coming back after studying a section out of route order goes to where an earlier detour returns, else to where
+  // the learner is now (ADR 0006).
+  const comeBackTo = $derived(app.returnSection ?? app.currentId);
+  // A prerequisite not studied yet is named before the learner moves here, so they choose knowingly; nothing blocks it.
+  const missing = $derived((concept?.prerequisites ?? []).filter((id) => !app.studied(id)).map((id) => app.concept(id)?.title ?? id));
   const goal = $derived(
     position?.goal ||
       concept?.objective ||
@@ -59,24 +63,6 @@
     if (open) return last ? t("Try the {count} open exercises below.", { count: open }) : t("Try the {count} open exercises below, or enter the next section.", { count: open });
     return last ? t("Review this section. It is the last one on the route.") : t("Enter the next section when you are ready.");
   });
-
-  // Jumping ahead marks the sections passed over that have no finished lesson as skipped, the current one included,
-  // exactly as the host does; a prerequisite not studied yet is named so the learner chooses knowingly.
-  function jump() {
-    const route = app.state?.curriculum.route ?? [];
-    const finished = (id: string) => app.lessons(id).some((l) => l.status === 'completed');
-    const passed = route.slice(app.routeIndex(app.currentId), index).filter((id) => !finished(id));
-    const missing = (concept?.prerequisites ?? []).filter((id) => !finished(id)).map((id) => app.concept(id)?.title ?? id);
-    const parts = [
-      ...(missing.length ? [t("{section} builds on {titles}, which you have not studied yet.", { section: concept!.title, titles: missing.join(', ') })] : []),
-      ...(passed.length
-        ? [t("Study it now? These sections will be marked skipped: {titles}. They stay on the route, and you can study them at any time.", {
-            titles: passed.map((id) => app.concept(id)?.title ?? id).join(', '),
-          })]
-        : []),
-    ];
-    if (!parts.length || confirm(parts.join(' '))) void app.jumpTo(conceptId!);
-  }
 
   function openQuestion(id: string) {
     app.focusThread = id.replace(/^web:/, '');
@@ -130,15 +116,21 @@
     {#if !isCurrent}
       <div class="previewing" role="note">
         <p>
-          {#if skipped}{t("You skipped this section with its chapter.")}{/if}
           {t("You're previewing this section. Your learning position stays at")}
           <strong>{app.concept(app.currentId)?.title}</strong>.
+          {#if missing.length}{t("{section} builds on {titles}, which you have not studied yet.", { section: concept.title, titles: missing.join(', ') })}{/if}
         </p>
+        <!-- Studying a section never marks the ones in between: the learner says only where to go afterwards. -->
         <div class="previewing-actions">
-          {#if skipped}
-            <button class="btn btn-small btn-primary" onclick={() => app.studySkipped(conceptId)}>{t("Study this section now")}</button>
+          {#if conceptId === comeBackTo}
+            <button class="btn btn-small btn-primary" onclick={() => app.enter(conceptId)}>{t("Return to this section")}</button>
+          {:else}
+            <button class="btn btn-small btn-primary" onclick={() => app.enter(conceptId, true)}>
+              {t("Study this, then come back to {section}", { section: app.concept(comeBackTo)?.title ?? '' })}
+            </button>
+            <button class="btn btn-small" onclick={() => app.enter(conceptId)}>{t("Study from here")}</button>
           {/if}
-          <button class="btn btn-small" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
+          <button class="btn btn-small btn-quiet" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
         </div>
       </div>
     {/if}
@@ -178,6 +170,12 @@
             </div>
           {/if}
         </dl>
+        {#if app.returnSection}
+          <p class="detour">
+            {t("After this section, you go back to {section}.", { section: app.concept(app.returnSection)?.title ?? '' })}
+            <button class="btn btn-small" onclick={() => app.enter(app.returnSection!)}>{t("Go back now")}</button>
+          </p>
+        {/if}
         {#if position?.progress}
           <details class="left-off">
             <summary>{t("Where you left off")}</summary>
@@ -235,21 +233,18 @@
       </div>
     {:else if !isCurrent}
       {@const ahead = index - app.routeIndex(app.currentId)}
-      <!-- A later section says how far off it is and can be studied now, skipping the ones before it (ADR 0006). -->
+      <!-- A later section says how far off it is; the banner above offers to study it now (ADR 0006). -->
       <div class="ahead">
         <p>
           {#if ahead > 1}{t("No lesson yet. {count} sections come before it, starting with the one you're on.", { count: ahead })}
           {:else if ahead === 1}{t("No lesson yet. It comes right after the section you're on.")}
           {:else}{t("No lesson yet.")}{/if}
         </p>
-        <div class="previewing-actions">
-          {#if ahead > 0 && !skipped}
-            <button class="btn btn-small btn-primary" onclick={jump}>{t("Study this section now")}</button>
-          {/if}
-          {#if chapter && chapter.id !== app.chapterOf(app.currentId)?.id}
+        {#if chapter && chapter.id !== app.chapterOf(app.currentId)?.id}
+          <div class="previewing-actions">
             <button class="btn btn-small" onclick={() => app.viewChapter(chapter.id)}>{t("Open its chapter")}</button>
-          {/if}
-        </div>
+          </div>
+        {/if}
       </div>
     {/if}
 
@@ -389,6 +384,16 @@
     margin: 0.2rem 0 0;
     font-size: var(--step-0);
     color: var(--ink);
+  }
+
+  .detour {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.9rem;
+    font-size: var(--step-0);
+    color: var(--ink-soft);
   }
 
   .left-off {

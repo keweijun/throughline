@@ -1,6 +1,6 @@
 # Courses carry a schema version and migrate forward
 
-Learners already have courses on disk, and courses move between computers by copying the folder (ADR 0004). Until now the course format changed implicitly: code read missing fields with fallbacks and "existing courses open without migration" (ADR 0003). That works for additive fields but not for reshaping stored data, backfilling a field that new features depend on, or protecting a course from an older app that does not understand it.
+Learners already have courses on disk, and courses move between computers by copying the folder (ADR 0004), and since ADR 0020 as course packages. Until now the course format changed implicitly: code read missing fields with fallbacks and "existing courses open without migration" (ADR 0003). That works for additive fields but not for reshaping stored data, backfilling a field that new features depend on, or protecting a course from an older app that does not understand it.
 
 Each course workspace stores `course/schema` = `{"version": N}`. `guided_learning/migrations.py` holds an ordered list of migrations, each a function `(store) -> None` that moves the course from version N-1 to N. Courses without the record are version 1, the format before versioning.
 

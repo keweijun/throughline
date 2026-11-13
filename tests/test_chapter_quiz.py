@@ -15,8 +15,6 @@ class EarlierExercises(unittest.TestCase):
             self.store.put('streams', f'lesson-{cid}', {'id': f'lesson-{cid}', 'channel': 'mainline', 'status': 'completed', 'concept_id': cid})
         # A recap anchored to d is not a lesson of d, so d stays unstudied.
         self.store.put('streams', 'recap:1', {'id': 'recap:1', 'channel': 'mainline', 'status': 'completed', 'concept_id': 'd', 'chapter_id': 'one'})
-        # c was skipped with the chapter and not studied since (its lesson predates the skip, say).
-        self.store.put('evidence_deferred', 'chapter-skip:one:c', {'id': 'chapter-skip:one:c', 'concept_id': 'c'})
 
     def task(self, identifier, concept, kind=None, status=None, origin='self_created', **extra):
         history = [{'action': 'assess', 'kind': kind, 'outcome': 'needs_work' if kind == 'needs_work' else 'passed'}] if kind else []
@@ -31,7 +29,6 @@ class EarlierExercises(unittest.TestCase):
         self.task('b-independent', 'b', 'independent')
         self.task('b-open', 'b')  # never answered: still an open exercise, not quiz material
         self.task('b-review', 'b', 'hinted', origin='review')
-        self.task('c-hinted', 'c', 'hinted')  # skipped section
         self.task('d-hinted', 'd', 'hinted')  # unstudied section
         self.task('quiz', 'd', 'hinted', origin='chapter_quiz', chapter_id='one', from_task_id='b-independent')
         self.assertEqual(practice.quiz_earlier(self.store, CHAPTER), ['a-hinted', 'a-missed', 'b-later'],

@@ -126,18 +126,19 @@
   {@const status = stateOf(id, index)}
   {@const count = exercises.get(id)}
   {@const waiting = saved.get(id)}
-  {@const skipped = app.isSkipped(id)}
+  {@const unstudied = app.notStudied(id)}
   {@const step = status === 'current' ? app.stepProgress(id) : null}
   {@const viewing = id === app.viewingId && !app.viewingChapter && !app.pageOpen}
   <li class={status} class:passed={index < currentIndex} class:arriving={id === arriving}>
-    <span class="node" aria-hidden="true"><span class="route-dot {status}" class:viewing class:skipped></span></span>
+    <span class="node" aria-hidden="true"><span class="route-dot {status}" class:viewing class:unstudied></span></span>
     <button class="entry" class:viewing aria-current={viewing ? 'page' : undefined} onclick={() => app.view(id)}>
       <span class="name">{concept?.title ?? id}{#if app.bookmark(id)}<span class="star" aria-hidden="true" title={t("Bookmarked")}> ★</span><span class="visually-hidden">, {t("Bookmarked")}</span>{/if}</span>
-      {#if status === 'current' || count || waiting || skipped || prepared.has(id)}
+      {#if status === 'current' || count || waiting || unstudied || id === app.returnSection || prepared.has(id)}
         <span class="meta">
           {#if status === 'current'}<span>{t("You are here")}</span>{/if}
           {#if step}<span>{t("Step {number} of {total}", step)}</span>{/if}
-          {#if skipped && status !== 'current'}<span class="skipped">{t("Skipped")}</span>{/if}
+          {#if unstudied}<span class="unstudied">{t("Not studied")}</span>{/if}
+          {#if id === app.returnSection}<span>{t("You go back here")}</span>{/if}
           {#if count}<span>{t("{solved}/{total} exercises solved", { solved: count.solved, total: count.total })}</span>{/if}
           {#if waiting}<span class="saved">{waiting === 1 ? t("1 saved question") : t("{count} saved questions", { count: waiting })}</span>{/if}
           {#if prepared.has(id) && status !== 'current'}<span>{t("Lesson ready")}</span>{/if}
@@ -453,7 +454,7 @@
     color: var(--accent);
   }
 
-  .meta .skipped {
+  .meta .unstudied {
     color: var(--caution);
   }
 

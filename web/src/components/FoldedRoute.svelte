@@ -87,7 +87,7 @@
                   aria-label={(app.concept(id)?.title ?? id) + ', ' + t(labels[status])}
                   title={app.concept(id)?.title ?? id}
                   onclick={() => app.view(id)}
-                ><span class="route-dot {status}" class:viewing={id === viewing} class:skipped={app.isSkipped(id)}></span></button>
+                ><span class="route-dot {status}" class:viewing={id === viewing} class:unstudied={app.notStudied(id)}></span></button>
               </li>
             {/each}
             {#if shown.after}<li class="more" aria-hidden="true">+{shown.after}</li>{/if}

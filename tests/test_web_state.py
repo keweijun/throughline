@@ -6,7 +6,7 @@ from pathlib import Path
 
 from guided_learning.api import execute
 from guided_learning.server import Host
-from support import host_client
+from support import host_client, taught
 
 
 class BlockingRunner:
@@ -150,6 +150,7 @@ class SlimState(unittest.TestCase):
             execute(tmp, {'op': 'course.init', 'title': 'Quantum'})
             execute(tmp, {'op': 'curriculum.save', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}], 'route': ['a', 'b'], 'coverage': []})
             execute(tmp, {'op': 'mainline.enter', 'request_id': 'enter', 'concept_id': 'a', 'goal': 'A', 'next_step': 'Read'})
+            taught(tmp, 'a')
             host = Host(tmp, runner=Runner())
             seen = []
 

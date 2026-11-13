@@ -119,3 +119,30 @@ test('Continue shows the next step at once: it was written while the learner rea
   await expect(page.locator('#practice article').first(), 'the revealed last step leads to grouped practice').toContainText('Find');
   expect(errors).toEqual([]);
 });
+
+test('a lesson left with steps to go is read-only from elsewhere and goes on once the learner is back in its section', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const first = page.getByRole('region', { name: 'Step 1 of 4' });
+  await expect(first.getByRole('group', { name: 'Next step' })).toBeVisible();
+
+  const rail = page.locator('#route');
+  await rail.getByRole('button', { name: /Quantum states/ }).click();
+  let message = '';
+  page.once('dialog', (dialog) => ((message = dialog.message()), dialog.accept()));
+  const jumped = page.waitForResponse('**/api/sections/jump');
+  await page.getByRole('button', { name: 'Study this section now' }).click();
+  await jumped;
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+  expect(message, 'a lesson with steps to go is not finished').toContain('These sections will be marked skipped: Wave superposition.');
+
+  await rail.getByRole('button', { name: /Wave superposition/ }).click();
+  await expect(page.getByText("You're previewing this section")).toBeVisible();
+  await expect(first).toContainText('Each path carries a complex amplitude.');
+  await expect(first.getByRole('button', { name: 'Continue' }), 'Continue goes on only in the current section').toHaveCount(0);
+  await page.getByRole('button', { name: 'Study this section now' }).click();
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+  await first.getByRole('group', { name: 'Next step' }).getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('region', { name: 'Step 2 of 4' })).toContainText('A step that is still being written');
+  expect(errors).toEqual([]);
+});

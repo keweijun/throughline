@@ -7,7 +7,8 @@ from support import host_client, settle
 
 
 class Runner:
-    """Captures each prompt and completes immediately, or once `gate` opens; practice turns return no exercises."""
+    """Captures each prompt and completes immediately, or once `gate` opens; practice turns return no exercises and a
+    lesson is taught in one step."""
 
     def __init__(self):
         self.prompts = []
@@ -17,7 +18,10 @@ class Runner:
         self.prompts.append(prompt)
         if self.gate:
             self.gate.wait(5)
-        emit({'kind': 'final', 'text': '{"questions": []}' if 'Practice only' in prompt else 'Lesson text'})
+        text = '{"questions": []}' if 'Practice only' in prompt else 'Lesson text'
+        if 'This reply teaches step' in prompt:
+            text += '\n<lesson-step>{"remaining": []}</lesson-step>'
+        emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 
 

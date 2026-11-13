@@ -38,6 +38,10 @@ Every review request carries the review context, computed when read, as data for
 
 The teacher is asked to prefer sections that are stale or were missed, and to ask again, in a new situation, about what was missed before. No interval or due date is stored.
 
+## Review sets from Studio
+
+A learner may ask Codex in Studio for a review ("20 minutes before tomorrow's test"). Without a way to write a set, Codex wrote a document of questions, registered it as a source and added a chapter for it, so every miss counted against that chapter instead of the sections the questions tested, and none reached later reviews. `review.write` lets Codex save a set of kind `request` with its questions in one step, under the rules above: only studied sections, every question naming the sections it tests, at most the sanity cap, recall questions with an explanation for every option. An invalid question rejects the whole set, since Codex can correct it, where a teacher's malformed recall question is dropped.
+
 ## Prepared set
 
 So that **Review for me** opens at once, the host writes one set in the background when the course is open, the host is idle (nothing running, and nothing for preparation of the next section to do), some section is studied, the learner has asked for a review in this course before, and no prepared set is waiting. Learners who never review spend no teacher turns on it. It starts only when idle and runs beside any request made after it. It stays hidden until the learner asks for a review without a request, then becomes an ordinary set; one whose writing failed is closed and replaced then, so a failing teacher is never retried in a loop. A request with text or a scope always writes a new set.

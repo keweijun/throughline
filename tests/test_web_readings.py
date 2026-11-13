@@ -40,6 +40,11 @@ def course(path, base):
     return source, figure
 
 
+def taught(runner):
+    """The latest call that taught: preparing the next section runs in the background and can land after it."""
+    return next(c for c in reversed(runner.calls) if 'Internal preparation task' not in c[0])
+
+
 @unittest.skipUnless(has_pdf_extra(), 'Install the pdf extra for page readings')
 class ReadingsInTeaching(unittest.TestCase):
     def test_preparation_and_an_unprepared_first_lesson_see_figures_and_problem_pages(self):
@@ -60,14 +65,14 @@ class ReadingsInTeaching(unittest.TestCase):
                 # Section a has no preparation material, so its first lesson prepares itself and sees the same images.
                 first = host.start_turn({'concept_id': 'a', 'channel': 'mainline', 'prompt': 'Teach'})['turn']
                 host.wait(first['id'], 5)
-                prompt, images = runner.calls[-1]
+                prompt, images = taught(runner)
                 self.assertIn('Image inputs, in order: figure', prompt)
                 self.assertEqual(len(images), 2)
                 for request in ({'concept_id': 'a', 'channel': 'mainline', 'prompt': 'Again'},
                                 {'concept_id': 'a', 'channel': 'sidequestion', 'prompt': 'Why?'}):
                     turn = host.start_turn(request)['turn']
                     host.wait(turn['id'], 5)
-                    prompt, images = runner.calls[-1]
+                    prompt, images = taught(runner)
                     self.assertEqual(images, [])
                     self.assertNotIn('Image inputs', prompt)
 

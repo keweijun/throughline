@@ -21,9 +21,12 @@
   const units = $derived([...new Set(lessons.map((l) => app.stepOf(l.id)?.lesson.id ?? l.id))]);
   const number = $derived(units.indexOf(step?.lesson.id ?? turn.id) + 1);
   const planned = $derived(step ? step.lesson.steps.slice(step.number) : []);
+  // A section's lesson goes on only at the learner's position; a section they are previewing shows it read-only. A
+  // chapter recap is started from anywhere.
+  const here = $derived(!!turn.chapter_id || turn.concept_id === app.currentId);
   // Continue is offered under the latest step once it is complete and the plan has steps left.
   const continues = $derived(
-    !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),
+    here && !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),
   );
   let continuing = $state(false);
   // A check stays answerable until the next step starts; continuing without answering leaves it unanswered.
@@ -114,7 +117,9 @@
     {:else if turn.status !== 'completed'}
       <span class="chip chip-{status.tone}">{t(status.label)}</span>
     {/if}
-    <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={step ? t("Regenerate step") : t("Regenerate lesson")} />
+    {#if here || turn.status === 'running'}
+      <TurnControls {turn} pauseLabel={t("Pause")} regenerateLabel={step ? t("Regenerate step") : t("Regenerate lesson")} />
+    {/if}
   </div>
 
   {#if turn.error && turn.status !== 'completed'}

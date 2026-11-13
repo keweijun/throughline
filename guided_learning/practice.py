@@ -315,7 +315,7 @@ def quiz_chapter(store, value):
     return next((c for c in curriculum.view(store,{})['chapters'] if c['id']==chapter_id and c['concept_ids']),None)
 
 def quiz_sections(store, chapter):
-    """The chapter's sections a quiz may test: studied ones not skipped with the chapter."""
+    """The chapter's sections a quiz may test: the studied ones."""
     allowed=set(review.reviewable(store))
     return [c for c in chapter['concept_ids'] if c in allowed]
 
@@ -333,7 +333,7 @@ def quiz_tier(task):
 
 def quiz_earlier(store, chapter):
     """Up to QUIZ_EARLIER of the chapter's own exercises to ask again, best first by quiz_tier and spread across sections,
-    from studied sections not skipped with the chapter; never review or quiz questions. Among equals, ones asked in
+    from studied sections; never review or quiz questions. Among equals, ones asked in
     fewer earlier quizzes come first, so retaking the quiz varies it."""
     sections=chapter['concept_ids']
     allowed=set(quiz_sections(store,chapter))

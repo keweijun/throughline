@@ -62,11 +62,12 @@ class ReviewContext(unittest.TestCase):
         self.assertEqual(sections['a']['objective'], 'Use A')
         self.assertEqual(sections['b']['set_aside'], ['later'])
 
-    def test_sections_skipped_with_their_chapter_are_not_reviewed(self):
+    def test_a_skip_recorded_before_learners_could_go_back_no_longer_hides_a_studied_section(self):
         self.lesson('a', T0)
         self.lesson('b', T0)
         self.store.put('evidence_deferred', 'chapter-skip:one:b', {'id': 'chapter-skip:one:b', 'concept_id': 'b'})
-        self.assertEqual(list(self.context(T0)), ['a'])
+        self.store.put('evidence_deferred', 'route-skip:r:c', {'id': 'route-skip:r:c', 'concept_id': 'c'})
+        self.assertEqual(list(self.context(T0)), ['a', 'b'], 'reviews follow lessons; the old skip records are history')
 
     def test_earlier_review_questions_carry_their_outcomes(self):
         self.lesson('a', T0)

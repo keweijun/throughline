@@ -67,6 +67,15 @@ Default `verification` is `pending`. A page reading verifies the page's text (se
 
 Changes to the relative order of existing concepts or chapters require the learner's agreement; then pass `confirm_reorder: true`. Adding a node without changing existing relative order is a local revision. Keep stable IDs and defer content instead of deleting concepts.
 
+### Chapters the learner has studied
+
+A learner may ask to fix a chapter they have already studied, for example after finding that a source was missing or misread. Find the studied sections first: `{"op":"stream.summaries","brief":true}` lists the course's turns, and a section is studied once a `mainline` turn with its `concept_id` is `completed` and has no `chapter_id` (that one is a chapter recap). Then:
+
+- Put missing material where it belongs: revise the section whose core question it answers, adding its links, notation and exercises there and updating its objective. A new section is for a new core question with enough material for a lesson of its own; a page fragment or a single formula joins an existing section.
+- Save every changed chapter with `curriculum.chapter.save`, then read each back with `curriculum.chapter.view` and confirm every section you meant to add or revise is there with its links. An outline change alone builds no section.
+- Keep the position and every learning record as they are. The learner studies a revised or added section from its preview in the app, before or after where they are, and comes back afterwards; earlier lessons, answers and notes stay beside the new lesson.
+- When you finish, name the studied sections you revised or added, and tell the learner to open each one in the app and choose "Study this, then come back".
+
 `curriculum.save` accepts a complete model (`concepts`, `route`, `coverage`, optional `chapters` each with `concept_ids`) in one call. Prefer the chapter operations; use it for small courses or whole-model repairs. Without `chapters`, a course with no chapters of its own becomes one chapter titled after the course (id `course`), which follows the route until you outline real chapters; otherwise the stored chapters are kept, so a new concept must then be placed through `chapters`, `curriculum.outline` or `curriculum.chapter.save`. With chapters, their `concept_ids` joined in order must equal the route.
 
 ## Inspect

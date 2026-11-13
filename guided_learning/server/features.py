@@ -11,7 +11,6 @@ from .. import practice
 from .. import images as attached
 from .. import pages
 from .. import readings
-from .. import review
 from ..store import OperationError
 from .. import memory
 from .. import course_changes
@@ -455,7 +454,6 @@ class Navigation(Feature):
     def on_complete(self, turn):
         if turn['channel'] != 'mainline' or is_recap(turn):
             return
-        self.host.practice.resolve_skip(turn)
         lesson, _ = self.step_of(turn['id'])
         if lesson:
             self._record_step(lesson, turn)
@@ -708,7 +706,7 @@ class Practice(Feature):
             target = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['next_concept_id']
             if not target:
                 return {'finished': True}
-            return self._enter(target, request_id)
+            return self._enter(target, request_id, self._kept_return(current, target))
 
     def _guard_mainline(self):
         session = self.operation({'op': 'session.resume'})
@@ -716,7 +714,18 @@ class Practice(Feature):
             raise OperationError('active_branch', 'Return to the teaching mainline first')
         return session.get('position') or {}
 
-    def _enter(self, concept_id, request_id):
+    def _kept_return(self, position, target):
+        """Moving on keeps the section to come back to until the learner reaches or passes it (ADR 0006)."""
+        back = position.get('return_to')
+        route = self.operation({'op': 'curriculum.view'})['route']
+        if back not in route:
+            return None
+        here = position.get('concept_id')
+        if here in route and route.index(here) < route.index(back) <= route.index(target):
+            return None
+        return back
+
+    def _enter(self, concept_id, request_id, return_to=None):
         left = (self.operation({'op': 'course.status'})['position'] or {}).get('concept_id')
         self.host.navigation.discard_prepared()
         for turn in self.host.brief_turns():
@@ -724,20 +733,16 @@ class Practice(Feature):
                 self.host.pause_turn(turn['id'])
         concept = self.operation({'op': 'curriculum.context', 'concept_id': concept_id})['concept']
         chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
-        result = self.operation({'op': 'mainline.enter', 'request_id': request_id, 'concept_id': concept_id,
-                                 'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''})
+        request = {'op': 'mainline.enter', 'request_id': request_id, 'concept_id': concept_id,
+                   'goal': prompts.section_goal(concept, chinese), 'next_step': '开始本小节讲解' if chinese else 'Begin teaching this section', 'progress': ''}
+        result = self.operation({**request, 'return_to': return_to} if return_to else request)
         if left and left != concept_id:
             self.host.memory.consolidate(left)
         self.host.changed()
         return result
 
-    def skipped(self):
-        """Sections the learner skipped, with their chapter or by jumping past them, and has not studied since."""
-        deferred = self.operation({'op': 'evidence.unresolved'})['deferred']
-        return [d for d in deferred if d['id'].startswith(review.SKIP_PREFIXES)]
-
     def skip_chapter(self, chapter_id, request_id):
-        """Move on to the next chapter; the skipped sections stay on the route as deferred."""
+        """Move on to the next chapter, like Next section from its last section; nothing is marked (ADR 0006)."""
         with self.host.lock:
             position = self._guard_mainline()
             model = self.operation({'op': 'curriculum.view'})
@@ -749,56 +754,22 @@ class Practice(Feature):
             if end + 1 >= len(model['route']):
                 raise OperationError('no_next_chapter', 'No later chapter is built yet')
             target = model['route'][end + 1]
-            for cid in chapter['concept_ids'][chapter['concept_ids'].index(current):]:
-                self.operation({'op': 'evidence.defer', 'id': f'chapter-skip:{chapter_id}:{cid}', 'concept_id': cid,
-                                'reason': 'Learner skipped the chapter', 'section_id': chapter_id, 'target_concept_id': target})
-            return self._enter(target, request_id)
+            return self._enter(target, request_id, self._kept_return(position, target))
 
-    def jump(self, concept_id, request_id):
-        """Study a later section now. The sections passed over that have no finished lesson, the current one included, stay on
-        the route as skipped, like a skipped chapter's, deferred to the section jumped to (ADR 0006)."""
+    def enter(self, concept_id, request_id, then_return=False):
+        """Study any section now, earlier or later. With `then_return` the learner comes back afterwards to the section
+        they leave, or to the one a detour already remembers; without it they go on from here. Nothing is marked: a section
+        before the position without a finished lesson shows as not studied, worked out from its lessons (ADR 0006)."""
         with self.host.lock:
             position = self._guard_mainline()
-            model = self.operation({'op': 'curriculum.view'})
-            route = model['route']
-            current = position.get('concept_id') or next(iter(route), None)
+            route = self.operation({'op': 'curriculum.view'})['route']
             if concept_id not in route:
                 raise OperationError('unknown_concept', 'That section is not on the route')
-            start, end = route.index(current), route.index(concept_id)
-            if end <= start:
-                # A retried jump finds the position already moved; any other earlier section is studied out of order
-                # only once skipped.
-                if concept_id == current:
-                    return self._enter(concept_id, request_id)
-                raise OperationError('not_ahead', 'Only a later section can be jumped to')
-            studied = {t['concept_id'] for t in self.host.brief_turns()
-                       if t['channel'] == 'mainline' and t['status'] == 'completed' and not t.get('chapter_id')}
-            chapters = {cid: c['id'] for c in model['chapters'] for cid in c['concept_ids']}
-            for cid in route[start:end]:
-                if cid in studied:
-                    continue
-                self.operation({'op': 'evidence.defer', 'id': f'route-skip:{request_id}:{cid}', 'concept_id': cid,
-                                'reason': 'Learner jumped to a later section', 'section_id': chapters.get(cid, cid),
-                                'target_concept_id': concept_id})
-            return self._enter(concept_id, request_id)
-
-    def enter_skipped(self, concept_id, request_id):
-        with self.host.lock:
-            self._guard_mainline()
-            if not any(d['concept_id'] == concept_id for d in self.skipped()):
-                raise OperationError('not_skipped', 'Only a skipped section can be studied out of route order')
-            return self._enter(concept_id, request_id)
-
-    def resolve_skip(self, turn):
-        if not turn.get('record_user'):
-            return
-        for item in self.skipped():
-            if item['concept_id'] == turn['concept_id']:
-                try:
-                    self.operation({'op': 'evidence.resolve', 'id': 'resolved:' + item['id'], 'deferred_id': item['id'],
-                                    'interaction_id': 'stream-user:' + turn['id']})
-                except OperationError:
-                    continue
+            current = position.get('concept_id') or route[0]
+            if concept_id == position.get('concept_id'):
+                return {'position': position, 'replayed': True}  # a retried move finds the learner there already
+            back = (position.get('return_to') or current) if then_return else None
+            return self._enter(concept_id, request_id, back if back in route and back != concept_id else None)
 
     def _sources(self, refs):
         return self.operation({'op': 'source.units', 'refs': refs})['sources']
@@ -846,7 +817,7 @@ class Practice(Feature):
         again = [{'section': titles.get(earlier[i]['concept_id'], earlier[i]['concept_id']), 'question': earlier[i]['question']}
                  for i in job.get('earlier', []) if i in earlier]
         seen = [t['question'] for t in tasks if t['id'] not in earlier and ({t['concept_id'], *t.get('tests_concept_ids', [])} & tested)]
-        # New questions test only sections the learner has studied (and not skipped), however much of the chapter remains.
+        # New questions test only sections the learner has studied, however much of the chapter remains.
         sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in self.operation({'op': 'practice.quiz_sections', 'chapter_id': chapter['id']})['sections']]
         return prompts.chapter_quiz(chapter, sections, seen, again)
 

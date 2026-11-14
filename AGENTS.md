@@ -16,7 +16,7 @@ Read `GLOSSARY.md` and the relevant ADRs in `docs/adr/` before changing behavior
 
 ## Versions
 
-Learners install the latest release, and are offered an update when its version is higher than theirs (Settings → About; ADR 0020). A release is a version bump merged to `main`: once CI passes, it tags `v<version>`, publishes a GitHub release and moves the `stable` branch that installs fetch. A change merged without a bump never reaches learners. Every PR that changes what a learner installs bumps the version in the same PR and adds a `## <version>` entry to `CHANGELOG.md`, written for learners; CI fails the PR otherwise (`scripts/release.py check`):
+Learners install the latest release, and are offered an update when its version is higher than theirs (Settings → About; ADR 0021). A release is a version bump merged to `main`: once CI passes, it tags `v<version>`, publishes a GitHub release and moves the `stable` branch that installs fetch. A change merged without a bump never reaches learners. Every PR that changes what a learner installs bumps the version in the same PR and adds a `## <version>` entry to `CHANGELOG.md`, written for learners; CI fails the PR otherwise (`scripts/release.py check`):
 
 - **Patch** (0.6.0 → 0.6.1): bug fixes and small interface polish.
 - **Minor** (0.6.1 → 0.7.0): a new feature or a visible change in behavior, a migration of stored course data, or a change to the skill or its references.

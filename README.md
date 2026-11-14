@@ -65,7 +65,7 @@ uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://
 guided-learning setup                # add --language zh-CN for the Chinese welcome guide
 ```
 
-With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`. Both forms fetch the latest release, so the same three lines install and update. `stable` always points at the latest release; each release is also tagged, with its changes in [CHANGELOG.md](CHANGELOG.md), so `@v0.43.0` in place of `@stable` installs that version. Going back to an older version can leave courses that a newer one has already updated unreadable to it. Run `guided-learning --version` to see what you have, and `guided-learning doctor` to check that Codex is found and answers (it sends one tiny message to a small model).
+With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`. Both forms fetch the latest release, so the same three lines install and update. `stable` always points at the latest release; each release is also tagged, with its changes in [CHANGELOG.md](CHANGELOG.md), so `@v0.45.0` in place of `@stable` installs that version. Going back to an older version can leave courses that a newer one has already updated unreadable to it. Run `guided-learning --version` to see what you have, and `guided-learning doctor` to check that Codex is found and answers (it sends one tiny message to a small model).
 
 Updating from a version before 0.5.1, when the package was named `codex-guided-learning`: run `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`) after `guided-learning stop`, then continue as above.
 
@@ -150,6 +150,6 @@ npm run check && npm run build                     # type check, then write guid
 npx playwright test                                # browser tests against disposable fixture courses
 ```
 
-Read [architecture](docs/architecture.md), the [glossary](GLOSSARY.md) and the [decisions](docs/adr/) before larger changes; agent instructions are in [AGENTS.md](AGENTS.md). Tasks live in GitHub Issues. CI runs all of the above on every pull request; a version bump merged to `main` is tagged, released with its [CHANGELOG.md](CHANGELOG.md) entry and becomes what learners install ([ADR 0020](docs/adr/0020-releases-are-tagged-from-main.md)).
+Read [architecture](docs/architecture.md), the [glossary](GLOSSARY.md) and the [decisions](docs/adr/) before larger changes; agent instructions are in [AGENTS.md](AGENTS.md). Tasks live in GitHub Issues. CI runs all of the above on every pull request; a version bump merged to `main` is tagged, released with its [CHANGELOG.md](CHANGELOG.md) entry and becomes what learners install ([ADR 0021](docs/adr/0021-releases-are-tagged-from-main.md)).
 
 Throughline is licensed under [MIT](LICENSE); bundled dependencies keep the licenses listed in [third-party notices](THIRD_PARTY_LICENSES.md). The Python package is named `throughline` (`codex-guided-learning` before 0.5.1) and the command `guided-learning`.

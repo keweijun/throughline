@@ -1,4 +1,4 @@
-"""Release checks and notes for CI (ADR 0020). Not part of the installed package.
+"""Release checks and notes for CI (ADR 0021). Not part of the installed package.
 
     python scripts/release.py version          the version in pyproject.toml
     python scripts/release.py check <base>     fails a PR that changes what learners install without a newer version

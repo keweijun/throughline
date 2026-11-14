@@ -1,4 +1,4 @@
-# Tests every pull request and every push to main; a push to main whose version has no release yet is released (ADR 0020).
+# Tests every pull request and every push to main; a push to main whose version has no release yet is released (ADR 0021).
 name: CI
 
 on:

@@ -23,6 +23,8 @@
   ];
 
   const teacherModel = $derived(app.settings?.model ?? '');
+  // A course from someone else's package (ADR 0020), whose Studio is the one on screen.
+  const shared = $derived(!!app.state?.course.imported && !app.libraryOpen);
   const model = $derived(studio.choice.model || teacherModel);
   const effort = $derived(studio.choice.effort || app.settings?.effort || 'medium');
   const entry = (id: string) => studio.models?.find((m) => (id ? m.id === id : m.default));
@@ -109,9 +111,14 @@
     class="chip"
     id="studio-access"
     class:full={studio.access?.full_access}
+    class:shared={studio.access?.full_access && shared}
     aria-haspopup="true"
     aria-expanded={open === 'access'}
-    title={studio.access?.full_access ? t("Codex can change files anywhere and runs commands without asking.") : t("Codex writes only inside your Throughline folder and asks before anything else.")}
+    title={studio.access?.full_access
+      ? shared
+        ? t('This course came from someone else. With Full access, a document or lesson in it written to instruct Codex could change files on your computer.')
+        : t("Codex can change files anywhere and runs commands without asking.")
+      : t("Codex writes only inside your Throughline folder and asks before anything else.")}
     onclick={() => void toggle('access')}
   >{studio.access?.full_access ? t('Full access') : t('Library access')}</button>
 
@@ -155,6 +162,10 @@
     <div class="menu" role="group" transition:pop aria-label={t("Access")}>
       {#if studio.access?.forced}
         <p class="note">{t("Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.")}</p>
+      {/if}
+      {#if shared}
+        <!-- A course from someone else's package (ADR 0020): its documents and lessons reach Codex's prompts. -->
+        <p class="note warning">{t('This course came from someone else. With Full access, a document or lesson in it written to instruct Codex could change files on your computer.')}</p>
       {/if}
       <div class="options" role="radiogroup" aria-label={t("Access")}>
         <label class="option">
@@ -207,6 +218,10 @@
   .chip.full {
     border-color: var(--caution);
     color: var(--caution);
+  }
+
+  .chip.shared {
+    background: var(--caution-wash);
   }
 
   /* The writing box sits at the bottom, so its menus open upward over the chat. */
@@ -269,6 +284,10 @@
   .note {
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .warning {
+    color: var(--caution);
   }
 
   .meta {

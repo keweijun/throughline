@@ -8,6 +8,7 @@
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
+  import CourseImport from './CourseImport.svelte';
   import { lightDismiss } from '../lib/dialog';
 
   let opening = $state<string | null>(null);
@@ -114,6 +115,34 @@
     } else opening = name;
   }
 
+  // A course package to import (ADR 0020): chosen with Import course or dropped anywhere on the library. Other files
+  // dropped here, on Studio, are attachments as before.
+  let importing = $state<File | null>(null);
+  let picker = $state<HTMLInputElement>();
+  const isPackage = (file: File) => file.name.toLowerCase().endsWith('.throughline');
+
+  function dropped(event: DragEvent) {
+    const file = [...(event.dataTransfer?.files ?? [])].find(isPackage);
+    if (!file || !library?.root) return;
+    event.preventDefault();
+    event.stopPropagation();
+    app.libraryView = 'list';
+    importing = file;
+  }
+
+  function dragging(event: DragEvent) {
+    if (library?.root && [...(event.dataTransfer?.items ?? [])].some((item) => item.kind === 'file')) event.preventDefault();
+  }
+
+  function picked() {
+    const file = picker?.files?.[0];
+    if (file) {
+      app.libraryView = 'list';
+      importing = file;
+    }
+    if (picker) picker.value = '';
+  }
+
   async function open(course: LibraryCourse) {
     opening = course.name;
     await app.openCourse(course.name);
@@ -121,7 +150,8 @@
   }
 </script>
 
-<section class="library" class:making aria-labelledby="library-title">
+<section class="library" class:making aria-labelledby="library-title" ondropcapture={dropped} ondragover={dragging}>
+  <input class="picker" type="file" accept=".throughline" bind:this={picker} onchange={picked} tabindex="-1" aria-hidden="true" />
   <header>
     {#if making}
       <div>
@@ -130,6 +160,11 @@
         {/if}
         <h1 id="library-title">{t('New course')}</h1>
       </div>
+      {#if library?.root}
+        <div class="header-actions">
+          <button class="btn btn-small" onclick={() => picker?.click()}>{t('Import a course')}</button>
+        </div>
+      {/if}
     {:else}
       <div>
         <h1 id="library-title">{t('All courses')}</h1>
@@ -138,6 +173,9 @@
       <div class="header-actions">
         {#if app.state}
           <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
+        {/if}
+        {#if library?.root}
+          <button class="btn btn-small" onclick={() => picker?.click()}>{t('Import a course')}</button>
         {/if}
         {#if studioHere}
           <button class="btn btn-primary btn-small" onclick={() => ask()}>{t('New course')}</button>
@@ -170,7 +208,9 @@
     {/if}
   </dialog>
 
-  {#if making}
+  {#if importing}
+    <CourseImport file={importing} onclose={() => (importing = null)} />
+  {:else if making}
     <!-- New course: the library's Studio across the page (ADR 0016, #109). When the course it makes is ready, the chat
          moves into that course's own Studio by itself. -->
     <section class="studio-part" aria-label={t('Studio')}>
@@ -302,6 +342,10 @@
 
   .back {
     margin-bottom: 0.4rem;
+  }
+
+  .picker {
+    display: none;
   }
 
   /* A new course still being made reads as a course to come, not a finished one. */

@@ -73,6 +73,8 @@ def app_questions(store):
     """Side questions asked in the app that still need attention: unanswered, awaiting the learner's supplement choice, or in an accepted supplement."""
     open_items = []
     for branch in store.list('web_branches'):
+        if branch.get('from_sender'):
+            continue  # the sender's, kept to read (ADR 0020); nothing waits on the learner
         if branch.get('status') in ('unanswered', 'suggested') or (branch.get('choice') == 'accept' and not branch.get('returned')):
             selection = branch.get('selection') or ''
             open_items.append({'id': branch['id'], 'question': branch['question'], 'status': branch['status'],

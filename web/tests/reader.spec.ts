@@ -313,7 +313,7 @@ test('settings hold only what applies to every course; the course page holds the
   const coursePage = page.locator('main article[aria-labelledby="course-title"]');
   await expect(coursePage.getByRole('heading', { level: 1 })).toBeVisible();
   // One tab at a time, and the arrow keys move between them; how the learner is taught sits beside Studio.
-  await expect(coursePage.getByRole('tab')).toHaveText(['Studio', 'Sources', 'Your notes']);
+  await expect(coursePage.getByRole('tab')).toHaveText(['Studio', 'Sources', 'Your notes', 'Share']);
   await expect(coursePage.getByRole('region', { name: "How you're taught" })).toContainText('Nothing yet.');
   await coursePage.getByRole('tab', { name: 'Studio' }).click();
   await page.keyboard.press('ArrowRight');

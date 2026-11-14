@@ -9,7 +9,7 @@ import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, Check
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
-export type CoursePart = 'studio' | 'sources' | 'notes';
+export type CoursePart = 'studio' | 'sources' | 'notes' | 'share';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = {
   text: string;

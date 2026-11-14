@@ -109,6 +109,8 @@ export type Question = {
   choice: 'accept' | 'decline' | null;
   supplement_turn_id?: string;
   returned?: boolean;
+  /** Asked by whoever shared the course, kept to read (ADR 0020): no follow-ups, and never sent to the teacher. */
+  from_sender?: boolean;
 };
 
 export type EvidenceKind = 'independent' | 'retest_passed' | 'hinted' | 'needs_work';
@@ -252,7 +254,7 @@ export type Preferences = { language: 'en' | 'zh-CN' };
 
 export type State = {
   preferences: Preferences;
-  course:{ id: string; title: string };
+  course: { id: string; title: string; imported?: ImportedFrom | null; built_for?: BuiltFor | null };
   position: Position | null;
   sources: {
     id: string; path: string; revision: string; status: string; converted_from?: { path: string; revision: string };
@@ -363,6 +365,8 @@ export type Annotation = {
   images?: string[];
   created_at: number;
   updated_at: number;
+  /** Made by whoever shared the course, kept to read (ADR 0020): it can be deleted but not changed. */
+  from_sender?: boolean;
 };
 
 export type Overview = {
@@ -419,6 +423,19 @@ export type LibraryCourse = {
   goal?: string | null;
   updated?: number;
   error?: string;
+};
+
+/** A course started fresh from someone else's package (ADR 0020). */
+export type ImportedFrom = { title: string; level: ShareLevel; notes: boolean; at: number };
+/** What the sender's learner profile said the course was built for, shown until the learner gives their own goal. */
+export type BuiltFor = { goal: string; depth?: string; focus?: string };
+export type ShareLevel = 'route' | 'lessons' | 'everything';
+export type ImportMode = 'continue' | 'fresh' | 'fresh-with-notes';
+export type PackageContents = { lessons: number; exercises: number; notes: number; questions: number; evidence: number };
+/** A package uploaded to import, waiting for the learner to choose how to take it. */
+export type WaitingPackage = {
+  token: string; level: ShareLevel; title: string; name: string; language?: string; contents?: PackageContents;
+  built_for?: BuiltFor; sources: number; modes: ImportMode[];
 };
 
 export type Library = { root: string | null; active: string | null; courses: LibraryCourse[] };

@@ -116,12 +116,14 @@ def step(store, request):
         raise OperationError('step_unfinished', 'Finish the current step first')
     if len(taught) == len(lesson['steps']):
         raise OperationError('lesson_finished', 'This lesson has no steps left')
+    entry = lesson['steps'][len(taught)]
     turn = store.get('streams', turn_id)
-    if lesson.pop('prepared', None) == turn_id:
+    # A step shared in a course package was written for the sender and is revealed like a prepared one (ADR 0020).
+    hidden = (lesson.pop('prepared', None), entry.pop('written', None))
+    if turn and turn_id in hidden:
         reveal(store, turn)
     elif turn and turn['channel'] == PREPARED_STEP:
         raise OperationError('not_prepared', 'This turn is not the prepared step of the lesson')
-    entry = lesson['steps'][len(taught)]
     entry['turn_id'] = turn_id
     if isinstance(request_id, str) and request_id:
         entry['request_id'] = request_id

@@ -5,7 +5,7 @@ is used, except search and highlight positions, which keep the extraction in the
 Each page's reading is its own record, so readings saved at the same time (Codex's subagents reading parts of a source)
 never overwrite one another. Figures are also indexed by a short id, which a lesson's `figure` fence names; the id
 belongs to one figure on one page of one revision. Reading the page again keeps the id of each figure it finds again,
-with its corrected box, and never gives a new figure an id the page has had.
+with its corrected box, even one an earlier reading left out, and never gives a new figure an id the page has had.
 """
 import hashlib
 import os
@@ -69,11 +69,13 @@ def _figures(raw, page):
 
 
 def _overlap(a, b):
-    """How much of the smaller of two boxes the other covers: near 1 when a crop was only widened or tightened."""
+    """How alike two boxes are: (how much of their union they share, how much of the smaller one the other covers). The
+    second is near 1 when a crop was only widened or tightened; the first tells that apart from a region inside it."""
     width, height = min(a[2], b[2]) - max(a[0], b[0]), min(a[3], b[3]) - max(a[1], b[1])
     if width <= 0 or height <= 0:
-        return 0.0
-    return width * height / min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+        return 0.0, 0.0
+    shared, first, second = width * height, (a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1])
+    return shared / (first + second - shared), shared / min(first, second)
 
 
 def _same_figures(old, new):
@@ -89,11 +91,14 @@ def _same_figures(old, new):
             match = next(f for f in old if label(f) == label(figure))
             found[i] = match
             taken.add(match['id'])
-    pairs = sorted(((_overlap(figure['box'], f['box']), i, f['id']) for i, figure in enumerate(new) if i not in found
+    pairs = sorted(((*_overlap(figure['box'], f['box']), -i, f['id']) for i, figure in enumerate(new) if i not in found
                     for f in old if f['id'] not in taken and not (label(figure) and label(f) and label(figure) != label(f))), reverse=True)
     by_id = {f['id']: f for f in old}
-    for score, i, fid in pairs:
-        if score >= 0.5 and i not in found and fid not in taken:
+    # The most alike pair first, so an unchanged box keeps its id over a region inside it; a region far smaller than a
+    # figure is a new one, not its crop corrected.
+    for shared, cover, i, fid in pairs:
+        i = -i
+        if cover >= 0.5 and shared >= 0.25 and i not in found and fid not in taken:
             found[i] = by_id[fid]
             taken.add(fid)
     return found
@@ -121,7 +126,8 @@ def save(store, request):
                          'figures': _figures(reading.get('figures', []), page), 'problems': [p.strip() for p in problems]}
     now = time.time()
     for page, reading in checked.items():
-        old = [store.get(FIGURES, f['id']) or {**f, 'index': 0} for f in (store.get(READINGS, key(source_id, revision, page)) or {}).get('figures', [])]
+        # Every figure the page has had, so one an earlier reading left out gets its id back when it is found again.
+        old = [f for f in store.matching(FIGURES, 'source_id', source_id) if f['revision'] == revision and f['page'] == page]
         same = _same_figures(old, reading['figures'])
         index = max([f['index'] for f in old] + [0])
         for position, figure in enumerate(reading['figures']):
@@ -129,8 +135,6 @@ def save(store, request):
                 figure['id'], number = same[position]['id'], same[position]['index']
             else:
                 index += 1
-                while store.get(FIGURES, figure_id(source_id, revision, page, index)):  # a figure left out by an earlier reading
-                    index += 1
                 figure['id'], number = figure_id(source_id, revision, page, index), index
             store.put(FIGURES, figure['id'], {**figure, 'source_id': source_id, 'revision': revision, 'page': page, 'index': number})
         store.put(READINGS, key(source_id, revision, page), {**reading, 'read_at': now})

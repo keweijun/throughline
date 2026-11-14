@@ -117,6 +117,26 @@ class PageReadings(unittest.TestCase):
         self.assertNotIn(added, (lens, unlabelled, ids[0]))
         self.assertEqual(self.call('source.figure', id=lens)['figure']['box'], top['box'])
 
+    def test_a_region_inside_a_figure_and_a_figure_found_again_keep_their_ids_apart(self):
+        whole = {**self.LENS, 'label': '', 'box': [0.1, 0.1, 0.9, 0.9]}
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[whole, self.LENS])])
+        figure, lens = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+
+        # A new region inside the unlabelled figure, listed after it: the unchanged box keeps its id.
+        inset = {**whole, 'description': 'A detail of the lens.', 'box': [0.3, 0.3, 0.5, 0.5]}
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[whole, inset])])
+        kept, added = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+        self.assertEqual(kept, figure)
+        self.assertNotIn(added, (figure, lens))
+        self.assertEqual(self.call('source.figure', id=figure)['figure']['box'], whole['box'])
+
+        # The lens, left out by that reading, is found again with a corrected crop: it gets its id back.
+        corrected = {**self.LENS, 'box': [0.2, 0.15, 0.8, 0.5]}
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[whole, inset, corrected])])
+        ids = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+        self.assertEqual(ids, [figure, added, lens])
+        self.assertEqual(self.call('source.figure', id=lens)['figure']['box'], corrected['box'])
+
     def test_invalid_readings_are_refused_whole(self):
         bad = [
             [self.reading(5)],

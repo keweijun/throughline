@@ -2,7 +2,7 @@
 
 Learners want to give a course to a classmate, and to move or back up their own. The only way so far is copying the course folder (ADR 0007), which has three problems. A live course uses write-ahead logging, so a copy can miss recent writes. The folder carries Codex's working files (in one real course, `audit/` was 349 MB beside an 11 MB `sources/` folder) and the host's lease file. And a copy is all or nothing: the classmate gets the sender's progress, course memory, questions and notes, and the teacher then treats them as the sender.
 
-A **course package** is one file, `<course>.throughline`, made by `course.export` and read by `course.import` (also `guided-learning export` and `import`, so Studio can make one on request). The export is on the Course page; the import is on the library, beside New course, and accepts a package dropped on the library. Throughline is still for one learner per course (ADR 0004): a package is a copy, and nothing syncs back.
+A **course package** is one file, `<course>.throughline`, made by `guided-learning export` and read by `guided-learning import`, which Studio can also run on request. They are commands rather than course operations because an import makes a new course and an export reads the whole folder, while an operation works inside one course's transaction. The export is on the Course page; the import is on the library, beside New course, and accepts a package dropped on the library. Throughline is still for one learner per course (ADR 0004): a package is a copy, and nothing syncs back.
 
 ## Share levels
 

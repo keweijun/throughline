@@ -71,8 +71,9 @@
     }
   });
 
-  // The box at the bottom follows up on the open thread, or asks a new question when none is open.
-  const thread = $derived(questions.find((q) => q.id === openId));
+  // The box at the bottom follows up on the open thread, or asks a new question when none is open. A thread that came
+  // with a shared course takes no follow-ups (ADR 0020), so with one open the box asks a new question.
+  const thread = $derived(questions.find((q) => q.id === openId && !q.from_sender));
   // A passage chosen in a lesson starts a new question; one chosen in an answer follows up on that answer's thread.
   $effect(() => {
     const quote = app.quote;

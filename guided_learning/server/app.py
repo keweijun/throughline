@@ -3,6 +3,8 @@ import asyncio
 import json
 import logging
 import os
+import re
+import shutil
 import socket
 import tempfile
 import threading
@@ -17,8 +19,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.background import BackgroundTask
 
-from .. import checks as codex_checks, files, images as attached, library, updates
+from .. import checks as codex_checks, files, images as attached, library, packages, updates
 from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
@@ -35,6 +38,10 @@ IMAGE_UPLOAD = '/api/images'
 MAX_IMAGE = 25 * 1024 * 1024
 # A file attached in Studio is uploaded as its own raw body of any type, like an image.
 FILE_UPLOAD = '/api/studio/files'
+# A course package to import is uploaded the same way (ADR 0020); it holds the course's sources, so it may be large.
+PACKAGE_UPLOAD = '/api/library/packages'
+MAX_PACKAGE = 4 * 1024 * 1024 * 1024
+PACKAGE_TOKEN = re.compile(r'[0-9a-f]{32}')
 
 
 class Body(BaseModel):
@@ -178,6 +185,11 @@ class SeenRequest(Body):
 
 class OpenCourseRequest(Body):
     name: str
+
+
+class ImportRequest(Body):
+    mode: Literal['continue', 'fresh', 'fresh-with-notes']
+    name: Optional[str] = None
 
 
 class UpdateRequest(Body):
@@ -359,13 +371,15 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     async def guard(request: Request, call_next):
         has_body = request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
         image = request.method == 'POST' and request.url.path == IMAGE_UPLOAD
-        upload = request.method == 'POST' and request.url.path == FILE_UPLOAD
+        package = request.method == 'POST' and request.url.path == PACKAGE_UPLOAD
+        upload = package or request.method == 'POST' and request.url.path == FILE_UPLOAD
         if has_body:
             try:
                 size = int(request.headers.get('content-length', '0'))
             except ValueError:
                 size = -1
-            if request.headers.get('transfer-encoding') or size < 0 or size > (MAX_UPLOAD if upload else MAX_IMAGE if image else MAX_BODY):
+            limit = MAX_PACKAGE if package else MAX_UPLOAD if upload else MAX_IMAGE if image else MAX_BODY
+            if request.headers.get('transfer-encoding') or size < 0 or size > limit:
                 return JSONResponse({'error': 'Request body must have a bounded Content-Length'}, 413)
         origin = request.headers.get('origin')
         if request.headers.get('host') not in allowed or (origin is not None and origin not in origins):
@@ -847,6 +861,59 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def open_course(body: OpenCourseRequest):
         # The interface reloads after opening a course, so the library listing is left for it to ask for.
         return {'active': str(courses.open_named(body.name).workspace)}
+
+    # Course packages (ADR 0020). A package to import is uploaded first, so the learner can see what it holds and
+    # choose how to take it; it waits in the library's own folder until imported or dropped.
+    def package_folder():
+        if courses.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        return courses.root / '.throughline' / 'packages'
+
+    def waiting_package(token):
+        if not PACKAGE_TOKEN.fullmatch(token) or not (package_folder() / (token + packages.SUFFIX)).is_file():
+            raise OperationError('unknown_package', 'This package is no longer waiting; choose it again')
+        return package_folder() / (token + packages.SUFFIX)
+
+    @app.post(PACKAGE_UPLOAD)
+    async def package_upload(request: Request):
+        folder = package_folder()
+        folder.mkdir(parents=True, exist_ok=True)
+        token = uuid.uuid4().hex
+        path = folder / (token + packages.SUFFIX)
+        try:
+            with path.open('wb') as out:
+                async for chunk in request.stream():
+                    out.write(chunk)
+            view = await asyncio.to_thread(packages.inspect, path)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+        return {'token': token, **view, 'name': packages.suggested_name(courses.root, view.get('name'))}
+
+    @app.post('/api/library/packages/{token}')
+    def package_import(token: str, body: ImportRequest):
+        path = waiting_package(token)
+        result = packages.import_package(path, courses.root, body.name or None, body.mode)
+        path.unlink(missing_ok=True)
+        courses.events.publish({'type': 'changed', 'scope': 'library'})
+        return {'name': result['name'], 'title': result['title']}
+
+    @app.delete('/api/library/packages/{token}')
+    def package_drop(token: str):
+        waiting_package(token).unlink(missing_ok=True)
+        return {'dropped': True}
+
+    @app.get('/api/course/package')
+    def package_summary():
+        return {'name': host.workspace.name, 'levels': packages.summary(host.workspace)}
+
+    @app.get('/api/course/package/{level}')
+    def package_export(level: Literal['route', 'lessons', 'everything']):
+        name = host.workspace.name + packages.SUFFIX
+        folder = Path(tempfile.mkdtemp(prefix='throughline-export-'))
+        packages.export(host.workspace, folder / name, level)
+        return FileResponse(folder / name, media_type='application/zip', filename=name,
+                            background=BackgroundTask(shutil.rmtree, folder, ignore_errors=True))
 
     @app.post('/api/shutdown')
     def shutdown():

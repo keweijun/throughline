@@ -275,19 +275,22 @@ def _manifest(package, archive, entries):
     return manifest
 
 
-def _target(root, name, suggested):
-    """The new course's folder: the name asked for, which must be free, or the package's name made unique."""
-    if name is not None:
-        target = library.course_path(root, name)
-        if target.exists():
-            raise OperationError('course_exists', f'A course named {name} already exists')
-        return target
+def suggested_name(root, suggested):
+    """The name an import gives a course when none is asked for: the package's, made unique in the library."""
     base = suggested if isinstance(suggested, str) and library.NAME.match(suggested) else 'imported-course'
     for number in range(1, 1000):
         candidate = base if number == 1 else f'{base[:60]}-{number}'
-        if not (root / candidate).exists():
-            return library.course_path(root, candidate)
+        if not (Path(root) / candidate).exists():
+            return candidate
     raise OperationError('course_exists', f'Courses named {base} already exist; choose a name')
+
+
+def _target(root, name, suggested):
+    """The new course's folder: the name asked for, which must be free, or the package's name made unique."""
+    target = library.course_path(root, suggested_name(root, suggested) if name is None else name)
+    if target.exists():
+        raise OperationError('course_exists', f'A course named {target.name} already exists')
+    return target
 
 
 def _rows(database):

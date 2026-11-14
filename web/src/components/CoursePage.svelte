@@ -7,6 +7,7 @@
   import TeachingPreferences from './TeachingPreferences.svelte';
   import StudioChats from './StudioChats.svelte';
   import SourceList from './SourceList.svelte';
+  import CourseShare from './CourseShare.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
 
@@ -33,7 +34,13 @@
     { id: 'studio', label: () => (studio.available === false ? t('Change this course') : t('Studio')) },
     { id: 'sources', label: () => t('Sources') },
     { id: 'notes', label: () => t('Your notes') },
+    { id: 'share', label: () => t('Share') },
   ];
+
+  // A course started fresh from someone else's package (ADR 0020): the route was built for their goal, so the page asks
+  // for the learner's own until Studio records it.
+  const imported = $derived(app.state?.course.imported ?? null);
+  const builtFor = $derived(app.state?.course.built_for ?? null);
 
   let exporting = $state(false);
   async function exportAll() {
@@ -93,6 +100,19 @@
   <header class="head">
     <h1 id="course-title">{app.state?.course.title}</h1>
     {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}
+    {#if imported}
+      <div class="shared">
+        <p>
+          <span class="chip chip-plain">{t('Shared course')}</span>
+          {#if builtFor?.goal}{t('Built for someone else’s goal: {goal}', { goal: builtFor.goal })}{/if}
+        </p>
+        {#if builtFor}
+          <CodexLink class="btn btn-small" prompt={t('$throughline this course was shared with me. Ask me about my goal and background, record them as my learner profile, and say whether the route fits me. ')}>
+            {t('Tell Studio your goal')}
+          </CodexLink>
+        {/if}
+      </div>
+    {/if}
 
     <!-- The whole route at a glance; a segment opens its chapter. -->
     <div class="glance">
@@ -193,6 +213,10 @@
   <div class="part" id="course-sources" role="tabpanel" aria-labelledby="course-tab-sources" hidden={app.coursePart !== 'sources'}>
     <p class="lead">{t('Every document in the course; choose one to open it in the reader.')}</p>
     <SourceList page />
+  </div>
+
+  <div class="part" id="course-share" role="tabpanel" aria-labelledby="course-tab-share" hidden={app.coursePart !== 'share'}>
+    <CourseShare active={app.courseOpen && app.coursePart === 'share'} />
   </div>
 
   <div class="part" id="course-notes" role="tabpanel" aria-labelledby="course-tab-notes" hidden={app.coursePart !== 'notes'}>
@@ -417,6 +441,21 @@
   .lead {
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .shared {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.8rem;
+    align-items: center;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .shared p {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
   }
 
   /* Studio and Memory are built for the side panel: the same surface and padding here keep their raised writing box

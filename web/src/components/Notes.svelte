@@ -118,7 +118,7 @@
     {#snippet note(item: Annotation)}
       <article id="annotation-{item.id}" class="item {item.kind}" class:flash={flash === item.id}>
         <p class="kind">
-          {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}
+          {label(item)}{#if item.source?.label}<span class="where"> · {item.source.label}</span>{:else if item.task_id}<span class="where"> · {t("Exercise")}</span>{:else if app.turn(item.turn_id)?.channel === 'sidequestion'}<span class="where"> · {t("Answer to a side question")}</span>{/if}{#if item.from_sender}<span class="where"> · {t("From the shared course")}</span>{/if}
         </p>
         {#if item.passage}
           <blockquote class="prose" use:markdown={{ language: locale.language, text: item.passage }}></blockquote>
@@ -147,7 +147,10 @@
             {#if item.kind !== 'note'}
               <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
             {/if}
-            <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
+            <!-- A note that came with a shared course is the sender's (ADR 0020): it can be deleted, not changed. -->
+            {#if !item.from_sender}
+              <button class="btn btn-quiet btn-small" onclick={() => start(item)}>{item.note ? t("Edit") : t("Add note")}</button>
+            {/if}
             <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
           </div>
         {/if}

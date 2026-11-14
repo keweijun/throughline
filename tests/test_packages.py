@@ -194,6 +194,37 @@ class CoursePackages(unittest.TestCase):
         refused = run('import', str(self.package), '--name', 'copy')
         self.assertEqual((refused.returncode, json.loads(refused.stdout)['error']['code']), (1, 'course_exists'))
 
+    def test_the_app_exports_a_download_and_imports_an_upload_as_chosen(self):
+        from fastapi.testclient import TestClient
+        from guided_learning.server import create_app
+        from guided_learning.server.settings import TeacherSettings
+        settings = TeacherSettings(self.home / 'settings.json')
+        app = create_app(self.course, runner=None, settings=settings, library_root=self.sender, watch_interval=60)
+        with TestClient(app, base_url='http://127.0.0.1:8765') as client:
+            levels = client.get('/api/course/package').json()['levels']
+            self.assertEqual((levels['everything']['notes'], levels['lessons']['notes'], levels['route']['exercises']), (1, 0, 0))
+            download = client.get('/api/course/package/everything')
+            self.assertEqual(download.status_code, 200)
+            self.assertIn('quantum-v1.throughline', download.headers['content-disposition'])
+            self.assertEqual(client.get('/api/course/package/all').status_code, 400)
+
+            waiting = client.post('/api/library/packages', content=download.content, headers={'content-type': 'application/zip'}).json()
+            self.assertEqual((waiting['title'], waiting['level'], waiting['name'], waiting['modes']),
+                             ('Quantum', 'everything', 'quantum-v1-2', ['continue', 'fresh', 'fresh-with-notes']))
+            self.assertEqual(len(list((self.sender / '.throughline' / 'packages').iterdir())), 1)
+            imported = client.post(f"/api/library/packages/{waiting['token']}", json={'mode': 'fresh'}).json()
+            self.assertEqual(imported['name'], 'quantum-v1-2')
+            self.assertEqual(list((self.sender / '.throughline' / 'packages').iterdir()), [], 'an imported package is not kept')
+            self.assertEqual(execute(self.sender / 'quantum-v1-2', {'op': 'course.status'})['imported']['level'], 'lessons')
+            self.assertEqual(client.post(f"/api/library/packages/{waiting['token']}", json={'mode': 'fresh'}).json()['code'], 'unknown_package')
+
+            refused = client.post('/api/library/packages', content=b'not a package', headers={'content-type': 'application/zip'})
+            self.assertEqual(refused.json()['code'], 'invalid_package')
+            self.assertEqual(list((self.sender / '.throughline' / 'packages').iterdir()), [], 'a refused upload is not kept')
+            dropped = client.post('/api/library/packages', content=download.content, headers={'content-type': 'application/zip'}).json()
+            self.assertTrue(client.delete(f"/api/library/packages/{dropped['token']}").json()['dropped'])
+            self.assertEqual(client.delete('/api/library/packages/../../x').status_code, 404)
+
 
 class MovedSources(unittest.TestCase):
     """A file registered from a new path keeps the source of the same content whose file is gone (ADR 0020)."""

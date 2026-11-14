@@ -120,7 +120,7 @@ The interface and new teaching default to English; switch to Simplified Chinese 
 ## Where things live
 
 - **Courses:** your Throughline folder, `~/Throughline` (`C:\Users\<you>\Throughline` on Windows). It is deliberately outside Documents, which OneDrive and iCloud often sync: a course's database can be corrupted by sync. To use another folder, set `GUIDED_LEARNING_HOME`; if you point it at a synced folder, open each course on only one computer at a time. It holds an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence; to move a course, stop the app and copy its folder.
-- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, fast mode, and Studio's Full access; the model lists come from your Codex sign-in. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
+- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, and fast mode; the model lists come from your Codex sign-in. Studio's own model and its access (Library or Full) are chosen in its writing box, as in Codex. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).
 

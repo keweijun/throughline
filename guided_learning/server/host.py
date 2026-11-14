@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..api import execute
-from .. import codex
+from .. import codex, library
 from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
 from ..store import OperationError, hold
@@ -94,6 +94,10 @@ class Host:
         self._pending = {}  # (turn id, attempt) -> events not yet stored
         self._live = {}  # (turn id, attempt) -> channel, while this host streams the attempt
         self._timer = None
+        # The course files' stamp after this host's latest write, while no other process has written since: the library
+        # watcher leaves such changes alone, since the host announces its own.
+        self._stamp_lock = threading.Lock()
+        self._own_stamp = library.stamp(self.workspace)
         self.operation({'op': 'course.status'})
         self._lease = _acquire_lease(self.workspace)
         self._held = hold(self.workspace)
@@ -129,7 +133,26 @@ class Host:
                 self._persist()
             except Exception:
                 log.exception('Could not store streamed text before %s', request.get('op'))
-        return execute(self.workspace, request)
+        return self._execute(request)
+
+    def _execute(self, request):
+        before = library.stamp(self.workspace)
+        result = execute(self.workspace, request)
+        after = library.stamp(self.workspace)
+        with self._stamp_lock:
+            # Another process may commit between the stamps; its change is then taken for the host's, and only a later
+            # one shows. Writers take turns, so that window is the moment around this operation's own transaction.
+            if before == self._own_stamp:
+                self._own_stamp = after
+        return result
+
+    def own_change(self, stamp):
+        """Whether the course files at `stamp` hold only this host's writes since the last call; later writes are
+        judged from `stamp`."""
+        with self._stamp_lock:
+            own = stamp == self._own_stamp
+            self._own_stamp = stamp
+            return own
 
     def _persist(self, key=None):
         """Store buffered stream events, of one attempt or all; returns the last write's result. Events that cannot be
@@ -141,7 +164,7 @@ class Host:
                 if not events:
                     continue
                 try:
-                    result = execute(self.workspace, {'op': 'stream.events', 'id': key[0], 'attempt': key[1], 'events': events})
+                    result = self._execute({'op': 'stream.events', 'id': key[0], 'attempt': key[1], 'events': events})
                 except Exception:
                     self._pending[key] = events
                     raise
@@ -166,10 +189,6 @@ class Host:
             feature = getattr(self, name, None)
             if feature:
                 feature.wake()
-
-    def turns(self):
-        """Every turn in full, with frozen prompt snapshots; prefer `brief_turns` when only status matters."""
-        return self.operation({'op': 'stream.list'})['turns']
 
     def brief_turns(self):
         """Each turn's id, channel, section, attempt and status, without its text or snapshot."""
@@ -212,7 +231,7 @@ class Host:
         """Save course preferences; a new language makes preparation stale, and its running turns pause."""
         with self.lock:
             result = self.operation({'op': 'preferences.save', **changes})
-            stale = {job['id'] for job in self.preparation.state()['jobs'] if job['status'] == 'stale'}
+            stale = {job['id'] for job in self.preparation.state(brief=True)['jobs'] if job['status'] == 'stale'}
             for turn in self.brief_turns():
                 if turn['id'] in stale and turn['status'] == 'running':
                     self.pause_turn(turn['id'])
@@ -310,7 +329,8 @@ class Host:
             if event['kind'] in ('complete', 'failed'):
                 self.publish_turn(result['turn'])
                 if event['kind'] == 'complete':
-                    self.completed(result['turn'])
+                    # Stored text comes back without the turn's prompt snapshot, which completion hooks read.
+                    self.completed(self.operation({'op': 'stream.read', 'id': identifier})['turn'])
                 self.changed(FINISHED.get(result['turn']['channel'], 'state'))
         emit.sequence = 0
 
@@ -379,6 +399,10 @@ class Host:
             if previous['channel'] == PREPARED_STEP:
                 raise OperationError('invalid_transition', 'A prepared step that stopped is discarded, not regenerated')
             if previous['channel'] == 'mainline':
+                # A section's lesson is taught at the position, like Continue; a chapter recap is started from anywhere.
+                position = self.operation({'op': 'course.status'})['position'] or {}
+                if not previous.get('chapter_id') and previous['concept_id'] != position.get('concept_id'):
+                    raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
                 self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))
             if worker and worker[0].is_alive():

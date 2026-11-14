@@ -26,10 +26,12 @@ class LibraryStudioTest(unittest.TestCase):
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
 
-    def received(self, method):
+    def received(self, method, titles=False):
         import json
         lines = self.log.read_text(encoding='utf-8').splitlines() if self.log.exists() else []
-        return [json.loads(line)['params'] for line in lines if json.loads(line).get('method') == method]
+        # A new chat's title is written on a side thread of its own, left out unless asked for.
+        found = [json.loads(line)['params'] for line in lines if json.loads(line).get('method') == method]
+        return [p for p in found if titles or not (p.get('ephemeral') or p.get('outputSchema'))]
 
     def threads(self, scope='library'):
         return [t['id'] for t in self.client.get('/api/studio', params={'scope': scope} if scope else {}).json()['threads']]

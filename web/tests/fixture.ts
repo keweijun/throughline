@@ -24,6 +24,8 @@ async function open(page: Page, module: string, children: ChildProcess[]) {
   const base = `http://127.0.0.1:${out.toString().trim()}`;
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Codex is never asked for its models from a test; tests that need a list route /api/models themselves.
+  await page.route('**/api/models', (route) => route.fulfill({ json: { models: [] } }));
   await page.goto(base);
   return { base, errors };
 }

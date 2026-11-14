@@ -16,6 +16,7 @@
   import SettingsDialog from './components/SettingsDialog.svelte';
   import CitationPeek from './components/CitationPeek.svelte';
   import Help from './components/Help.svelte';
+  import Search from './components/Search.svelte';
   import ErrorToast from './components/ErrorToast.svelte';
   import Library from './components/Library.svelte';
 
@@ -47,12 +48,16 @@
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a
   // drawer on a phone. The stage is measured rather than queried in CSS so the rail, its capsule and the grid agree.
+  // It is measured for the width it is heading to: a docked side panel counts at its full width while it slides in or
+  // out, so the route folds or unfolds as the panel starts to move rather than partway through.
   let stage = $state<HTMLElement>();
+  let room = $state(Infinity);
   $effect(() => {
     if (!stage) return;
-    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const observer = new ResizeObserver(([entry]) => (app.stageNarrow = entry.contentRect.width < 66 * rem));
-    observer.observe(stage);
+    const workspace = stage.parentElement!;
+    const scrollbar = () => stage!.offsetWidth - stage!.clientWidth;
+    const observer = new ResizeObserver(() => (room = workspace.clientWidth - scrollbar()));
+    observer.observe(workspace);
     const phone = matchMedia('(max-width: 56rem)');
     const update = () => (app.phone = phone.matches);
     update();
@@ -61,6 +66,11 @@
       observer.disconnect();
       phone.removeEventListener('change', update);
     };
+  });
+  $effect(() => {
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const docked = app.state && !app.libraryOpen && app.panelShown && !panelCoversLesson();
+    app.stageNarrow = room - (docked ? app.panelWidth : 0) < 68.5 * rem;
   });
 
   $effect(() => {
@@ -74,11 +84,32 @@
     if (next) app.view(next);
   }
 
+  // Search opens with Shift pressed twice on its own, as in JetBrains IDEs, or with Ctrl+K (⌘K on a Mac).
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  let shiftAlone = false;
+  let shiftAt = 0;
+  const searchable = () => !!app.state && !app.libraryOpen && !app.searchOpen;
+
+  function onKeyUp(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !shiftAlone) return;
+    shiftAlone = false;
+    if (event.timeStamp - shiftAt < 400 && searchable()) {
+      shiftAt = 0;
+      app.searchOpen = true;
+    } else shiftAt = event.timeStamp;
+  }
+
   function onKey(event: KeyboardEvent) {
+    shiftAlone = event.key === 'Shift' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey;
+    if (event.key.toLowerCase() === 'k' && (mac ? event.metaKey : event.ctrlKey) && !event.altKey && !event.shiftKey && searchable()) {
+      event.preventDefault();
+      app.searchOpen = true;
+      return;
+    }
     if (event.key === 'Escape') {
       if (app.routeOpen) app.routeOpen = false;
       else if (app.libraryOpen && app.state && !(event.target as HTMLElement).closest('dialog')) app.libraryOpen = false;
-      else if (app.panelOpen && panelCoversLesson()) app.panelOpen = false;
+      else if (app.panelShown && panelCoversLesson()) app.panelOpen = false;
 
       return;
     }
@@ -91,8 +122,8 @@
       requestAnimationFrame(() => document.getElementById('question-input')?.focus());
     } else if (event.key === '[') step(-1);
     else if (event.key === ']') step(1);
-    else if (event.key === 's') app.panelOpen && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
-    else if (event.key === 'n') app.panelOpen && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
+    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
+    else if (event.key === 'n') app.panelShown && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse();
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
@@ -101,14 +132,14 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} />
+<svelte:window onkeydown={onKey} onkeyup={onKeyUp} onpointerdown={() => (shiftAlone = false)} />
 
 <TopBar />
 
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelOpen} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
+<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
   {#if app.libraryOpen}
     <Library />
   {:else if app.state}
@@ -146,13 +177,16 @@
 <SettingsDialog />
 <CitationPeek />
 <Help />
+<Search />
 <ErrorToast />
 
 <style>
+  /* The side panel slides in and out past the window's edge, which must not scroll the window sideways. */
   .workspace {
     display: flex;
     flex: 1;
     min-height: 0;
+    overflow: clip;
   }
 
   /* The stable gutter keeps the centred layout from shifting when a page is too short to scroll. */
@@ -174,9 +208,9 @@
     max-width: calc(var(--rail) + var(--measure) + 12rem);
     margin-inline: auto;
     transition:
-      grid-template-columns var(--settle) var(--ease-out),
-      column-gap var(--settle) var(--ease-out),
-      max-width var(--settle) var(--ease-out);
+      grid-template-columns var(--move) var(--ease-in-out),
+      column-gap var(--move) var(--ease-in-out),
+      max-width var(--move) var(--ease-in-out);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -227,12 +261,25 @@
       padding-top: 1.5rem;
     }
 
-    .scrim.visible {
+    .scrim {
       display: block;
       position: fixed;
       inset: var(--topbar) 0 0;
       z-index: 30;
       background: rgb(17 20 27 / 0.4);
+      opacity: 0;
+      visibility: hidden;
+      transition:
+        opacity var(--move) ease,
+        visibility 0s linear var(--move);
+    }
+
+    .scrim.visible {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity var(--move) ease,
+        visibility 0s;
     }
   }
 </style>

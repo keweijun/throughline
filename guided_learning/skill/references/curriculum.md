@@ -4,7 +4,7 @@ Use the same JSON entrypoint as [course operations](course-operations.md). The t
 
 ## Chapters and sections
 
-Group the route into chapters, the course's table of contents. A chapter is never taught as one block; each concept in it is one learning section that answers one core question. Explain closely related ideas in the same section, and give a prerequisite its own earlier section when several sections rely on it. Take the number of chapters and sections from the materials and the learner's goal; there is no target count. Follow the materials' own chapters where they fit the learning order.
+Group the route into chapters, the course's table of contents. A chapter is never taught as one block; each concept in it is one learning section that answers one core question. Explain closely related ideas in the same section, and give a prerequisite its own earlier section when several sections rely on it. A section is a **sitting**: what a learner studies in one go, through a lesson of a few steps, its check questions and its exercises. Group the pages that answer one question into it, so a single slide or a page that only continues an argument is rarely a section of its own, and a worked example belongs to the section whose method it shows. Take the number of chapters and sections from the materials and the learner's goal; there is no target count. Follow the materials' own chapters where they fit the learning order.
 
 ## Build a course chapter by chapter
 
@@ -45,7 +45,9 @@ Use stable concept IDs across edits. Merge duplicate concepts with multiple link
 
 ## Exercise placement
 
-An exercise part goes in the latest section among the concepts it requires, never earlier, so a lesson never has to teach ahead of the route. Give every exercise `required_concepts`: the IDs of all sections the part needs, its own section included. A save rejects an exercise it sends without a nonempty `required_concepts` (`invalid_request`); exercises stored earlier in concepts the save does not send may still lack it. A save is also rejected (`exercise_placement`, naming the exercise and the concept) when a required concept comes later in the route or is not in it; reordering chapters or moving a concept that would leave an exercise too early is rejected the same way. Deadlines do not change this: a learner who needs a part sooner can study the sections it needs, or ask a side question.
+Register as exercises only the problems the materials set for the learner to solve: homework, problem sets, end-of-chapter questions, past exams. A worked example printed with its solution is teaching material: link its page to the section whose method it shows, and the lesson works it.
+
+An exercise part goes in the latest section among the concepts it requires, never earlier, so a lesson never has to teach ahead of the route. Give every exercise `required_concepts`: the IDs of all sections the part needs, its own section included. A save rejects an exercise it sends without a nonempty `required_concepts` (`invalid_request`); exercises stored earlier in concepts the save does not send may still lack it. A save is also rejected (`exercise_placement`, naming the exercise and the concept) when a required concept comes later in the route or is not in it; reordering chapters or moving a concept that would leave an exercise too early is rejected the same way. Deadlines do not change this: a learner who needs a part sooner can study the sections it needs, or ask a side question. A mapped exercise is shown to the learner when the app's teacher sets the section's practice; to show it as worded, at once, add it with [`practice.add`](practice.md#add-exercises-to-a-section).
 
 Split homework by part. When the parts of a question need different sections, map each part (`7(a)`, `7(b)`) as its own exercise on the latest section it requires, with `part_of` naming the original question (`7`) and `other_parts` listing the other parts with the `concept_id` of the section that teaches each. When building chapter by chapter, a part that needs a chapter not built yet waits: list it in `other_parts` without `concept_id`, map it when you build that chapter, and then add its `concept_id` to the earlier part. The app's own chapter builds receive such waiting parts with their source text.
 
@@ -59,11 +61,20 @@ Coverage dispositions:
 - `deferred`: explicit reason, preserving the content for later teaching.
 - `needs_review`: explicit reason for uncertain extraction, mapping or interpretation.
 
-Default `verification` is `pending`. Set `verified` only after checking the contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
+Default `verification` is `pending`. A page reading verifies the page's text (see [reading the pages](course-operations.md#reading-the-pages)); a coverage entry's `verification` is about its mapping, so a read page can show `verification: pending` in `curriculum.coverage`, whose units say whether their page is `read`. Set `verified` only after checking that the mapped concepts teach the unit's contents and include a `verification_note` describing that review. Mapping a page to a concept is a navigation link, not proof every formula, image or detail on it was extracted or taught.
 
 ## Revising and reordering
 
 Changes to the relative order of existing concepts or chapters require the learner's agreement; then pass `confirm_reorder: true`. Adding a node without changing existing relative order is a local revision. Keep stable IDs and defer content instead of deleting concepts.
+
+### Chapters the learner has studied
+
+A learner may ask to fix a chapter they have already studied, for example after finding that a source was missing or misread. Find the studied sections first: `{"op":"stream.summaries","brief":true}` lists the course's turns, and a section is studied once a `mainline` turn with its `concept_id` is `completed` and has no `chapter_id` (that one is a chapter recap). Then:
+
+- Put missing material where it belongs: revise the section whose core question it answers, adding its links, notation and exercises there and updating its objective. A new section is for a new core question with enough material for a lesson of its own; a page fragment or a single formula joins an existing section.
+- Save every changed chapter with `curriculum.chapter.save`, then read each back with `curriculum.chapter.view` and confirm every section you meant to add or revise is there with its links. An outline change alone builds no section.
+- Keep the position and every learning record as they are. The learner studies a revised or added section from its preview in the app, before or after where they are, and comes back afterwards; earlier lessons, answers and notes stay beside the new lesson.
+- When you finish, name the studied sections you revised or added, and tell the learner to open each one in the app and choose "Study this, then come back".
 
 `curriculum.save` accepts a complete model (`concepts`, `route`, `coverage`, optional `chapters` each with `concept_ids`) in one call. Prefer the chapter operations; use it for small courses or whole-model repairs. Without `chapters`, a course with no chapters of its own becomes one chapter titled after the course (id `course`), which follows the route until you outline real chapters; otherwise the stored chapters are kept, so a new concept must then be placed through `chapters`, `curriculum.outline` or `curriculum.chapter.save`. With chapters, their `concept_ids` joined in order must equal the route.
 

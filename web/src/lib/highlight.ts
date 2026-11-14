@@ -72,18 +72,22 @@ const tokenize = (needle: string) => needle.replace(FORMULA, (m) => token(m.star
 /**
  * Every occurrence of a passage in rendered text, ignoring whitespace differences and citation chips. A formula in the
  * passage matches the rendered formula with the same TeX; passages saved from text whose formulas differ since are
- * matched on their words alone.
+ * matched on their words alone, and passages saved with a chip's label are matched with chips read as text.
  */
 export function occurrences(root: HTMLElement, needle: string, options: LocateOptions = {}): Range[] {
   const found = search(root, tokenize(needle), options, true);
-  return found.length || !needle.includes('$') ? found : search(root, needle.replace(FORMULA, ' '), options, false);
+  if (found.length) return found;
+  const words = needle.includes('$') ? search(root, needle.replace(FORMULA, ' '), options, false) : [];
+  if (words.length || options.skip) return words;
+  // Passages selected before chips were left out of them carry a chip's label in the text.
+  return search(root, tokenize(needle), { ...options, skip: '.katex, .widget' }, true);
 }
 
 type Position = [Text, number] | Element;
 
 function search(root: HTMLElement, needle: string, options: LocateOptions, formulas: boolean): Range[] {
   const target = options.loose ? needle.replace(/\s+/g, '') : needle.replace(/\s+/g, ' ').trim();
-  if (target.length < 3) return [];
+  if (!target) return [];
   const skip = options.skip ?? '.katex, .citation, .widget';
   const nodes: (Text | Element)[] = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
@@ -208,4 +212,14 @@ export function highlights(node: HTMLElement, params: { passages: Passage[]; tex
       clear('mine', key);
     },
   };
+}
+
+let fading: ReturnType<typeof setTimeout> | undefined;
+
+/** Marks for a moment the passage a search took the learner to. */
+export function flash(range: Range) {
+  if (!('highlights' in CSS)) return;
+  CSS.highlights.set('found', new Highlight(range));
+  clearTimeout(fading);
+  fading = setTimeout(() => CSS.highlights.delete('found'), 2400);
 }

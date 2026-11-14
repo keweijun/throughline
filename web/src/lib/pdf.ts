@@ -23,6 +23,8 @@ export function openPdf(url: string, key = url): Promise<PDFDocumentProxy> {
   let doc = documents.get(key);
   if (doc) documents.delete(key);
   else {
+    // The host answers Range requests, so pdf.js fetches the pages being shown at once while the rest streams in: a large
+    // PDF shows its first page without waiting for the whole file, and a small one still loads in one request.
     doc = pdfjs().then((pdf) => pdf.getDocument({ url }).promise);
     doc.catch(() => documents.get(key) === doc && documents.delete(key));
   }

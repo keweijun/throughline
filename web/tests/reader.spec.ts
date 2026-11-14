@@ -38,6 +38,51 @@ test('a PDF citation opens the reader at the cited page, and its text can be quo
   expect(errors).toEqual([]);
 });
 
+test('a PDF the browser cannot open, such as one of 2 GB or more, shows the pages the host renders', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.route('**/api/sources/**format=pdf', (route) => route.fulfill({ contentType: 'application/pdf', body: 'not a pdf' }));
+  await page.getByRole('button', { name: 'View source p. 2' }).first().click();
+
+  const cited = page.locator('.pdf-page.cited');
+  await expect(cited.locator('img')).toHaveJSProperty('complete', true);
+  expect(await cited.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByText('its pages are shown as pictures')).toBeVisible();
+  await expect(page.getByText('could not be displayed')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('2');
+  await expect(page.locator('.pdf-page')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await expect(page.locator('.pdf-page[data-page="3"] img')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('3');
+  expect(errors).toEqual([]);
+});
+
+test('a citation preview typesets the formulas in its excerpt and keeps long ones inside the card', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  // Text extracted from a PDF keeps its formulas as TeX, delimited \( \) and \[ \].
+  const text = 'Vibrations in molecules follow the harmonic oscillator. Two masses \\(m_1,m_2\\) joined by a spring of constant \\(k_f\\): '
+    + '\\[\\hat H=-\\frac{\\hbar^2}{2m_1}\\frac{\\partial^2}{\\partial x_1^2}-\\frac{\\hbar^2}{2m_2}\\frac{\\partial^2}{\\partial x_2^2}+\\frac12k_f(x_1-x_2-x_0)^2.\\] '
+    + 'With reduced-mass coordinates \\[M=m_1+m_2,\\quad\\frac1\\mu=\\frac1{m_1}+\\frac1{m_2},\\quad X=\\frac{m_1x_1+m_2x_2}{M},\\quad x=x_1-x_2-x_0\\] the problem separates.';
+  await page.route('**/api/sources/**/page-2', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), text } });
+  });
+  const citation = page.getByRole('button', { name: 'View source p. 2' }).first();
+  const excerpt = page.getByRole('tooltip').locator('blockquote');
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await citation.hover();
+    await expect(excerpt).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(excerpt.locator('.katex').first()).toBeVisible();
+  // The limit falls inside the second display formula, so the excerpt stops before it and no raw TeX is left over.
+  await expect(excerpt).toContainText('With reduced-mass coordinates');
+  await expect(excerpt).not.toContainText('\\[');
+  await expect(excerpt).not.toContainText('\\quad');
+  expect(await excerpt.evaluate((node) => node.scrollWidth <= node.clientWidth
+    && node.getBoundingClientRect().right <= node.closest('[role=tooltip]')!.getBoundingClientRect().right)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
 test('another citation into the same PDF moves the open reader and keeps its zoom', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   await page.getByRole('button', { name: 'View source p. 2' }).first().click();
@@ -74,6 +119,35 @@ test('the top bar is the only navigation for the side panel and focus returns to
   await page.getByRole('button', { name: 'Close panel' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#toggle-notes')).toBeFocused();
+});
+
+test('Overview puts the side panel aside, and Learn and Review bring it back as it was', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  const panel = page.locator('#auxiliary');
+  await page.locator('#toggle-notes').click();
+  await expect(panel).toBeVisible();
+
+  // Overview has its own Sources and notes, and Studio needs the width.
+  await page.locator('#open-course').click();
+  await expect(panel).toBeHidden();
+  await expect(page.locator('#toggle-notes')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#open-study').click();
+  await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
+
+  // Opening it on Overview shows it there; it was the learner's choice.
+  await page.keyboard.press('m');
+  await expect(panel).toBeHidden();
+  await page.keyboard.press('s');
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  await expect(page.locator('#toggle-source')).toHaveAttribute('aria-pressed', 'true');
+
+  // Review keeps the panel: a missed question is checked against its source or asked about.
+  await page.keyboard.press('m');
+  await page.keyboard.press('m');
+  await expect(panel).toBeHidden();
+  await page.locator('#open-review').click();
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  expect(errors).toEqual([]);
 });
 
 test('the reading column scrolls beside the open panel, not past it', async ({ page, course }) => {

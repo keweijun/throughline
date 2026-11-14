@@ -26,6 +26,13 @@ IMAGE_ANSWER='(Answer given in the attached images)'
 def section_exercise(task):
     return task.get('origin') in ('source','self_created')
 
+# Statuses kept for the record only: never shown, counted or asked again. The teacher replaces exercises the learner
+# asked to swap; Codex retires ones it added that the learner never touched (ADR 0011).
+HIDDEN=('replaced','retired')
+# Exercises Codex adds to a section in one request, at most: a sanity cap, not a target.
+MAX_ADDED=100
+MAX_RETIRE_REASON=300
+
 def replaceable(task):
     """An exercise the teacher wrote that the learner has not touched: no answer, ask or help, not set aside or skipped.
     Asking for different exercises replaces these; the course's own exercises are never replaced (ADR 0011)."""
@@ -181,24 +188,8 @@ def _parse(store, value, text):
             if value.get('variant_of') and (len(questions)!=1 or questions[0].get('origin')!='self_created'):
                 raise FormatError('A variant is exactly one question with origin self_created')
             context=curriculum.context(store,{'concept_id':value['concept_id']})
-            allowed=context['concept'].get('exercises',[])+context['concept'].get('links',[])
             for q in questions:
-                if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
-                _check_parts(q)
-                if q.get('origin') not in ('source','self_created'): raise FormatError('Missing question origin')
-                refs=q.get('source_refs',[])
-                if not isinstance(refs,list) or (q['origin']=='source' and not refs): raise FormatError('Missing exercise source')
-                for ref in refs:
-                    try: curriculum.source_unit(store,ref)
-                    except OperationError as exc: raise FormatError(str(exc)) from exc
-                    if not any(_same_unit(ref,a) for a in allowed): raise FormatError('Unrelated question source')
-                exercises=context['concept'].get('exercises',[])
-                if 'exercise' in q:
-                    if q['origin']!='source' or not any(e.get('question')==q['exercise'] for e in exercises): raise FormatError('exercise must name one of the section\'s exercises')
-                else:
-                    # A task from the only exercise of its source unit uses that exercise.
-                    used=[e for e in exercises if any(_same_unit(ref,e) for ref in refs)]
-                    if q['origin']=='source' and len(used)==1 and isinstance(used[0].get('question'),str): q['exercise']=used[0]['question']
+                _section_question(store,context,q)
         else:
             if not isinstance(result.get('feedback'),str) or not result['feedback'].strip(): raise FormatError('feedback must be nonempty text')
             if value['action']=='assess':
@@ -215,15 +206,37 @@ def _parse(store, value, text):
     except (json.JSONDecodeError,AttributeError,IndexError,TypeError) as exc:
         raise FormatError(str(exc)) from exc
 
+def _section_question(store, context, q):
+    """One exercise written for a section: its text, parts, origin and sources, which must be the section's own.
+    Raises FormatError; a course exercise it uses is named in `exercise`."""
+    if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
+    _check_parts(q)
+    if q.get('origin') not in ('source','self_created'): raise FormatError('Missing question origin')
+    refs=q.get('source_refs',[])
+    if not isinstance(refs,list) or (q['origin']=='source' and not refs): raise FormatError('Missing exercise source')
+    allowed=context['concept'].get('exercises',[])+context['concept'].get('links',[])
+    for ref in refs:
+        try: curriculum.source_unit(store,ref)
+        except OperationError as exc: raise FormatError(str(exc)) from exc
+        if not any(_same_unit(ref,a) for a in allowed): raise FormatError('Unrelated question source')
+    exercises=context['concept'].get('exercises',[])
+    if 'exercise' in q:
+        if q['origin']!='source' or not any(e.get('question')==q['exercise'] for e in exercises): raise FormatError('exercise must name one of the section\'s exercises')
+    else:
+        # A task from the only exercise of its source unit uses that exercise.
+        used=[e for e in exercises if any(_same_unit(ref,e) for ref in refs)]
+        if q['origin']=='source' and len(used)==1 and isinstance(used[0].get('question'),str): q['exercise']=used[0]['question']
+
 def _same_unit(ref, other):
     return all(ref.get(k)==other.get(k) for k in ('source_id','revision','unit_id'))
 
-def _review_questions(store, value, result):
+def _review_questions(store, value, result, strict=False):
     """A review set's questions (ADR 0014): each tests sections the set may test and is an apply question, answered in
     writing and assessed by part, or a recall question with its options. A recall question that is malformed is dropped,
-    so one bad question does not lose the set."""
+    so one bad question does not lose the set; with `strict` (Codex writing a set) it is an error instead."""
     questions=result.get('questions')
     if not isinstance(questions,list) or not questions: raise FormatError('Expected a list of questions')
+    if strict and len(questions)>review.MAX_QUESTIONS: raise FormatError(f'A review set has at most {review.MAX_QUESTIONS} questions')
     allowed=review.scope_sections(store,store.get('review_sets',value['set_id']) or {})
     kept=[]
     for index,q in enumerate(questions[:review.MAX_QUESTIONS]):
@@ -234,7 +247,9 @@ def _review_questions(store, value, result):
         tested=list(dict.fromkeys(tested))
         if q.get('kind','apply')=='recall':
             try: check=lessons._check({**q,'idea':q.get('idea') or q['question'][:200]},value['id']+':'+str(index))
-            except OperationError: continue
+            except OperationError as exc:
+                if strict: raise FormatError(f'Question {index+1}: {exc}') from exc
+                continue
             kept.append({'kind':'recall','question':check['question'],'idea':check['idea'],'options':check['options'],'correct':check['correct'],'tests_concept_ids':tested})
             continue
         if q.get('kind','apply')!='apply': raise FormatError('kind must be apply or recall')
@@ -285,8 +300,11 @@ def complete(store, request):
         cid=value['concept_id']
         teaching.record_interaction(store,{'id':iid,'role':'assistant','text':feedback,'concept_id':cid,'source_refs':task['source_refs']})
         base={'id':'practice-evidence:'+value['id'],'concept_id':cid,'session_id':'practice:'+task['id'],'exercise_id':task['id']}
-        if value['action']=='ask':
-            task['history'].append({'action':'ask','question':value['question'],'feedback':feedback,**({'images':value['images']} if value.get('images') else {})})
+        # An answer that addresses no part, such as a question typed into the answer box, is kept as an ask: it is never
+        # assessed and records no evidence (ADR 0011, issue #178).
+        asked=value['action']=='ask' or (value['action']=='assess' and all(p=='not_attempted' for p in result['parts']))
+        if asked:
+            task['history'].append({'action':'ask','question':value.get('question',value.get('answer')),'feedback':feedback,**({'images':value['images']} if value.get('images') else {})})
         elif value['action']=='assess':
             parts=[old if new=='not_attempted' else new for old,new in zip(part_statuses(task),result['parts'])]
             outcome='passed' if all(p=='correct' for p in parts) else 'needs_work'
@@ -315,7 +333,7 @@ def quiz_chapter(store, value):
     return next((c for c in curriculum.view(store,{})['chapters'] if c['id']==chapter_id and c['concept_ids']),None)
 
 def quiz_sections(store, chapter):
-    """The chapter's sections a quiz may test: studied ones not skipped with the chapter."""
+    """The chapter's sections a quiz may test: the studied ones."""
     allowed=set(review.reviewable(store))
     return [c for c in chapter['concept_ids'] if c in allowed]
 
@@ -333,7 +351,7 @@ def quiz_tier(task):
 
 def quiz_earlier(store, chapter):
     """Up to QUIZ_EARLIER of the chapter's own exercises to ask again, best first by quiz_tier and spread across sections,
-    from studied sections not skipped with the chapter; never review or quiz questions. Among equals, ones asked in
+    from studied sections; never review or quiz questions. Among equals, ones asked in
     fewer earlier quizzes come first, so retaking the quiz varies it."""
     sections=chapter['concept_ids']
     allowed=set(quiz_sections(store,chapter))
@@ -422,4 +440,88 @@ def sections_for_quiz(store, request):
     if not chapter: raise OperationError('unknown_chapter','Unknown chapter')
     return {'sections':quiz_sections(store,chapter)}
 
-OPERATIONS={'practice.list':listing,'practice.quiz_sections':sections_for_quiz,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}
+def add(store, request):
+    """Exercises Codex adds to a section as the learner should see them, such as a problem set's questions with their
+    formulas set in LaTeX (issue #172). They meet the rules for exercises the teacher writes, and a course exercise
+    already shown in the section is revised rather than added again."""
+    identifier=teaching.require_text(request,'id')
+    cid=teaching.require_text(request,'concept_id')
+    teaching.validate_concept(store,cid)
+    if store.get('practice_tasks',identifier+':0'):
+        return {'tasks':[t for t in (store.get('practice_tasks',f'{identifier}:{i}') for i in range(MAX_ADDED)) if t]}
+    exercises=request.get('exercises')
+    if not isinstance(exercises,list) or not 1<=len(exercises)<=MAX_ADDED:
+        raise OperationError('invalid_request',f'exercises must list 1 to {MAX_ADDED} exercises')
+    context=curriculum.context(store,{'concept_id':cid})
+    shown={t['exercise'] for t in store.list('practice_tasks') if t['concept_id']==cid and section_exercise(t) and t.get('exercise') and t['status'] not in HIDDEN}
+    tasks=[]
+    for index,given in enumerate(exercises):
+        q={k:given[k] for k in ('question','parts','origin','source_refs','exercise') if k in given} if isinstance(given,dict) else given
+        try: _section_question(store,context,q)
+        except FormatError as exc: raise OperationError('invalid_exercise',f'Exercise {index+1}: {exc}') from exc
+        if q['origin']=='source' and 'exercise' not in q:
+            raise OperationError('invalid_exercise',f'Exercise {index+1}: name the section exercise it asks in exercise')
+        if q.get('exercise') in shown:
+            raise OperationError('exercise_exists',f'Exercise {index+1}: {q["exercise"]} is already shown in this section; revise that exercise instead')
+        if q.get('exercise'): shown.add(q['exercise'])
+        tasks.append({'id':f'{identifier}:{index}','concept_id':cid,'question':q['question'],'origin':q['origin'],'source_refs':q.get('source_refs',[]),
+                      'status':'pending','history':[],'created_at':time.time(),**{k:q[k] for k in ('parts','exercise') if k in q}})
+    for task in tasks: store.put('practice_tasks',task['id'],task)
+    return {'tasks':tasks}
+
+def _codex_task(store, request):
+    task=store.get('practice_tasks',teaching.require_text(request,'id'))
+    if not task or not section_exercise(task) or task['status'] in HIDDEN:
+        raise OperationError('unknown_exercise','Unknown exercise: name one of a section\'s exercises still shown')
+    return task
+
+def revise(store, request):
+    """Change how an exercise is worded (its text, parts or sources) while keeping what the learner did on it. Earlier
+    wordings are kept in `revisions`. A change in the number of parts is refused once an answer was assessed, since the
+    part statuses would no longer fit."""
+    task=_codex_task(store,request)
+    changes={k:request[k] for k in ('question','parts','source_refs') if k in request}
+    if not changes: raise OperationError('invalid_request','Give question, parts or source_refs to change')
+    candidate={**{k:task[k] for k in ('question','parts','origin','source_refs','exercise') if k in task},**changes}
+    try: _section_question(store,curriculum.context(store,{'concept_id':task['concept_id']}),candidate)
+    except FormatError as exc: raise OperationError('invalid_exercise',str(exc)) from exc
+    if part_count(candidate)!=part_count(task) and any(h.get('action')=='assess' for h in task.get('history',[])):
+        raise OperationError('exercise_answered','The learner has answered this exercise; keep its number of parts')
+    if all(task.get(k)==candidate.get(k) for k in changes): return {'task':task}
+    earlier={k:task[k] for k in ('question','parts','source_refs') if k in task}
+    task={**task,**{k:candidate[k] for k in changes},'revisions':task.get('revisions',[])+[{**earlier,'revised_at':time.time()}]}
+    return {'task':store.put('practice_tasks',task['id'],task)}
+
+def retire(store, request):
+    """Take an exercise the learner never touched out of the section, such as a duplicate or one added by mistake. It is
+    kept for the record but never shown, counted or asked again. One the learner worked on stays: revise it instead, or
+    leave skipping it to the learner, since a skip means the learner closed it (ADR 0011)."""
+    task=_codex_task(store,request)
+    if task.get('history') or task['status'] not in ('pending','skipped'):
+        raise OperationError('exercise_answered','The learner has worked on this exercise; revise it instead')
+    if any(j.get('task_id')==task['id'] and not j.get('processed') for j in store.list('practice_jobs')):
+        raise OperationError('exercise_busy','The learner has a request running on this exercise')
+    reason=request.get('reason')
+    if reason is not None and (not isinstance(reason,str) or len(reason)>MAX_RETIRE_REASON):
+        raise OperationError('invalid_request',f'reason must be text of at most {MAX_RETIRE_REASON} characters')
+    task={**task,'status':'retired','retired_at':time.time(),**({'retire_reason':reason.strip()} if reason and reason.strip() else {})}
+    return {'task':store.put('practice_tasks',task['id'],task)}
+
+def write_review(store, request):
+    """A review set Codex writes with its questions, for a learner who asks in Studio to review what they studied (issue
+    #173): a request as **Review for me** with a request would make, under the same rules, written in one step."""
+    identifier=teaching.require_text(request,'id')
+    found=store.get('review_sets',identifier)
+    if found:
+        return {'set':found,'task_ids':[t['id'] for t in store.list('practice_tasks') if t.get('set_id')==identifier]}
+    review.create(store,{'id':identifier,'kind':'request',**{k:request[k] for k in ('request','scope') if k in request}})
+    note=request.get('note')
+    if note is not None and (not isinstance(note,str) or len(note)>review.MAX_NOTE):
+        raise OperationError('invalid_request',f'note must be text of at most {review.MAX_NOTE} characters')
+    value={'id':identifier,'set_id':identifier}
+    try: questions=_review_questions(store,value,{'questions':request.get('questions')},strict=True)
+    except FormatError as exc: raise OperationError('invalid_review_question',str(exc)) from exc
+    review_tasks(store,value,{'questions':questions,'note':note})
+    return {'set':store.get('review_sets',identifier),'task_ids':[f'{identifier}:{i}' for i in range(len(questions))]}
+
+OPERATIONS={'practice.add':add,'practice.revise':revise,'practice.retire':retire,'review.write':write_review,'practice.list':listing,'practice.quiz_sections':sections_for_quiz,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}

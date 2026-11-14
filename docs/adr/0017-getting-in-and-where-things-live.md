@@ -43,6 +43,8 @@ Everything in the app belongs to one of three levels, and each level has its pla
 
 **The side panel holds only what is used while reading a section**, in this order: **Questions** (used most, and it carries the count of open questions), **Source** (opened by citations), **Notes** (the learner's own). Memory leaves the side panel.
 
+The places choose what fills the reading column; the side panel accompanies it. It belongs with Learn and Review, where a missed review question is checked against its source or asked about. Overview has its own Sources and notes, and Studio there needs the width and is the one place to talk to Codex, so arriving on Overview puts an open panel aside rather than closing it: Learn and Review bring it back as it was, and opening it on Overview (a source from the Sources tab, the switcher, `s` or `n`) shows it there.
+
 **The Course page** is the course-level place, labelled **Overview**. It opens in the reading column across its whole width, with the route rail stepping aside, since its strip of chapters shows the route. A compact header (title, goal on two lines, the chapter strip and which chapter the learner is in) sits above one tab at a time, in this order, so Studio's and Memory's writing boxes never share the screen and nothing scrolls inside something else that scrolls:
 
 1. **Studio**, with this course's threads (below), in a frame as tall as the window allows, so its writing box stays in view. Once the learner writes to it, the header scrolls away under the tabs, which stay pinned, and the frame takes its room. The strip of chapters above the tabs fills as sections are studied, and each chapter in it opens its chapter page.

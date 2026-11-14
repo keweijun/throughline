@@ -4,6 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { open, solved } from '../lib/format';
   import Exercise from './Exercise.svelte';
+  import SuggestedMemory from './SuggestedMemory.svelte';
   import Composer from './Composer.svelte';
 
   let { conceptId, isCurrent }: { conceptId: string; isCurrent: boolean } = $props();
@@ -13,11 +14,17 @@
   const practice = $derived(app.state?.practice ?? { tasks: [], jobs: [] });
   // The chapter quiz anchored to a last section is listed on the chapter page, not here.
   const tasks = $derived(app.tasks(conceptId));
+  // A skipped exercise is closed (ADR 0011), so it leaves the list and waits, folded, under Skipped.
+  const shown = $derived(tasks.filter((t) => t.status !== 'skipped'));
+  const skipped = $derived(tasks.filter((t) => t.status === 'skipped'));
+  // A preference suggested from repeated skips is asked here, since the skip that suggested it is folded away.
+  const skipSuggestions = $derived(
+    (app.state?.memory ?? []).filter((e) => e.status === 'suggested' && skipped.some((t) => t.id === e.skip_ids?.at(-1))),
+  );
   // One line says where the section's practice stands, so the cards need not be read to find out.
   const tally = $derived.by(() => {
-    const counted = tasks.filter((t) => t.status !== 'skipped');
-    const again = counted.filter((t) => !solved(t) && t.history.some((h) => h.action === 'assess')).length;
-    return { solved: counted.filter(solved).length, total: counted.length, again };
+    const again = shown.filter((t) => !solved(t) && t.history.some((h) => h.action === 'assess')).length;
+    return { solved: shown.filter(solved).length, total: shown.length, again };
   });
   const standing = $derived(
     [
@@ -96,9 +103,21 @@
       <button class="btn" disabled={busy} onclick={generate}>{failed || interrupted ? t("Try again") : t("Prepare exercises")}</button>
     {/if}
 
-    {#each tasks as task, i (task.id)}
+    {#each shown as task, i (task.id)}
       <Exercise {task} number={i + 1} />
     {/each}
+
+    {#if skipped.length}
+      <details class="folded skipped">
+      <summary>{t("Skipped")} <span>({skipped.length})</span></summary>
+      <div class="folded-tasks">
+      {#each skipped as task (task.id)}
+        <Exercise {task} />
+      {/each}
+      </div>
+      </details>
+    {/if}
+    <SuggestedMemory entries={skipSuggestions} />
 
     {#if requestFailed && !generating}
       <p class="problem">{t("The new exercises could not be written:")} {diagnostic(requestFailed.error ?? "")}</p>
@@ -128,9 +147,9 @@
     {/if}
 
     {#if earlier.length}
-      <details class="earlier">
+      <details class="folded earlier">
       <summary>{t("Still open in this chapter")} <span>({earlier.length})</span></summary>
-      <div class="earlier-tasks">
+      <div class="folded-tasks">
       {#each earlier as task (task.id)}
         <Exercise {task} showSection />
       {/each}
@@ -166,7 +185,7 @@
     font-weight: 600;
   }
 
-  .earlier-tasks { display: grid; gap: 1rem; margin-top: 1rem; }
+  .folded-tasks { display: grid; gap: 1rem; margin-top: 1rem; }
 
   summary {
     cursor: pointer;

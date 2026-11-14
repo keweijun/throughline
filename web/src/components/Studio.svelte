@@ -11,6 +11,7 @@
   import StudioTurn from './StudioTurn.svelte';
   import StudioRequest from './StudioRequest.svelte';
   import CodexLink from './CodexLink.svelte';
+  import StudioControls from './StudioControls.svelte';
 
   /**
    * Studio (ADR 0016): course work as a Codex chat. `$` suggests skills and `@` the course's files, both left in the
@@ -230,25 +231,56 @@
     return null;
   }
 
-  // The transcript follows new output while the learner is at its end, as a chat does.
+  // The transcript follows new output, as a chat does, until the learner scrolls up; reaching its end again, or
+  // sending, follows it once more. Growth is watched rather than the events behind it, so output that renders late
+  // (Markdown, an opened fold) is followed too, and scrolling up is never undone by the next piece of output.
+  let following = $state(true);
+  let scroller = $state<HTMLElement | null>(null);
+  const atEnd = (node: HTMLElement) => node.scrollHeight - node.scrollTop - node.clientHeight < 8;
+  function toEnd() {
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  }
   $effect(() => {
-    const last = studio.turns.at(-1);
-    void [studio.turns.length, last?.items.length, last?.status, JSON.stringify(last?.items.at(-1) ?? '').length, studio.pending.length];
-    const scroller = scrollParent(list);
-    if (!scroller) return;
-    const near = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
-    if (near) requestAnimationFrame(() => (scroller.scrollTop = scroller.scrollHeight));
+    const node = scrollParent(list);
+    scroller = node;
+    if (!node || !list) return;
+    let last = node.scrollTop;
+    const onScroll = () => {
+      if (node.scrollTop < last - 2) following = atEnd(node);
+      else if (atEnd(node)) following = true;
+      last = node.scrollTop;
+    };
+    // A wheel or touch upward means the learner wants to read back, even while output keeps the end moving.
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY < 0) following = false;
+    };
+    const onTouch = () => (following = false);
+    const grew = new ResizeObserver(() => {
+      if (following) toEnd();
+      last = node.scrollTop;
+    });
+    grew.observe(list);
+    node.addEventListener('scroll', onScroll, { passive: true });
+    node.addEventListener('wheel', onWheel, { passive: true });
+    node.addEventListener('touchmove', onTouch, { passive: true });
+    return () => {
+      grew.disconnect();
+      node.removeEventListener('scroll', onScroll);
+      node.removeEventListener('wheel', onWheel);
+      node.removeEventListener('touchmove', onTouch);
+    };
+  });
+  // A message the learner sends, or another chat opened, brings the end back into view.
+  $effect(() => {
+    void [studio.threadId, studio.sent.length];
+    following = true;
+    requestAnimationFrame(toEnd);
   });
 
-  const accessLabel = $derived(studio.access?.full_access ? t('Full access') : t('Library access'));
-  const threadLabel = (id: string) => {
-    const thread = studio.threads.find((x) => x.id === id);
-    return thread?.name || thread?.preview || t('Untitled chat');
-  };
 </script>
 
 <section class="panel-view studio" aria-labelledby="studio-title">
-  <header class="panel-head">
+  <header class="panel-head pinned">
     <div class="panel-bar">
       <h2 id="studio-title">{t("Studio")}</h2>
     </div>
@@ -265,8 +297,10 @@
           }}
         >
           <option value="">{t("New chat")}</option>
+          <!-- A chat just begun, until the list knows it. -->
+          {#if studio.threadId && !studio.thread}<option value={studio.threadId}>{studio.label(studio.threadId)}</option>{/if}
           {#each studio.threads as thread (thread.id)}
-            <option value={thread.id}>{thread.running ? '● ' : ''}{threadLabel(thread.id)}</option>
+            <option value={thread.id}>{thread.running ? '● ' : ''}{studio.label(thread.id)}</option>
           {/each}
         </select>
         <button class="btn btn-quiet btn-small" disabled={!studio.threadId} onclick={() => studio.newThread()}>{t("New chat")}</button>
@@ -310,7 +344,7 @@
 
   {#snippet target()}
     <span class="target">
-      {studio.threadId ? threadLabel(studio.threadId) : t("New chat")}{#if title}{' · '}{title}{/if}
+      {studio.threadId ? studio.label(studio.threadId) : t("New chat")}{#if title}{' · '}{title}{/if}
       {#if studio.origin}
         <span class="origin" title={studio.origin.text}>
           <span class="origin-label">{studio.origin.label}</span>
@@ -320,25 +354,19 @@
     </span>
   {/snippet}
   {#snippet tools()}
+    <StudioControls />
+    {#if studio.context !== null}
+      <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
+    {/if}
+    {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
+  {/snippet}
+  <!-- Stop sits beside Send, where Codex puts it. -->
+  {#snippet actions()}
     {#if studio.running}
       <button type="button" class="btn btn-small stop" onclick={() => void studio.stop()} title={t("Stop Codex")}>
         <span class="square" aria-hidden="true"></span>{t("Stop")}
       </button>
     {/if}
-    <button
-      type="button"
-      class="access"
-      class:full={studio.access?.full_access}
-      title={studio.access?.full_access ? t("Codex can change files anywhere and runs commands without asking.") : t("Codex writes only inside your Throughline folder and asks before anything else.")}
-      onclick={() => {
-        app.settingsPane = 'teacher';
-        app.settingsOpen = true;
-      }}
-    >{accessLabel}</button>
-    {#if studio.context !== null}
-      <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
-    {/if}
-    {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
   {/snippet}
   <div class="panel-foot">
     {#each made as item (item.name)}
@@ -368,6 +396,7 @@
         onview={(editor) => (view = editor)}
         onfiles={attachFiles}
         {tools}
+        {actions}
       />
     {/if}
   </div>
@@ -477,28 +506,59 @@
     background: currentColor;
   }
 
-  .access {
-    padding: 0.1rem 0.5rem;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    background: none;
-    color: var(--pencil);
-    font-size: 0.75rem;
-    cursor: pointer;
-  }
-
-  .access:hover {
-    border-color: var(--pencil);
-  }
-
-  .access.full {
-    border-color: var(--caution);
-    color: var(--caution);
-  }
-
   .context {
+    flex: none;
     font-size: 0.75rem;
     color: var(--pencil);
+    white-space: nowrap;
+  }
+
+  /* The chat picker and New chat on one row, pinned to the top of the frame as the writing box is to its bottom, so
+     the transcript scrolls between them. The frame's top padding is taken in, so nothing shows above the bar. */
+  .pinned {
+    position: sticky;
+    top: -1.1rem;
+    z-index: 2;
+    margin-top: -1.1rem;
+    padding-top: 1.1rem;
+    background: var(--sheet);
+  }
+
+  .pinned::after {
+    content: '';
+    position: absolute;
+    inset: 100% 0 -1.1rem;
+    background: linear-gradient(to top, transparent, var(--sheet));
+    pointer-events: none;
+  }
+
+  .pinned .panel-tools {
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+
+  .pinned select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    font-size: var(--step--1);
+  }
+
+  .pinned .panel-tools .btn {
+    flex: none;
+  }
+
+  /* One row of tools however much Studio shows in it; its chips give way first (StudioControls). */
+  .studio :global(.composer .bar) {
+    flex-wrap: nowrap;
+  }
+
+  .studio :global(.composer .bar > *) {
+    flex-shrink: 0;
+  }
+
+  .studio :global(.composer .bar > .controls) {
+    flex-shrink: 1;
   }
 
   /* Where a hand-off came from, a chip in the box's header that the learner can take off before sending. */

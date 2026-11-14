@@ -7,6 +7,7 @@ import hashlib
 import json
 
 from ..streaming import PREPARED_STEP
+from .. import practice as practice_ops
 
 # Channels whose text a view shows: lessons and side-question answers. Other turns only report their status.
 SHOWN = ('mainline', 'sidequestion')
@@ -14,7 +15,7 @@ REF = ('source_id', 'revision', 'unit_id')
 CONCEPT = ('id', 'title', 'prerequisites', 'objective', 'goal')
 COVERAGE = REF + ('concept_ids', 'disposition', 'verification')
 JOB = ('id', 'concept_id', 'status', 'reason', 'created_at')
-SOURCE = ('id', 'path', 'revision', 'status', 'converted_from')
+SOURCE = ('id', 'path', 'revision', 'status', 'converted_from', 'pages', 'pages_read', 'problem_pages')
 INTERACTION = ('id', 'role', 'text', 'concept_id')
 
 
@@ -58,7 +59,10 @@ def curriculum(model):
 
 def public_question(branch):
     selected = branch.get('selected_lecture')
-    return {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
+    slim = {**branch, 'selected_lecture': {'id': selected['id']} if selected else None}
+    # The interface already holds the exercise; only the host's prompt needs the frozen copy.
+    slim.pop('selected_exercise', None)
+    return slim
 
 
 def _course(host):
@@ -70,8 +74,8 @@ def _practice(host):
     practice = host.practice.state()
     # Review questions and their requests live on the review page, not among a section's exercises (ADR 0008).
     # Chapter recaps and quiz questions carry chapter_id; the chapter page lists them, section views leave them out.
-    # Replaced exercises are kept for the record only (ADR 0011).
-    return {'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review' and t['status'] != 'replaced'],
+    # Replaced and retired exercises are kept for the record only (ADR 0011).
+    return {'practice': {'tasks': [t for t in practice['tasks'] if t['origin'] != 'review' and t['status'] not in practice_ops.HIDDEN],
                          'jobs': [j for j in practice['jobs'] if j.get('purpose') != 'review']},
             'review': host.review.state(practice)}
 
@@ -104,7 +108,6 @@ PARTS = {
     'annotations': lambda host: host.operation({'op': 'annotations.list'}),
     'memory': lambda host: {'memory': host.operation({'op': 'memory.view'})['entries'],
                             'memory_requests': host.operation({'op': 'memory.requests'})['requests']},
-    'skipped': lambda host: {'skipped': host.practice.skipped()},
     'course_changes': lambda host: host.operation({'op': 'course_change.list'}),
     'builds': lambda host: {'builds': host.builds.state()},
 }

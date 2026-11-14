@@ -2,6 +2,7 @@
   import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { spotlight, shown } from '../lib/spotlight';
+  import { lightDismiss } from '../lib/dialog';
 
   // Help is a map of what the learner can do, by level (ADR 0017): the app, the course, the section being read.
   // "Show me" closes Help and rings the real control where it sits, so the map teaches where things live.
@@ -30,6 +31,7 @@
               { title: 'Overview', text: 'The course as a whole: Studio, what the teacher remembers, sources and your notes. Overview, Learn and Review are the course\'s three places.', target: '#open-course', key: 'm' },
               { title: 'Studio', text: 'Codex itself, working on your course. If you can describe a change, it can probably make it: new sections or exercises, added files, a different way of teaching.', key: 'd', open: () => app.showStudio({ focus: true }) },
               { title: 'Review', text: 'Questions to answer from memory on what you have studied, whenever you ask for them.', target: '#open-review' },
+              { title: 'Search', text: 'Find any section, lesson passage, question, exercise, note or source page in this course.', target: '#open-search', key: 'Shift Shift' },
             ] as Item[],
           },
           {
@@ -46,6 +48,7 @@
   ]);
 
   const keys: [string, MessageKey][] = [
+    ['Shift Shift', 'Search this course'],
     ['c', 'Continue the lesson'],
     ['/', 'Ask a side question'],
     ['[', 'Previous section'],
@@ -74,7 +77,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} onclose={() => (app.helpOpen = false)} aria-labelledby="help-title">
+<dialog bind:this={dialog} use:lightDismiss onclose={() => (app.helpOpen = false)} aria-labelledby="help-title">
   <header>
     <h2 id="help-title">{t('Help')}</h2>
     <p class="lead">{t('What you can do, from the whole app down to the section you are reading.')}</p>
@@ -208,7 +211,7 @@
 
   dl div {
     display: grid;
-    grid-template-columns: 3rem 1fr;
+    grid-template-columns: 6rem 1fr;
     align-items: center;
     font-size: var(--step--1);
   }

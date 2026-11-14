@@ -26,9 +26,9 @@
 
   // Opening the panel moves focus into it, unless something there already took it (such as the question box);
   // closing it returns focus to the top-bar toggle when focus was inside, so keyboard users are not dropped on the page.
-  let wasOpen = app.panelOpen;
+  let wasOpen = app.panelShown;
   $effect.pre(() => {
-    const open = app.panelOpen;
+    const open = app.panelShown;
     if (open === wasOpen) return;
     wasOpen = open;
     const tab = app.panelTab;
@@ -67,7 +67,7 @@
   }
 </script>
 
-<aside id="auxiliary" class="panel" aria-label={labels[app.panelTab]()} hidden={!app.panelOpen} tabindex="-1" bind:this={panel}>
+<aside id="auxiliary" class="panel" aria-label={labels[app.panelTab]()} hidden={!app.panelShown} tabindex="-1" bind:this={panel}>
   <!-- A focusable window splitter is interactive per WAI-ARIA, which this lint rule does not model. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div
@@ -92,8 +92,9 @@
 </aside>
 
 <style>
+  /* Docked, the panel slides in from the window's edge and makes room as it comes, and slides back out the same way;
+     as an overlay it slides over the page. Hidden, it stays on screen until it has left. */
   .panel {
-    animation: enter-slide var(--settle) var(--ease-out);
     position: relative;
     display: flex;
     flex: none;
@@ -101,16 +102,20 @@
     width: var(--panel);
     border-left: 1px solid var(--rule);
     background: var(--sheet);
+    transition:
+      margin-right var(--move) var(--ease-in-out),
+      translate var(--move) var(--ease-in-out),
+      display var(--move) allow-discrete;
   }
 
-  /* Closing slides the panel back out the way it came, and the reading column takes the room once it has gone. */
   .panel[hidden] {
-    opacity: 0;
-    translate: 1.25rem 0;
-    transition:
-      opacity var(--quick) ease,
-      translate var(--quick) ease,
-      display var(--quick) allow-discrete;
+    margin-right: calc(-1 * var(--panel));
+  }
+
+  @starting-style {
+    .panel {
+      margin-right: calc(-1 * var(--panel));
+    }
   }
 
   .panel:focus {
@@ -207,6 +212,18 @@
       width: min(var(--panel), 100vw);
       height: auto;
       box-shadow: var(--shadow);
+    }
+
+    .panel[hidden] {
+      margin-right: 0;
+      translate: 102% 0;
+    }
+
+    @starting-style {
+      .panel {
+        margin-right: 0;
+        translate: 102% 0;
+      }
     }
   }
 

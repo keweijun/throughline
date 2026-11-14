@@ -46,7 +46,7 @@
 
   --radius: 6px;
   --topbar: 3.5rem;
-  --rail: 15.5rem;
+  --rail: 18rem;
   --rail-folded: 3.5rem;
   --panel: 25rem;
   --measure: 40rem;
@@ -135,6 +135,11 @@ a {
 
 ::highlight(mine) {
   background-color: var(--mine-wash);
+}
+
+/* The passage a search opened, marked for a moment. */
+::highlight(found) {
+  background-color: var(--marker-wash);
 }
 
 /* A formula inside a highlighted or asked passage is painted whole: KaTeX's glyph boxes would leave gaps. */
@@ -365,7 +370,7 @@ summary::before,
   border-right: 1.6px solid currentColor;
   border-bottom: 1.6px solid currentColor;
   transform: rotate(-45deg);
-  transition: transform var(--quick) var(--ease-out);
+  transition: transform 0.15s ease;
   vertical-align: middle;
 }
 
@@ -522,7 +527,7 @@ summary:focus-visible {
   background: var(--accent);
 }
 
-.route-dot.skipped {
+.route-dot.unstudied {
   border-color: var(--caution);
   background: var(--marker-ground, var(--sheet));
 }
@@ -842,6 +847,33 @@ summary:focus-visible {
   margin-bottom: 0.4em;
 }
 
+/* Source figures: a crop of the page as printed, so it keeps the page's own white in both schemes. */
+.prose .widget-figure {
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+.prose .widget-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 34rem;
+  margin-inline: auto;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.prose .widget-figure figcaption {
+  margin-top: 0.5em;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.prose .widget-figure .figure-page {
+  color: var(--pencil);
+}
+
 /* Highlighted code: token colors from the theme, readable in both schemes. */
 .prose .hljs-keyword,
 .prose .hljs-selector-tag,
@@ -913,6 +945,28 @@ summary:focus-visible {
   border-style: dashed;
 }
 
+/* A file Codex links to in Studio, which opens like a link; Studio's handler adds a note when it opened elsewhere. */
+button.file-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+button.file-link:hover {
+  text-decoration: underline;
+}
+
+.file-note {
+  margin-left: 0.4em;
+  color: var(--pencil);
+  font-family: var(--sans);
+  font-size: 0.8em;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -924,14 +978,22 @@ summary:focus-visible {
 }
 
 /*
- * Motion: short and purposeful. Controls ease between states; things that appear arrive from where they come
- * from. Keyframes animate `translate` and `scale`, never `transform`, so they never undo an element's positioning.
- * Reduced motion turns all of it off (above).
+ * Motion: short and purposeful, from one set of tokens.
+ * - Things that appear arrive from where they come from (`--settle`, `--ease-out`) with one of the enter-* keyframes,
+ *   and leave the way they came, a little faster (`--leave`, `--ease-in`): a popup does not outstay the click.
+ * - Surfaces that move the layout, the side panel and the route, glide between places (`--move`, `--ease-in-out`).
+ * - Controls ease between states (`--quick`).
+ * Keyframes animate `translate` and `scale`, never `transform`, so they never undo an element's positioning. Svelte
+ * transitions for blocks that come and go use the same tokens (lib/motion.ts). Reduced motion turns all of it off (above).
  */
 :root {
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.5, 0, 0.75, 0.2);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.2, 1);
   --quick: 0.14s;
   --settle: 0.22s;
+  --leave: 0.15s;
+  --move: 0.28s;
 }
 
 button,
@@ -990,11 +1052,49 @@ textarea {
   }
 }
 
-/* What a disclosure reveals settles into place under its summary. */
+/* A page arrives the same way whichever page it is: a section, a chapter, review. The course page holds Studio's
+   writing box, which takes the caret as the page opens, so it fades in rather than moving under the learner. */
+#main > .page {
+  animation: enter-rise var(--settle) var(--ease-out);
+}
+
+#main > .page.still {
+  animation-name: enter-fade;
+}
+
+/* What a disclosure reveals settles into place under its summary. Where the browser can animate a disclosure's
+   height, opening grows it and closing folds it away; its content is clipped only while it folds, so a focus ring or a
+   menu inside an open one is never cut off. */
 details[open] > :not(summary) {
   animation: enter-rise var(--settle) var(--ease-out);
 }
 
+@supports selector(::details-content) and (interpolate-size: allow-keywords) {
+  details {
+    interpolate-size: allow-keywords;
+  }
+
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size var(--leave) var(--ease-in),
+      content-visibility var(--leave) allow-discrete,
+      overflow 0s;
+  }
+
+  details[open]::details-content {
+    block-size: auto;
+    overflow: visible;
+    transition:
+      block-size var(--settle) var(--ease-out),
+      content-visibility var(--settle) allow-discrete,
+      overflow 0s var(--settle) allow-discrete;
+  }
+}
+
+/* Modals pop in over a fading backdrop. Where the browser can keep a closing dialog in the top layer (`overlay`), it
+   settles back out the same way; elsewhere it closes at once. The error toast, a popover, does the same. */
 dialog[open] {
   animation: enter-pop var(--settle) var(--ease-out);
 }
@@ -1003,35 +1103,32 @@ dialog[open]::backdrop {
   animation: enter-fade var(--settle) ease;
 }
 
-/* Closing settles back the way the dialog came, a little faster; the dialog stays in the top layer until it has. */
-dialog {
-  opacity: 0;
-  scale: 0.97;
-  translate: 0 4px;
-  transition:
-    opacity var(--quick) ease,
-    scale var(--quick) ease,
-    translate var(--quick) ease,
-    overlay var(--quick) allow-discrete,
-    display var(--quick) allow-discrete;
-}
+@supports (overlay: auto) {
+  dialog,
+  dialog::backdrop,
+  [popover] {
+    transition:
+      opacity var(--leave) var(--ease-in),
+      scale var(--leave) var(--ease-in),
+      translate var(--leave) var(--ease-in),
+      display var(--leave) allow-discrete,
+      overlay var(--leave) allow-discrete;
+  }
 
-dialog[open] {
-  opacity: 1;
-  scale: 1;
-  translate: 0;
-}
+  dialog:not([open]) {
+    opacity: 0;
+    scale: 0.97;
+    translate: 0 4px;
+  }
 
-dialog::backdrop {
-  opacity: 0;
-  transition:
-    opacity var(--quick) ease,
-    overlay var(--quick) allow-discrete,
-    display var(--quick) allow-discrete;
-}
+  dialog:not([open])::backdrop {
+    opacity: 0;
+  }
 
-dialog[open]::backdrop {
-  opacity: 1;
+  [popover]:not(:popover-open) {
+    opacity: 0;
+    translate: 0 -6px;
+  }
 }
 
 /* Thin scrollbars that take the theme's colours instead of the platform default. */

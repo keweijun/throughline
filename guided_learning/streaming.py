@@ -18,11 +18,59 @@ PREPARED_STEP = 'prepared_step'
 # A `memory` turn answers what the learner asked to be remembered; their message is recorded by memory.request.
 BACKGROUND = ('preparation', 'build', 'consolidation', 'memory')  # channels whose turns are not teaching interactions
 SMALL_MODEL = ('preparation', 'consolidation', 'memory')  # channels the small model serves
+# What a prompt carries of a prerequisite section: enough to bridge or refer back to it. Its pages, exercises and any
+# build notes Codex stored with it would be most of a prompt (issue #175).
+PREREQUISITE_FIELDS = ('id', 'title', 'core_question', 'objective', 'goal', 'overview')
+
+
+def recent_for_prompt(item):
+    """A recent interaction as the teacher reads it: the source and unit are enough to cite, the revision hash is not."""
+    slim = {k: v for k, v in item.items() if k != 'supplied_source_refs'}
+    slim['source_refs'] = [{k: ref[k] for k in ('source_id', 'unit_id') if k in ref} for ref in item.get('source_refs', [])]
+    return slim
 CHANNELS = LEARNER_CHANNELS + (PREPARED_STEP,) + BACKGROUND
+
+# A turn's frozen prompt snapshots, its own and each earlier attempt's, are kept apart from the turn: they are nearly all
+# of its size, and only prompts and completion hooks read them, while listings and streamed text read the turn often.
+SNAPSHOTS = 'stream_snapshots'
+
+
+def save(store, turn):
+    """Store a turn. A turn read with its snapshots (`load`) stores them too; one read without leaves them as they are."""
+    attempts = turn.get('attempts', [])
+    slim = {k: v for k, v in turn.items() if k != 'prompt_snapshot'}
+    if 'attempts' in turn:
+        slim['attempts'] = [{k: v for k, v in a.items() if k != 'prompt_snapshot'} for a in attempts]
+    if 'prompt_snapshot' in turn or any('prompt_snapshot' in a for a in attempts):
+        cold = {'id': turn['id'], 'attempts': [a.get('prompt_snapshot') for a in attempts]}
+        if 'prompt_snapshot' in turn:
+            cold['prompt_snapshot'] = turn['prompt_snapshot']
+        store.put(SNAPSHOTS, turn['id'], cold)
+    store.put('streams', turn['id'], slim)
+
+
+def _with_snapshots(turn, cold):
+    if cold:
+        if 'prompt_snapshot' in cold:
+            turn['prompt_snapshot'] = cold['prompt_snapshot']
+        for attempt, snapshot in zip(turn.get('attempts', []), cold['attempts']):
+            attempt['prompt_snapshot'] = snapshot
+    return turn
+
+
+def load(store, identifier):
+    """A turn with its prompt snapshots, or None."""
+    turn = store.get('streams', identifier)
+    return turn and _with_snapshots(turn, store.get(SNAPSHOTS, identifier))
+
+
+def title(turn):
+    """The title of the section a turn teaches, as its snapshot froze it."""
+    return (((turn.get('prompt_snapshot') or {}).get('context') or {}).get('concept') or {}).get('title')
 
 
 def read(store, request):
-    turn = store.get('streams', require_text(request, 'id'))
+    turn = load(store, require_text(request, 'id'))
     if turn is None:
         raise OperationError('unknown_turn', request['id'])
     return {'turn': turn}
@@ -45,7 +93,7 @@ def start(store, request):
         if not chapter or chapter['concept_ids'][-1:] != [concept]:
             raise OperationError('invalid_request','A chapter turn is anchored to the last section of its chapter')
         identity['chapter_id'] = chapter['id']
-    old = store.get('streams', identifier)
+    old = load(store, identifier)
     # Omitted language on a retry means the original request, not today's preference.
     identity['language'] = validate_language(request.get('language', old.get('language','en') if old else preferences(store,{})['preferences']['language']))
     if old:
@@ -63,9 +111,13 @@ def start(store, request):
     model = curriculum.model(store)
     concepts = {c['id']:c for c in model['concepts']}
     route = deepcopy([{k:concepts[cid][k] for k in ('id','title','prerequisites') if k in concepts[cid]} for cid in model['route'] if cid in concepts])
+    context['prerequisites'] = [{k: c[k] for k in PREREQUISITE_FIELDS if k in c} for c in context['prerequisites']]
     session = session_resume(store,{})
     session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
     session.pop('context', None)  # the learner's section again, sources and all; context.position already says where they are
+    session['recent_interactions'] = [recent_for_prompt(i) for i in session['recent_interactions']]
+    # A chat-era side question the learner moved on from is not waiting for an answer.
+    session['unanswered_questions'] = [q for q in session['unanswered_questions'] if q.get('status') == 'open']
     snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
     if model['chapters']: snapshot['chapters'] = deepcopy([{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']])
     profile = store.get('course','profile')
@@ -89,16 +141,15 @@ def start(store, request):
             for tid in history_ids if tid and tid != identifier
             for prior in [store.get('streams', tid)] if prior and prior['status'] == 'completed'
         ]
-        selected=branch.get('selected_lecture')
-        if selected:
+        for selected in filter(None, (branch.get('selected_lecture'), branch.get('selected_exercise'))):
             for ref in selected.get('source_refs',[]):
                 if ref not in source_refs:
                     source_refs.append(ref)
                     # The passage may come from an earlier section, so give the teacher its sources too.
                     context['sources'].append({**ref, **curriculum.source_unit(store,ref), 'stale':curriculum.is_stale(store,ref)})
     turn = {**identity, 'source_refs':source_refs, 'prompt_snapshot':snapshot, 'attempt':1, 'status':'running', 'text':'', 'final_text':None, 'sequence':0,
-            'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[]}
-    store.put('streams', identifier, turn)
+            'started_at':time.time(), 'metrics':{}, 'attempts':[], 'resume_requests':[], 'title':context['concept'].get('title')}
+    save(store, turn)
     return {'turn':turn, 'created':True}
 
 
@@ -110,7 +161,7 @@ def reveal(store, turn):
     record_interaction(store, {'id':'stream-user:'+turn['id'], 'role':'user', 'text':turn['prompt'], 'concept_id':turn['concept_id']})
     if turn['status'] == 'completed':
         record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})
-    store.put('streams', turn['id'], turn)
+    save(store, turn)
     return turn
 
 
@@ -155,36 +206,49 @@ def _apply(store, turn, request):
     return True
 
 
+def _stored(store, request):
+    """A turn without its prompt snapshots, for the frequent writes that never read them."""
+    turn = store.get('streams', require_text(request, 'id'))
+    if turn is None:
+        raise OperationError('unknown_turn', request['id'])
+    return turn
+
+
 def event(store, request):
-    turn = read(store, request)['turn']
+    turn = _stored(store, request)
     if not _apply(store, turn, request):
         return {'turn':turn, 'ignored':True}
-    store.put('streams',turn['id'],turn)
+    save(store,turn)
     return {'turn':turn}
 
 
 def events(store, request):
     """Several events of one attempt, in order, written once: the host stores streamed text a few times a second."""
-    turn = read(store, request)['turn']
+    turn = _stored(store, request)
     batch = request.get('events')
     if not isinstance(batch, list) or not all(isinstance(e, dict) for e in batch):
         raise OperationError('invalid_request', 'events must be an array of event objects')
     applied = [_apply(store, turn, {**e, 'attempt': request.get('attempt')}) for e in batch]
     if not any(applied):
         return {'turn':turn, 'ignored':True}
-    store.put('streams',turn['id'],turn)
+    save(store,turn)
     return {'turn':turn}
 
 OPERATIONS = {'stream.start':start, 'stream.read':read, 'stream.event':event, 'stream.events':events,
-              'stream.list':lambda s,r:{'turns':sorted(s.list('streams'),key=lambda t:t['started_at'])}}
+              'stream.list':lambda s,r:{'turns':sorted(every(s),key=lambda t:t['started_at'])}}
+
+
+def every(store):
+    """Every turn with its prompt snapshots."""
+    cold = {c['id']: c for c in store.list(SNAPSHOTS)}
+    return [_with_snapshots(turn, cold.get(turn['id'])) for turn in store.list('streams')]
 
 
 def summarize(turn):
     """A turn without its frozen prompt snapshot, which the browser never needs."""
     summary = {k: v for k, v in turn.items() if k not in ('prompt_snapshot', 'resume_requests')}
     summary['attempts'] = [{'attempt': a.get('attempt'), 'text': a.get('text'), 'status': a.get('status')} for a in turn.get('attempts', [])]
-    concept = (turn.get('prompt_snapshot') or {}).get('context', {}).get('concept') or {}
-    summary['title'] = concept.get('title')
+    summary['title'] = turn.get('title')
     return summary
 
 
@@ -205,10 +269,10 @@ OPERATIONS['stream.summaries'] = summaries
 
 
 def pause(store, request):
-    turn = read(store,request)['turn']
+    turn = _stored(store,request)
     if turn['status'] == 'running':
         turn['status'] = 'paused'
-        store.put('streams',turn['id'],turn)
+        save(store,turn)
     return {'turn':turn}
 
 
@@ -226,16 +290,18 @@ def resume(store, request):
         turn['prompt_snapshot']={**turn['prompt_snapshot'],'language':language}
     turn.pop('error',None)
     turn['resume_requests'].append(request_id)
-    store.put('streams',turn['id'],turn)
+    save(store,turn)
     return {'turn':turn,'created':True}
 
 
 def recover(store, request):
-    for turn in store.list('streams'):
-        if turn['status'] == 'running':
-            turn['status'] = 'interrupted'
-            turn['error'] = 'Learning server stopped; regenerate to resume this lesson'
-            store.put('streams',turn['id'],turn)
-    return OPERATIONS['stream.list'](store,request)
+    """Mark turns left running by a stopped host as interrupted; returns their IDs."""
+    recovered = []
+    for turn in store.matching('streams', 'status', 'running'):
+        turn['status'] = 'interrupted'
+        turn['error'] = 'Learning server stopped; regenerate to resume this lesson'
+        save(store,turn)
+        recovered.append(turn['id'])
+    return {'recovered': recovered}
 
 OPERATIONS.update({'stream.pause':pause,'stream.resume':resume,'stream.recover':recover})

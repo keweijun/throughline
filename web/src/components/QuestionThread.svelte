@@ -1,7 +1,6 @@
 <script lang="ts">
     import { panelCoversLesson } from '../lib/media';
-  import { slide } from 'svelte/transition';
-  import { prefersReducedMotion } from 'svelte/motion';
+  import { fold } from '../lib/motion';
   import { highlights, annotationPassage } from '../lib/highlight';
   import { locale, t } from '../lib/i18n.svelte';
 
@@ -38,7 +37,7 @@
   }
 
   $effect(() => {
-    if (app.focusThread !== question.id || !node || !app.panelOpen) return;
+    if (app.focusThread !== question.id || !node || !app.panelShown) return;
     open = true;
     requestAnimationFrame(() => node!.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     flash = true;
@@ -144,7 +143,7 @@
   </div>
 
   {#if open}
-  <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: prefersReducedMotion.current ? 0 : 200 }}>
+  <div class="body" id="thread-body-{question.id}" transition:fold>
   <!-- Takes no room in the thread, so the answers never move when it appears. -->
   <div class="pin">
     {#if away}

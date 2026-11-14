@@ -6,7 +6,7 @@ from pathlib import Path
 
 from guided_learning.api import execute
 from guided_learning.server import Host
-from support import host_client
+from support import host_client, taught
 
 
 class BlockingRunner:
@@ -67,8 +67,10 @@ class SlimState(unittest.TestCase):
                 full = op(op='preparation.view', concept_id='b')
                 self.assertIn('snapshot', full['jobs'][0], 'the operation itself is unchanged')
                 brief = op(op='preparation.view', concept_id='b', brief=True)
-                self.assertEqual(brief, {**full, 'jobs': [{k: v for k, v in j.items() if k not in ('snapshot', 'content')} for j in full['jobs']],
-                                         'ready': {k: v for k, v in full['ready'].items() if k not in ('snapshot', 'content')}})
+                # A brief job keeps only its snapshot's teaching language, which background scheduling compares.
+                slim = lambda j: {k: v for k, v in j.items() if k not in ('snapshot', 'content', 'fingerprint')}
+                self.assertEqual(slim(full['jobs'][0])['language'], 'en')
+                self.assertEqual(brief, {**full, 'jobs': [slim(j) for j in full['jobs']], 'ready': slim(full['ready'])})
 
                 lesson = next(t for t in state['turns'] if t['id'] == 'lesson')
                 self.assertEqual(lesson['text'], 'Amplitudes add.')
@@ -82,7 +84,8 @@ class SlimState(unittest.TestCase):
                 self.assertEqual({'id', 'role', 'text', 'concept_id'}, set(state['session']['recent_interactions'][-1]))
                 self.assertNotIn('profile', state)
                 self.assertTrue({'course', 'position', 'sources', 'preferences', 'deferred_explanations', 'lessons', 'questions',
-                                 'practice', 'review', 'settings', 'annotations', 'memory', 'skipped', 'builds'} <= set(state))
+                                 'practice', 'review', 'settings', 'annotations', 'memory', 'builds'} <= set(state))
+                self.assertNotIn('skipped', state, 'sections passed over are worked out from lessons (ADR 0006)')
 
     def test_curriculum_version_follows_fields_the_projection_leaves_out(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -147,6 +150,7 @@ class SlimState(unittest.TestCase):
             execute(tmp, {'op': 'course.init', 'title': 'Quantum'})
             execute(tmp, {'op': 'curriculum.save', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}], 'route': ['a', 'b'], 'coverage': []})
             execute(tmp, {'op': 'mainline.enter', 'request_id': 'enter', 'concept_id': 'a', 'goal': 'A', 'next_step': 'Read'})
+            taught(tmp, 'a')
             host = Host(tmp, runner=Runner())
             seen = []
 

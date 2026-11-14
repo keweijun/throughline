@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { t } from '../lib/i18n.svelte';
+  import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
+  import { markdown, mathSpans } from '../lib/markdown';
+  import { pop } from '../lib/motion';
   import type { Ref, SourceView } from '../lib/types';
 
   let view = $state<SourceView | null>(null);
@@ -17,7 +19,13 @@
   const v = $derived(verification(view?.verification));
   const excerpt = $derived.by(() => {
     const text = (view?.text ?? '').replace(/\s+/g, ' ').trim();
-    return text.length > 320 ? text.slice(0, 320).replace(/\s\S*$/, '') + '…' : text;
+    if (text.length <= 320) return text;
+    // A limit inside a formula cuts before it instead, so its TeX is not left open and shown raw.
+    for (const { from, tex } of mathSpans(text)) {
+      const delimiter = text[from - 1] === '$' && text[from - 2] !== '$' ? 1 : 2;
+      if (from - delimiter < 320 && from + tex.length + delimiter > 320) return text.slice(0, from - delimiter).trimEnd() + '…';
+    }
+    return text.slice(0, 320).replace(/\s\S*$/, '') + '…';
   });
 
   function citation(target: EventTarget | null) {
@@ -70,6 +78,7 @@
   <div
     class="peek"
     class:above
+    transition:pop={{ from: above ? 'above' : 'below' }}
     style:left="{left}px"
     style:top="{top}px"
     role="tooltip"
@@ -84,7 +93,7 @@
         <span class="title">{view.title}</span>
         <span class="where">{view.locator?.page ? t('p. {page}', { page: view.locator.page }) : t('line {line}', { line: view.locator?.line ?? '' })}</span>
       </p>
-      {#if excerpt}<blockquote>{excerpt}</blockquote>{:else}<p class="muted">{t("No text was extracted at this location.")}</p>{/if}
+      {#if excerpt}<blockquote class="prose" use:markdown={{ language: locale.language, text: excerpt }}></blockquote>{:else}<p class="muted">{t("No text was extracted at this location.")}</p>{/if}
       <p class="foot">
         <span class="chip chip-{v.tone}">{t(v.label)}</span>
         <span class="muted">{t("Click to open in the reader")}</span>
@@ -106,12 +115,10 @@
     background: var(--raised);
     box-shadow: var(--shadow);
     font-size: var(--step--1);
-    animation: enter-rise var(--quick) var(--ease-out);
   }
 
   .peek.above {
     transform: translateY(-100%);
-    animation-name: enter-drop;
   }
 
   .head {

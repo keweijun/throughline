@@ -5,6 +5,7 @@
   import { exportNotes } from '../lib/notes';
   import CodexLink from './CodexLink.svelte';
   import TeachingPreferences from './TeachingPreferences.svelte';
+  import StudioChats from './StudioChats.svelte';
   import SourceList from './SourceList.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
@@ -88,7 +89,7 @@
   }
 </script>
 
-<article class="page" aria-labelledby="course-title">
+<article class="page still" aria-labelledby="course-title">
   <header class="head">
     <h1 id="course-title">{app.state?.course.title}</h1>
     {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}
@@ -181,7 +182,11 @@
       </div>
     {/if}
     </div>
-    <TeachingPreferences />
+    <!-- Beside Studio: its chats, as Codex lists threads beside a chat, then how the learner is taught. -->
+    <div class="studio-aside">
+      {#if studio.available}<StudioChats />{/if}
+      <TeachingPreferences />
+    </div>
     </div>
   </div>
 
@@ -203,9 +208,7 @@
 </article>
 
 <style>
-  /* Fades rather than rises: `d` puts the caret in Studio's box at once, and the box never moves under the learner. */
   .page {
-    animation: enter-fade var(--settle) ease;
     max-width: calc(var(--measure) + 20rem);
     margin-inline: auto;
     display: grid;
@@ -379,6 +382,26 @@
     }
   }
 
+  .studio-aside {
+    display: grid;
+    gap: 1.5rem;
+    align-content: start;
+    min-width: 0;
+  }
+
+  /* Where the aside drops below Studio, the chats are Studio's own pinned bar instead; beside it, the bar steps aside. */
+  @media (max-width: 71.99rem) {
+    .studio-aside :global(.chats) {
+      display: none;
+    }
+  }
+
+  @media (min-width: 72rem) {
+    #course-studio :global(.studio > .panel-head) {
+      display: none;
+    }
+  }
+
   .studio-main {
     display: grid;
     gap: 0.75rem;
@@ -415,6 +438,8 @@
   .studio-frame {
     height: calc(max(24rem, 100vh - var(--topbar) - 22rem) + var(--grown, 0px));
     max-height: none;
+    /* Scrolling past the transcript's ends never carries on into the page, which would move the frame away. */
+    overscroll-behavior: contain;
   }
 
   .actions {

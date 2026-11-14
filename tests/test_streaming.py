@@ -13,6 +13,51 @@ class StreamingCourse(unittest.TestCase):
     def call(self, op, **kwargs):
         return execute(self.workspace, {'op':op, **kwargs})
 
+    def test_streamed_text_is_stored_without_rewriting_the_frozen_snapshot(self):
+        import sqlite3
+        from pathlib import Path
+
+        def stored(namespace):
+            db = sqlite3.connect(Path(self.workspace) / 'course.sqlite3')
+            try:
+                return db.execute('SELECT value FROM documents WHERE namespace=? AND key=?', (namespace, 'lecture')).fetchone()[0]
+            finally:
+                db.close()
+        started = self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')['turn']
+        self.assertEqual(started['title'], 'States')
+        snapshot = stored('stream_snapshots')
+        self.assertNotIn('prompt_snapshot', stored('streams'))
+        self.call('stream.events', id='lecture', attempt=1, events=[{'sequence': 1, 'kind': 'delta', 'text': 'part'}])
+        self.call('stream.pause', id='lecture')
+        self.assertEqual(stored('stream_snapshots'), snapshot, 'streamed text and pausing leave the snapshot alone')
+        resumed = self.call('stream.resume', id='lecture', request_id='again', language='zh-CN')['turn']
+        self.assertEqual(resumed['attempts'][0]['prompt_snapshot'], started['prompt_snapshot'])
+        self.assertEqual(self.call('stream.read', id='lecture')['turn'], resumed)
+        self.assertEqual(resumed['prompt_snapshot'], {**started['prompt_snapshot'], 'language': 'zh-CN'})
+
+    def test_the_prompt_snapshot_leaves_out_what_the_teacher_does_not_read(self):
+        from pathlib import Path
+        path = Path(self.workspace) / 'lecture.md'
+        path.write_text('States\nProjection', encoding='utf-8')
+        source = self.call('source.register', path=str(path))['source']
+        ref = {'source_id': source['id'], 'revision': source['revision'], 'unit_id': 'line-1'}
+        state = {'id': 'state', 'title': 'States', 'objective': 'Normalize a state', 'links': [{**ref, 'detail': 'Definition'}],
+                 'exercises': [{'question': '1', **ref, 'required_concepts': ['state']}], 'coverage_checklist': ['a long build note']}
+        self.call('curriculum.save', concepts=[state, {'id': 'projection', 'title': 'Projection', 'prerequisites': ['state']}],
+                  route=['state', 'projection'], coverage=[{**ref, 'disposition': 'mapped', 'concept_ids': ['state']}])
+        self.call('mainline.enter', request_id='enter', concept_id='projection', goal='Project', next_step='Teach')
+        self.call('interaction.record', id='q', role='user', text='What is psi?', concept_id='projection', source_refs=[ref])
+        self.call('sidequestion.open', id='moved-on', interaction_id='q', category='local', depth='short', rationale='r', strategy='definition')
+        self.call('sidequestion.continue', id='moved-on')
+        self.assertEqual([q['id'] for q in self.call('session.resume')['unanswered_questions']], ['moved-on'], 'session.resume is unchanged')
+
+        snapshot = self.call('stream.start', id='lesson', concept_id='projection', prompt='Teach')['turn']['prompt_snapshot']
+        self.assertEqual(snapshot['context']['prerequisites'], [{'id': 'state', 'title': 'States', 'objective': 'Normalize a state'}])
+        question = next(i for i in snapshot['session']['recent_interactions'] if i['id'] == 'q')
+        self.assertNotIn('supplied_source_refs', question)
+        self.assertEqual(question['source_refs'], [{'source_id': source['id'], 'unit_id': 'line-1'}])
+        self.assertEqual(snapshot['session']['unanswered_questions'], [])
+
     def test_only_authoritative_completed_turn_becomes_one_interaction(self):
         turn = self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')['turn']
         self.call('stream.event', id='lecture', attempt=1, sequence=1, kind='delta', text='partial')
@@ -47,7 +92,8 @@ class StreamingCourse(unittest.TestCase):
         self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')
         with self.assertRaises(OperationError):
             self.call('stream.event', id='lecture', attempt=1, sequence=2, kind='delta', text='gap')
-        self.call('stream.recover')
+        self.assertEqual(self.call('stream.recover'), {'recovered': ['lecture']})
+        self.assertEqual(self.call('stream.recover'), {'recovered': []})
         self.assertEqual(self.call('stream.read',id='lecture')['turn']['status'],'interrupted')
         self.assertEqual([i for i in self.call('session.resume')['recent_interactions'] if i['role']=='assistant'],[])
 

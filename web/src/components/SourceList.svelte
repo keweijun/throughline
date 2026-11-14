@@ -12,6 +12,9 @@
     kind: string;
     original?: string;
     status: string;
+    /** For a PDF: pages Codex has not read as images yet, and read pages whose readings list problems (ADR 0019). */
+    unread: number | null;
+    problems: number;
     sections: string[];
     target: Ref | null;
     notes: number;
@@ -39,6 +42,8 @@
         kind,
         original,
         status: source.status,
+        unread: source.pages === undefined ? null : source.pages - (source.pages_read ?? 0),
+        problems: source.problem_pages ?? 0,
         sections,
         target: source.revision ? { source_id: source.id, revision: source.revision, unit_id: unit } : null,
         notes: (app.state?.annotations ?? []).filter((a) => a.source?.source_id === source.id).length,
@@ -79,7 +84,16 @@
                 <span class="kind">{entry.kind}</span>
                 {#if entry.original}<span>{t("From {name}", { name: entry.original })}</span>{/if}
                 {#if entry.status === 'failed'}<span class="chip chip-danger">{t("Could not be read")}</span>
-                {:else if entry.status === 'needs_review'}<span class="chip chip-caution">{t("Some pages not checked yet")}</span>{/if}
+                {:else if entry.unread}
+                  <span class="chip chip-caution" title={t("Codex reads every page before teaching from it. Ask it in Studio to read the rest.")}>
+                    {entry.unread === 1 ? t("1 page not read yet") : t("{count} pages not read yet", { count: entry.unread })}
+                  </span>
+                {:else if entry.unread === null && entry.status === 'needs_review'}<span class="chip chip-caution">{t("Some pages not checked yet")}</span>{/if}
+                {#if entry.problems}
+                  <span class="chip chip-caution" title={t("Codex could not read part of these pages; the teacher checks them against the page.")}>
+                    {entry.problems === 1 ? t("1 page partly unreadable") : t("{count} pages partly unreadable", { count: entry.problems })}
+                  </span>
+                {/if}
                 {#if entry.sections.length}
                   <span>{entry.sections.length === 1 ? app.concept(entry.sections[0])?.title : t("{count} sections", { count: entry.sections.length })}</span>
                 {:else}

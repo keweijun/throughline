@@ -34,6 +34,7 @@
     imagesAlone = false,
     preview = true,
     tools,
+    actions,
     rows = 2,
     compact = false,
     completions,
@@ -71,6 +72,8 @@
     preview?: boolean;
     /** Switches for how the text is sent, such as pausing the lesson, at the start of the bottom row. */
     tools?: Snippet;
+    /** Buttons beside the send button at the end of the bottom row, such as Stop. */
+    actions?: Snippet;
     rows?: number;
     /** Empty and unfocused, the box rests as one line, its header and tools out of the way of what is listed above it. */
     compact?: boolean;
@@ -284,6 +287,7 @@
     {/if}
     {@render tools?.()}
     <span class="keys" id={hintId}>{t("{keys} to send", { keys: sendKeys })}</span>
+    {@render actions?.()}
     <button class="btn btn-small btn-primary send" type="submit" disabled={!ready}>{submitLabel}</button>
   </div>
 </form>

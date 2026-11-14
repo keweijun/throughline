@@ -3,6 +3,7 @@
   import { app, type PanelTab } from '../lib/store.svelte';
   import { studio } from '../lib/studio.svelte';
   import type { LibraryCourse } from '../lib/types';
+  import { pop } from '../lib/motion';
 
   const studying = $derived(!!app.state && !app.libraryOpen);
   // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
@@ -57,7 +58,7 @@
   const review = $derived(app.state?.review);
 
   // The side panel's views are switched only from here: picking another view swaps it, picking the open one closes the panel.
-  const showing = (tab: PanelTab) => studying && app.panelOpen && app.panelTab === tab;
+  const showing = (tab: PanelTab) => studying && app.panelShown && app.panelTab === tab;
   function toggle(tab: PanelTab) {
     if (showing(tab)) app.panelOpen = false;
     else app.openPanel(tab);
@@ -99,7 +100,7 @@
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         {#if menuOpen}
-          <ul class="course-menu" role="menu" aria-label={t("Switch course")}>
+          <ul class="course-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t("Switch course")}>
             {#each others as course (course.path)}
               <li role="none">
                 <button role="menuitem" class:active={course.path === app.library?.active} onclick={() => switchTo(course)}>
@@ -156,7 +157,7 @@
       </span>
     {/if}
     {#if studying}
-      <div class="switcher" class:open={app.panelOpen} role="group" aria-label={t("Questions and sources")}>
+      <div class="switcher" class:open={app.panelShown} role="group" aria-label={t("Questions and sources")}>
       <button id="toggle-questions" class="btn btn-quiet" aria-label={t("Questions")} aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4.5h12v8.5H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Questions")}</span>{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
       </button>
@@ -207,6 +208,11 @@
       >
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Update available")}</span>
+      </button>
+    {/if}
+    {#if studying}
+      <button id="open-search" class="btn btn-quiet icon" onclick={() => (app.searchOpen = true)} aria-label={t("Search this course")} title={t("Search this course (Shift Shift)")}>
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="m12.8 12.8 4.4 4.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
       </button>
     {/if}
     <button id="open-settings" class="btn btn-quiet icon" onclick={() => (app.settingsOpen = true)} aria-label={t("Settings")} title={t("Settings: teacher, appearance and about")}>
@@ -317,7 +323,6 @@
   }
 
   .course-menu {
-    animation: enter-drop var(--quick) var(--ease-out);
     position: absolute;
     top: calc(100% + 0.35rem);
     left: 0;

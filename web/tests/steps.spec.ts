@@ -119,3 +119,40 @@ test('Continue shows the next step at once: it was written while the learner rea
   await expect(page.locator('#practice article').first(), 'the revealed last step leads to grouped practice').toContainText('Find');
   expect(errors).toEqual([]);
 });
+
+test('a lesson left with steps to go is read-only from elsewhere and goes on once the learner is back in its section', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const first = page.getByRole('region', { name: 'Step 1 of 4' });
+  await expect(first.getByRole('group', { name: 'Next step' })).toBeVisible();
+
+  const rail = page.locator('#route');
+  await rail.getByRole('button', { name: /Quantum states/ }).click();
+  const moved = page.waitForResponse('**/api/sections/enter');
+  await page.getByRole('button', { name: 'Study this, then come back to Wave superposition' }).click();
+  await moved;
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+
+  await rail.getByRole('button', { name: /Wave superposition/ }).click();
+  await expect(page.getByText("You're previewing this section")).toBeVisible();
+  await expect(first).toContainText('Each path carries a complex amplitude.');
+  await expect(first.getByRole('button', { name: 'Continue' }), 'Continue goes on only in the current section').toHaveCount(0);
+  await page.getByRole('button', { name: 'Return to this section' }).click();
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+  await first.getByRole('group', { name: 'Next step' }).getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('region', { name: 'Step 2 of 4' })).toContainText('A step that is still being written');
+  expect(errors).toEqual([]);
+});
+
+test('an earlier section can be studied again, and its earlier lesson stays', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.locator('#route').getByRole('button', { name: /Classical waves/ }).click();
+  await expect(page.getByText('A long lesson saved as one reply.')).toBeVisible();
+  await page.getByRole('button', { name: 'Study this, then come back to Wave superposition' }).click();
+  await expect(page.getByText("You're previewing this section")).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Classical waves');
+  await expect(page.getByText('A long lesson saved as one reply.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Go back' })).toContainText('Wave superposition');
+  expect(errors).toEqual([]);
+});

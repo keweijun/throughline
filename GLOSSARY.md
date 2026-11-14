@@ -47,10 +47,13 @@ _Avoid_: Step (a lesson step), a separate exercise.
 _Avoid_: Paraphrase, ritual restatement, a separate kind of record.
 
 **Skipped exercise**: An exercise the learner closed as too easy, too tedious or not relevant; it records no outcome and is never reminded.
-_Avoid_: Deferred item ("Do later" stays in scope and enters the review context), replaced exercise, failed, skipped section.
+_Avoid_: Deferred item ("Do later" stays in scope and enters the review context), replaced exercise, failed, a section not studied.
 
 **Replaced exercise**: An exercise the teacher wrote that the learner had not touched, replaced when they asked for different exercises; it is kept for the record but no longer shown. The course's own exercises are never replaced.
 _Avoid_: Skipped exercise, deleted, regenerated homework.
+
+**Retired exercise**: An exercise the learner never touched that Codex took out of its section, such as a duplicate; it is kept for the record but no longer shown, counted or asked again (ADR 0011).
+_Avoid_: Skipped exercise (the learner closed it), replaced exercise, deleted.
 
 **Chapter**: A table-of-contents grouping of consecutive learning sections, built and revised one at a time; it is never taught as one block. A chapter with no sections is not built yet (ADR 0006).
 _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number of chapters.
@@ -79,17 +82,32 @@ _Avoid_: Pre-test, gate, the chapter overview.
 **Retrieval question**: A review question answered from memory, without new material or hints in the question: a recall question (multiple choice or a short answer, with instant feedback, not evidence) or an apply question (a written answer to a new situation, assessed by part like an exercise).
 _Avoid_: Flashcard, a repeat of an exercise already seen (a chapter quiz asks earlier exercises again as such, not as new questions).
 
-**Skipped section**: A section deferred when the learner skipped the rest of its chapter or jumped past it to a later section; it stays on the route until a lesson there is studied.
-_Avoid_: Excluded, completed, mastered.
+**Not studied**: A section before the learner's position, or before the section they return to, that has no lesson; worked out from lessons, never stored, and studiable at any time (ADR 0006).
+_Avoid_: Skipped section (retired: passed-over sections are no longer marked), excluded, deferred item.
+
+**Return section**: The section the learner comes back to after choosing to study another section out of route order, kept with the position as `return_to` until they go back to it or move past it (ADR 0006).
+_Avoid_: Mainline restore point (where a side question returns to), bookmark, skipped section.
 
 **Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
 _Avoid_: Course manager, a second store of progress, Studio (where courses are changed).
+
+**Course package**: One file holding a copy of a course at a share level, with its sources, to give to someone else or to move or back up one's own. Importing it makes a new course; nothing syncs back (ADR 0020).
+_Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never read back).
+
+**Share level**: How much of a course a package holds: Route (the route and sources), Route and lessons (adds lessons and exercises without the sender's answers) or Everything. The recipient takes at most that much when importing.
+_Avoid_: Privacy setting, export format.
 
 **Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
 _Avoid_: Chat, workshop, side question, teaching.
 
 **Suggested course change**: A change to the course itself that the teacher proposes under a lesson reply or side-question answer, which the learner opens in Studio with the request filled in or dismisses. One is open at a time (ADR 0016).
 _Avoid_: Suggested preference (course memory), a Studio hand-off button, supplement (taught in the side question itself).
+
+**Page reading**: Codex's transcription of one PDF page read as an image: its text with formulas and tables, its figures and what could not be read. A page with a reading is verified (ADR 0019).
+_Avoid_: Extracted text (what pypdf returns), OCR, coverage (whether the page is taught).
+
+**Figure**: A region of a source page that a lesson can show, recorded in the page reading by its box on the page, label, caption and description; the interface crops it from the page (ADR 0019).
+_Avoid_: An extracted image file, an image from the web, a drawing the teacher writes (a teaching widget).
 
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.

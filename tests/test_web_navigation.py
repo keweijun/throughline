@@ -65,6 +65,10 @@ class Navigation(unittest.TestCase):
         response=self.client.get(view['pdf_url'].split('#')[0])
         self.assertEqual(response.headers['content-type'],'application/pdf')
         self.assertEqual(response.content,original)
+        # Ranges let the reader open a PDF too large to download whole.
+        response=self.client.get(view['pdf_url'].split('#')[0],headers={'Range':'bytes=5-14'})
+        self.assertEqual((response.status_code,response.content),(206,original[5:15]))
+        self.assertEqual(view['pages'],1)
         self.assertIsNotNone(view['image_url'])
         response=self.client.get(view['image_url'])
         self.assertEqual(response.headers['content-type'],'image/png')
@@ -92,7 +96,7 @@ class Navigation(unittest.TestCase):
         with path.open('wb') as file:writer.write(file)
         source=execute(self.root,{'op':'source.register','path':str(path)})['source']
         ref={'source_id':source['id'],'revision':source['revision'],'unit_id':'page-1'}
-        with patch('guided_learning.server.features.importlib.util.find_spec',return_value=None):
+        with patch('guided_learning.pages.importlib.util.find_spec',return_value=None):
             view=self.get(source_path(ref))
             self.assertIsNone(view['image_url']);self.assertIn('unavailable',view['render_message'])
             self.assertEqual(self.client.get(view['pdf_url'].split('#')[0]).content,path.read_bytes())

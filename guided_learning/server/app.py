@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from .. import checks as codex_checks, images as attached, library, updates
+from .. import checks as codex_checks, files, images as attached, library, updates
 from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
@@ -59,6 +59,7 @@ class QuestionRequest(Body):
     question: str
     selection: Optional[str] = None
     selected_turn_id: Optional[str] = None
+    selected_task_id: Optional[str] = None
     main_turn_id: Optional[str] = None
     anchor: Optional[dict] = None
     pause: bool = False
@@ -129,6 +130,7 @@ class NextSectionRequest(Body):
 class EnterSectionRequest(Body):
     concept_id: str
     request_id: str
+    then_return: bool = False
 
 
 class SkipChapterRequest(Body):
@@ -217,8 +219,18 @@ class StudioAccess(Body):
     full_access: bool
 
 
+class StudioChoice(Body):
+    model: str = ''
+    effort: str = ''
+
+
 class StudioRefile(Body):
     name: str
+
+
+class StudioFile(Body):
+    path: str = Field(min_length=1, max_length=4096)
+    line: Optional[int] = Field(default=None, ge=1)
 
 
 class Courses:
@@ -253,11 +265,13 @@ class Courses:
     def watch(self, seen):
         """Tell open tabs when Codex changes a course or the library from outside the app."""
         while not self.stopping.wait(self.watch_interval):
+            host = self.host
             current = self._fingerprints()
+            # The host announces its own writes; only a change made outside it, by Codex say, reloads the course.
+            outside = host is not None and not host.own_change(self._stamps.get(host.workspace, (None,))[0])
             if current != seen:
                 self.events.publish({'type': 'changed', 'scope': 'library'})
-                host = self.host
-                if host and current.get(host.workspace) != seen.get(host.workspace):
+                if host and outside and current.get(host.workspace) != seen.get(host.workspace):
                     self.events.publish({'type': 'changed', 'scope': 'state'})
                     host._wake_background()
             seen = current
@@ -314,11 +328,13 @@ class ActiveHost:
 
 
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None,
-               launcher=None, checks=None):
-    """`launcher` and `checks` (a `CodexStatus`) stand in for this computer's launcher and Codex in tests."""
+               launcher=None, checks=None, opener=None):
+    """`launcher`, `checks` (a `CodexStatus`) and `opener` (a `files.Opener`) stand in for this computer's launcher,
+    Codex and file manager in tests."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     seen = Seen(courses.settings.path.with_name('seen.json'))
     launcher = launcher or Launcher()
+    opener = opener or files.Opener()
     checks = checks or codex_checks.CodexStatus(courses.settings)
     if workspace:
         courses.open(workspace)
@@ -444,8 +460,22 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def source(source_id: str, revision: str, unit_id: str, format: Optional[str] = None):
         result = host.navigation.source(source_id, revision, unit_id, format)
         if isinstance(result, tuple):
+            content, media_type = result
+            # A file answers Range requests, so a PDF too large for one response still opens.
+            return FileResponse(content, media_type=media_type) if isinstance(content, Path) else Response(content, media_type=media_type)
+        return result
+
+    @app.get('/api/figures/{figure_id}')
+    def figure(figure_id: str, format: Optional[str] = None):
+        result = host.navigation.figure(figure_id, format)
+        if isinstance(result, tuple):
             return Response(result[0], media_type=result[1])
         return result
+
+    @app.get('/api/search/sources')
+    def search_sources(q: str):
+        """Search covers the course in the browser, from the state; source text is not part of it, so it is searched here."""
+        return host.operation({'op': 'source.search', 'query': q})
 
     @app.post('/api/questions')
     def ask(body: QuestionRequest):
@@ -574,11 +604,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/sections/enter')
     def enter_section(body: EnterSectionRequest):
-        return host.practice.enter_skipped(body.concept_id, body.request_id)
-
-    @app.post('/api/sections/jump')
-    def jump_to_section(body: EnterSectionRequest):
-        return host.practice.jump(body.concept_id, body.request_id)
+        return host.practice.enter(body.concept_id, body.request_id, body.then_return)
 
     @app.post('/api/chapters/{chapter_id}/skip')
     def skip_chapter(chapter_id: str, body: SkipChapterRequest):
@@ -712,11 +738,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         course = scoped(scope)
         try:
             studio.ready()
-            return {'available': True, 'access': studio.access(), 'threads': studio.threads(course)}
+            return {'available': True, 'access': studio.access(), 'choice': studio.choice(), 'threads': studio.threads(course)}
         except OperationError as exc:
             if exc.code != 'studio_unavailable':
                 raise
-            return {'available': False, 'error': str(exc), 'access': studio.access(), 'threads': []}
+            return {'available': False, 'error': str(exc), 'access': studio.access(), 'choice': studio.choice(), 'threads': []}
 
     @app.get('/api/studio/activity')
     def studio_activity(scope: str = ''):
@@ -754,6 +780,21 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             raise OperationError('unknown_course', f'No course named {body.name} in the library')
         return studio.refile(thread_id, path.resolve())
 
+    @app.post('/api/studio/files/open')
+    def studio_open_file(body: StudioFile, scope: str = ''):
+        """A file Codex linked in a reply: a source of the open course opens in its reader, anything else on this computer."""
+        path = files.resolve(body.path, courses.root or course_folder())
+        course = courses.host if scope != 'library' else None
+        if course is not None:
+            ref = files.source_location(course.operation({'op': 'course.status'})['sources'], path, body.line)
+            if ref and ref['unit_id'] not in ('page-1', 'line-1'):
+                units = course.operation({'op': 'source.read', **ref})['units']
+                if not any(u['id'] == ref['unit_id'] for u in units):
+                    ref['unit_id'] = 'line-1'
+            if ref:
+                return {'source': ref}
+        return opener.open(path)
+
     @app.post('/api/studio/messages')
     def studio_send(body: StudioMessage, scope: str = ''):
         course = scoped(scope)
@@ -778,6 +819,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         courses.events.publish({'type': 'changed', 'scope': 'settings'})
         return result
 
+    @app.put('/api/studio/model')
+    def studio_choice(body: StudioChoice):
+        """Studio's own model and effort, from the next turn on; empty follows the teacher's."""
+        result = studio.set_choice(body.model, body.effort)
+        courses.events.publish({'type': 'changed', 'scope': 'settings'})
+        return result
+
     @app.post(FILE_UPLOAD)
     async def studio_upload(request: Request, name: str, scope: str = ''):
         course = scoped(scope)
@@ -797,8 +845,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.post('/api/library/open')
     def open_course(body: OpenCourseRequest):
-        courses.open_named(body.name)
-        return courses.view()
+        # The interface reloads after opening a course, so the library listing is left for it to ask for.
+        return {'active': str(courses.open_named(body.name).workspace)}
 
     @app.post('/api/shutdown')
     def shutdown():
@@ -824,7 +872,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
 
 def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None,
-          launcher=None, checks=None):
+          launcher=None, checks=None, opener=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -833,7 +881,7 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
     app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
-                     studio_command=studio_command, launcher=launcher, checks=checks)
+                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener)
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:

@@ -1,5 +1,6 @@
 import { api, ApiError } from './api';
 import { t } from './i18n.svelte';
+import type { CodexModel, Ref } from './types';
 
 /**
  * Studio (ADR 0016): course work as a Codex chat. The host forwards the App Server's notifications for the threads it
@@ -25,7 +26,7 @@ export type CommandAction =
 
 export type StudioItem =
   | { type: 'userMessage'; id: string; content: StudioUserInput[] }
-  | { type: 'agentMessage'; id: string; text: string; phase: 'commentary' | 'partial_answer' | 'final_answer' | null }
+  | { type: 'agentMessage'; id: string; text: string; phase: 'commentary' | 'partial_answer' | 'final_answer' | null; questions?: AsyncQuestion[] | null }
   | { type: 'reasoning'; id: string; summary: string[] }
   | { type: 'plan'; id: string; text: string }
   | { type: 'commandExecution'; id: string; command: string; status: string; commandActions: CommandAction[]; aggregatedOutput: string | null; exitCode: number | null }
@@ -36,6 +37,32 @@ export type StudioItem =
   | { type: 'contextCompaction'; id: string }
   | { type: string; id: string };
 
+/** A question Codex asks in its message rather than by waiting on the learner (Codex's async user input). */
+export type AsyncQuestion = { title: string; options: string[] | null };
+/** An answer to one, sent back as Codex's own app sends it: in a user message, by the question's id. */
+export type QuestionReply = { questionItemId: string; question: string; answer: string };
+
+const REPLY_OPEN = '<send_user_message_question_reply>';
+const REPLY_CLOSE = '</send_user_message_question_reply>';
+/** The id Codex's app gives a message's question: the message and the question's place in it. */
+export const questionId = (itemId: string, index: number) => JSON.stringify(['request_user_input_async', itemId, index]);
+export const replyText = (replies: QuestionReply[]) => `${REPLY_OPEN}\n${JSON.stringify(replies)}\n${REPLY_CLOSE}`;
+/** The answers a user message carries, if it is a reply to Codex's questions. */
+export function parseReply(text: string): QuestionReply[] | null {
+  const at = text.lastIndexOf(REPLY_OPEN);
+  const end = text.lastIndexOf(REPLY_CLOSE);
+  if (at < 0 || end < at) return null;
+  try {
+    const parsed = JSON.parse(text.slice(at + REPLY_OPEN.length, end));
+    const list = (Array.isArray(parsed) ? parsed : [parsed]).filter(
+      (r): r is QuestionReply => typeof r?.questionItemId === 'string' && typeof r?.answer === 'string',
+    );
+    return list.length ? list : null;
+  } catch {
+    return null;
+  }
+}
+
 export type PlanStep = { step: string; status: 'pending' | 'inProgress' | 'completed' };
 export type StudioTurn = {
   id: string;
@@ -43,7 +70,29 @@ export type StudioTurn = {
   items: StudioItem[];
   error: { message: string } | null;
   plan?: PlanStep[];
+  /** When Codex started and finished it (seconds) and how long it took, for "Worked for". */
+  startedAt?: number | null;
+  completedAt?: number | null;
+  durationMs?: number | null;
 };
+
+/** How much of a command's output is kept, from its end, as Codex keeps it. */
+export const OUTPUT_KEPT = 20000;
+export const TRUNCATED = '[output truncated]\n';
+/** The end of a command's output, marked when its start was cut. */
+export const outputTail = (text: string) => (text.length > OUTPUT_KEPT ? TRUNCATED + text.slice(-OUTPUT_KEPT) : text);
+
+/** A chat's first message as a label until its title arrives, as Codex shows one: plain text, skills left out, one
+ * line of at most 60 characters. */
+export function provisionalTitle(text: string) {
+  const plain = text
+    .replace(/(^|\s)\$[\w:.-]+/g, '$1')
+    .replace(/[*_`#>]+/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length <= 60 ? plain : `${plain.slice(0, 59).trimEnd()}…`;
+}
 
 export type ApprovalMethod = 'item/commandExecution/requestApproval' | 'item/fileChange/requestApproval' | 'item/permissions/requestApproval';
 export type UserInputQuestion = { id: string; header: string; question: string; isOther: boolean; isSecret: boolean; options: { label: string; description: string }[] | null };
@@ -55,6 +104,8 @@ export type StudioThread = { id: string; name: string; preview: string; updated_
 export type StudioSkill = { name: string; path: string; title: string; description: string };
 export type StudioFile = { name: string; path: string; absolute: string };
 export type StudioAccess = { full_access: boolean; saved: boolean; forced: boolean };
+/** Studio's own model and effort; empty follows the teacher's (ADR 0016). */
+export type StudioChoice = { model: string; effort: string };
 export type StudioEvent = { type: 'studio'; method: string; params: Record<string, any> };
 
 /** What a message sends besides its text: the spans its chips cover (code-point offsets) and what they name. */
@@ -89,6 +140,9 @@ class StudioStore {
   available = $state<boolean | null>(null);
   error = $state('');
   access = $state<StudioAccess | null>(null);
+  choice = $state<StudioChoice>({ model: '', effort: '' });
+  /** The models Codex offers, so Studio's writing box can name its model; null until Codex has answered. */
+  models = $state<CodexModel[] | null>(null);
   threads = $state<StudioThread[]>([]);
   /** The open thread, or null for a new one that starts with the next message. */
   threadId = $state<string | null>(null);
@@ -144,8 +198,36 @@ class StudioStore {
     return !!this.activeTurn;
   }
 
+  /** The answers already given to Codex's questions in this chat, by question id. */
+  get replies() {
+    const found = new Map<string, string>();
+    for (const turn of this.turns) {
+      for (const item of turn.items) {
+        if (item.type !== 'userMessage') continue;
+        for (const input of (item as Extract<StudioItem, { type: 'userMessage' }>).content) {
+          if (input.type === 'text') for (const reply of parseReply(input.text) ?? []) found.set(reply.questionItemId, reply.answer);
+        }
+      }
+    }
+    return found;
+  }
+
   get thread() {
     return this.threads.find((t) => t.id === this.threadId);
+  }
+
+  /** A chat's name: its title, else the start of its first message, which for a chat just begun the list may not
+   * know yet. */
+  label(id: string) {
+    const thread = this.threads.find((x) => x.id === id);
+    if (thread?.name) return thread.name;
+    let first = thread?.preview ?? '';
+    if (!first && id === this.threadId) {
+      const said = this.turns[0]?.items.find((i) => i.type === 'userMessage') as Extract<StudioItem, { type: 'userMessage' }> | undefined;
+      const text = said?.content.find((c) => c.type === 'text' && !c.text.startsWith(CONTEXT));
+      first = text?.type === 'text' ? text.text : '';
+    }
+    return provisionalTitle(first.startsWith(CONTEXT) ? '' : first) || t('Untitled chat');
   }
 
   /** Loads availability and the course's threads once, opening the most recent thread. */
@@ -154,10 +236,13 @@ class StudioStore {
       this.#loaded = (async () => {
         this.loading = true;
         try {
-          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; threads: StudioThread[] }>(this.url('/api/studio'));
+          const view = await api.get<{ available: boolean; error?: string; access: StudioAccess; choice: StudioChoice; threads: StudioThread[] }>(
+            this.url('/api/studio'),
+          );
           this.available = view.available;
           this.error = view.error ?? '';
           this.access = view.access;
+          this.choice = view.choice;
           this.threads = view.threads;
           if (!view.available) return;
           if (!this.#chosen && this.threadId === null && this.turns.length === 0 && view.threads[0]) {
@@ -217,18 +302,40 @@ class StudioStore {
     }
   }
 
+  // Counted, so a read that started before the learner switched access cannot put the old access back.
+  #accessWrites = 0;
+
   async loadAccess() {
+    const written = this.#accessWrites;
     try {
-      this.access = await api.get<StudioAccess>('/api/studio/access');
+      const access = await api.get<StudioAccess>('/api/studio/access');
+      if (written === this.#accessWrites) this.access = access;
     } catch {
-      // Settings shows the switch without the Windows note.
+      // The menu shows the choice without the Windows note.
     }
     return this.access;
   }
 
   async setFullAccess(on: boolean) {
+    this.#accessWrites++;
     this.access = await api.put<StudioAccess>('/api/studio/access', { full_access: on });
     return this.access;
+  }
+
+  /** Studio's model and effort from the next turn on; empty strings follow the teacher's. */
+  async setChoice(choice: StudioChoice) {
+    this.choice = await api.put<StudioChoice>('/api/studio/model', choice);
+    return this.choice;
+  }
+
+  #models: Promise<CodexModel[]> | null = null;
+
+  /** Asks Codex once per visit, since each ask starts Codex; `retry` asks again after a failure. */
+  loadModels(retry = false) {
+    if (!this.#models || (retry && !this.models)) {
+      this.#models = api.get<{ models: CodexModel[] }>('/api/models').then((r) => (this.models = r.models));
+    }
+    return this.#models;
   }
 
   async open(id: string) {
@@ -331,6 +438,11 @@ class StudioStore {
     return api.upload<StudioFile>(this.url(`/api/studio/files?name=${encodeURIComponent(file.name)}`), file);
   }
 
+  /** Opens a file Codex linked: a course source comes back to open in the reader; the host opens anything else. */
+  openFile(file: { path: string; line?: number }) {
+    return api.post<{ source: Ref } | { opened: string; shown: boolean }>(this.url('/api/studio/files/open'), file);
+  }
+
   #turn(id: string) {
     let turn = this.turns.find((x) => x.id === id);
     if (!turn) {
@@ -380,6 +492,7 @@ class StudioStore {
     switch (method) {
       case 'turn/started':
         this.#turn(params.turn.id).status = 'inProgress';
+        this.#turn(params.turn.id).startedAt = params.turn.startedAt ?? Date.now() / 1000;
         this.activeTurn = params.turn.id;
         this.error = '';
         void this.refreshThreads();
@@ -388,6 +501,8 @@ class StudioStore {
         const turn = this.#turn(params.turn.id);
         turn.status = params.turn.status;
         turn.error = params.turn.error;
+        turn.completedAt = params.turn.completedAt ?? Date.now() / 1000;
+        turn.durationMs = params.turn.durationMs ?? null;
         if (this.activeTurn === params.turn.id) this.activeTurn = null;
         this.pending = this.pending.filter((p) => p.params.turnId !== params.turn.id);
         void this.read(thread);
@@ -424,7 +539,7 @@ class StudioStore {
       }
       case 'item/commandExecution/outputDelta': {
         const item = this.#item(params.turnId, params.itemId);
-        if (item) item.aggregatedOutput = (item.aggregatedOutput ?? '') + params.delta;
+        if (item) item.aggregatedOutput = outputTail((item.aggregatedOutput ?? '') + params.delta);
         break;
       }
       case 'turn/plan/updated':

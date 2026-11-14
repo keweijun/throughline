@@ -3,10 +3,10 @@
   import { t, locale, type Language, type MessageKey } from '../lib/i18n.svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { studio } from '../lib/studio.svelte';
   import type { CodexModel, LauncherStatus, Settings, UpdateProgress } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
+  import { lightDismiss } from '../lib/dialog';
 
   type Theme = 'system' | 'light' | 'dark';
   type Pane = 'teacher' | 'appearance' | 'about';
@@ -28,21 +28,6 @@
   let launcher = $state<LauncherStatus | null>(null);
   let updateError = $state('');
   let checking = $state(false);
-  let savingAccess = $state(false);
-  // Studio's access belongs to the learner; read when the Teacher pane opens, since on Windows it depends on Codex.
-  $effect(() => {
-    if (pane === 'teacher' && app.settingsOpen) void studio.loadAccess();
-  });
-
-  async function setFullAccess(on: boolean) {
-    savingAccess = true;
-    try {
-      await studio.setFullAccess(on);
-    } catch (e) {
-      app.error = e instanceof Error ? e.message : String(e);
-    }
-    savingAccess = false;
-  }
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
@@ -245,7 +230,7 @@
   </div>
 {/snippet}
 
-<dialog bind:this={dialog} onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
+<dialog bind:this={dialog} use:lightDismiss onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
   <header>
     <h2 id="settings-title">{t("Settings")}</h2>
     <button class="btn btn-quiet close" onclick={() => (app.settingsOpen = false)} aria-label={t("Close")}>
@@ -323,28 +308,7 @@
           {/if}
 
           <h4>{t("Studio")}</h4>
-          <p class="lead">{t("Studio is where Codex creates and changes your courses. It reads any file you point it to and writes inside your Throughline folder without asking.")}</p>
-          <div class="setting">
-            <div class="text">
-              <label class="title" for="full-access">{t("Full access")}</label>
-              <p>
-                {#if studio.access?.forced}
-                  {t("Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.")}
-                {:else}
-                  {t("Let Codex change files anywhere and run commands without asking, as Codex can in its own app. Off, it asks before writing outside your Throughline folder or using the network.")}
-                {/if}
-              </p>
-            </div>
-            <input
-              id="full-access"
-              class="switch"
-              type="checkbox"
-              role="switch"
-              checked={studio.access?.full_access ?? false}
-              disabled={!studio.access || studio.access.forced || savingAccess}
-              onchange={(event) => void setFullAccess(event.currentTarget.checked)}
-            />
-          </div>
+          <p class="lead">{t("Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.")}</p>
 
           <h4>{t("Background work")}</h4>
           <p class="lead">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>

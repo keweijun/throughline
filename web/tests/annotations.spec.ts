@@ -49,6 +49,20 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   expect(errors).toEqual([]);
 });
 
+test('a highlight of a couple of characters is painted', async ({ page, course }) => {
+  const { errors } = await course('navigation_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
+
+  expect((await dragSelect(page, paragraph, 14)).trim().length).toBeLessThan(3);
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('highlight text in the PDF reader and bookmark the page', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   await page.getByRole('button', { name: 'View source p. 2' }).first().click();
@@ -110,7 +124,7 @@ test('highlight and note an exercise', async ({ page, course }) => {
   const question = page.locator('#practice article').first().locator('.question');
   await expect(question).toBeVisible();
   expect((await dragSelect(page, question, 120)).trim().length).toBeGreaterThan(3);
-  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ask about this passage' })).toBeVisible();
   await page.getByRole('button', { name: 'Note', exact: true }).click();
   await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Watch the sign');
   await page.getByRole('button', { name: 'Save note' }).click();
@@ -141,6 +155,28 @@ test('a highlight running into a formula is still painted', async ({ page, cours
   expect(excerpt).toContain('squared magnitude');
   await page.getByRole('button', { name: 'Highlight', exact: true }).click();
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('a highlight running across a citation chip is still painted, without the chip label', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  const excerpt = await page.locator('.lesson-body').first().evaluate((body) => {
+    const chip = body.querySelector('.citation')!;
+    const range = document.createRange();
+    range.setStart(chip.closest('p')!.firstChild!, 0);
+    range.setEndAfter(chip);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return window.getSelection()!.toString();
+  });
+  expect(excerpt).toContain('p. 2');
+  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.locator('#panel-notes').getByRole('radio', { name: /^All/ }).check();
+  await expect(page.locator('#panel-notes .item.highlight')).toContainText('probability amplitudes');
+  await expect(page.locator('#panel-notes .item.highlight')).not.toContainText('p. 2');
   expect(errors).toEqual([]);
 });
 

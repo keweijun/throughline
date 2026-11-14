@@ -430,6 +430,7 @@
   }
 
   .parts {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem 1rem;
@@ -534,6 +535,7 @@
   }
 
   .confirm {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.5rem;
     padding: 0.75rem 0.9rem;
@@ -550,12 +552,19 @@
   }
 
   .note {
+    animation: enter-fade var(--settle) ease;
     font-size: var(--step--1);
     color: var(--pencil);
   }
 
   .problem {
+    animation: enter-rise var(--settle) var(--ease-out);
     font-size: var(--step-0);
     color: var(--danger);
+  }
+
+  .working,
+  .submitted-answer {
+    animation: enter-rise var(--settle) var(--ease-out);
   }
 </style>

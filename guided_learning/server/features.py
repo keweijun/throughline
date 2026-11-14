@@ -651,7 +651,7 @@ class Practice(Feature):
     def generate(self, concept_id):
         # Retrieval questions (ADR 0008) and a chapter's quiz anchored here are not the section's own exercises.
         existing = [t for t in self.state()['tasks'] if t['concept_id'] == concept_id and t['origin'] not in RETRIEVAL_ORIGINS
-                    and not chapter_owned(t) and t['status'] != 'replaced']
+                    and not chapter_owned(t) and t['status'] not in practice.HIDDEN]
         if existing:
             return {'tasks': existing}
         return self._launch(concept_id, 'generate')
@@ -811,7 +811,7 @@ class Practice(Feature):
                 return prompts.practice_generate(sources)
             tasks = {t['id']: t for t in state['tasks']}
             kept = [t['question'] for t in state['tasks'] if t['concept_id'] == job['concept_id'] and practice.section_exercise(t)
-                    and t['status'] not in ('replaced', 'skipped') and t['id'] not in job.get('replaces', [])]
+                    and t['status'] not in (*practice.HIDDEN, 'skipped') and t['id'] not in job.get('replaces', [])]
             return prompts.different_exercises(sources, job.get('note'), [tasks[i]['question'] for i in job.get('replaces', []) if i in tasks],
                                                kept, tasks.get(job.get('variant_of'), {}).get('question'))
         task = next(t for t in state['tasks'] if t['id'] == job['task_id'])
@@ -1016,6 +1016,8 @@ class Preparation(Feature):
             job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
             return prompts.preparation_task(job['snapshot']['context']) + shown
         material = self._material(turn)
+        if material:
+            self.operation({'op': 'preparation.use', 'id': material['id'], 'turn_id': turn['id']})
         return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING + shown
 
     def _material(self, turn):

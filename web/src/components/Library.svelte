@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
   import { api } from '../lib/api';
-  import { t, locale } from '../lib/i18n.svelte';
+  import { t, locale, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import type { CodexCheck, CodexChecks, LauncherStatus, LibraryCourse } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
@@ -218,6 +218,11 @@
         <Studio scope="library" />
       </div>
     </section>
+  {:else if !library && app.libraryError}
+    <div class="load-failed" role="alert">
+      <p class="problem">{t('Your courses could not be loaded: {error}', { error: diagnostic(app.libraryError) })}</p>
+      <button class="btn btn-small" onclick={() => app.retryLoad()}>{t('Try again')}</button>
+    </div>
   {:else if !library}
     <p class="muted" aria-busy="true">{t('Loading your courses…')}</p>
   {:else if !library.courses.length}
@@ -479,6 +484,17 @@
     font-size: var(--step--1);
   }
 
+  .load-failed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+
+  .load-failed .problem {
+    margin: 0;
+  }
+
   .codex-actions {
     flex-basis: 100%;
     display: flex;
@@ -497,6 +513,7 @@
   }
 
   .empty {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     justify-items: start;
     gap: 0.9rem;
@@ -513,6 +530,7 @@
   }
 
   .checks {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -577,5 +595,12 @@
   .codex h2 {
     font-size: var(--step-0);
     font-family: var(--sans);
+  }
+
+  /* Switching between the list and a new course brings the other in rather than swapping it in a blink; a fade, so
+     Studio's box never moves under a learner already typing in it. */
+  .studio-part,
+  header > div {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

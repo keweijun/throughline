@@ -48,7 +48,7 @@ A source's id is derived from the path it was registered from, which means nothi
 
 ## What no level carries
 
-A package holds the course's records, its sources' stored files and, with the records that use them, attached images (`answer_images/`), and nothing else from the folder. So it never carries Studio threads (they live in the sender's Codex home, ADR 0016), files Codex wrote while working (such as `audit/`, `inputs/` and `import-requests.jsonl`), rendered page images (`page_images/`, drawn again when needed), the host's lease file and per-user settings.
+A package holds the course's records, its sources' stored files and, with the records that use them, attached images (`answer_images/`), and nothing else from the folder. So it never carries Studio threads (they live in the sender's Codex home, ADR 0016), files Codex wrote while working (such as `audit/`, `inputs/` and `import-requests.jsonl`), rendered page images (`page_images/`, drawn again when needed), copies kept before a format update (`backups/`, ADR 0007), the host's lease file and per-user settings.
 
 ## Format
 

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { panelCoversLesson } from '../lib/media';
-  import { slide } from 'svelte/transition';
+  import { fold } from '../lib/motion';
   import { highlights, annotationPassage } from '../lib/highlight';
   import { locale, t } from '../lib/i18n.svelte';
 
@@ -145,7 +145,7 @@
   </div>
 
   {#if open}
-  <div class="body" id="thread-body-{question.id}" transition:slide={{ duration: 200 }}>
+  <div class="body" id="thread-body-{question.id}" transition:fold>
   <!-- Takes no room in the thread, so the answers never move when it appears. -->
   <div class="pin">
     {#if away}
@@ -318,6 +318,7 @@
   }
 
   .reply {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.6rem;
     margin-top: 1rem;
@@ -400,6 +401,7 @@
   }
 
   .later {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -410,6 +412,7 @@
 
 
   .suggest {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.5rem;
     padding: 0.7rem 0.8rem;

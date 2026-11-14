@@ -82,15 +82,34 @@ const UPDATE_STEPS = { starting: [3, 22, 20], installing: [25, 92, 50], restarti
 const UPDATE_WAIT = 22 * 60_000;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Drafts of the library page, and of Studio before a course exists, kept apart from every course's. */
+const LIBRARY_DRAFTS = 'library';
+
 /**
- * Unsent text the learner typed (exercise answers, lesson requests, follow-ups), keyed by what it belongs to, so it
- * survives moving between sections and reloads within the tab.
+ * Unsent text the learner typed (exercise answers, lesson requests, side questions, Studio messages), keyed by what it
+ * belongs to. Each course keeps its own, so a question half-written in one course never shows in another, in local
+ * storage, so they survive moving between sections, reloads and closing the browser.
  */
 class Drafts {
-  #values = $state<Record<string, string>>(readDrafts());
+  /** The open course's id; null on the library before a course is open. */
+  #course = $state<string | null>(null);
+  /** This tab's copy of each scope's drafts, read when the scope is opened. */
+  #values = $state<Record<string, Record<string, string>>>({ [LIBRARY_DRAFTS]: readDrafts(LIBRARY_DRAFTS) });
+
+  /** Shows the drafts of a course, or with null only the library's. A page holds one course: opening another reloads it. */
+  open(course: string | null) {
+    this.#course = course;
+    const scope = this.#scope('');
+    if (!(scope in this.#values)) this.#values[scope] = readDrafts(scope);
+  }
+
+  /** The library page's Studio keeps its drafts apart from every course's, whichever course is open. */
+  #scope(key: string) {
+    return key.replace(/^images:/, '').startsWith('studio:library:') || !this.#course ? LIBRARY_DRAFTS : `course:${this.#course}`;
+  }
 
   get(key: string): string {
-    return this.#values[key] ?? '';
+    return this.#values[this.#scope(key)]?.[key] ?? '';
   }
 
   /** The images attached to a draft, by name; kept beside its text under `images:<key>`. */
@@ -109,19 +128,25 @@ class Drafts {
 
   set(key: string, value: string) {
     if (value === this.get(key)) return;
-    if (value) this.#values[key] = value;
-    else delete this.#values[key];
+    const scope = this.#scope(key);
+    const values = (this.#values[scope] ??= {});
+    if (value) values[key] = value;
+    else delete values[key];
+    // Another tab may have saved drafts since this one read them, so change the stored drafts, not this tab's copy.
+    const stored = readDrafts(scope);
+    if (value) stored[key] = value;
+    else delete stored[key];
     try {
-      sessionStorage.setItem('drafts', JSON.stringify(this.#values));
+      localStorage.setItem(`drafts:${scope}`, JSON.stringify(stored));
     } catch {
       // The draft still lives for this page.
     }
   }
 }
 
-function readDrafts(): Record<string, string> {
+function readDrafts(scope: string): Record<string, string> {
   try {
-    const stored = JSON.parse(sessionStorage.getItem('drafts') ?? '{}');
+    const stored = JSON.parse(localStorage.getItem(`drafts:${scope}`) ?? '{}');
     return stored && typeof stored === 'object' ? stored : {};
   } catch {
     return {};
@@ -132,6 +157,9 @@ class AppStore {
   state = $state<State | null>(null);
   connection = $state<Connection>('connecting');
   error = $state<string | null>(null);
+  /** Why the course or the library could not be loaded at all: said in place of the page, with a way to try again. */
+  stateError = $state<string | null>(null);
+  libraryError = $state<string | null>(null);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** The library page shows the course list, or New course: the library's Studio across the page. */
@@ -384,6 +412,7 @@ class AppStore {
     try {
       const state = await api.get<State>('/api/state');
       const missed = this.#inflight;
+      this.drafts.open(state.course.id);
       this.state = state;
       for (const delta of missed) this.#delta(delta);
       for (const change of this.#pending.values()) change(this.state.annotations);
@@ -391,10 +420,13 @@ class AppStore {
       locale.language = this.state.preferences.language;
       rememberLanguage(locale.language);
       this.error = null;
+      this.stateError = null;
       if (!this.library) void this.loadLibrary(true);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'no_course') {
         this.state = null;
+        this.stateError = null;
+        this.drafts.open(null);
         this.libraryOpen = true;
         locale.language = rememberLanguage() ?? locale.language;
         try {
@@ -403,7 +435,8 @@ class AppStore {
         } catch (error) {
           this.error = (error as Error).message;
         }
-      } else this.error = (e as Error).message;
+      } else if (this.state) this.error = (e as Error).message;
+      else this.stateError = (e as Error).message;
     } finally {
       this.#inflight = null;
     }
@@ -413,8 +446,23 @@ class AppStore {
   async loadLibrary(quiet = false) {
     try {
       this.library = await api.get<Library>('/api/library');
+      this.libraryError = null;
     } catch (e) {
-      if (!quiet) this.error = (e as Error).message;
+      if (quiet) return;
+      // Without a listing the library page has nothing to show, so it says why there instead.
+      if (this.library) this.error = (e as Error).message;
+      else this.libraryError = (e as Error).message;
+    }
+  }
+
+  /** Try again after the course, or the library, could not be loaded. */
+  retryLoad() {
+    if (this.libraryOpen) {
+      this.libraryError = null;
+      void this.loadLibrary();
+    } else {
+      this.stateError = null;
+      void this.sync();
     }
   }
 

@@ -1,14 +1,47 @@
 import tempfile
 import unittest
 from guided_learning.api import execute
+from support import taught
 
 class PreparationState(unittest.TestCase):
+    def test_the_next_section_is_prepared_once_a_lesson_starts_and_its_use_is_recorded(self):
+        from guided_learning.store import OperationError
+        with tempfile.TemporaryDirectory() as path:
+            def op(**kw): return execute(path,kw)
+            op(op='course.init',title='Physics')
+            op(op='curriculum.save',concepts=[{'id':c,'title':c} for c in 'abc'],route=['a','b','c'],coverage=[])
+            op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            self.assertIsNone(op(op='preparation.view')['next_concept_id'],'nothing is prepared before a lesson in the section')
+            with self.assertRaises(OperationError) as caught: op(op='preparation.enqueue',id='early')
+            self.assertEqual(caught.exception.code,'no_next_section')
+            op(op='stream.start',id='practice-a',concept_id='a',prompt='Exercises',channel='practice')
+            self.assertIsNone(op(op='preparation.view')['next_concept_id'],'drilling exercises is not a lesson')
+            op(op='stream.start',id='lesson-a',concept_id='a',prompt='Teach',channel='mainline')
+            self.assertEqual(op(op='preparation.view')['next_concept_id'],'b','a lesson started, even unfinished')
+            op(op='stream.pause',id='lesson-a')
+            op(op='preparation.enqueue',id='prep')
+            op(op='stream.start',id='prep',concept_id='b',prompt='Internal',channel='preparation',record_user=False)
+            op(op='stream.event',id='prep',attempt=1,sequence=1,kind='final',text='Prepared')
+            op(op='stream.event',id='prep',attempt=1,sequence=2,kind='complete')
+            op(op='mainline.enter',request_id='next',concept_id='b',goal='B',next_step='explain')
+            self.assertEqual(op(op='preparation.view',concept_id='b')['ready']['id'],'prep','still ready in its own section')
+            op(op='preparation.use',id='prep',turn_id='first')
+            used=op(op='preparation.use',id='prep',turn_id='second')['job']
+            self.assertEqual(used['used_by'],'first','the first turn that read it')
+            self.assertNotIn('content',used)
+            op(op='mainline.enter',request_id='jump',concept_id='c',goal='C',next_step='explain')
+            job=op(op='preparation.view')['jobs'][0]
+            self.assertEqual((job['status'],job['reason'],job['used_by']),('stale','The learner moved to another section','first'))
+            with self.assertRaises(OperationError) as caught: op(op='preparation.use',id='missing',turn_id='t')
+            self.assertEqual(caught.exception.code,'unknown_preparation')
+
     def test_preparation_is_internal_and_ready_does_not_change_learning(self):
         with tempfile.TemporaryDirectory() as path:
             def op(**kw): return execute(path,kw)
             op(op='course.init',title='Physics')
             op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            taught(path,'a')
             before=op(op='session.resume')
             job=op(op='preparation.enqueue',id='prep')['job']
             self.assertEqual(job['concept_id'],'b')
@@ -28,6 +61,7 @@ class PreparationState(unittest.TestCase):
             concepts=[{'id':c,'title':c} for c in 'abcd']
             op(op='curriculum.save',concepts=concepts,route=['a','b','c','d'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            taught(path,'a')
             def prepare(identifier):
                 op(op='preparation.enqueue',id=identifier)
                 op(op='stream.start',id=identifier,concept_id='b',prompt='Internal',channel='preparation',record_user=False)
@@ -64,6 +98,7 @@ class PreparationState(unittest.TestCase):
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            taught(path,'a')
             runner=Runner();app=Host(path,runner=runner)
             try:
                 self.assertTrue(runner.entered.wait(3),'automatic next-section preparation must start')
@@ -80,6 +115,7 @@ class PreparationState(unittest.TestCase):
                 op(op='mainline.enter',request_id='next',concept_id='b',goal='B',next_step='explain')
                 turn=app.start_turn({'concept_id':'b','channel':'sidequestion','prompt':'Explain'})['turn'];app.wait(turn['id'],3)
                 self.assertIn('PREP_UNIQUE',runner.prompts[-1])
+                self.assertEqual(op(op='preparation.view')['jobs'][-1]['used_by'],turn['id'])
                 self.assertNotIn('PREP_UNIQUE',str(op(op='session.resume')['recent_interactions']))
             finally:app.close()
 
@@ -96,6 +132,7 @@ class PreparationState(unittest.TestCase):
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            taught(path,'a')
             runner=Runner();app=Host(path,runner=runner)
             deadline=time.time()+3
             while time.time()<deadline:
@@ -118,6 +155,7 @@ class PreparationState(unittest.TestCase):
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])
             op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+            taught(path,'a')
             op(op='preparation.enqueue',id='crashed-before-launch')
             app=Host(path)
             try:self.assertEqual(app.preparation.state()['jobs'][0]['status'],'failed')

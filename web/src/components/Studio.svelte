@@ -421,6 +421,7 @@
 
   /* An empty chat asks its question in the middle of the frame, as a chat app does, with the ideas under it. */
   .welcome {
+    animation: enter-fade var(--settle) ease;
     display: grid;
     justify-items: center;
     gap: 0.75rem;
@@ -431,6 +432,7 @@
   }
 
   .made {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -485,6 +487,7 @@
   }
 
   .error {
+    animation: enter-rise var(--settle) var(--ease-out);
     margin: 0;
     font-size: var(--step--1);
     color: var(--danger);

@@ -263,6 +263,7 @@
     padding: 0.3rem 0.45rem;
     border-radius: var(--radius);
     cursor: pointer;
+    transition: background-color var(--quick) ease;
   }
 
   .option:hover {

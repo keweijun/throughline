@@ -19,7 +19,7 @@ from guided_learning.api import execute
 from guided_learning.server import Host, create_app
 from guided_learning.server.settings import TeacherSettings
 from guided_learning.store import OperationError
-from support import call_cli, host_client
+from support import call_cli, host_client, taught
 
 
 def course(path, concepts=('a', 'b')):
@@ -153,6 +153,7 @@ class PreparationLoop(unittest.TestCase):
                 emit({'kind': 'complete'})
         with tempfile.TemporaryDirectory() as path:
             course(path)
+            taught(path, 'a')
             host = Host(path, runner=Prepare())
             try:
                 self.assertTrue(wait_until(lambda: any(j['status'] == 'ready' for j in host.preparation.state()['jobs'])))
@@ -401,7 +402,8 @@ class SessionAndLanguage(unittest.TestCase):
 class Storage(unittest.TestCase):
     def test_fingerprint_reads_courses_whose_path_needs_quoting(self):
         with tempfile.TemporaryDirectory() as root:
-            path = Path(root) / 'odd ?name#%20' / 'course'
+            # Windows forbids '?' in names; '#' and '%' still need quoting there.
+            path = Path(root) / ('odd name#%20' if sys.platform == 'win32' else 'odd ?name#%20') / 'course'
             course(path, ('a',))
             self.assertIsNotNone(library.fingerprint(path))
 

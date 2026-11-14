@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -21,8 +22,8 @@ def course(path, title):
     execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}], 'route': ['state'], 'coverage': []})
 
 
-def cli(home, *args, stdin=''):
-    env = {**os.environ, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
+def cli(home, *args, stdin='', **extra):
+    env = {**os.environ, **extra, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
            'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata')}
     return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
@@ -76,7 +77,9 @@ class CourseLibrary(unittest.TestCase):
             self.assertNotIn('growing intervals', result.stdout, 'review has no schedule (ADR 0014)')
             self.assertNotIn('codex://', result.stdout)
             self.assertNotIn('Throughline is open at', result.stdout, '--no-open leaves the app closed')
-            chinese = cli(home, 'setup', '--no-open', '--no-launcher', '--language', 'zh-CN')
+            # As on Windows, where output piped to Codex is in a code page that has no Chinese.
+            chinese = cli(home, 'setup', '--no-open', '--no-launcher', '--language', 'zh-CN', PYTHONIOENCODING='cp1252')
+            self.assertEqual(chinese.returncode, 0, chinese.stderr)
             self.assertIn('已安装', chinese.stdout)
             self.assertIn('When the learner has not said what to do', agents.read_text(encoding='utf-8'))
             if os.name == 'nt':
@@ -148,6 +151,34 @@ class CourseLibrary(unittest.TestCase):
                 self.assertEqual(library.summary(path)['title'], 'Alpha')
             execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
             self.assertEqual(library.summary(path)['concepts'], 2)
+
+    def test_one_broken_course_is_listed_with_its_error_beside_the_others(self):
+        from guided_learning import library, migrations
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            course(Path(root) / 'beta', 'Beta')
+            (Path(root) / 'corrupt').mkdir()
+            (Path(root) / 'corrupt' / 'course.sqlite3').write_bytes(b'not a database' * 100)
+            # Beta is an older format whose migration fails.
+            old = sqlite3.connect(Path(root) / 'beta' / 'course.sqlite3')
+            old.execute("UPDATE documents SET value=? WHERE namespace='course' AND key='schema'", (json.dumps({'version': 6}),))
+            old.commit()
+            old.close()
+            failing = [*migrations.MIGRATIONS[:-1], mock.Mock(side_effect=KeyError('chapters'))]
+            app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'), library_root=root)
+            with TestClient(app, base_url='http://127.0.0.1:8765') as client, mock.patch.object(migrations, 'MIGRATIONS', failing), \
+                    self.assertLogs('guided_learning.library', 'ERROR') as logged:
+                response = client.get('/api/library')
+                self.assertEqual(response.status_code, 200)
+                listed = {c['name']: c for c in response.json()['courses']}
+                # Nothing keeps the broken file open, so the learner can replace it while Throughline runs (Windows).
+                (Path(root) / 'corrupt' / 'course.sqlite3').unlink()
+            self.assertEqual(listed['alpha']['title'], 'Alpha')
+            self.assertIn('DatabaseError', listed['corrupt']['error'])
+            self.assertIn("KeyError: 'chapters'", listed['beta']['error'])
+            self.assertEqual(len(logged.records), 2)
+            self.assertTrue(all(record.exc_info for record in logged.records), 'logged with the traceback')
+            self.assertEqual(library.summary(Path(root) / 'beta')['title'], 'Beta', 'the course reads once its migration works')
 
     def test_the_watcher_reads_only_courses_whose_files_changed(self):
         from guided_learning import library

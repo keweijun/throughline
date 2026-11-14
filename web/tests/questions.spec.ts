@@ -115,6 +115,8 @@ test('questions sort oldest first, like a conversation, and selected follow-ups 
   await expect(thread.locator('.title').first()).toHaveText('Newer question');
   await thread.getByRole('button', { name: 'Expand question' }).click();
   const paragraph = thread.locator('.answer p').filter({ hasText: 'This is a complete lesson paragraph' }).first();
+  // The answer folds open; a selection made while it still moves is dropped by the scroll that follows, as a learner's would be.
+  await paragraph.click({ trial: true });
   const excerpt = await paragraph.evaluate((node) => {
     const range = document.createRange(); range.selectNodeContents(node);
     window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);

@@ -100,6 +100,7 @@
 
 <style>
   .next {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -134,6 +135,7 @@
   }
 
   .chapter-end {
+    animation: enter-fade var(--settle) ease;
     margin-top: 3rem;
   }
 

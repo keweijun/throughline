@@ -10,7 +10,7 @@ We add a **course memory** to the course workspace (ADR 0001) with three kinds o
 
 - **Preferences**: how the learner wants to be taught, learned during teaching or stated when the course was built. The learner profile records the rest of what they reported then (goal, depth, prior knowledge, focus); a way of learning goes here instead, so the learner sees and edits every preference in one place. One stated while building the course belongs to no section.
 - **Taught terms**: a term or notation and the section, lesson step or side question where it was defined.
-- **Difficulties**: an idea the learner has repeatedly got wrong, with the interactions that show it. A difficulty is cleared when a later check question or exercise on it is answered correctly.
+- **Difficulties**: an idea the learner has repeatedly got wrong, with the interactions that show it. A difficulty is cleared when a later check question or exercise on it is answered correctly. Resubmitting the exercise that showed it, right after its feedback named the fix, does not clear it: in a real course every difficulty was cleared that way within minutes and none reached a later lesson (issue #177).
 
 Entries are facts about the learner and the course, each citing the interactions it came from. They never store phrasing, analogies or examples for the teacher to repeat. Issue #21 showed that analogies the learner raised anchor later lessons.
 

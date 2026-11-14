@@ -21,8 +21,8 @@ def course(path, title):
     execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}], 'route': ['state'], 'coverage': []})
 
 
-def cli(home, *args, stdin=''):
-    env = {**os.environ, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
+def cli(home, *args, stdin='', **extra):
+    env = {**os.environ, **extra, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
            'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata')}
     return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
@@ -76,7 +76,9 @@ class CourseLibrary(unittest.TestCase):
             self.assertNotIn('growing intervals', result.stdout, 'review has no schedule (ADR 0014)')
             self.assertNotIn('codex://', result.stdout)
             self.assertNotIn('Throughline is open at', result.stdout, '--no-open leaves the app closed')
-            chinese = cli(home, 'setup', '--no-open', '--no-launcher', '--language', 'zh-CN')
+            # As on Windows, where output piped to Codex is in a code page that has no Chinese.
+            chinese = cli(home, 'setup', '--no-open', '--no-launcher', '--language', 'zh-CN', PYTHONIOENCODING='cp1252')
+            self.assertEqual(chinese.returncode, 0, chinese.stderr)
             self.assertIn('已安装', chinese.stdout)
             self.assertIn('When the learner has not said what to do', agents.read_text(encoding='utf-8'))
             if os.name == 'nt':

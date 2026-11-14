@@ -94,7 +94,9 @@ class Runner:
 
 
 try:
+    # Studio talks to the scripted App Server, so the page is the same whether or not this computer has Codex.
     serve(root, port=int(sys.argv[1]) if len(sys.argv) > 1 else 0, runner=Runner(), settings=TeacherSettings(root / 'settings.json'),
+          studio_command=[sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), str(root / 'studio.log')],
           on_ready=lambda port: print(port, flush=True))
 finally:
     scratch.cleanup()

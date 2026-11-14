@@ -18,6 +18,16 @@ PREPARED_STEP = 'prepared_step'
 # A `memory` turn answers what the learner asked to be remembered; their message is recorded by memory.request.
 BACKGROUND = ('preparation', 'build', 'consolidation', 'memory')  # channels whose turns are not teaching interactions
 SMALL_MODEL = ('preparation', 'consolidation', 'memory')  # channels the small model serves
+# What a prompt carries of a prerequisite section: enough to bridge or refer back to it. Its pages, exercises and any
+# build notes Codex stored with it would be most of a prompt (issue #175).
+PREREQUISITE_FIELDS = ('id', 'title', 'core_question', 'objective', 'goal', 'overview')
+
+
+def recent_for_prompt(item):
+    """A recent interaction as the teacher reads it: the source and unit are enough to cite, the revision hash is not."""
+    slim = {k: v for k, v in item.items() if k != 'supplied_source_refs'}
+    slim['source_refs'] = [{k: ref[k] for k in ('source_id', 'unit_id') if k in ref} for ref in item.get('source_refs', [])]
+    return slim
 CHANNELS = LEARNER_CHANNELS + (PREPARED_STEP,) + BACKGROUND
 
 # A turn's frozen prompt snapshots, its own and each earlier attempt's, are kept apart from the turn: they are nearly all
@@ -101,9 +111,13 @@ def start(store, request):
     model = curriculum.model(store)
     concepts = {c['id']:c for c in model['concepts']}
     route = deepcopy([{k:concepts[cid][k] for k in ('id','title','prerequisites') if k in concepts[cid]} for cid in model['route'] if cid in concepts])
+    context['prerequisites'] = [{k: c[k] for k in PREREQUISITE_FIELDS if k in c} for c in context['prerequisites']]
     session = session_resume(store,{})
     session.pop('app_questions', None)  # for Codex resuming in chat; the branch prompt already carries the question being answered
     session.pop('context', None)  # the learner's section again, sources and all; context.position already says where they are
+    session['recent_interactions'] = [recent_for_prompt(i) for i in session['recent_interactions']]
+    # A chat-era side question the learner moved on from is not waiting for an answer.
+    session['unanswered_questions'] = [q for q in session['unanswered_questions'] if q.get('status') == 'open']
     snapshot = {'context':context,'route':route,'session':session,'language':identity['language']}
     if model['chapters']: snapshot['chapters'] = deepcopy([{k:c[k] for k in ('id','title','concept_ids')} for c in model['chapters']])
     profile = store.get('course','profile')

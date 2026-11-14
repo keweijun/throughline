@@ -109,7 +109,7 @@ def context(store, request):
     result = []
     for cid in sections:
         concept = concepts.get(cid, {})
-        mine = [t for t in tasks if cid in _tested(t) and t.get('status') != 'replaced']
+        mine = [t for t in tasks if cid in _tested(t) and t.get('status') not in ('replaced', 'retired')]
         misses = [t['question'] for t in mine if outcome(t) in ('missed', 'partly')][-RECENT_MISSES:]
         entry = {'id': cid, 'title': concept.get('title', cid),
                  **{k: concept[k] for k in ('core_question', 'objective') if concept.get(k)},

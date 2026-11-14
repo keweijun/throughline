@@ -3,6 +3,8 @@ import { test, expect, editorText } from './fixture';
 /** Python cells (the python add-on, ADR 0013) against a fake Pyodide served in place of the CDN. */
 
 // Prints what `print('…')` calls print, fails on `raise`, and never finishes `while True`, so Stop has a run to end.
+// `probe('url', 'METHOD')` sends a real request from where the cell's code runs and prints what came back, as
+// Python's `js.fetch` would.
 const FAKE_PYODIDE = `
 export async function loadPyodide() {
   let out = () => {};
@@ -16,6 +18,15 @@ export async function loadPyodide() {
       if (code.includes('while True')) await new Promise(() => {});
       if (code.includes('raise')) throw new Error('Traceback (most recent call last):\\n  File "/lib/python314.zip/_pyodide/_base.py", line 1\\n  File "<exec>", line 1, in <module>\\nValueError: bad');
       for (const match of code.matchAll(/print\\('([^']*)'\\)/g)) out(match[1]);
+      for (const [, url, method] of code.matchAll(/probe\\('([^']*)', '([A-Z]+)'\\)/g)) {
+        const body = method === 'GET' ? undefined : JSON.stringify({ full_access: true });
+        try {
+          const response = await fetch(url, { method, body, headers: body ? { 'content-type': 'application/json' } : {} });
+          out(method + ' ' + response.status);
+        } catch {
+          out(method + ' refused');
+        }
+      }
       return undefined;
     },
   };
@@ -77,4 +88,19 @@ test('an exercise cell adds the code and its output to the answer', async ({ pag
   const answer = await editorText(exercise.getByRole('textbox', { name: 'Exercise answer' }));
   expect(answer).toContain("```python\n# your code here\nprint('fortynine')\n```");
   expect(answer).toContain('Output:\n```text\nfortynine\n```');
+});
+
+test("a cell's code cannot use the app's own API", async ({ page, course }) => {
+  const { base, errors } = await course('python_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const cell = page.locator('.lesson-body python-cell');
+  await cell.getByRole('textbox', { name: 'Python code' }).fill(
+    `probe('${base}/api/state', 'GET')\nprobe('${base}/api/studio/access', 'PUT')\nprint('done')`);
+  await cell.getByRole('button', { name: 'Run' }).click();
+  await expect(cell.locator('.output')).toContainText('done');
+  await expect(cell.locator('.output')).toContainText('GET refused');
+  await expect(cell.locator('.output')).toContainText('PUT refused');
+  // The page itself still can, and Studio's access is as it was.
+  expect(await page.evaluate(() => fetch('/api/studio/access').then((r) => r.json()))).toMatchObject({ full_access: false });
+  expect(errors).toEqual([]);
 });

@@ -48,6 +48,14 @@ class ReadingsInTeaching(unittest.TestCase):
             runner = Runner()
             client, host = host_client(path, runner=runner)
             with client:
+                # Section a has no preparation material, so its first lesson prepares itself and sees the figures.
+                first = host.start_turn({'concept_id': 'a', 'channel': 'mainline', 'prompt': 'Teach'})['turn']
+                host.wait(first['id'], 5)
+                prompt, images = runner.calls[0]
+                self.assertIn('Image inputs, in order: figure', prompt)
+                self.assertEqual(len(images), 2)
+
+                # With a lesson started, the next section is prepared, and its preparation sees the same images.
                 deadline = time.time() + 5
                 while time.time() < deadline and not any('Internal preparation task' in p for p, _ in runner.calls):
                     time.sleep(.05)
@@ -56,13 +64,6 @@ class ReadingsInTeaching(unittest.TestCase):
                 self.assertEqual(len(images), 2)
                 self.assertTrue(all(Path(p).read_bytes().startswith(b'\x89PNG') for p in images))
                 self.assertIn(figure, Path(images[0]).name)
-
-                # Section a has no preparation material, so its first lesson prepares itself and sees the same images.
-                first = host.start_turn({'concept_id': 'a', 'channel': 'mainline', 'prompt': 'Teach'})['turn']
-                host.wait(first['id'], 5)
-                prompt, images = runner.calls[-1]
-                self.assertIn('Image inputs, in order: figure', prompt)
-                self.assertEqual(len(images), 2)
                 for request in ({'concept_id': 'a', 'channel': 'mainline', 'prompt': 'Again'},
                                 {'concept_id': 'a', 'channel': 'sidequestion', 'prompt': 'Why?'}):
                     turn = host.start_turn(request)['turn']

@@ -92,10 +92,30 @@ class PageReadings(unittest.TestCase):
         self.call('source.readings.save', **self.ref, readings=[{'page': 2, 'text': 'Corrected', 'figures': [{**self.LENS, 'caption': 'A thin convex lens'}]}])
         unit = self.call('source.read', source_id=self.source['id'])['units'][1]
         self.assertEqual(unit['text'], 'Corrected')
-        self.assertEqual([f['id'] for f in unit['figures']], ids[:1])  # ids follow the position on the page
+        self.assertEqual([f['id'] for f in unit['figures']], ids[:1])
         found = self.call('source.figure', id=ids[0])['figure']
         self.assertEqual((found['caption'], found['page'], found['unit_id'], found['box']), ('A thin convex lens', 2, 'page-2', self.LENS['box']))
-        self.call('source.figure', error='unknown_figure', id=ids[1])
+        # A figure the new reading leaves out is no longer on the page, but a lesson that shows it still draws it.
+        self.assertEqual(self.call('source.figure', id=ids[1])['figure']['label'], 'Figure 2.2')
+
+    def test_reading_a_page_again_keeps_each_figures_id_whatever_its_position(self):
+        top, bottom = {**self.LENS, 'box': [0.1, 0.1, 0.9, 0.45]}, {**self.LENS, 'label': '', 'box': [0.1, 0.5, 0.9, 0.9]}
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[top, bottom])])
+        lens, unlabelled = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+
+        # Read again in another order, with the unlabelled figure's crop corrected and a new figure before both.
+        corner = {'label': '', 'caption': '', 'description': 'A ray diagram in the corner.', 'box': [0.0, 0.0, 0.08, 0.08]}
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[corner, {**bottom, 'box': [0.05, 0.45, 0.95, 0.95]}, top])])
+        ids = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+        self.assertEqual(ids[1:], [unlabelled, lens], 'the same label, or a box over the same region, is the same figure')
+        self.assertNotIn(ids[0], (lens, unlabelled), 'a new figure never takes an id a lesson may already show')
+        self.assertEqual(self.call('source.figure', id=unlabelled)['figure']['box'], [0.05, 0.45, 0.95, 0.95])
+
+        # Leaving the lens out and adding another figure does not hand the lens's id to it.
+        self.call('source.readings.save', **self.ref, readings=[self.reading(2, figures=[{**corner, 'box': [0.9, 0.0, 1.0, 0.08]}])])
+        [added] = [f['id'] for f in self.call('source.read', source_id=self.source['id'])['units'][1]['figures']]
+        self.assertNotIn(added, (lens, unlabelled, ids[0]))
+        self.assertEqual(self.call('source.figure', id=lens)['figure']['box'], top['box'])
 
     def test_invalid_readings_are_refused_whole(self):
         bad = [

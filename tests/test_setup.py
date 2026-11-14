@@ -140,6 +140,39 @@ class Commands(unittest.TestCase):
             run.assert_called_once_with(['stop'])
 
 
+class MovingOldLibraries(unittest.TestCase):
+    """Setup moves courses from where earlier versions kept them, but never one a host still has open."""
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp())
+        self.old, self.root = self.home / 'old', self.home / 'library'
+        self.root.mkdir()
+        for name in ('waves', 'optics'):
+            (self.old / name).mkdir(parents=True)
+            (self.old / name / 'course.sqlite3').write_bytes(b'')
+        patches = (mock.patch.object(commands.library, 'legacy_roots', return_value=[self.old]),
+                   mock.patch.object(commands, 'SHUTDOWN_WAIT', 0.2))
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def test_a_course_a_host_still_holds_is_left_with_the_old_librarys_bookkeeping(self):
+        (self.old / '.throughline').mkdir()
+        (self.old / '.throughline' / 'host.json').write_text('{"port": 9}', encoding='utf-8')  # a host that does not answer
+        held = commands.library.acquire_lease(self.old / 'optics')
+        self.addCleanup(held.close)
+        moved, skipped = commands.migrate(self.root)
+        self.assertEqual((moved, skipped), (['waves'], [str(self.old / 'optics')]))
+        self.assertTrue((self.root / 'waves' / 'course.sqlite3').is_file())
+        self.assertTrue((self.old / 'optics' / 'course.sqlite3').is_file())
+        self.assertTrue((self.old / '.throughline' / 'host.json').is_file(), 'the host that holds optics is still recorded')
+
+    def test_an_emptied_old_library_is_removed(self):
+        moved, skipped = commands.migrate(self.root)
+        self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))
+        self.assertFalse(self.old.exists())
+
+
 class Doctor(unittest.TestCase):
     FOUND = checks.result('codex', True, 'codex-cli 1.0 (/bin/codex)')
 

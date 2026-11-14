@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import library
 from .codex import find_codex
+from .store import OperationError
 
 SKILL = Path(__file__).resolve().parent / 'skill'
 ICONS = Path(__file__).resolve().parent / 'icons'
@@ -31,6 +32,9 @@ LAUNCHER_HINTS = {
 # Where a macOS launcher goes when the shared Applications folder is writable; tests point it elsewhere.
 APPLICATIONS = Path('/Applications')
 BUNDLE_ID = 'io.github.keweijun.throughline'
+# How long setup waits for a host started from an old library location to let go of its courses; Host.close can
+# wait twelve seconds for the teacher's work to stop.
+SHUTDOWN_WAIT = 20
 
 
 def platform():
@@ -205,18 +209,23 @@ def migrate(root):
         try:  # a host started from the old location still holds its courses
             record = json.loads((old / '.throughline' / 'host.json').read_text(encoding='utf-8'))
             _call(record['port'], 'POST', '/api/shutdown', {})
-            time.sleep(3)
         except (OSError, ValueError, KeyError, urllib.error.URLError):
             pass
+        deadline = time.monotonic() + SHUTDOWN_WAIT
+        left = False
         for course in sorted(p for p in old.iterdir() if p.is_dir() and library.is_course(p)):
-            if (root / course.name).exists():
+            if (root / course.name).exists() or not _free(course, deadline):
                 skipped.append(str(course))
+                left = True
                 continue
             try:
                 shutil.move(str(course), str(root / course.name))
                 moved.append(course.name)
             except OSError:
                 skipped.append(str(course))
+                left = True
+        if left:
+            continue  # the old library still has courses, and may have a host whose record setup must not forget
         agents = old / 'AGENTS.md'
         if agents.is_file() and agents.read_text(encoding='utf-8').startswith(LIBRARY_MARKER):
             agents.unlink()
@@ -226,6 +235,18 @@ def migrate(root):
         except OSError:
             pass
     return moved, skipped
+
+
+def _free(course, deadline):
+    """Whether no host holds the course, waiting until `deadline` for one that is shutting down to let it go."""
+    while True:
+        try:
+            library.acquire_lease(course).close()  # released before the move, which Windows refuses for an open file
+            return True
+        except OperationError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.2)
 
 
 def ours(folder, name):

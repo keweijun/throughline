@@ -36,6 +36,26 @@ def state_dir():
     return default_root() / '.throughline'
 
 
+def acquire_lease(workspace):
+    """Hold a course for one host, or for setup while it moves the course; refused while another holds it."""
+    lease = (workspace / '.learning-host.lock').open('a+b')
+    lease.seek(0)
+    lease.write(b'0')
+    lease.flush()
+    lease.seek(0)
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(lease.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        lease.close()
+        raise OperationError('host_running', 'Another learning host already owns this course')
+    return lease
+
+
 def course_path(root, name):
     if not isinstance(name, str) or not NAME.match(name):
         raise OperationError('invalid_course_name', 'Course names use lowercase letters, digits and hyphens, for example quantum-v1')

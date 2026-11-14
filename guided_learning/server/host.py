@@ -1,7 +1,6 @@
 """The learning host: owns a course workspace and runs every model turn through one engine."""
 import asyncio
 import logging
-import os
 import threading
 import time
 import uuid
@@ -51,25 +50,6 @@ def _offer(queue, event):
     queue.put_nowait(event)
 
 
-def _acquire_lease(workspace):
-    lease = (workspace / '.learning-host.lock').open('a+b')
-    lease.seek(0)
-    lease.write(b'0')
-    lease.flush()
-    lease.seek(0)
-    try:
-        if os.name == 'nt':
-            import msvcrt
-            msvcrt.locking(lease.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        lease.close()
-        raise OperationError('host_running', 'Another learning host already owns this course')
-    return lease
-
-
 turn_summary = summarize
 # What a finished background turn changes besides itself: the interface reloads only that part of the state.
 FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': 'memory'}
@@ -99,7 +79,7 @@ class Host:
         self._stamp_lock = threading.Lock()
         self._own_stamp = library.stamp(self.workspace)
         self.operation({'op': 'course.status'})
-        self._lease = _acquire_lease(self.workspace)
+        self._lease = library.acquire_lease(self.workspace)
         self._held = hold(self.workspace)
         self.operation({'op': 'stream.recover'})
         self.navigation = Navigation(self)

@@ -285,8 +285,11 @@ def complete(store, request):
         cid=value['concept_id']
         teaching.record_interaction(store,{'id':iid,'role':'assistant','text':feedback,'concept_id':cid,'source_refs':task['source_refs']})
         base={'id':'practice-evidence:'+value['id'],'concept_id':cid,'session_id':'practice:'+task['id'],'exercise_id':task['id']}
-        if value['action']=='ask':
-            task['history'].append({'action':'ask','question':value['question'],'feedback':feedback,**({'images':value['images']} if value.get('images') else {})})
+        # An answer that addresses no part, such as a question typed into the answer box, is kept as an ask: it is never
+        # assessed and records no evidence (ADR 0011, issue #178).
+        asked=value['action']=='ask' or (value['action']=='assess' and all(p=='not_attempted' for p in result['parts']))
+        if asked:
+            task['history'].append({'action':'ask','question':value.get('question',value.get('answer')),'feedback':feedback,**({'images':value['images']} if value.get('images') else {})})
         elif value['action']=='assess':
             parts=[old if new=='not_attempted' else new for old,new in zip(part_statuses(task),result['parts'])]
             outcome='passed' if all(p=='correct' for p in parts) else 'needs_work'

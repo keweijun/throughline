@@ -199,6 +199,29 @@ class AskFlow(unittest.TestCase):
             self.assertEqual(caught.exception.code,'empty_question')
             app.close()
 
+    def test_a_question_typed_into_the_answer_box_is_kept_as_an_ask(self):
+        class Runner:
+            reply='';prompts=[]
+            def run(self,prompt,cwd,emit,cancel):
+                self.prompts.append(prompt);emit({'kind':'final','text':self.reply});emit({'kind':'complete'})
+        with tempfile.TemporaryDirectory() as path:
+            execute(path,{'op':'course.init','title':'Physics'})
+            execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
+            runner=Runner();app=Host(path,runner=runner)
+            def run(start,text):
+                runner.reply=text;t=app.wait(start()['turn']['id'],5);self.assertEqual(t['status'],'completed',t)
+                return app.practice.state()
+            tid=run(lambda:app.practice.generate('a'),'{"questions":[{"question":"1. State it.\\n2. Apply it.","origin":"self_created","source_refs":[]}]}')['tasks'][0]['id']
+            task=run(lambda:app.practice.act(tid,'assess','What does part 2 mean?'),'{"feedback":"It means use the rule.","parts":["not_attempted","not_attempted"]}')['tasks'][0]
+            self.assertIn('it is a question, not an answer',runner.prompts[-1])
+            self.assertEqual(task['history'],[{'action':'ask','question':'What does part 2 mean?','feedback':'It means use the rule.'}])
+            self.assertEqual(task['status'],'pending')
+            self.assertEqual(execute(path,{'op':'evidence.view','concept_id':'a'})['history'],[])
+            # A real answer afterwards is still independent: the question's feedback was no help.
+            task=run(lambda:app.practice.act(tid,'assess','Both parts.'),'{"feedback":"Correct.","parts":["correct","correct"]}')['tasks'][0]
+            self.assertEqual(task['history'][-1]['kind'],'independent')
+            app.close()
+
     def test_an_ask_job_needs_a_question(self):
         from guided_learning.store import OperationError
         with tempfile.TemporaryDirectory() as path:

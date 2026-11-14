@@ -68,7 +68,7 @@ class Welcome(unittest.TestCase):
         for language in commands.LANGUAGES:
             text = commands.welcome(Path('/courses'), Path('/x/throughline.desktop'), language, opened=True)
             self.assertIn(commands.version(), text)
-            self.assertIn('/courses', text)
+            self.assertIn(str(Path('/courses')), text)
             self.assertIn('New course', text)
             self.assertLess(len(text.splitlines()), 10)
             self.assertNotIn('间隔', text)

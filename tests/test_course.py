@@ -8,7 +8,7 @@ class CourseCLI(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()  # macOS and Windows hand out temp paths through links and short names
         self.course = self.base / 'course'
 
     def call(self, op, error=None, workspace=None, **fields):

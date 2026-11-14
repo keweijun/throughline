@@ -15,7 +15,7 @@ class StudioFiles(unittest.TestCase):
     def setUp(self):
         scratch = tempfile.TemporaryDirectory()
         self.addCleanup(scratch.cleanup)
-        self.tmp = Path(scratch.name)
+        self.tmp = Path(scratch.name).resolve()  # macOS and Windows hand out temp paths through links and short names
         self.library = self.tmp / 'library'
         self.course = self.library / 'waves'
         self.course.mkdir(parents=True)

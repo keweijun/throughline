@@ -1,18 +1,32 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "throughline"
-version = "0.44.1"
+version = "0.45.0"
 description = "Throughline: guided learning across your documents, taught by Codex"
 readme = "README.md"
+license = "MIT"
+# The built interface bundles third-party code, whose notices ship beside the package's own license.
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES.md", "licenses/*"]
+authors = [{ name = "Keweijun" }]
+keywords = ["learning", "study", "codex", "pdf", "tutor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Education",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Education",
+]
 requires-python = ">=3.10"
 # Starlette serves PDF snapshots range by range; 0.49.1 fixed its Range parsing.
 dependencies = ["fastapi>=0.115", "starlette>=0.49.1", "uvicorn>=0.30"]
 
 [project.urls]
 Homepage = "https://github.com/keweijun/throughline"
+Changelog = "https://github.com/keweijun/throughline/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 pdf = ["pypdf>=6,<7", "pypdfium2>=5,<6", "Pillow>=11,<13"]

@@ -1,0 +1,132 @@
+# Tests every pull request and every push to main; a push to main whose version has no release yet is released (ADR 0021).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: '3.10' }
+          - { os: ubuntu-latest, python: '3.13' }
+          - { os: macos-latest, python: '3.13' }
+          - { os: windows-latest, python: '3.13' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[pdf,dev]"
+      - run: python -m unittest discover -s tests
+
+  web:
+    name: Interface build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run licenses
+      - run: npm run build
+      - name: The committed guided_learning/web_dist is the build of web/src
+        run: |
+          if [ -n "$(git status --porcelain -- ../guided_learning/web_dist)" ]; then
+            git status --short -- ../guided_learning/web_dist
+            echo "::error::guided_learning/web_dist is out of date: run npm run build in web/ and commit it."
+            exit 1
+          fi
+
+  browser:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # The browser tests start fixture hosts with .venv's Python, as in development.
+      - run: python -m venv .venv && .venv/bin/python -m pip install -e ".[pdf,dev]"
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npx playwright test
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: web/test-results
+          retention-days: 7
+
+  version:
+    name: Version and changelog
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python scripts/release.py check "origin/${{ github.base_ref }}"
+
+  release:
+    name: Release
+    needs: [python, web, browser]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Tag and publish the version if it is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(python scripts/release.py version)"
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "v$version is already released."
+          else
+            python scripts/release.py notes "$version" > "$RUNNER_TEMP/notes.md"
+            gh release create "v$version" --target "$GITHUB_SHA" --title "Throughline $version" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          git fetch --tags --force origin
+          # Installs and the update check read stable; it only ever moves forward, to the latest release.
+          git push origin "$(git rev-list -n 1 "v$version"):refs/heads/stable"

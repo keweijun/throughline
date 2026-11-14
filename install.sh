@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install or update Throughline on macOS or Linux:
-#   curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/main/install.sh | sh
+#   curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/stable/install.sh | sh
 # For the Chinese welcome guide, set THROUGHLINE_LANGUAGE=zh-CN or pass --language zh-CN (`| sh -s -- --language zh-CN`).
 # --no-open leaves the app closed when setup is done.
 #
@@ -8,12 +8,12 @@
 #   1. install uv if it is missing (uv brings its own Python)
 #   2. stop a running Throughline, which keeps its files open
 #   3. remove the pre-0.5.1 package name, codex-guided-learning
-#   4. install the latest version from main
+#   4. install the latest release (the stable branch, which CI moves to each release)
 #   5. run setup: the skill, the course library, the launcher, then open the app
 # Courses are never touched. Codex is checked for, not installed.
 set -eu
 
-PACKAGE='throughline[pdf] @ git+https://github.com/keweijun/throughline'
+PACKAGE='throughline[pdf] @ git+https://github.com/keweijun/throughline@stable'
 
 main() {
   language="${THROUGHLINE_LANGUAGE:-en}"

@@ -22,7 +22,7 @@ class PageReadings(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()  # macOS and Windows hand out temp paths through links and short names
         self.course = self.base / 'course'
         self.call('course.init', title='Optics')
         self.pdf = self.base / 'lecture.pdf'

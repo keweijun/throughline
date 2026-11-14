@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.49.0
+
+- A figure in a lesson keeps showing the same figure after Codex reads its page again. Before, reading a page again could make an earlier lesson show a different figure from that page, when the new reading listed the figures in another order or added or left one out. Correcting a figure's crop still fixes it in every lesson that shows it.
+- Reviews now count a question that tests several sections part by part: a missed part counts against its own section only, and answering the question counts as practice of every section it tests, not just the first.
+
 ## 0.48.0
 
 - When a course file moves, or you add your own copy of a file that an imported course already has, Throughline now keeps the existing source, with its page readings and its place in the route, instead of adding a second one. Two copies you register on purpose still stay two sources.

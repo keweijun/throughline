@@ -175,8 +175,8 @@
     padding: 0.3rem 0;
     border-radius: 999px;
     background: var(--accent-wash);
-    transform-origin: top;
     animation: tray-in var(--settle) var(--ease-out);
+    transform-origin: top;
   }
 
   @keyframes tray-in {

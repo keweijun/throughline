@@ -69,12 +69,16 @@
 
 <style>
   .questions {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.6rem;
     padding: 0.7rem 0.8rem;
     border: 1px solid var(--rule);
     border-radius: calc(var(--radius) * 2);
     font-size: var(--step--1);
+    transition:
+      border-color var(--settle) ease,
+      background-color var(--settle) ease;
   }
 
   .questions.open {
@@ -105,6 +109,7 @@
   }
 
   .given {
+    animation: enter-fade var(--settle) ease;
     margin: 0;
     color: var(--ink-soft);
   }

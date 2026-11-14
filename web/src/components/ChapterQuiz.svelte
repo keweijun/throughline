@@ -118,6 +118,7 @@
   }
 
   .problem {
+    animation: enter-rise var(--settle) var(--ease-out);
     color: var(--danger);
     font-size: var(--step-0);
   }
@@ -133,5 +134,9 @@
     display: grid;
     gap: 1rem;
     margin-top: 1rem;
+  }
+
+  .status {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

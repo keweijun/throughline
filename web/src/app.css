@@ -370,7 +370,7 @@ summary::before,
   border-right: 1.6px solid currentColor;
   border-bottom: 1.6px solid currentColor;
   transform: rotate(-45deg);
-  transition: transform 0.15s ease;
+  transition: transform var(--quick) var(--ease-out);
   vertical-align: middle;
 }
 

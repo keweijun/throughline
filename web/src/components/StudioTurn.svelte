@@ -325,6 +325,7 @@
   }
 
   .user {
+    animation: enter-rise var(--settle) var(--ease-out);
     justify-self: end;
     display: grid;
     gap: 0.3rem;
@@ -384,6 +385,7 @@
   }
 
   .said-by-codex {
+    animation: enter-fade var(--settle) ease;
     font-size: var(--step--1);
     overflow-wrap: anywhere;
   }
@@ -393,6 +395,7 @@
   }
 
   .tool {
+    animation: enter-fade var(--settle) ease;
     min-width: 0;
     font-size: 0.8rem;
     color: var(--pencil);
@@ -427,6 +430,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     font-family: var(--mono);
+    transition: color var(--quick) ease;
   }
 
   .count {
@@ -474,6 +478,8 @@
     border-radius: 50%;
     background: var(--rule-strong);
     transform: translateY(-0.05rem);
+    /* A call that finishes or fails settles into its colour rather than snapping from the pulse. */
+    transition: background-color var(--settle) ease;
   }
 
   .dot.running {
@@ -539,6 +545,7 @@
   }
 
   .compacted {
+    animation: enter-fade var(--settle) ease;
     margin: 0;
     text-align: center;
     font-size: 0.75rem;
@@ -546,6 +553,7 @@
   }
 
   .plan {
+    animation: enter-fade var(--settle) ease;
     display: grid;
     gap: 0.2rem;
     margin: 0;
@@ -560,6 +568,7 @@
   .plan li {
     display: flex;
     gap: 0.45rem;
+    transition: color var(--settle) ease;
   }
 
   .plan .completed {
@@ -586,6 +595,7 @@
 
   .working,
   .ended {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     align-items: baseline;
     gap: 0.45rem;
@@ -599,6 +609,8 @@
   }
 
   .plan-text {
+    animation: enter-fade var(--settle) ease;
     font-size: var(--step--1);
   }
+
 </style>

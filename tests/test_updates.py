@@ -25,7 +25,7 @@ class UpdateCheck(unittest.TestCase):
         self.assertFalse(updates.newer('0.5.0', '0.5.1'))
         self.assertFalse(updates.newer('0.6.0', 'development'))
 
-    def test_the_host_reports_main_s_declared_version(self):
+    def test_the_host_reports_the_latest_release_s_declared_version(self):
         updates._found.clear()
         with tempfile.TemporaryDirectory() as tmp:
             remote = Path(tmp) / 'pyproject.toml'

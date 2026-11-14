@@ -90,6 +90,10 @@
     list-style: none;
   }
 
+  li {
+    animation: enter-fade var(--settle) ease;
+  }
+
   .chat {
     display: flex;
     align-items: baseline;

@@ -2,7 +2,7 @@
 import hashlib
 import json
 import time
-from . import curriculum
+from . import curriculum, streaming
 from .teaching import require_text
 from .store import OperationError
 from .preferences import view as preferences
@@ -20,8 +20,13 @@ def capture(store, cid):
 
 
 def target(store):
+    """The section to prepare: the next one on the route, once the learner has started a lesson in the current one.
+    Learners who drill exercises without lessons, or jump from section to section, would otherwise leave most of what is
+    prepared unread (issue #176); a lesson takes minutes, preparation about a minute, so waiting for it costs no head start."""
     current = store.get('course','position',{}).get('concept_id')
     if not current: return None
+    if not any(t['channel'] == 'mainline' and t['concept_id'] == current and not t.get('chapter_id') for t in store.digest('streams', streaming.brief)):
+        return None
     return curriculum.context(store,{'concept_id':current})['next_concept_id']
 
 
@@ -70,7 +75,9 @@ def reconcile(store, request):
         if listed['status'] not in ('running','ready'): continue
         job = store.get('preparation_jobs', listed['id'])
         change = None
-        if job['concept_id'] not in (current,upcoming) or capture(store,job['concept_id'])['fingerprint'] != job.get('fingerprint'):
+        if job['concept_id'] not in (current,upcoming):
+            change = {'status':'stale','reason':'The learner moved to another section','content':None}
+        elif capture(store,job['concept_id'])['fingerprint'] != job.get('fingerprint'):
             change = {'status':'stale','reason':'Route, sources, or teaching language changed; the main teacher will prepare independently','content':None}
         elif job['status']=='running':
             turn=store.get('streams',job['id'])
@@ -110,6 +117,16 @@ def view(store, request):
     ready=next((j for j in reversed(jobs) if j['concept_id']==cid and j['status']=='ready'),None)
     return {'jobs':jobs,'next_concept_id':target(store),'ready':ready}
 
+def use(store, request):
+    """Record the first teaching turn that received a job's material, so preparation nobody read can be told apart."""
+    job = store.get('preparation_jobs', require_text(request, 'id'))
+    if job is None:
+        raise OperationError('unknown_preparation', request['id'])
+    if 'used_by' not in job:
+        save(store, {**job, 'used_by': require_text(request, 'turn_id'), 'used_at': time.time()})
+    return {'job': brief(store.get('preparation_jobs', job['id']))}
+
+
 def recover(store, request):
     for job in store.matching('preparation_jobs', 'status', 'running'):
         if store.get('streams',job['id']) is None:
@@ -117,4 +134,4 @@ def recover(store, request):
             save(store,job)
     return reconcile(store,{})
 
-OPERATIONS={'preparation.recover':recover,'preparation.enqueue':enqueue,'preparation.reconcile':reconcile,'preparation.view':view}
+OPERATIONS={'preparation.use':use,'preparation.recover':recover,'preparation.enqueue':enqueue,'preparation.reconcile':reconcile,'preparation.view':view}

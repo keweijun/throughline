@@ -52,6 +52,9 @@ _Avoid_: Deferred item ("Do later" stays in scope and enters the review context)
 **Replaced exercise**: An exercise the teacher wrote that the learner had not touched, replaced when they asked for different exercises; it is kept for the record but no longer shown. The course's own exercises are never replaced.
 _Avoid_: Skipped exercise, deleted, regenerated homework.
 
+**Retired exercise**: An exercise the learner never touched that Codex took out of its section, such as a duplicate; it is kept for the record but no longer shown, counted or asked again (ADR 0011).
+_Avoid_: Skipped exercise (the learner closed it), replaced exercise, deleted.
+
 **Chapter**: A table-of-contents grouping of consecutive learning sections, built and revised one at a time; it is never taught as one block. A chapter with no sections is not built yet (ADR 0006).
 _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number of chapters.
 

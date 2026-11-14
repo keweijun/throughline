@@ -36,6 +36,7 @@
 
 <style>
   .prep {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     flex-wrap: wrap;
     align-items: center;

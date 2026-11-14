@@ -408,7 +408,8 @@
     cursor: pointer;
     transition:
       color var(--quick) ease,
-      background-color var(--quick) ease;
+      background-color var(--quick) ease,
+      box-shadow var(--quick) ease;
   }
 
   .place:hover {
@@ -475,6 +476,7 @@
   }
 
   .update {
+    animation: enter-fade var(--settle) ease;
     gap: 0.3rem;
     border-radius: 999px;
     border-color: transparent;
@@ -489,6 +491,7 @@
   }
 
   .studio-status {
+    animation: enter-fade var(--settle) ease;
     gap: 0.4rem;
     border-radius: 999px;
     border-color: var(--rule);
@@ -569,5 +572,10 @@
     .topbar {
       gap: 0.5rem;
     }
+  }
+
+  /* Connecting and reconnecting come and go with the host; they fade rather than blink. */
+  .actions > [role='status'] {
+    animation: enter-fade var(--settle) ease;
   }
 </style>

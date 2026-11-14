@@ -186,5 +186,5 @@ for line in sys.stdin:
         reply = {'files': [{'root': params['roots'][0], 'path': 'inputs/waves.md', 'file_name': 'waves.md', 'score': 9},
                            {'root': params['roots'][0], 'path': 'course.sqlite3', 'file_name': 'course.sqlite3', 'score': 1}]}
     elif method == 'windowsSandbox/readiness':
-        reply = {'status': 'notConfigured'}
+        reply = {'status': 'ready'}  # so the tests see the same sandboxed turns on Windows
     send({'id': rid, 'result': reply})

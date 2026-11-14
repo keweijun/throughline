@@ -4,26 +4,87 @@
 // exercise, Add to answer sends the code and its output to the answer box; the teacher assesses it like any answer.
 import { t } from './i18n.svelte';
 import type { Reply, Request } from './python-worker';
+import workerUrl from './python-worker.ts?worker&url';
 
 export const ANSWER = 'python-answer';
 export type Answer = { exercise: string; text: string };
 
-let worker: Worker | null = null;
+// The worker runs inside a sandboxed frame with no origin of its own, so a cell's requests are not the app's: the host
+// refuses them as it refuses any other site's. The frame cannot load the app's files, so the page hands it the worker's
+// code, and starts it as a data URL: Pyodide needs a module worker, and a frame without an origin cannot start one from a
+// blob. After that the frame only passes messages between the page and the worker. A worker that cannot start, in a
+// browser that refuses it say, is reported as run 0, so the cell says Python could not load instead of waiting.
+const FRAME = `<script>
+let worker;
+const failed = (text) => parent.postMessage({ id: 0, type: 'error', text: String(text), load: true }, '*');
+onmessage = (event) => {
+  if (event.source !== parent) return;
+  if (worker) return worker.postMessage(event.data);
+  try {
+    worker = new Worker('data:text/javascript,' + encodeURIComponent(event.data), { type: 'module' });
+  } catch (error) {
+    return failed(error && error.message || error);
+  }
+  worker.onmessage = (reply) => parent.postMessage(reply.data, '*');
+  worker.onerror = (error) => failed(error.message || 'Python could not start');
+};
+</script>`;
+
+let frame: HTMLIFrameElement | null = null;
+let ready: Promise<Window> | null = null;
 let sequence = 0;
 const listeners = new Map<number, (reply: Reply) => void>();
 
 function python() {
-  if (!worker) {
-    worker = new Worker(new URL('./python-worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (event: MessageEvent<Reply>) => listeners.get(event.data.id)?.(event.data);
+  if (!ready) {
+    const box = (frame = document.createElement('iframe'));
+    box.sandbox.add('allow-scripts');
+    box.srcdoc = FRAME;
+    box.hidden = true;
+    box.tabIndex = -1;
+    box.setAttribute('aria-hidden', 'true');
+    const loaded = new Promise((resolve) => box.addEventListener('load', resolve, { once: true }));
+    const started = (ready = Promise.all([fetch(workerUrl).then((response) => response.text()), loaded]).then(([source]) => {
+      // The development server adds an import of its own client to the worker, which a data URL cannot resolve; the
+      // worker uses nothing from it. A build has no such import.
+      if (import.meta.env.DEV) source = source.replace(/^import\s+["']\/@[^"']*["'];?\s*$/gm, '');
+      box.contentWindow!.postMessage(source, '*');
+      return box.contentWindow!;
+    }));
+    started.catch(() => {
+      box.remove();
+      if (ready === started) ready = frame = null; // tried again on the next run
+    });
+    document.body.append(box);
   }
-  return worker;
+  return ready;
 }
 
-/** Ends every run by ending the worker; the next run starts a new one, with Pyodide from the browser's cache. */
+/** A reply from the frame: only the shapes the worker sends are read, and only as text. */
+function reply(data: unknown): data is Reply {
+  const value = data as Partial<Record<'id' | 'type' | 'text' | 'result', unknown>> | null;
+  return typeof value?.id === 'number' && typeof value.type === 'string' && ['undefined', 'string'].includes(typeof value.text) &&
+    (value.result === undefined || value.result === null || typeof value.result === 'string');
+}
+
+if (typeof window !== 'undefined') {
+  addEventListener('message', (event) => {
+    if (!frame || event.source !== frame.contentWindow || !reply(event.data)) return;
+    if (event.data.id !== 0) return listeners.get(event.data.id)?.(event.data);
+    const failure = event.data;
+    frame.remove(); // tried again on the next run
+    frame = ready = null;
+    for (const [id, listener] of listeners) listener({ ...failure, id });
+    listeners.clear();
+  });
+}
+
+/** Ends every run by removing the frame, and the worker with it; the next run starts both again, with Pyodide from the
+ * browser's cache. */
 function stopAll() {
-  worker?.terminate();
-  worker = null;
+  frame?.remove();
+  frame = null;
+  ready = null;
   for (const [id, listener] of listeners) listener({ id, type: 'error', text: '' });
   listeners.clear();
 }
@@ -162,7 +223,10 @@ class PythonCell extends HTMLElement {
         finish();
       }
     });
-    python().postMessage({ id, code } satisfies Request);
+    python().then(
+      (box) => box.postMessage({ id, code } satisfies Request, '*'),
+      () => listeners.get(id)?.({ id, type: 'error', text: '', load: true }),
+    );
   }
 
   private answer() {

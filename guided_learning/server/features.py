@@ -925,10 +925,12 @@ class Memory(Feature):
 
     def recover(self):
         """Record what turns completed just before a crash asked memory to keep, without a model call: every request
-        of the learner's still unanswered, and the notes and consolidations of the turns started or revealed within
-        RECOVERY_WINDOW of the course's latest, since a crash interrupts only turns still running as it happens, and
-        requests that overlap can finish in any order. Each is applied once (`memory.note`, `memory.consolidate` and
-        `memory.answer` keep the turn that applied them), so a turn already recorded changes nothing."""
+        of the learner's still unanswered, and the notes of the turns started or revealed within RECOVERY_WINDOW of the
+        course's latest, since a crash interrupts only turns still running as it happens, and requests that overlap can
+        finish in any order. `memory.note` and `memory.answer` keep the turn that applied them, and a refused note stays
+        refused, so a turn already handled changes nothing. Consolidations are not replayed: a refused one leaves no
+        record, and replayed against memory the learner has since changed it could merge away what they confirmed; a
+        lost one only leaves duplicates for the next."""
         unanswered = {r['turn_id'] for r in self.operation({'op': 'memory.requests'})['requests'] if 'reply' not in r and 'error' not in r}
         turns = self.host.brief_turns()  # oldest first
 
@@ -936,7 +938,7 @@ class Memory(Feature):
             return max(turn['started_at'], turn.get('revealed_at') or 0)
         since = max(map(last_active, turns), default=0) - RECOVERY_WINDOW
         pending = [t for t in turns if t['status'] == 'completed' and (t['id'] in unanswered or (
-            t['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation') and last_active(t) >= since))]
+            t['channel'] in ('mainline', 'sidequestion', 'practice') and last_active(t) >= since))]
         if any(t['channel'] == 'practice' for t in pending):
             self.host.practice.state()  # records the practice a note cites first, as completion does
         for brief in pending:

@@ -348,5 +348,13 @@ class SectionEndConsolidation(unittest.TestCase):
                 self.assertEqual(app.operation({'op': 'memory.consolidations'})['consolidations'], [])
 
 
+    def test_a_refused_consolidation_is_not_tried_again_when_the_course_opens(self):
+        with tempfile.TemporaryDirectory() as path:
+            ids = remembered(path)
+            self.run_consolidation(path, {'merge': [{'into': ids['term'], 'entries': [ids['deleted']]}]})
+            with mock.patch('guided_learning.server.features.Memory.on_complete') as completed:
+                Host(path, settings=Consolidating({})).close()
+            self.assertNotIn('consolidation', [turn['channel'] for (turn,), _ in completed.call_args_list])
+
 if __name__ == '__main__':
     unittest.main()

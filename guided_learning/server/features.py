@@ -925,15 +925,18 @@ class Memory(Feature):
 
     def recover(self):
         """Record what turns completed just before a crash asked memory to keep, without a model call: every request
-        of the learner's still unanswered, and the notes and consolidations of the turns that started within
+        of the learner's still unanswered, and the notes and consolidations of the turns started or revealed within
         RECOVERY_WINDOW of the course's latest, since a crash interrupts only turns still running as it happens, and
         requests that overlap can finish in any order. Each is applied once (`memory.note`, `memory.consolidate` and
         `memory.answer` keep the turn that applied them), so a turn already recorded changes nothing."""
         unanswered = {r['turn_id'] for r in self.operation({'op': 'memory.requests'})['requests'] if 'reply' not in r and 'error' not in r}
         turns = self.host.brief_turns()  # oldest first
-        since = max((t['started_at'] for t in turns), default=0) - RECOVERY_WINDOW
+
+        def last_active(turn):  # a prepared step is taught, and its hooks run, when the learner reveals it
+            return max(turn['started_at'], turn.get('revealed_at') or 0)
+        since = max(map(last_active, turns), default=0) - RECOVERY_WINDOW
         pending = [t for t in turns if t['status'] == 'completed' and (t['id'] in unanswered or (
-            t['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation') and t['started_at'] >= since))]
+            t['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation') and last_active(t) >= since))]
         if any(t['channel'] == 'practice' for t in pending):
             self.host.practice.state()  # records the practice a note cites first, as completion does
         for brief in pending:

@@ -199,6 +199,29 @@ class CrashRecovery(unittest.TestCase):
             finally:
                 store.db.close()
 
+    def test_a_step_prepared_long_before_it_was_revealed_is_recorded(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+
+            def two(app):
+                app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'})
+                settle(app)
+                app.start_turn({'id': 'two', 'concept_id': 'state', 'prompt': 'Teach'})
+            self.crashed(path, runner=Runner(), work=two)
+            store = Store(path)
+            try:  # 'one' stands for a step prepared two hours before the learner revealed it, just before the crash
+                turn = store.get('streams', 'one')
+                with store.db:
+                    store.put('streams', 'one', {**turn, 'started_at': turn['started_at'] - 7200, 'revealed_at': turn['started_at']})
+            finally:
+                store.db.close()
+            self.reopen(path, runner=Runner())
+            store = Store(path)
+            try:
+                self.assertIn('one', [n['turn_id'] for n in store.list('memory_notes')])
+            finally:
+                store.db.close()
+
     def test_the_learners_memory_request_is_answered_by_the_next_host(self):
         with tempfile.TemporaryDirectory() as path:
             course(path)

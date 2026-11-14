@@ -130,7 +130,7 @@ class CoursePackages(unittest.TestCase):
     def test_packages_from_a_newer_throughline_are_refused_before_unpacking(self):
         packages.export(self.course, self.package)
         for field, value, code in (('schema', migrations.VERSION + 1, 'course_too_new'), ('format', packages.FORMAT + 1, 'package_too_new'),
-                                   ('level', 'route', 'package_too_new')):
+                                   ('level', 'syllabus', 'package_too_new')):
             original = self.package.read_bytes()
             self.rewrite(lambda folder: (folder / 'manifest.json').write_text(json.dumps({**json.loads((folder / 'manifest.json').read_text()), field: value})))
             with self.assertRaises(OperationError) as refused:

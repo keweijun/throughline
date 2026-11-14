@@ -88,6 +88,7 @@ def decide(store,request):
 
 def choose(store,request):
     branch=read(store,request)['branch']
+    if branch.get('from_sender'): raise OperationError('read_only',"A question that came with a shared course is the sender's")
     choice=request.get('choice')
     if choice not in ('accept','decline'): raise OperationError('invalid_choice','accept or decline required')
     if branch['choice']:
@@ -125,6 +126,8 @@ def listing(store, request):
 
 def reply(store, request):
     branch = read(store, request)['branch']
+    if branch.get('from_sender'):
+        raise OperationError('read_only', "A question that came with a shared course is the sender's; ask your own instead")
     identifier = require_text(request, 'reply_id')
     question = require_text(request, 'question')
     selection = request.get('selection', '')

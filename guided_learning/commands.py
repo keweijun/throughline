@@ -419,12 +419,13 @@ def _answer(work):
 def export_course(args):
     from . import packages
     out = Path(args.out) if args.out else Path.cwd() / (args.course + packages.SUFFIX)
-    return _answer(lambda: packages.export(library.course_path(library.default_root(), args.course), out))
+    return _answer(lambda: packages.export(library.course_path(library.default_root(), args.course), out, args.level))
 
 
 def import_course(args):
     from . import packages
-    return _answer(lambda: packages.import_package(args.package, library.default_root(), args.name))
+    mode = 'fresh-with-notes' if args.keep_notes else 'fresh' if args.fresh else None
+    return _answer(lambda: packages.import_package(args.package, library.default_root(), args.name, mode))
 
 
 def doctor(args):
@@ -470,9 +471,13 @@ def main(argv):
     exporter = commands.add_parser('export', help='Write a course and its sources to one .throughline package')
     exporter.add_argument('course', help='Course name in the library')
     exporter.add_argument('--out', help='Package file; defaults to <course>.throughline in the current folder')
+    exporter.add_argument('--level', choices=('route', 'lessons', 'everything'), default='everything',
+                          help='How much to share: the route, the route and lessons, or everything (the default)')
     importer = commands.add_parser('import', help='Make a new course in the library from a .throughline package')
     importer.add_argument('package', help='The .throughline file')
     importer.add_argument('--name', help="Course name; defaults to the package's, made unique")
+    importer.add_argument('--fresh', action='store_true', help='Start fresh instead of continuing where the course was left')
+    importer.add_argument('--keep-notes', action='store_true', help="Start fresh, keeping the sender's notes and questions to read")
     args = parser.parse_args(argv)
     return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor,
             'export': export_course, 'import': import_course}[args.command](args)

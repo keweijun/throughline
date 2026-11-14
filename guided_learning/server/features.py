@@ -272,6 +272,11 @@ class Navigation(Feature):
             if existing:
                 return existing
             taught = any(t['channel'] == 'mainline' and t['concept_id'] == concept_id and not chapter_owned(t) for t in self.host.brief_turns())
+            shared = next((l for l in self.operation({'op': 'lesson.list', 'concept_id': concept_id})['lessons']
+                           if l['steps'] and not l['steps'][0].get('turn_id') and l['steps'][0].get('written')), None)
+            if shared and not taught and not prompt:
+                self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+                return self._reveal(shared, identifier)
             if taught:
                 return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt or prompts.DEFAULT_LESSON_REQUEST})
             self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
@@ -299,17 +304,34 @@ class Navigation(Feature):
             if done:
                 return {'turn': self.operation({'op': 'stream.read', 'id': done['turn_id']})['turn'], 'created': False}
             self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
+            if self._next_written(lesson):
+                return self._reveal(lesson, identifier)
             prepared = self._prepared(lesson)
             if not prepared:
                 self.discard_prepared()
                 return self._start_step(lesson_id, identifier, lesson['concept_id'], prompts.STEP_CONTINUE_REQUEST)
             self.operation({'op': 'lesson.step', 'id': lesson_id, 'turn_id': prepared['id'], 'request_id': identifier})
-            turn = self.operation({'op': 'stream.read', 'id': prepared['id']})['turn']
-            self.host.publish_turn(turn)
-            if turn['status'] == 'completed':
-                self.host.completed(turn)
-            self.host.changed()
-            return {'turn': turn, 'created': True, 'prepared': True}
+            return self._shown(prepared['id'])
+
+    @staticmethod
+    def _next_written(lesson):
+        """The hidden turn of the lesson's next step when a course package brought it written (ADR 0020)."""
+        following = next((s for s in lesson['steps'] if not s.get('turn_id')), None)
+        return (following or {}).get('written')
+
+    def _reveal(self, lesson, identifier):
+        """Show the next step a course package brought written, as Continue shows a prepared step, with no model turn."""
+        turn_id = self._next_written(lesson)
+        self.operation({'op': 'lesson.step', 'id': lesson['id'], 'turn_id': turn_id, 'request_id': identifier})
+        return self._shown(turn_id)
+
+    def _shown(self, turn_id):
+        turn = self.operation({'op': 'stream.read', 'id': turn_id})['turn']
+        self.host.publish_turn(turn)
+        if turn['status'] == 'completed':
+            self.host.completed(turn)
+        self.host.changed()
+        return {'turn': turn, 'created': True, 'prepared': True}
 
     def answer_check(self, lesson_id, turn_id, choice):
         """A check answer shows its explanation at once: it is recorded, with no model turn (ADR 0009). A miss means the
@@ -333,6 +355,7 @@ class Navigation(Feature):
             turns = {t['id']: t for t in self.host.brief_turns()}
             position = self.operation({'op': 'course.status'})['position'] or {}
             if (self.host.closing or not taught or len(taught) == len(lesson['steps']) or position.get('concept_id') != lesson['concept_id']
+                    or self._next_written(lesson)
                     or turns.get(taught[-1]['turn_id'], {}).get('status') != 'completed'
                     or any(t['channel'] == 'mainline' and t['status'] == 'running' for t in turns.values())):
                 return None

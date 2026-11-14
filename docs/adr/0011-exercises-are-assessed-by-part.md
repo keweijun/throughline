@@ -14,7 +14,7 @@ Assistance stays per exercise: a solved exercise is `independent` only if no hin
 
 ## Asking and skipping
 
-- Asking what an exercise or part means is its own action. It is answered like a short side question and never assessed.
+- Asking what an exercise or part means is its own action. It is answered like a short side question and never assessed. Learners also type questions into the answer box; an assessment that addresses no part (every part `not_attempted`) is kept as an ask, with no assessment and no evidence, and the teacher is told to treat such a submission as a question (issue #178).
 - Answers can include pasted or uploaded images of handwritten work, saved in the course workspace and sent to the teacher with the answer.
 - Besides **Do later** (a deferral; set-aside exercises enter the review context, ADR 0014), the learner can **skip** an exercise. A skipped exercise is closed: it is not open, not deferred, never reminded, and records no outcome. It leaves the section's list of exercises, which is numbered and counted without it, and is folded under **Skipped** below the list, where it can still be read. An optional reason (too easy, too tedious, not relevant) is remembered: once two exercises in a course are skipped with the same reason, the host suggests a matching preference for course memory (ADR 0010) in fixed wording, citing those skips, which the learner confirms or dismisses; it is asked below the section's exercises, since the skips it cites are folded away. It is not suggested again once dismissed or while a matching preference exists. Skip applies to a section's exercises; review and quiz questions can simply stay unanswered (ADR 0014). A chapter quiz never asks a skipped exercise again.
 

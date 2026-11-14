@@ -4,7 +4,7 @@ import unittest
 from guided_learning.api import execute
 from guided_learning.store import OperationError, Store
 from guided_learning.server import Host
-from tests.support import host_client
+from tests.support import host_client, taught
 
 
 class LanguagePreferences(unittest.TestCase):
@@ -62,6 +62,7 @@ class LanguagePreferences(unittest.TestCase):
 
     def test_language_change_invalidates_preparation(self):
         self.op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+        taught(self.path,'a')
         self.op(op='preparation.enqueue',id='prep')
         self.op(op='stream.start',id='prep',concept_id='b',prompt='Internal prep',channel='preparation',record_user=False)
         self.op(op='stream.event',id='prep',attempt=1,sequence=1,kind='final',text='English preparation')
@@ -110,6 +111,7 @@ class LanguagePreferences(unittest.TestCase):
                 if 'selected teaching language: English' in prompt:raise RuntimeError('Synthetic English failure')
                 emit({'kind':'final','text':'Chinese preparation'});emit({'kind':'complete'})
         self.op(op='mainline.enter',request_id='enter',concept_id='a',goal='A',next_step='explain')
+        taught(self.path,'a')
         app=Host(self.path,runner=Runner())
         try:
             def wait_for(status):

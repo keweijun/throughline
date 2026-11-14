@@ -131,6 +131,8 @@ guided-learning setup                 # install or update the Codex skill
 guided-learning open [course] [--no-browser] [--port 8765]
 guided-learning stop
 guided-learning courses               # the library as JSON
+guided-learning export quantum        # the course and its sources as quantum.throughline
+guided-learning import quantum.throughline [--name copy]
 echo '{"op":"course.status"}' | guided-learning --course quantum
 ```
 

@@ -66,6 +66,10 @@ When the readings record figures, add `figure` to the course's add-ons with `wid
 
 A PDF page is `verification: verified` once it has a reading and `pending` until then; a text source is exact. Source units are units of the document, not a completed coverage ledger. A text line must not be presented as a PDF page.
 
+## Sharing and moving a course
+
+A course package is one `.throughline` file holding a course with its sources. `guided-learning export <course-name> [--out <file>]` writes the whole course, progress, course memory and notes included, so it suits a backup or a move to another computer; say so before the learner sends it to someone else. `guided-learning import <file> [--name <course-name>]` makes a new course in the library that continues where the package's course was left, named after it (made unique) unless `--name` is given. Both print `{ok, result}` like operations; an import refuses a damaged or unexpected package (`invalid_package`) and one from a newer Throughline (`package_too_new`, `course_too_new`). Never copy a course folder by hand.
+
 ## Storage and extension contract
 
 The workspace contains `course.sqlite3`, `sources/<source-id>/<sha256>` byte snapshots, `page_images/`, rendered pages that can be deleted and drawn again, and `backups/`, copies of the course from before each update of its format, which are never course material. Use operations instead of editing the database. Source identity follows normalized absolute path; moving a source registers a new identity. Keep a stable input location for revisions.

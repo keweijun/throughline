@@ -27,6 +27,16 @@ Exercises written for a section may not suit the learner (too much arithmetic, a
 - New exercises must still meet the section's objective: the note changes how a problem is posed, not what solving it shows. The teacher sees the replaced exercises, so it does not write them again.
 - A request with a note carries a memory note (ADR 0010): when the note says how the learner wants to practise, the teacher may suggest it as a preference, which the learner confirms as usual.
 
+## Codex changes a section's exercises
+
+Exercises reached the learner only through the teacher's practice turn, at most four at a time and in the teacher's words. Learners asked Codex in Studio for what that could not give: a problem set's questions as exercises, their formulas set in LaTeX, an exam's questions copied in full rather than linked, textbook references added. With no operation for it, Codex wrote practice turns itself through the host's internal operations (216 of 290 turns in one course), made each change a new copy of every exercise, and hid the old copies with skip: 480 exercises were recorded as skipped by a learner who had skipped none, including three they had worked on, while duplicates stayed visible.
+
+Codex now has three operations, documented in the skill's practice reference, which apply the rules the teacher's exercises meet:
+
+- **Add** puts exercises on a section as worded, without a teacher turn. A course exercise names one of the section's mapped exercises (so ADR 0012 placement holds) and is not added while it is already shown there.
+- **Revise** rewords an exercise in place, keeping the learner's answers, help and part statuses and the earlier wordings; once an answer was assessed, the number of parts stays.
+- **Retire** takes out an exercise the learner never touched. A **retired exercise** is kept for the record, like a replaced one, and never shown, counted or asked again. One the learner worked on is revised instead, or left for the learner to skip: a skip stays the learner's own act.
+
 ## Explaining in one's own words
 
 Some sections are about understanding an idea more than carrying out a method. For them the teacher may write an **explanation exercise**: the learner explains an idea in their own words to a stated reader (a classmate who knows the previous section, say), such as why a result holds, what a definition captures or how two ideas connect. It is an ordinary self-created exercise, with one part or one part per idea, and is not a new kind of record. The question asks for the explanation without listing the points it should make. Assessment judges the ideas, not the wording: a part is `correct` when the explanation is right and covers what the idea needs, and `partly_correct` when it is right but misses an essential point, which the feedback names without supplying. The teacher decides when a section calls for one; review apply questions may ask for one too (ADR 0014).

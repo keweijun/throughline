@@ -243,6 +243,8 @@ def _free(course, deadline):
         try:
             library.acquire_lease(course).close()  # released before the move, which Windows refuses for an open file
             return True
+        except OSError:  # a course setup cannot open stays where it is, like one in use
+            return False
         except OperationError:
             if time.monotonic() >= deadline:
                 return False

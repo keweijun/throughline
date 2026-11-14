@@ -7,6 +7,7 @@ from unittest import mock
 from guided_learning.api import execute
 from guided_learning.server import Host
 from guided_learning.server.settings import TeacherSettings
+from guided_learning.store import Store
 from support import host_client, settle
 
 LESSON = ('A plane wave is $e^{ikx}$.\n<course-memory>{"entries":[{"kind":"taught_term","text":"plane wave"},'
@@ -181,6 +182,22 @@ class CrashRecovery(unittest.TestCase):
             self.assertEqual(sorted(e['text'] for e in entries), ['One step at a time', 'plane wave'])
             again, _ = self.reopen(path, runner=Runner())
             self.assertEqual(again, entries)
+
+    def test_every_turn_the_crash_cut_off_is_recorded_not_only_the_latest(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+
+            def two(app):
+                app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'})
+                settle(app)
+                app.start_turn({'id': 'two', 'concept_id': 'state', 'prompt': 'Teach'})
+            self.crashed(path, runner=Runner(), work=two)
+            self.reopen(path, runner=Runner())
+            store = Store(path)
+            try:
+                self.assertEqual(sorted(n['turn_id'] for n in store.list('memory_notes')), ['one', 'two'])
+            finally:
+                store.db.close()
 
     def test_the_learners_memory_request_is_answered_by_the_next_host(self):
         with tempfile.TemporaryDirectory() as path:

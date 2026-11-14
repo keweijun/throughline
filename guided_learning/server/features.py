@@ -25,6 +25,8 @@ STEP_REPLY = re.compile(r'<lesson-step>\s*(\{.*?\})\s*</lesson-step>', re.S)
 STEP_BLOCK = re.compile(r'\s*<lesson-step>.*$', re.S)
 FIGURE_SIZE = 1400  # pixels on the long side of a figure drawn in a lesson
 MAX_SOURCE_IMAGES = 12  # figures and pages sent with one turn, a sanity limit
+# A teacher turn runs for minutes, so every turn a crash can cut off started within this of the course's latest.
+RECOVERY_WINDOW = 3600
 
 
 def source_url(ref, fmt=None):
@@ -923,21 +925,18 @@ class Memory(Feature):
 
     def recover(self):
         """Record what turns completed just before a crash asked memory to keep, without a model call: every request
-        of the learner's still unanswered, and the note or consolidation of each channel's latest turn, since a crash
-        interrupts only the turns finishing as it happens. Each is applied once (`memory.note`, `memory.consolidate`
-        and `memory.answer` keep the turn that applied them), so a turn already recorded changes nothing."""
+        of the learner's still unanswered, and the notes and consolidations of the turns that started within
+        RECOVERY_WINDOW of the course's latest, since a crash interrupts only turns still running as it happens, and
+        requests that overlap can finish in any order. Each is applied once (`memory.note`, `memory.consolidate` and
+        `memory.answer` keep the turn that applied them), so a turn already recorded changes nothing."""
         unanswered = {r['turn_id'] for r in self.operation({'op': 'memory.requests'})['requests'] if 'reply' not in r and 'error' not in r}
-        latest = {}
-        for brief in self.host.brief_turns():  # oldest first
-            if brief['status'] != 'completed':
-                continue
-            if brief['id'] in unanswered:
-                latest[brief['id']] = brief
-            elif brief['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation'):
-                latest[brief['channel']] = brief
-        if any(b['channel'] == 'practice' for b in latest.values()):
+        turns = self.host.brief_turns()  # oldest first
+        since = max((t['started_at'] for t in turns), default=0) - RECOVERY_WINDOW
+        pending = [t for t in turns if t['status'] == 'completed' and (t['id'] in unanswered or (
+            t['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation') and t['started_at'] >= since))]
+        if any(t['channel'] == 'practice' for t in pending):
             self.host.practice.state()  # records the practice a note cites first, as completion does
-        for brief in latest.values():
+        for brief in pending:
             try:
                 self.on_complete(self.operation({'op': 'stream.read', 'id': brief['id']})['turn'])
             except Exception:

@@ -167,6 +167,17 @@ class MovingOldLibraries(unittest.TestCase):
         self.assertTrue((self.old / 'optics' / 'course.sqlite3').is_file())
         self.assertTrue((self.old / '.throughline' / 'host.json').is_file(), 'the host that holds optics is still recorded')
 
+    def test_a_course_setup_cannot_open_is_left_where_it_is(self):
+        real = commands.library.acquire_lease
+
+        def refuse(workspace):
+            if workspace.name == 'optics':
+                raise PermissionError('read-only')
+            return real(workspace)
+        with mock.patch.object(commands.library, 'acquire_lease', refuse):
+            moved, skipped = commands.migrate(self.root)
+        self.assertEqual((moved, skipped), (['waves'], [str(self.old / 'optics')]))
+
     def test_an_emptied_old_library_is_removed(self):
         moved, skipped = commands.migrate(self.root)
         self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))

@@ -1,7 +1,9 @@
+import shutil
 import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from guided_learning import library, migrations
 from guided_learning.api import execute
@@ -231,6 +233,59 @@ class Migrations(unittest.TestCase):
             self.assertEqual({j['id']: j for j in store.list('preparation_jobs')}, jobs)
         finally:
             store.db.close()
+
+    def backups(self):
+        folder = self.workspace / 'backups'
+        return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
+
+    def test_a_course_is_backed_up_at_its_old_format_before_it_is_migrated(self):
+        execute(self.workspace, {'op': 'curriculum.save', 'concepts': [{'id': 'a', 'title': 'A'}], 'route': ['a'], 'coverage': []})
+        self.put('course', 'schema', {'version': 6})
+        before = self.raw('SELECT namespace, key, value FROM documents ORDER BY namespace, key')
+        original = migrations.MIGRATIONS[-1]
+        with mock.patch.object(migrations, 'MIGRATIONS', [*migrations.MIGRATIONS[:-1], mock.Mock(side_effect=KeyError('broken'))]):
+            with self.assertRaises(KeyError):
+                execute(self.workspace, {'op': 'course.status'})
+        self.assertEqual(self.stored_version(), 6, 'a failed migration rolls back')
+        self.assertEqual(self.backups(), ['course-format-6.sqlite3'])
+
+        # The course changes before the next attempt; the backup from before the first attempt is the one kept.
+        self.put('notes', 'later', {'id': 'later'})
+        with mock.patch.object(migrations, 'MIGRATIONS', [*migrations.MIGRATIONS[:-1], original]):
+            execute(self.workspace, {'op': 'course.status'})
+        self.assertEqual(self.stored_version(), migrations.VERSION)
+        self.assertEqual(self.backups(), ['course-format-6.sqlite3'])
+
+        backup = self.workspace / 'backups' / 'course-format-6.sqlite3'
+        db = sqlite3.connect(backup)
+        try:
+            self.assertEqual(db.execute('PRAGMA integrity_check').fetchone(), ('ok',))
+            self.assertEqual(db.execute('SELECT namespace, key, value FROM documents ORDER BY namespace, key').fetchall(), before)
+        finally:
+            db.close()
+        # Restoring: the backup in place of course.sqlite3, without the write-ahead log files, opens as that course.
+        restored = Path(self.temp.name) / 'restored'
+        restored.mkdir()
+        shutil.copyfile(backup, restored / 'course.sqlite3')
+        self.assertEqual(execute(restored, {'op': 'course.status'})['course']['title'], 'Quantum')
+        self.assertEqual(execute(restored, {'op': 'curriculum.view'})['route'], ['a'])
+
+    def test_new_and_current_courses_are_not_backed_up(self):
+        execute(self.workspace, {'op': 'course.status'})
+        execute(self.workspace, {'op': 'curriculum.save', 'concepts': [{'id': 'a', 'title': 'A'}], 'route': ['a'], 'coverage': []})
+        self.put('course', 'schema', {'version': migrations.VERSION + 1})
+        with self.assertRaises(OperationError):
+            execute(self.workspace, {'op': 'course.status'})
+        self.assertFalse((self.workspace / 'backups').exists())
+
+    def test_a_course_that_cannot_be_backed_up_is_not_migrated(self):
+        self.put('course', 'schema', {'version': 6})
+        (self.workspace / 'backups').write_text('not a folder', encoding='utf-8')  # as a full disk or a read-only folder would
+        with self.assertRaises(OperationError) as raised:
+            execute(self.workspace, {'op': 'course.status'})
+        self.assertEqual(raised.exception.code, 'backup_failed')
+        self.assertIn('could not back it up', str(raised.exception))
+        self.assertEqual(self.stored_version(), 6)
 
     def test_a_course_from_a_newer_throughline_is_refused_and_listed_with_the_reason(self):
         self.put('course', 'schema', {'version': migrations.VERSION + 1})

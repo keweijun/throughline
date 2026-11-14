@@ -180,12 +180,12 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(self.client.get('/api/studio').json()['threads'], [])
         self.assertEqual(self.client.get(f'/api/studio/threads/{thread}').status_code, 404)
 
-    def test_the_composer_lists_enabled_skills_and_course_files_but_not_the_course_database(self):
+    def test_the_composer_lists_enabled_skills_and_course_files_but_not_the_course_database_or_its_backups(self):
         skills = self.client.get('/api/studio/skills').json()['skills']
         self.assertEqual(skills, [{'name': 'throughline', 'path': '/skills/throughline/SKILL.md', 'title': 'Throughline',
                                    'description': 'Build a course'}])
         files = self.client.get('/api/studio/search', params={'q': 'wav'}).json()['files']
-        self.assertEqual([f['path'] for f in files], ['inputs/waves.md'])
+        self.assertEqual([f['path'] for f in files], ['inputs/waves.md', 'inputs/waves.sqlite3'], "a learner's own database is material")
         self.assertEqual(files[0]['absolute'], str(self.course.resolve() / 'inputs' / 'waves.md'))
 
     def test_attached_files_are_copied_into_the_course_inputs_without_overwriting(self):

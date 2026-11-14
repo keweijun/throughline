@@ -1,9 +1,12 @@
 """Forward-only course migrations (ADR 0007).
 
 A course records its format version in `course/schema`; courses without it are version 1. `upgrade` runs inside the
-first operation's transaction, so a migration commits or rolls back with it. MIGRATIONS[i] moves a course from
-version i + 1 to i + 2. Each migration must be idempotent and keep learning evidence and raw interactions intact.
+first operation's transaction, so a migration commits or rolls back with it, after a copy of the course as it was is
+kept in `backups/`. MIGRATIONS[i] moves a course from version i + 1 to i + 2. Each migration must be idempotent and keep
+learning evidence and raw interactions intact.
 """
+import os
+import sqlite3
 from datetime import datetime
 
 from .store import OperationError
@@ -169,10 +172,45 @@ def upgrade(store):
     current = version(store)
     if current > VERSION:
         raise OperationError('course_too_new', f'This course was saved by a newer version of Throughline (format {current}); update Throughline to open it')
+    if current == VERSION:
+        return
+    back_up(store, current)
     for target in range(current + 1, VERSION + 1):
         MIGRATIONS[target - 2](store)
-    if current < VERSION:
-        mark_current(store)
+    mark_current(store)
+
+
+def back_up(store, current):
+    """Copy the course to `backups/course-format-<current>.sqlite3` before migrating it, since an older Throughline
+    refuses it afterwards. The first copy of a format is kept: a later one could hold a migration's partial work.
+
+    A second connection reads the copy: SQLite refuses to back up through the store's own connection while it holds the
+    write lock, and a reader sees the course as committed, which is all of it, since nothing is written before this."""
+    folder = store.workspace / 'backups'
+    target = folder / f'course-format-{current}.sqlite3'
+    if target.exists():
+        return
+    partial = folder / (target.name + '.partial')  # renamed only when complete, so a failed copy never counts as one
+    try:
+        folder.mkdir(exist_ok=True)
+        partial.unlink(missing_ok=True)
+        source = sqlite3.connect(store.workspace / 'course.sqlite3', timeout=30)
+        try:
+            copy = sqlite3.connect(partial)
+            try:
+                source.backup(copy)
+            finally:
+                copy.close()
+        finally:
+            source.close()
+        os.replace(partial, target)
+    except (sqlite3.Error, OSError) as exc:
+        try:
+            partial.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise OperationError('backup_failed', f'Throughline needs to update this course to a new format and could not back it up first '
+                                              f'({exc}). Free some disk space or check the course folder can be written to, then open it again') from exc
 
 
 def mark_current(store):

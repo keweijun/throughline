@@ -2,10 +2,12 @@ import json
 import tempfile
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from guided_learning.api import execute
 from guided_learning.server import Host
 from guided_learning.server.settings import TeacherSettings
+from guided_learning.store import Store
 from support import host_client, settle
 
 LESSON = ('A plane wave is $e^{ikx}$.\n<course-memory>{"entries":[{"kind":"taught_term","text":"plane wave"},'
@@ -151,6 +153,86 @@ class MemoryFlow(unittest.TestCase):
                     self.assertTrue(state['memory_requests'][0]['error'])
 
 
+class CrashRecovery(unittest.TestCase):
+    """A turn is stored as completed before memory records what it asked for; a host stopped in between, by a crash
+    say, leaves that to the next host to open the course."""
+
+    def crashed(self, path, settings=None, runner=None, work=None):
+        app = Host(path, runner=runner, settings=settings)
+        try:
+            with mock.patch('guided_learning.server.features.Memory.on_complete'):
+                work(app)
+                settle(app)
+        finally:
+            app.close()
+
+    def reopen(self, path, settings=None, runner=None):
+        app = Host(path, runner=runner, settings=settings)
+        try:
+            return app.operation({'op': 'memory.view'})['entries'], app.operation({'op': 'memory.requests'})['requests']
+        finally:
+            app.close()
+
+    def test_a_lessons_memory_note_is_recorded_once_by_the_next_host(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            self.crashed(path, runner=Runner(), work=lambda app: app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'}))
+            self.assertEqual(execute(path, {'op': 'memory.view'})['entries'], [], 'the note was lost with the host')
+            entries, _ = self.reopen(path, runner=Runner())
+            self.assertEqual(sorted(e['text'] for e in entries), ['One step at a time', 'plane wave'])
+            again, _ = self.reopen(path, runner=Runner())
+            self.assertEqual(again, entries)
+
+    def test_every_turn_the_crash_cut_off_is_recorded_not_only_the_latest(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+
+            def two(app):
+                app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'})
+                settle(app)
+                app.start_turn({'id': 'two', 'concept_id': 'state', 'prompt': 'Teach'})
+            self.crashed(path, runner=Runner(), work=two)
+            self.reopen(path, runner=Runner())
+            store = Store(path)
+            try:
+                self.assertEqual(sorted(n['turn_id'] for n in store.list('memory_notes')), ['one', 'two'])
+            finally:
+                store.db.close()
+
+    def test_a_step_prepared_long_before_it_was_revealed_is_recorded(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+
+            def two(app):
+                app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'})
+                settle(app)
+                app.start_turn({'id': 'two', 'concept_id': 'state', 'prompt': 'Teach'})
+            self.crashed(path, runner=Runner(), work=two)
+            store = Store(path)
+            try:  # 'one' stands for a step prepared two hours before the learner revealed it, just before the crash
+                turn = store.get('streams', 'one')
+                with store.db:
+                    store.put('streams', 'one', {**turn, 'started_at': turn['started_at'] - 7200, 'revealed_at': turn['started_at']})
+            finally:
+                store.db.close()
+            self.reopen(path, runner=Runner())
+            store = Store(path)
+            try:
+                self.assertIn('one', [n['turn_id'] for n in store.list('memory_notes')])
+            finally:
+                store.db.close()
+
+    def test_the_learners_memory_request_is_answered_by_the_next_host(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            settings = Answering({'reply': 'I will keep it short.', 'remember': ['Short answers first'], 'forget': []})
+            self.crashed(path, settings=settings, work=lambda app: app.memory.ask('r', 'Keep it short', 'state'))
+            entries, [request] = self.reopen(path, settings=settings)
+            self.assertEqual(request['reply'], 'I will keep it short.')
+            self.assertEqual([(e['text'], e['status']) for e in entries], [('Short answers first', 'confirmed')])
+            self.assertEqual(len(settings.calls), 1, 'recovery makes no model call')
+
+
 class Answering(TeacherSettings):
     """Answers every turn with `reply` and records whether it ran on the small model."""
 
@@ -265,6 +347,14 @@ class SectionEndConsolidation(unittest.TestCase):
                 self.assertEqual(app.operation({'op': 'memory.view'})['entries'], before)
                 self.assertEqual(app.operation({'op': 'memory.consolidations'})['consolidations'], [])
 
+
+    def test_a_refused_consolidation_is_not_tried_again_when_the_course_opens(self):
+        with tempfile.TemporaryDirectory() as path:
+            ids = remembered(path)
+            self.run_consolidation(path, {'merge': [{'into': ids['term'], 'entries': [ids['deleted']]}]})
+            with mock.patch('guided_learning.server.features.Memory.on_complete') as completed:
+                Host(path, settings=Consolidating({})).close()
+            self.assertNotIn('consolidation', [turn['channel'] for (turn,), _ in completed.call_args_list])
 
 if __name__ == '__main__':
     unittest.main()

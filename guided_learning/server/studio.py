@@ -600,14 +600,16 @@ class Studio:
             raise StudioError('invalid_studio_file', 'The file needs a name')
         folder = Path(folder) if folder else Path(course) / 'inputs'
         folder.mkdir(parents=True, exist_ok=True)
-        target, stem, suffix = folder / name, Path(name).stem, Path(name).suffix
-        for n in itertools.count(2):
-            if not target.exists():
+        stem, suffix = Path(name).stem, Path(name).suffix
+        for target in itertools.chain([folder / name], (folder / f'{stem} ({n}){suffix}' for n in itertools.count(2))):
+            try:  # claiming the name and creating the file are one step, so a concurrent upload of the same name takes the next
+                out = target.open('xb')
                 break
-            target = folder / f'{stem} ({n}){suffix}'
+            except FileExistsError:
+                continue
         size = 0
-        try:
-            with target.open('xb') as out:
+        try:  # from here the file is this upload's own
+            with out:
                 for chunk in chunks:
                     size += len(chunk)
                     if size > MAX_UPLOAD:

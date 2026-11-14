@@ -993,6 +993,8 @@ class Preparation(Feature):
             job = next(j for j in self.state()['jobs'] if j['id'] == turn['id'])
             return prompts.preparation_task(job['snapshot']['context']) + shown
         material = self._material(turn)
+        if material:
+            self.operation({'op': 'preparation.use', 'id': material['id'], 'turn_id': turn['id']})
         return prompts.preparation_material(material['content']) if material else prompts.PREPARATION_MISSING + shown
 
     def _material(self, turn):

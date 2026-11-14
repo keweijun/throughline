@@ -104,3 +104,17 @@ test("a cell's code cannot use the app's own API", async ({ page, course }) => {
   expect(await page.evaluate(() => fetch('/api/studio/access').then((r) => r.json()))).toMatchObject({ full_access: false });
   expect(errors).toEqual([]);
 });
+
+test('a worker that cannot start says Python could not load, and the next run tries again', async ({ page, course }) => {
+  const { errors } = await course('python_browser_fixture');
+  // Code no browser can start stands in for a browser that refuses the sandboxed worker.
+  await page.route('**/assets/python-worker-*.js', (route) => route.fulfill({ contentType: 'text/javascript', body: 'this is not ( javascript' }));
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const cell = page.locator('.lesson-body python-cell');
+  await cell.getByRole('button', { name: 'Run' }).click();
+  await expect(cell.locator('.output')).toContainText('Python could not load');
+  await page.unroute('**/assets/python-worker-*.js');
+  await cell.getByRole('button', { name: 'Run' }).click();
+  await expect(cell.locator('.output')).toHaveText('hello');
+  expect(errors).toEqual([]);
+});

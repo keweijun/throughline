@@ -12,14 +12,21 @@ export type Answer = { exercise: string; text: string };
 // The worker runs inside a sandboxed frame with no origin of its own, so a cell's requests are not the app's: the host
 // refuses them as it refuses any other site's. The frame cannot load the app's files, so the page hands it the worker's
 // code, and starts it as a data URL: Pyodide needs a module worker, and a frame without an origin cannot start one from a
-// blob. After that the frame only passes messages between the page and the worker.
+// blob. After that the frame only passes messages between the page and the worker. A worker that cannot start, in a
+// browser that refuses it say, is reported as run 0, so the cell says Python could not load instead of waiting.
 const FRAME = `<script>
 let worker;
+const failed = (text) => parent.postMessage({ id: 0, type: 'error', text: String(text), load: true }, '*');
 onmessage = (event) => {
   if (event.source !== parent) return;
   if (worker) return worker.postMessage(event.data);
-  worker = new Worker('data:text/javascript,' + encodeURIComponent(event.data), { type: 'module' });
+  try {
+    worker = new Worker('data:text/javascript,' + encodeURIComponent(event.data), { type: 'module' });
+  } catch (error) {
+    return failed(error && error.message || error);
+  }
   worker.onmessage = (reply) => parent.postMessage(reply.data, '*');
+  worker.onerror = (error) => failed(error.message || 'Python could not start');
 };
 </script>`;
 
@@ -38,6 +45,9 @@ function python() {
     box.setAttribute('aria-hidden', 'true');
     const loaded = new Promise((resolve) => box.addEventListener('load', resolve, { once: true }));
     const started = (ready = Promise.all([fetch(workerUrl).then((response) => response.text()), loaded]).then(([source]) => {
+      // The development server adds an import of its own client to the worker, which a data URL cannot resolve; the
+      // worker uses nothing from it. A build has no such import.
+      if (import.meta.env.DEV) source = source.replace(/^import\s+["']\/@[^"']*["'];?\s*$/gm, '');
       box.contentWindow!.postMessage(source, '*');
       return box.contentWindow!;
     }));
@@ -59,7 +69,13 @@ function reply(data: unknown): data is Reply {
 
 if (typeof window !== 'undefined') {
   addEventListener('message', (event) => {
-    if (frame && event.source === frame.contentWindow && reply(event.data)) listeners.get(event.data.id)?.(event.data);
+    if (!frame || event.source !== frame.contentWindow || !reply(event.data)) return;
+    if (event.data.id !== 0) return listeners.get(event.data.id)?.(event.data);
+    const failure = event.data;
+    frame.remove(); // tried again on the next run
+    frame = ready = null;
+    for (const [id, listener] of listeners) listener({ ...failure, id });
+    listeners.clear();
   });
 }
 

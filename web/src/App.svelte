@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { t, locale } from './lib/i18n.svelte';
+  import { t, locale, diagnostic } from './lib/i18n.svelte';
   import { onMount } from 'svelte';
   import { app } from './lib/store.svelte';
   import { studio } from './lib/studio.svelte';
@@ -161,6 +161,11 @@
         {/key}
       {/if}
     </main>
+  {:else if app.stateError}
+    <main id="main" class="loading" role="alert">
+      <p class="problem">{t('This course could not be opened: {error}', { error: diagnostic(app.stateError) })}</p>
+      <button class="btn btn-small" onclick={() => app.retryLoad()}>{t('Try again')}</button>
+    </main>
   {:else if !app.error}
     <main id="main" class="loading" aria-busy="true">
       <p>{t("Opening your course…")}</p>
@@ -245,6 +250,10 @@
     grid-column: 1 / -1;
     color: var(--pencil);
     text-align: center;
+  }
+
+  .loading .problem {
+    color: var(--danger);
   }
 
   .scrim {

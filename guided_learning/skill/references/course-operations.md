@@ -68,7 +68,7 @@ A PDF page is `verification: verified` once it has a reading and `pending` until
 
 ## Storage and extension contract
 
-The workspace contains `course.sqlite3`, `sources/<source-id>/<sha256>` byte snapshots and `page_images/`, rendered pages that can be deleted and drawn again. Use operations instead of editing the database. Source identity follows normalized absolute path; moving a source registers a new identity. Keep a stable input location for revisions.
+The workspace contains `course.sqlite3`, `sources/<source-id>/<sha256>` byte snapshots, `page_images/`, rendered pages that can be deleted and drawn again, and `backups/`, copies of the course from before each update of its format, which are never course material. Use operations instead of editing the database. Source identity follows normalized absolute path; moving a source registers a new identity. Keep a stable input location for revisions.
 
 Python callers use `guided_learning.execute(workspace, request)`; validation errors raise `OperationError` with `.code`. Each request holds one SQLite transaction: `BEGIN IMMEDIATE` for a write, a deferred read-only one for operations listed in `guided_learning.api.READS`. An exception rolls it back. Operation modules export `OPERATIONS = {"operation.name": handler}`; add the module name to `guided_learning.api.MODULES`. Handlers take `(store, request)` and return JSON-serializable results. `store.get(namespace, key, default=None)`, `put(namespace, key, value)`, `list(namespace)` and `delete(namespace, key)` read/write JSON documents; reserve a separate namespace for each feature. `store.db` is available when relational constraints are needed. Handlers must not commit or close the shared transaction.
 

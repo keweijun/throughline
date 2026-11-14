@@ -1,5 +1,6 @@
 """The course library: the learner's Throughline folder, holding every course workspace."""
 import hashlib
+import logging
 import os
 import re
 import sqlite3
@@ -8,6 +9,7 @@ from pathlib import Path
 from .api import execute
 from .store import OperationError
 
+log = logging.getLogger(__name__)
 NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,63}$')
 
 
@@ -111,6 +113,10 @@ def list_courses(root):
     for path in sorted(p for p in root.iterdir() if p.is_dir() and is_course(p)):
         try:
             courses.append(summary(path))
-        except (OperationError, OSError) as exc:
+        except OperationError as exc:
             courses.append({'name': path.name, 'path': str(path.resolve()), 'error': str(exc)})
+        except Exception as exc:  # one broken course (a corrupt database, a failing migration) must not hide the others
+            log.exception('Could not list the course at %s', path)
+            courses.append({'name': path.name, 'path': str(path.resolve()),
+                            'error': f'{exc.__class__.__name__}: {exc} (details in the host log)'})
     return sorted(courses, key=lambda c: c.get('updated', 0), reverse=True)

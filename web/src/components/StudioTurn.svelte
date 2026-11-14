@@ -430,6 +430,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     font-family: var(--mono);
+    transition: color var(--quick) ease;
   }
 
   .count {
@@ -477,6 +478,8 @@
     border-radius: 50%;
     background: var(--rule-strong);
     transform: translateY(-0.05rem);
+    /* A call that finishes or fails settles into its colour rather than snapping from the pulse. */
+    transition: background-color var(--settle) ease;
   }
 
   .dot.running {
@@ -565,6 +568,7 @@
   .plan li {
     display: flex;
     gap: 0.45rem;
+    transition: color var(--settle) ease;
   }
 
   .plan .completed {
@@ -605,10 +609,8 @@
   }
 
   .plan-text {
+    animation: enter-fade var(--settle) ease;
     font-size: var(--step--1);
   }
 
-  .working {
-    animation: enter-fade var(--settle) ease;
-  }
 </style>

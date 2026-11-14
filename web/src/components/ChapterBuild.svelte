@@ -76,6 +76,7 @@
   }
 
   .progress {
+    animation: enter-fade var(--settle) ease;
     display: flex;
     align-items: center;
     gap: 0.55rem;
@@ -99,6 +100,7 @@
   }
 
   .problem {
+    animation: enter-rise var(--settle) var(--ease-out);
     display: grid;
     gap: 0.25rem;
     font-size: var(--step-0);

@@ -65,7 +65,7 @@ uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://
 guided-learning setup --language zh-CN
 ```
 
-使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`。两种方式都会获取最新发布的版本，所以安装和更新用的是同样三行命令。`stable` 始终指向最新发布的版本；每个版本也都有标签，变更记录见 [CHANGELOG.md](CHANGELOG.md)，把 `@stable` 换成 `@v0.43.0` 即可安装该版本。退回旧版本后，已被新版本更新过的课程可能无法在旧版本中打开。运行 `guided-learning --version` 可查看当前版本，运行 `guided-learning doctor` 可检查是否找到 Codex 以及它能否回复（会向一个小模型发送一条很短的消息）。
+使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`。两种方式都会获取最新发布的版本，所以安装和更新用的是同样三行命令。`stable` 始终指向最新发布的版本；每个版本也都有标签，变更记录见 [CHANGELOG.md](CHANGELOG.md)，把 `@stable` 换成 `@v0.45.0` 即可安装该版本。退回旧版本后，已被新版本更新过的课程可能无法在旧版本中打开。运行 `guided-learning --version` 可查看当前版本，运行 `guided-learning doctor` 可检查是否找到 Codex 以及它能否回复（会向一个小模型发送一条很短的消息）。
 
 从 0.5.1 之前的版本（包名为 `codex-guided-learning`）更新时：在 `guided-learning stop` 之后运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），再按上面的步骤继续。
 
@@ -150,6 +150,6 @@ npm run check && npm run build                     # 类型检查，然后生成
 npx playwright test                                # 用临时示例课程运行浏览器测试
 ```
 
-较大的改动前请先阅读[架构](docs/architecture.md)、[术语表](GLOSSARY.md)和[设计决策](docs/adr/)（均为英文）；面向智能体的说明在 [AGENTS.md](AGENTS.md)。任务通过 GitHub Issues 管理。CI 会在每个拉取请求上运行以上全部检查；合并到 `main` 的版本号更新会被打上标签，连同 [CHANGELOG.md](CHANGELOG.md) 中的条目一起发布，成为用户安装的版本（[ADR 0020](docs/adr/0020-releases-are-tagged-from-main.md)）。
+较大的改动前请先阅读[架构](docs/architecture.md)、[术语表](GLOSSARY.md)和[设计决策](docs/adr/)（均为英文）；面向智能体的说明在 [AGENTS.md](AGENTS.md)。任务通过 GitHub Issues 管理。CI 会在每个拉取请求上运行以上全部检查；合并到 `main` 的版本号更新会被打上标签，连同 [CHANGELOG.md](CHANGELOG.md) 中的条目一起发布，成为用户安装的版本（[ADR 0021](docs/adr/0021-releases-are-tagged-from-main.md)）。
 
 贯学采用 [MIT](LICENSE) 许可证；随附的第三方依赖保留各自的许可证，见[第三方许可声明](THIRD_PARTY_LICENSES.md)。Python 包名为 `throughline`（0.5.1 之前为 `codex-guided-learning`），命令名为 `guided-learning`。

@@ -24,6 +24,15 @@ def call_cli(case, workspace, op, error=None, **fields):
     return response['result']
 
 
+def taught(workspace, concept_id):
+    """A completed lesson turn in a section: preparing the next section waits for one (issue #176)."""
+    from guided_learning.api import execute
+    identifier = 'lesson-' + concept_id
+    execute(workspace, {'op': 'stream.start', 'id': identifier, 'concept_id': concept_id, 'prompt': 'Teach', 'channel': 'mainline'})
+    execute(workspace, {'op': 'stream.event', 'id': identifier, 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': 'Lesson'})
+    execute(workspace, {'op': 'stream.event', 'id': identifier, 'attempt': 1, 'sequence': 2, 'kind': 'complete'})
+
+
 def host_client(workspace, runner=None, settings=None, port=8765):
     """A loopback-addressed client for the HTTP host; close it to release the course lease."""
     from fastapi.testclient import TestClient

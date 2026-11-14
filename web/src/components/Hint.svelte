@@ -43,7 +43,7 @@
     border-radius: 0 var(--radius) var(--radius) 0;
     background: var(--marker-wash);
     font-size: var(--step--1);
-    animation: arrive 260ms var(--ease-out, ease-out);
+    animation: enter-drop var(--settle) var(--ease-out);
   }
 
   .label {
@@ -57,18 +57,5 @@
   p {
     margin: 0;
     line-height: 1.45;
-  }
-
-  @keyframes arrive {
-    from {
-      opacity: 0;
-      transform: translateY(-3px);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .hint {
-      animation: none;
-    }
   }
 </style>

@@ -17,7 +17,7 @@ from .codex import find_codex
 from .commands import detached, version
 from .store import OperationError
 
-# Installs fetch the stable branch, which CI moves to each release (ADR 0020), so its declared version is the latest one.
+# Installs fetch the stable branch, which CI moves to each release (ADR 0021), so its declared version is the latest one.
 LATEST = 'https://raw.githubusercontent.com/keweijun/throughline/stable/pyproject.toml'
 VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 # The interface checks on every launch, so a found version is kept for a while rather than asked of GitHub each time.

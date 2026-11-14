@@ -95,6 +95,7 @@ class Host:
         self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.course_changes, self.memory)
         self.questions.recover()
         self.navigation.recover()
+        self.memory.recover()
         self.preparation.start()
         self.builds.start()
 

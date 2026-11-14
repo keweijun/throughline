@@ -921,6 +921,28 @@ class Memory(Feature):
         except OperationError:
             log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
 
+    def recover(self):
+        """Record what turns completed just before a crash asked memory to keep, without a model call: every request
+        of the learner's still unanswered, and the note or consolidation of each channel's latest turn, since a crash
+        interrupts only the turns finishing as it happens. Each is applied once (`memory.note`, `memory.consolidate`
+        and `memory.answer` keep the turn that applied them), so a turn already recorded changes nothing."""
+        unanswered = {r['turn_id'] for r in self.operation({'op': 'memory.requests'})['requests'] if 'reply' not in r and 'error' not in r}
+        latest = {}
+        for brief in self.host.brief_turns():  # oldest first
+            if brief['status'] != 'completed':
+                continue
+            if brief['id'] in unanswered:
+                latest[brief['id']] = brief
+            elif brief['channel'] in ('mainline', 'sidequestion', 'practice', 'consolidation'):
+                latest[brief['channel']] = brief
+        if any(b['channel'] == 'practice' for b in latest.values()):
+            self.host.practice.state()  # records the practice a note cites first, as completion does
+        for brief in latest.values():
+            try:
+                self.on_complete(self.operation({'op': 'stream.read', 'id': brief['id']})['turn'])
+            except Exception:
+                log.exception('Could not recover the memory of turn %s', brief['id'])
+
 
 class CourseChanges(Feature):
     """A change to the course itself that a lesson or side-question reply suggests making in Studio (ADR 0016)."""

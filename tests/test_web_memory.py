@@ -2,6 +2,7 @@ import json
 import tempfile
 from pathlib import Path
 import unittest
+from unittest import mock
 
 from guided_learning.api import execute
 from guided_learning.server import Host
@@ -149,6 +150,47 @@ class MemoryFlow(unittest.TestCase):
                     state = client.get('/api/state').json()
                     self.assertEqual(state['memory'], [])
                     self.assertTrue(state['memory_requests'][0]['error'])
+
+
+class CrashRecovery(unittest.TestCase):
+    """A turn is stored as completed before memory records what it asked for; a host stopped in between, by a crash
+    say, leaves that to the next host to open the course."""
+
+    def crashed(self, path, settings=None, runner=None, work=None):
+        app = Host(path, runner=runner, settings=settings)
+        try:
+            with mock.patch('guided_learning.server.features.Memory.on_complete'):
+                work(app)
+                settle(app)
+        finally:
+            app.close()
+
+    def reopen(self, path, settings=None, runner=None):
+        app = Host(path, runner=runner, settings=settings)
+        try:
+            return app.operation({'op': 'memory.view'})['entries'], app.operation({'op': 'memory.requests'})['requests']
+        finally:
+            app.close()
+
+    def test_a_lessons_memory_note_is_recorded_once_by_the_next_host(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            self.crashed(path, runner=Runner(), work=lambda app: app.start_turn({'id': 'one', 'concept_id': 'state', 'prompt': 'Teach'}))
+            self.assertEqual(execute(path, {'op': 'memory.view'})['entries'], [], 'the note was lost with the host')
+            entries, _ = self.reopen(path, runner=Runner())
+            self.assertEqual(sorted(e['text'] for e in entries), ['One step at a time', 'plane wave'])
+            again, _ = self.reopen(path, runner=Runner())
+            self.assertEqual(again, entries)
+
+    def test_the_learners_memory_request_is_answered_by_the_next_host(self):
+        with tempfile.TemporaryDirectory() as path:
+            course(path)
+            settings = Answering({'reply': 'I will keep it short.', 'remember': ['Short answers first'], 'forget': []})
+            self.crashed(path, settings=settings, work=lambda app: app.memory.ask('r', 'Keep it short', 'state'))
+            entries, [request] = self.reopen(path, settings=settings)
+            self.assertEqual(request['reply'], 'I will keep it short.')
+            self.assertEqual([(e['text'], e['status']) for e in entries], [('Short answers first', 'confirmed')])
+            self.assertEqual(len(settings.calls), 1, 'recovery makes no model call')
 
 
 class Answering(TeacherSettings):

@@ -73,23 +73,34 @@ def converted_from(raw_path):
         raise OperationError('invalid_request', f'converted_from must be a readable file: {exc}') from None
     return {'path': str(path), 'revision': hashlib.sha256(data).hexdigest()}
 
+def moved(store, revision):
+    """The source whose file is gone from where it was registered and whose current content is `revision`: the same
+    document, moved on this computer or registered on another one before the course was imported (ADR 0020)."""
+    return next((s for s in store.list('sources') if s.get('revision') == revision and not Path(s['path']).is_file()), None)
+
 def register(store, request):
     raw_path = request.get('path')
     if not isinstance(raw_path, str) or not raw_path:
         raise OperationError('invalid_request', 'path must be a nonempty string')
     path = Path(raw_path).resolve()
     source_id = 'src-' + hashlib.sha256(os.path.normcase(str(path)).encode()).hexdigest()[:24]
-    previous = store.get('sources', source_id, {})
+    previous = store.get('sources', source_id)
+    try:
+        data, error = path.read_bytes(), None
+    except OSError as exc:
+        data, error = None, str(exc)
+    revision = hashlib.sha256(data).hexdigest() if data is not None else None
+    found = moved(store, revision) if previous is None and revision else None
+    if found:
+        source_id, previous = found['id'], found
+    previous = previous or {}
     original = converted_from(request.get('converted_from')) if 'converted_from' in request else previous.get('converted_from')
     source = {'id': source_id, 'path': str(path), 'revision': previous.get('revision'), 'status': 'failed', 'verification': 'pending', 'errors': [],
               **({'converted_from': original} if original else {})}
-    try:
-        data = path.read_bytes()
-    except OSError as exc:
-        source['errors'] = [str(exc)]
+    if data is None:
+        source['errors'] = [error]
         store.put('sources', source_id, source)
         return {'source': source}
-    revision = hashlib.sha256(data).hexdigest()
     source['revision'] = revision
     try:
         units = extract(path, data)
@@ -103,7 +114,7 @@ def register(store, request):
     write_snapshot(store.workspace / 'sources' / source_id, revision, data)
     store.put('source_revisions', source_id + ':' + revision, snapshot)
     store.put('sources', source_id, source)
-    return {'source': source}
+    return {'source': source, **({'moved_from': found['path']} if found else {})}
 
 def read(store, request):
     source_id = request.get('source_id')

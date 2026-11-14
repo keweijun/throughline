@@ -1,4 +1,4 @@
-"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop, courses and doctor."""
+"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop, courses, doctor, export and import."""
 import argparse
 import json
 import os
@@ -88,7 +88,7 @@ New learners often start with a bare request such as "help me create my first co
 
 If they are unsure what to learn, suggest goals that fit their files. Then wait for the files and the goal before building, and follow the `$throughline` skill's intake once both are clear.
 '''
-COMMANDS = ('setup', 'open', 'stop', 'courses', 'doctor')
+COMMANDS = ('setup', 'open', 'stop', 'courses', 'doctor', 'export', 'import')
 
 
 def version():
@@ -405,6 +405,28 @@ def courses(args):
     return 0
 
 
+def _answer(work):
+    """Print a result or an error in the JSON shape of course operations."""
+    from .store import OperationError
+    try:
+        print(json.dumps({'ok': True, 'result': work()}, ensure_ascii=True))
+        return 0
+    except OperationError as exc:
+        print(json.dumps({'ok': False, 'error': {'code': exc.code, 'message': str(exc)}}, ensure_ascii=True))
+        return 1
+
+
+def export_course(args):
+    from . import packages
+    out = Path(args.out) if args.out else Path.cwd() / (args.course + packages.SUFFIX)
+    return _answer(lambda: packages.export(library.course_path(library.default_root(), args.course), out))
+
+
+def import_course(args):
+    from . import packages
+    return _answer(lambda: packages.import_package(args.package, library.default_root(), args.name))
+
+
 def doctor(args):
     """A readable check of the install, for the learner or Codex; exits 1 when something needs fixing."""
     from . import checks
@@ -445,5 +467,12 @@ def main(argv):
     commands.add_parser('stop', help='Stop the background learning interface')
     commands.add_parser('courses', help='List the courses in the library as JSON')
     commands.add_parser('doctor', help='Check that Throughline and Codex are ready')
+    exporter = commands.add_parser('export', help='Write a course and its sources to one .throughline package')
+    exporter.add_argument('course', help='Course name in the library')
+    exporter.add_argument('--out', help='Package file; defaults to <course>.throughline in the current folder')
+    importer = commands.add_parser('import', help='Make a new course in the library from a .throughline package')
+    importer.add_argument('package', help='The .throughline file')
+    importer.add_argument('--name', help="Course name; defaults to the package's, made unique")
     args = parser.parse_args(argv)
-    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor}[args.command](args)
+    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor,
+            'export': export_course, 'import': import_course}[args.command](args)

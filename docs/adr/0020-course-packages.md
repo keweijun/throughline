@@ -2,7 +2,7 @@
 
 Learners want to give a course to a classmate, and to move or back up their own. The only way so far is copying the course folder (ADR 0007), which has three problems. A live course uses write-ahead logging, so a copy can miss recent writes. The folder carries Codex's working files (in one real course, `audit/` was 349 MB beside an 11 MB `sources/` folder) and the host's lease file. And a copy is all or nothing: the classmate gets the sender's progress, course memory, questions and notes, and the teacher then treats them as the sender.
 
-A **course package** is one file, `<course>.throughline`, made by `course.export` and read by `course.import` (also `guided-learning export` and `import`, so Studio can make one on request). The export is on the Course page; the import is on the library, beside New course, and accepts a package dropped on the library. Throughline is still for one learner per course (ADR 0004): a package is a copy, and nothing syncs back.
+A **course package** is one file, `<course>.throughline`, made by `guided-learning export` and read by `guided-learning import`, which Studio can also run on request. They are commands rather than course operations because an import makes a new course and an export reads the whole folder, while an operation works inside one course's transaction. The export is on the Course page; the import is on the library, beside New course, and accepts a package dropped on the library. Throughline is still for one learner per course (ADR 0004): a package is a copy, and nothing syncs back.
 
 ## Share levels
 
@@ -36,7 +36,7 @@ An imported course gets a new id and a folder name of the recipient's choosing. 
 
 Every package holds the sources' files, at every level. Teaching is led by the sources: lessons follow their pages in order and depth (ADR 0009), and citations, page readings, figures, coverage and exercises taken from problem sets all point into them. A course without its sources would be taught from section goals alone. The export says that the files are shared and that the learner must be allowed to share them.
 
-A source's id is derived from the path it was registered from, which means nothing on another computer. Sources in an imported course point at their stored copy instead, and registering a file matches an existing source by its content (the revision) before its path, so a recipient who adds the same PDF from their own folder updates that source rather than adding a second one.
+A source's id is derived from the path it was registered from, which means nothing on another computer. Reading a source always uses its stored copy, so an imported course keeps the sender's paths, which only name the files. Registering a path that is not a source yet takes over the source whose file is gone from where it was registered and whose current content (the revision) is the same, and updates its path. So a recipient who adds the same PDF from their own folder updates that source rather than adding a second one, and so does a learner who moves a file. Content is matched only for sources whose file is gone, so two copies of a file registered on purpose stay two sources.
 
 ## What no level carries
 

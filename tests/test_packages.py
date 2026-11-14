@@ -195,6 +195,58 @@ class CoursePackages(unittest.TestCase):
         self.assertEqual((refused.returncode, json.loads(refused.stdout)['error']['code']), (1, 'course_exists'))
 
 
+class MovedSources(unittest.TestCase):
+    """A file registered from a new path keeps the source of the same content whose file is gone (ADR 0020)."""
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.home = Path(temp.name)
+        self.course = self.home / 'course'
+        execute(self.course, {'op': 'course.init', 'title': 'Quantum'})
+        self.first = self.home / 'first' / 'lecture.pdf'
+        self.first.parent.mkdir()
+        write_pdf(self.first, [['Lecture 1', 'Amplitudes add before squaring.']])
+        self.source = execute(self.course, {'op': 'source.register', 'path': str(self.first)})['source']
+        self.second = self.home / 'second' / 'lecture.pdf'
+        self.second.parent.mkdir()
+
+    def sources(self):
+        return execute(self.course, {'op': 'course.status'})['sources']
+
+    def test_a_recipient_adding_their_own_copy_keeps_the_imported_source(self):
+        package, library = self.home / 'q.throughline', self.home / 'library'
+        library.mkdir()
+        packages.export(self.course, package)
+        self.second.write_bytes(self.first.read_bytes())
+        self.first.unlink()  # the sender's folder does not exist on the recipient's computer
+        course = Path(packages.import_package(package, library)['path'])
+        registered = execute(course, {'op': 'source.register', 'path': str(self.second)})
+        self.assertEqual(registered['source']['id'], self.source['id'])
+        self.assertEqual(registered['moved_from'], str(self.first.resolve()))
+        self.assertEqual([(s['id'], s['path'], s['revision']) for s in execute(course, {'op': 'course.status'})['sources']],
+                         [(self.source['id'], str(self.second.resolve()), self.source['revision'])])
+
+    def test_a_moved_file_keeps_its_source(self):
+        os.replace(self.first, self.second)
+        registered = execute(self.course, {'op': 'source.register', 'path': str(self.second)})
+        self.assertEqual(registered['source']['id'], self.source['id'])
+        self.assertEqual([s['path'] for s in self.sources()], [str(self.second.resolve())])
+
+    def test_two_copies_both_present_stay_two_sources(self):
+        self.second.write_bytes(self.first.read_bytes())
+        registered = execute(self.course, {'op': 'source.register', 'path': str(self.second)})
+        self.assertNotEqual(registered['source']['id'], self.source['id'])
+        self.assertNotIn('moved_from', registered)
+        self.assertEqual(len(self.sources()), 2)
+
+    def test_a_changed_file_at_a_new_path_is_a_new_source(self):
+        self.first.unlink()
+        write_pdf(self.second, [['Lecture 1, revised', 'Amplitudes add before squaring.']])
+        registered = execute(self.course, {'op': 'source.register', 'path': str(self.second)})
+        self.assertNotEqual(registered['source']['id'], self.source['id'])
+        self.assertEqual(len(self.sources()), 2)
+
+
 STORE_METHODS = {'get', 'put', 'list', 'matching', 'delete', 'shared', 'digest'}
 
 

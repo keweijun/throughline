@@ -36,7 +36,7 @@ An imported course gets a new id and a folder name of the recipient's choosing. 
 
 Every package holds the sources' files, at every level. Teaching is led by the sources: lessons follow their pages in order and depth (ADR 0009), and citations, page readings, figures, coverage and exercises taken from problem sets all point into them. A course without its sources would be taught from section goals alone. The export says that the files are shared and that the learner must be allowed to share them.
 
-A source's id is derived from the path it was registered from, which means nothing on another computer. Sources in an imported course point at their stored copy instead, and registering a file matches an existing source by its content (the revision) before its path, so a recipient who adds the same PDF from their own folder updates that source rather than adding a second one.
+A source's id is derived from the path it was registered from, which means nothing on another computer. Reading a source always uses its stored copy, so an imported course keeps the sender's paths, which only name the files. Registering a path that is not a source yet takes over the source whose file is gone from where it was registered and whose current content (the revision) is the same, and updates its path. So a recipient who adds the same PDF from their own folder updates that source rather than adding a second one, and so does a learner who moves a file. Content is matched only for sources whose file is gone, so two copies of a file registered on purpose stay two sources.
 
 ## What no level carries
 

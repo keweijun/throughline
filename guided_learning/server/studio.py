@@ -585,8 +585,8 @@ class Studio:
         files = []
         for match in found.get('files', []):
             relative = Path(match['path'])
-            if relative.parts and (relative.parts[0].startswith('.') or relative.name.startswith('course.sqlite3')):
-                continue  # the course database and hidden files are the app's, not material
+            if relative.parts and (relative.parts[0].startswith('.') or relative.parts[0] == 'backups' or relative.name.startswith('course.sqlite3')):
+                continue  # the course database, its backups and hidden files are the app's, not material; a learner's own database is
             files.append({'name': match.get('file_name') or relative.name, 'path': relative.as_posix(),
                           'absolute': str(Path(match.get('root') or course) / relative)})
         return files[:30]

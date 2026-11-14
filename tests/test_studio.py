@@ -4,6 +4,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 from support import call_cli
 from guided_learning.server import create_app
 from guided_learning.server.settings import TeacherSettings
-from guided_learning.server.studio import message_input
+from guided_learning.server.studio import Studio, StudioError, message_input
 
 FAKE = Path(__file__).resolve().parent / 'fake_studio_server.py'
 
@@ -235,6 +236,32 @@ class StudioTest(unittest.TestCase):
         view = client.get('/api/studio').json()
         self.assertFalse(view['available'])
         self.assertIn('newer Codex', view['error'])
+
+
+class UploadTest(unittest.TestCase):
+    def test_an_upload_racing_another_for_the_same_name_takes_the_next_name_and_keeps_the_other_file(self):
+        course = Path(tempfile.mkdtemp())
+        inputs = course / 'inputs'
+        inputs.mkdir()
+        opened = Path.open
+
+        def racing(path, *args, **kwargs):
+            # The other upload creates notes.pdf just after this one found the name free.
+            if path == inputs / 'notes.pdf' and not path.exists():
+                with opened(path, 'xb') as theirs:
+                    theirs.write(b'theirs')
+            return opened(path, *args, **kwargs)
+        with mock.patch.object(Path, 'open', racing):
+            uploaded = Studio.upload(course, 'notes.pdf', [b'mine'])
+        self.assertEqual(uploaded['path'], 'inputs/notes (2).pdf')
+        self.assertEqual((inputs / 'notes.pdf').read_bytes(), b'theirs')
+        self.assertEqual((inputs / 'notes (2).pdf').read_bytes(), b'mine')
+
+    def test_a_refused_upload_removes_only_its_own_file(self):
+        course = Path(tempfile.mkdtemp())
+        with mock.patch('guided_learning.server.studio.MAX_UPLOAD', 3), self.assertRaises(StudioError):
+            Studio.upload(course, 'big.pdf', [b'1234'])
+        self.assertEqual(list((course / 'inputs').iterdir()), [])
 
 
 class MessageInputTest(unittest.TestCase):

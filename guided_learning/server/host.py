@@ -6,7 +6,7 @@ import time
 import uuid
 from pathlib import Path
 
-from ..api import execute
+from ..api import CHANGED, execute
 from .. import codex, library
 from ..streaming import PREPARED_STEP, SMALL_MODEL, summarize
 from .settings import TeacherSettings
@@ -74,10 +74,9 @@ class Host:
         self._pending = {}  # (turn id, attempt) -> events not yet stored
         self._live = {}  # (turn id, attempt) -> channel, while this host streams the attempt
         self._timer = None
-        # The course files' stamp after this host's latest write, while no other process has written since: the library
-        # watcher leaves such changes alone, since the host announces its own.
-        self._stamp_lock = threading.Lock()
-        self._own_stamp = library.stamp(self.workspace)
+        # The last token an outside write left (`api.CHANGED`) that the library watcher has seen; the host announces its
+        # own changes, so its writes leave none.
+        self._seen_change = self._outside_token()
         self.operation({'op': 'course.status'})
         self._lease = library.acquire_lease(self.workspace)
         self._held = hold(self.workspace)
@@ -117,23 +116,19 @@ class Host:
         return self._execute(request)
 
     def _execute(self, request):
-        before = library.stamp(self.workspace)
-        result = execute(self.workspace, request)
-        after = library.stamp(self.workspace)
-        with self._stamp_lock:
-            # Another process may commit between the stamps; its change is then taken for the host's, and only a later
-            # one shows. Writers take turns, so that window is the moment around this operation's own transaction.
-            if before == self._own_stamp:
-                self._own_stamp = after
-        return result
+        return execute(self.workspace, request, announce=False)
 
-    def own_change(self, stamp):
-        """Whether the course files at `stamp` hold only this host's writes since the last call; later writes are
-        judged from `stamp`."""
-        with self._stamp_lock:
-            own = stamp == self._own_stamp
-            self._own_stamp = stamp
-            return own
+    def _outside_token(self):
+        try:
+            return (self.workspace / CHANGED).read_text(encoding='utf-8')
+        except OSError:
+            return None
+
+    def outside_change(self):
+        """Whether something outside this host, Codex say, wrote to the course since the last call (`api.CHANGED`)."""
+        token = self._outside_token()
+        changed, self._seen_change = token != self._seen_change, token
+        return changed
 
     def _persist(self, key=None):
         """Store buffered stream events, of one attempt or all; returns the last write's result. Events that cannot be
@@ -323,7 +318,7 @@ class Host:
                 except Exception:
                     log.exception('Could not store the rest of turn %s attempt %s', identifier, attempt)
                     self._pending.pop(key, None)
-                current = execute(self.workspace, {'op': 'stream.read', 'id': identifier})['turn']
+                current = execute(self.workspace, {'op': 'stream.read', 'id': identifier}, announce=False)['turn']
                 if current['attempt'] != attempt or current['status'] != 'running':
                     self._live.pop(key, None)
                     return

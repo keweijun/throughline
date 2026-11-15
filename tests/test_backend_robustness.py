@@ -56,11 +56,11 @@ class TurnFailures(unittest.TestCase):
         real = host_module.execute
         failed = []
 
-        def execute(workspace, request):
+        def execute(workspace, request, **options):
             if request.get('op') == 'stream.events' and not failed:
                 failed.append(request)
                 raise OperationError('busy', 'Synthetic write failure')
-            return real(workspace, request)
+            return real(workspace, request, **options)
         return mock.patch.object(host_module, 'execute', side_effect=execute)
 
     def test_a_failed_event_write_marks_the_turn_failed_and_frees_the_mainline(self):

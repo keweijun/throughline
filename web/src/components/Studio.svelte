@@ -159,8 +159,6 @@
     busy = true;
     app.drafts.set(key, '');
     app.drafts.setImages(key, []);
-    // On the library page, a chat remembers the courses there were when it began, to offer the one Codex makes.
-    if (library && studio.coursesBefore === null) studio.coursesBefore = (app.library?.courses ?? []).map((c) => c.name);
     try {
       await studio.send({ ...sent, images: attached });
     } catch (e) {
@@ -187,9 +185,10 @@
   }
 
   // Courses that appeared in the library since this chat began, offered once Codex has finished with them.
+  const before = $derived(studio.thread?.before);
   const made = $derived(
-    library && studio.coursesBefore && !studio.running
-      ? (app.library?.courses ?? []).filter((c) => !c.error && c.concepts && !studio.coursesBefore!.includes(c.name))
+    library && before && !studio.running
+      ? (app.library?.courses ?? []).filter((c) => !c.error && c.concepts && !before.includes(c.name))
       : [],
   );
 
@@ -203,9 +202,15 @@
     app.askCourseStudio(name, '', thread);
   }
 
-  // Once Codex has finished and the course it made has a route, the chat moves into that course by itself.
+  // Once Codex has finished and the course it made has a route, the chat moves into that course by itself. The host
+  // files it there when the turn ends, even with the page reloaded or left meanwhile; on screen, Studio follows it.
   $effect(() => {
-    if (library && active && made.length === 1) void openMade(made[0].name);
+    if (!library || !active || moving) return;
+    const moved = studio.moved;
+    if (moved && moved.thread === studio.threadId) {
+      moving = true;
+      untrack(() => app.askCourseStudio(moved.course, '', moved.thread));
+    } else if (made.length === 1) void openMade(made[0].name);
   });
 
   function recall() {

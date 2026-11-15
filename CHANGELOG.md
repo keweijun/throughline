@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.48.2
+
+- The Studio chat that makes a new course now always moves into that course once the course is built, so you find it on the course's Overview. Before, if you reloaded the page or went elsewhere while Codex was building, the chat stayed behind on the library page.
+
 ## 0.48.1
 
 - Code in a runnable Python cell can no longer use Throughline itself: it runs in a sealed-off part of the page, so a cell cannot read your course, turn on Studio's Full access or send Codex a message. Cells run as before, numpy and the other packages included.

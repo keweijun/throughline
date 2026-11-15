@@ -100,7 +100,15 @@ export type StudioRequest =
   | { id: string; method: ApprovalMethod; params: { threadId: string; turnId: string; reason?: string | null; command?: string | null; cwd?: string | null; grantRoot?: string | null } }
   | { id: string; method: 'item/tool/requestUserInput'; params: { threadId: string; turnId: string; questions: UserInputQuestion[] } };
 
-export type StudioThread = { id: string; name: string; preview: string; updated_at: number | null; running: boolean };
+/** `before`, for a library chat: the courses there were when it began, kept by the host so a reload loses nothing. */
+export type StudioThread = {
+  id: string;
+  name: string;
+  preview: string;
+  updated_at: number | null;
+  running: boolean;
+  before?: string[] | null;
+};
 export type StudioSkill = { name: string; path: string; title: string; description: string };
 export type StudioFile = { name: string; path: string; absolute: string };
 export type StudioAccess = { full_access: boolean; saved: boolean; forced: boolean };
@@ -134,8 +142,8 @@ export type StudioScope = 'course' | 'library';
 class StudioStore {
   /** The course whose Overview shows Studio, or the library page; switching starts from that place's chats. */
   scope = $state<StudioScope>('course');
-  /** On the library page, the courses there were when this chat began, so a course Codex makes can be offered. */
-  coursesBefore = $state<string[] | null>(null);
+  /** A library chat the host filed under the course it made, when its turn ended; Studio follows it there. */
+  moved = $state<{ thread: string; course: string } | null>(null);
   /** Null until asked; false when this Codex cannot run Studio, which then hands off to a Codex chat instead. */
   available = $state<boolean | null>(null);
   error = $state('');
@@ -191,7 +199,6 @@ class StudioStore {
     this.context = null;
     this.origin = null;
     this.skills = [];
-    this.coursesBefore = null;
   }
 
   get running() {
@@ -366,7 +373,6 @@ class StudioStore {
 
   newThread() {
     this.#chosen = true;
-    this.coursesBefore = null;
     this.#reading++;
     this.threadId = null;
     this.turns = [];
@@ -466,7 +472,10 @@ class StudioStore {
       this.error = t('Codex stopped. Send a message to start it again.');
       return;
     }
-    if (method === 'studio/threads') return void this.refreshThreads();
+    if (method === 'studio/threads') {
+      if (params.moved) this.moved = params.moved;
+      return void this.refreshThreads();
+    }
     if (method === 'studio/request') {
       const request = params as StudioRequest;
       if (!this.waiting.some((p) => p.id === request.id)) this.waiting.push(request);

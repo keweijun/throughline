@@ -76,6 +76,50 @@ class LibraryStudioTest(unittest.TestCase):
         self.assertEqual(self.threads(scope=''), [thread])
         self.assertGreaterEqual(self.client.post(f'/api/studio/threads/{thread}/course', json={'name': 'nowhere'}).status_code, 400)
 
+    def course(self, name, route=True):
+        path = self.library / name
+        path.mkdir()
+        call_cli(self, path, 'course.init', title=name.title())
+        if route:
+            call_cli(self, path, 'curriculum.save', concepts=[{'id': 'state', 'title': 'States'}], route=['state'], coverage=[])
+        return path
+
+    def settled(self, thread):
+        """Ends the chat's running turn, as Codex does, and waits until the host has heard it end."""
+        self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'thread_id': thread, 'text': 'thanks'})
+        deadline = time.time() + 5
+        while self.client.get('/api/studio/activity', params={'scope': 'library'}).json()['running'] and time.time() < deadline:
+            time.sleep(0.02)
+
+    def test_the_host_moves_a_chat_into_the_course_it_made_when_its_turn_ends(self):
+        # The interface may be reloaded or elsewhere when Codex finishes, so the host remembers the courses there were.
+        self.course('older')
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Make a course, wait'}).json()['thread']
+        self.course('quantum', route=False)
+        self.settled(thread)
+        # A course without a route is not made yet: the chat stays, and the courses it began with are known.
+        self.assertEqual(self.threads(), [thread])
+        self.assertEqual(self.client.get('/api/studio', params={'scope': 'library'}).json()['threads'][0]['before'], ['older'])
+
+        self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'thread_id': thread, 'text': 'Build the route, wait'})
+        call_cli(self, self.library / 'quantum', 'curriculum.save', concepts=[{'id': 'state', 'title': 'States'}], route=['state'], coverage=[])
+        self.settled(thread)
+        self.assertEqual(self.threads(), [])
+        self.client.post('/api/library/open', json={'name': 'quantum'})
+        self.assertEqual(self.threads(scope=''), [thread])
+        # Opening it from the interface as well, as a tab that saw the turn end may, changes nothing.
+        self.assertEqual(self.client.post(f'/api/studio/threads/{thread}/course', json={'name': 'quantum'}).status_code, 200)
+        self.assertEqual(self.threads(scope=''), [thread])
+
+    def test_a_chat_that_made_several_courses_offers_them_instead(self):
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Make two courses, wait'}).json()['thread']
+        self.course('waves')
+        self.course('optics')
+        self.settled(thread)
+        # Which one to open is the learner's: the chat stays, and the interface offers both.
+        listed = self.client.get('/api/studio', params={'scope': 'library'}).json()['threads']
+        self.assertEqual([(t['id'], t['before']) for t in listed], [(thread, [])])
+
 
 if __name__ == '__main__':
     unittest.main()

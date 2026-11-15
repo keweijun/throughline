@@ -6,6 +6,7 @@ threads it has open to the interface, and holds the approvals and questions Code
 answers them."""
 import itertools
 import json
+import logging
 import os
 import queue
 import re
@@ -13,10 +14,12 @@ import subprocess
 import threading
 from pathlib import Path
 
+from .. import library
 from ..codex import find_codex
 from ..store import OperationError
 from .settings import EFFORTS, default_path
 
+log = logging.getLogger(__name__)
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
 # Notifications about a thread that the interface draws; moderation, predictions and read state it ignores.
 FORWARDED = re.compile(r'^((thread|turn|item)/|error$)')
@@ -203,7 +206,8 @@ class Studio:
         self.missing = None  # why this Codex cannot run Studio, once known
         self.forced = None  # True when Windows has no ready sandbox, so Studio runs with full access
 
-    # Per-user record: Full access, Studio's own model and effort, and the threads of each course, newest first.
+    # Per-user record: Full access, Studio's own model and effort, the threads of each course, newest first, and the
+    # courses there were when each library thread began, so the course it makes is known after any reload.
 
     def _config(self):
         try:
@@ -211,8 +215,9 @@ class Studio:
         except (OSError, ValueError):
             data = {}
         courses = data.get('courses') if isinstance(data.get('courses'), dict) else {}
+        before = data.get('before') if isinstance(data.get('before'), dict) else {}
         model, effort = data.get('model'), data.get('effort')
-        return {'full_access': data.get('full_access') is True, 'courses': courses,
+        return {'full_access': data.get('full_access') is True, 'courses': courses, 'before': before,
                 'model': model.strip() if isinstance(model, str) else '',
                 'effort': effort if effort in EFFORTS else ''}
 
@@ -222,15 +227,53 @@ class Studio:
         temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
         os.replace(temporary, self.path)
 
-    def _record(self, course, thread, keep=True):
+    def _record(self, course, thread, keep=True, before=None):
         with self.lock:
             data = self._config()
             ids = [t for t in data['courses'].get(str(course), []) if t != thread]
             data['courses'][str(course)] = [thread, *ids] if keep else ids
+            if before is not None:
+                data['before'][thread] = before
+            elif not keep:
+                data['before'].pop(thread, None)
             self._save(data)
 
     def _ids(self, course):
         return self._config()['courses'].get(str(course), [])
+
+    def _courses(self):
+        root = self.root
+        return sorted(p.name for p in root.iterdir() if p.is_dir() and library.is_course(p)) if root and root.is_dir() else []
+
+    def _made(self, thread):
+        """The courses with a route that a library thread made: in the library now, but not when it began."""
+        before = self._config()['before'].get(thread)
+        if before is None:
+            return []
+        made = []
+        for name in self._courses():
+            if name in before:
+                continue
+            try:
+                if library.summary(self.root / name)['concepts']:
+                    made.append(name)
+            except Exception:  # a course that cannot be read yet is not offered
+                continue
+        return made
+
+    def _settle(self, thread):
+        """When a library thread's turn ends and it has made one course with a route, file it under that course, as
+        the interface would on screen, so a reload or leaving the page never strands the chat on the library page."""
+        try:
+            if thread not in self._ids(LIBRARY):
+                return
+            made = self._made(thread)
+            if len(made) == 1:
+                self.refile(thread, self.root / made[0])
+                self.events.publish({'type': 'studio', 'method': 'studio/threads',
+                                     'params': {'moved': {'thread': thread, 'course': made[0]}}})
+        except Exception:  # never let this stop the reader that forwards Codex's messages
+            log.exception('Could not file Studio thread %s under the course it made', thread)
 
     # The App Server.
 
@@ -304,6 +347,7 @@ class Studio:
         if method == 'turn/started':
             self.active[thread] = params['turn']['id']
         elif method == 'turn/completed':
+            self._settle(thread)  # before anyone hears the turn ended, so what they read next shows the move
             self.active.pop(thread, None)
             self.ended[thread] = params['turn']['id']
         if method == 'account/rateLimits/updated' or (FORWARDED.match(method) and method not in IGNORED and thread in self.owned):
@@ -420,7 +464,12 @@ class Studio:
             return []
         listed = self._server().call('thread/list', {'cwd': str(self._cwd(course)), 'limit': 100})
         found = {t['id']: t for t in listed.get('data', [])}
-        return [_summary(found[t], t in self.active) for t in ids if t in found]
+        summaries = [_summary(found[t], t in self.active) for t in ids if t in found]
+        if course == LIBRARY:
+            before = self._config()['before']
+            for summary in summaries:
+                summary['before'] = before.get(summary['id'])
+        return summaries
 
     def history(self, course, thread):
         server = self._load(course, thread)
@@ -434,7 +483,7 @@ class Studio:
         result = server.call('thread/start', {**self._thread_settings(course), 'ephemeral': False, 'serviceName': CLIENT})
         thread = result['thread']['id']
         self.owned.add(thread)
-        self._record(course, thread)
+        self._record(course, thread, before=self._courses() if course == LIBRARY else None)
         self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
         return thread
 
@@ -521,6 +570,8 @@ class Studio:
 
     def refile(self, thread, course):
         """File a library thread under the course it made, so the course's Overview shows it from now on."""
+        if thread in self._ids(course):
+            return {'thread': thread, 'course': str(course)}  # filed already, when its turn ended
         self._owns(LIBRARY, thread)
         self._record(LIBRARY, thread, keep=False)
         self._record(course, thread)

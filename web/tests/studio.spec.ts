@@ -374,6 +374,35 @@ test("the library page has its own Studio for new courses; a course card's actio
   expect(errors).toEqual([]);
 });
 
+test('a library chat still moves into the course it made after the page was reloaded while Codex worked', async ({ page, course }) => {
+  const { base, errors } = await course('studio_browser_fixture');
+  await page.locator('#open-courses').click();
+  await page.getByRole('button', { name: 'New course', exact: true }).click();
+  const box = page.locator('#studio-input');
+  await expect(box).toBeFocused();
+  await box.pressSequentially('make a course and wait');
+  await page.keyboard.press('Control+Enter');
+  await expect.poll(async () => (await (await page.request.get(base + '/api/studio/activity?scope=library')).json()).running).toHaveLength(1);
+  const thread = (await (await page.request.get(base + '/api/studio?scope=library')).json()).threads[0].id;
+
+  // The page is reloaded while Codex works; the library offers the chat again.
+  await page.reload();
+  await page.locator('#open-courses').click();
+  await page.getByRole('button', { name: 'Open the chat' }).click();
+
+  // Codex makes the course during the turn and then finishes (here the test does both, as the skill would, with
+  // nothing sent from the page); the chat moves into the course, which opens at its Studio.
+  const root = (await (await page.request.get(base + '/api/library')).json()).root;
+  const optics = `${root}/optics`;
+  courseOperation(optics, { op: 'course.init', title: 'Optics' });
+  courseOperation(optics, { op: 'curriculum.save', concepts: [{ id: 'lens', title: 'Thin lenses' }], route: ['lens'], coverage: [] });
+  await page.request.post(base + '/api/studio/messages?scope=library', { data: { thread_id: thread, text: 'finish' } });
+  await expect(page.locator('#course-switcher')).toContainText('Optics', { timeout: 15_000 });
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('steered: finish');
+  expect((await (await page.request.get(base + '/api/studio')).json()).threads.map((t: { id: string }) => t.id)).toEqual([thread]);
+  expect(errors).toEqual([]);
+});
+
 test('a long turn can be read back while it runs, then folds behind its answer, and the chat gets a title', async ({ page, course }) => {
   const { errors } = await course('studio_browser_fixture');
   await page.locator('#open-course').click();

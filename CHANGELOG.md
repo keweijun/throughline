@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.49.2
+
+- When Throughline closes, it now waits for its last check for changes Codex made, so it never quits with a course's database still open.
+
 ## 0.49.1
 
 - Changes Codex makes while a lesson is streaming now always show in the open course. Since 0.48.2 one could be missed when Codex saved at the same moment as the app, and the app's own saves could reload the course for nothing.

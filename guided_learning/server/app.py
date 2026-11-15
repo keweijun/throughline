@@ -247,6 +247,7 @@ class Courses:
         self.host = None
         self.watch_interval = watch_interval
         self.stopping = threading.Event()
+        self.watcher = None  # the thread running `watch`, once the app has started
         self._stamps = {}  # path -> (file stamp, fingerprint) from the last poll
 
     def _fingerprints(self):
@@ -311,6 +312,8 @@ class Courses:
 
     def close(self):
         self.stopping.set()
+        if self.watcher:  # a poll in progress still reads the courses' databases, and may wake the host
+            self.watcher.join(5)
         self.studio.close()
         with self.lock:
             if self.host:
@@ -344,7 +347,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @asynccontextmanager
     async def lifespan(app):
-        threading.Thread(target=courses.watch, args=(courses._fingerprints(),), name='library-watch', daemon=True).start()
+        courses.watcher = threading.Thread(target=courses.watch, args=(courses._fingerprints(),), name='library-watch', daemon=True)
+        courses.watcher.start()
         try:
             yield
         finally:

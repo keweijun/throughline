@@ -1,5 +1,7 @@
 import sqlite3
+import uuid
 from importlib import import_module
+from pathlib import Path
 from . import migrations
 from .store import Store, OperationError
 
@@ -19,7 +21,12 @@ class _NeedsWrite(Exception):
     pass
 
 
-def execute(workspace, request):
+# Every write made outside the open course's host, by Codex through the command say, leaves a new token here; the app
+# reloads the open course when it changes. The host passes announce=False, since it announces its own changes.
+CHANGED = '.learning-changed'
+
+
+def execute(workspace, request, announce=True):
     if not isinstance(request, dict) or not isinstance(request.get('op'), str):
         raise OperationError('invalid_request', 'Request must be an object with an op string')
     operations = {}
@@ -35,9 +42,15 @@ def execute(workspace, request):
                 return _read(store, handler, request)
             except _NeedsWrite:
                 pass
-        return _write(store, handler, request)
+        result = _write(store, handler, request)
     finally:
         store.db.close()
+    if announce:
+        try:
+            (Path(workspace) / CHANGED).write_text(uuid.uuid4().hex, encoding='utf-8')
+        except OSError:
+            pass  # the change is stored; the app shows it with the next one
+    return result
 
 
 def _read(store, handler, request):

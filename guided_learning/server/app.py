@@ -266,17 +266,14 @@ class Courses:
         """Tell open tabs when Codex changes a course or the library from outside the app."""
         while not self.stopping.wait(self.watch_interval):
             host = self.host
-            before = self._stamps.get(host.workspace, (None,))[0] if host else None
             current = self._fingerprints()
             if current != seen:
                 self.events.publish({'type': 'changed', 'scope': 'library'})
-            # The host announces its own writes; any commit made outside it, by Codex say, reloads the open course,
+            # The host announces its own writes; any write made outside it, by Codex say, reloads the open course,
             # whatever it changed: exercises, review sets, memory and readings are not in the library's fingerprint.
-            if host:
-                stamp = self._stamps.get(host.workspace, (None,))[0]
-                if not host.own_change(stamp) and stamp != before:
-                    self.events.publish({'type': 'changed', 'scope': 'state'})
-                    host._wake_background()
+            if host and host.outside_change():
+                self.events.publish({'type': 'changed', 'scope': 'state'})
+                host._wake_background()
             seen = current
 
     def open(self, path):

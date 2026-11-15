@@ -12,7 +12,8 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from guided_learning.api import execute
-from guided_learning.server import create_app
+from guided_learning.server import Host, create_app
+from guided_learning.server import host as host_module
 from guided_learning.server.settings import TeacherSettings
 from support import ROOT
 
@@ -140,6 +141,28 @@ class CourseLibrary(unittest.TestCase):
                 self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'the host announces its own changes')
                 execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
                 self.assertTrue(wait_for('state'), events)
+
+    def test_codexs_write_during_one_of_the_hosts_is_still_its_own_change(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'alpha'
+            course(path, 'Alpha')
+            host = Host(path, runner=Idle())
+            try:
+                real = host_module.execute
+
+                def writing(workspace, request, **options):
+                    result = real(workspace, request, **options)
+                    if request['op'] == 'memory.save' and request['id'] == 'pref':  # Codex commits as the host does
+                        execute(path, {'op': 'memory.save', 'id': 'other', 'kind': 'preference', 'concept_id': 'state', 'text': 'Examples first'})
+                    return result
+                host.operation({'op': 'memory.save', 'id': 'mine', 'kind': 'preference', 'concept_id': 'state', 'text': 'Short answers'})
+                self.assertFalse(host.outside_change(), "the host's own write")
+                with mock.patch.object(host_module, 'execute', writing):
+                    host.operation({'op': 'memory.save', 'id': 'pref', 'kind': 'preference', 'concept_id': 'state', 'text': 'Diagrams'})
+                self.assertTrue(host.outside_change(), "Codex's write, though the host wrote at the same moment")
+                self.assertFalse(host.outside_change(), 'told once')
+            finally:
+                host.close()
 
     def test_codex_changes_beyond_the_route_reach_open_tabs(self):
         # Studio adds exercises and notes memory through the skill, outside the host; the open course shows them at once.

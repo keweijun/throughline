@@ -7,6 +7,20 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - A figure in a lesson keeps showing the same figure after Codex reads its page again. Before, reading a page again could make an earlier lesson show a different figure from that page, when the new reading listed the figures in another order or added or left one out. Correcting a figure's crop still fixes it in every lesson that shows it.
 - Reviews now count a question that tests several sections part by part: a missed part counts against its own section only, and answering the question counts as practice of every section it tests, not just the first.
 
+## 0.48.3
+
+- Attaching two files with the same name in Studio at the same moment no longer deletes one of them; the second is saved as `name (2)`.
+- When setup moves courses from where earlier versions kept them, it now waits until Throughline has really let go of each course, and leaves a course it cannot take where it is instead of moving it while open.
+- If Throughline stops just as a lesson, a side question or a "remember this" request finishes, what that turn asked course memory to keep is now recorded the next time the course opens, instead of being lost.
+
+## 0.48.2
+
+- Exercises, review sets, course memory and page readings that Codex saves in Studio, or in another Codex session, now show in the open course right away, instead of only after something else reloaded it.
+
+## 0.48.1
+
+- Code in a runnable Python cell can no longer use Throughline itself: it runs in a sealed-off part of the page, so a cell cannot read your course, turn on Studio's Full access or send Codex a message. Cells run as before, numpy and the other packages included.
+
 ## 0.48.0
 
 - When a course file moves, or you add your own copy of a file that an imported course already has, Throughline now keeps the existing source, with its page readings and its place in the route, instead of adding a second one. Two copies you register on purpose still stay two sources.

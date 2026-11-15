@@ -25,6 +25,8 @@ STEP_REPLY = re.compile(r'<lesson-step>\s*(\{.*?\})\s*</lesson-step>', re.S)
 STEP_BLOCK = re.compile(r'\s*<lesson-step>.*$', re.S)
 FIGURE_SIZE = 1400  # pixels on the long side of a figure drawn in a lesson
 MAX_SOURCE_IMAGES = 12  # figures and pages sent with one turn, a sanity limit
+# A teacher turn runs for minutes, so every turn a crash can cut off started within this of the course's latest.
+RECOVERY_WINDOW = 3600
 
 
 def source_url(ref, fmt=None):
@@ -920,6 +922,30 @@ class Memory(Feature):
             self.operation({'op': 'memory.note', 'turn_id': turn['id'], 'concept_id': turn['concept_id'], 'interaction_ids': own, 'note': note})
         except OperationError:
             log.info('Memory note of turn %s was refused', turn['id'], exc_info=True)
+
+    def recover(self):
+        """Record what turns completed just before a crash asked memory to keep, without a model call: every request
+        of the learner's still unanswered, and the notes of the turns started or revealed within RECOVERY_WINDOW of the
+        course's latest, since a crash interrupts only turns still running as it happens, and requests that overlap can
+        finish in any order. `memory.note` and `memory.answer` keep the turn that applied them, and a refused note stays
+        refused, so a turn already handled changes nothing. Consolidations are not replayed: a refused one leaves no
+        record, and replayed against memory the learner has since changed it could merge away what they confirmed; a
+        lost one only leaves duplicates for the next."""
+        unanswered = {r['turn_id'] for r in self.operation({'op': 'memory.requests'})['requests'] if 'reply' not in r and 'error' not in r}
+        turns = self.host.brief_turns()  # oldest first
+
+        def last_active(turn):  # a prepared step is taught, and its hooks run, when the learner reveals it
+            return max(turn['started_at'], turn.get('revealed_at') or 0)
+        since = max(map(last_active, turns), default=0) - RECOVERY_WINDOW
+        pending = [t for t in turns if t['status'] == 'completed' and (t['id'] in unanswered or (
+            t['channel'] in ('mainline', 'sidequestion', 'practice') and last_active(t) >= since))]
+        if any(t['channel'] == 'practice' for t in pending):
+            self.host.practice.state()  # records the practice a note cites first, as completion does
+        for brief in pending:
+            try:
+                self.on_complete(self.operation({'op': 'stream.read', 'id': brief['id']})['turn'])
+            except Exception:
+                log.exception('Could not recover the memory of turn %s', brief['id'])
 
 
 class CourseChanges(Feature):

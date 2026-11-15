@@ -101,6 +101,19 @@ class WebLearning(unittest.TestCase):
                     self.assertEqual(response.json()['error'], 'Invalid local origin')
                 self.assertEqual(host.questions.list(), [])
 
+    def test_requests_from_a_python_cell_are_refused(self):
+        # A cell runs in a sandboxed frame without an origin (ADR 0013): its fetches say Origin "null", and a no-cors GET
+        # sends no Origin but is labelled cross-site.
+        with tempfile.TemporaryDirectory() as tmp:
+            course(tmp)
+            client, _ = host_client(tmp, runner=BlockingRunner())
+            with client:
+                for response in (client.get('/api/state', headers={'Origin': 'null', 'Sec-Fetch-Site': 'cross-site'}),
+                                 client.put('/api/studio/access', json={'full_access': True}, headers={'Origin': 'null', 'Sec-Fetch-Site': 'cross-site'}),
+                                 client.get('/api/state', headers={'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors'})):
+                    self.assertEqual(response.status_code, 403)
+                self.assertFalse(client.get('/api/studio/access').json()['full_access'])
+
     def test_live_events_carry_lesson_deltas(self):
         class Runner:
             def run(self, prompt, cwd, emit, cancel):

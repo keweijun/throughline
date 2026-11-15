@@ -8,6 +8,14 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - When setup moves courses from where earlier versions kept them, it now waits until Throughline has really let go of each course, and leaves a course it cannot take where it is instead of moving it while open.
 - If Throughline stops just as a lesson, a side question or a "remember this" request finishes, what that turn asked course memory to keep is now recorded the next time the course opens, instead of being lost.
 
+## 0.48.2
+
+- Exercises, review sets, course memory and page readings that Codex saves in Studio, or in another Codex session, now show in the open course right away, instead of only after something else reloaded it.
+
+## 0.48.1
+
+- Code in a runnable Python cell can no longer use Throughline itself: it runs in a sealed-off part of the page, so a cell cannot read your course, turn on Studio's Full access or send Codex a message. Cells run as before, numpy and the other packages included.
+
 ## 0.48.0
 
 - When a course file moves, or you add your own copy of a file that an imported course already has, Throughline now keeps the existing source, with its page readings and its place in the route, instead of adding a second one. Two copies you register on purpose still stay two sources.

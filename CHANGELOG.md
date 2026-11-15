@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.48.2
+
+- Exercises, review sets, course memory and page readings that Codex saves in Studio, or in another Codex session, now show in the open course right away, instead of only after something else reloaded it.
+
 ## 0.48.1
 
 - Code in a runnable Python cell can no longer use Throughline itself: it runs in a sealed-off part of the page, so a cell cannot read your course, turn on Studio's Full access or send Codex a message. Cells run as before, numpy and the other packages included.

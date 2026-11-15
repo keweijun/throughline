@@ -141,6 +141,35 @@ class CourseLibrary(unittest.TestCase):
                 execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
                 self.assertTrue(wait_for('state'), events)
 
+    def test_codex_changes_beyond_the_route_reach_open_tabs(self):
+        # Studio adds exercises and notes memory through the skill, outside the host; the open course shows them at once.
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
+                             library_root=root, watch_interval=0.05)
+            with TestClient(app, base_url='http://127.0.0.1:8765'):
+                events = []
+                app.state.courses.events.publish = events.append
+
+                def wait_for_state():
+                    for _ in range(100):
+                        if {'type': 'changed', 'scope': 'state'} in events:
+                            return True
+                        time.sleep(0.05)
+                    return False
+                for op in ('course.status', 'practice.list', 'memory.view', 'review.context'):
+                    execute(Path(root) / 'alpha', {'op': op})
+                time.sleep(0.3)
+                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'reading the course changes nothing')
+                execute(Path(root) / 'alpha', {'op': 'practice.add', 'id': 'ps1', 'concept_id': 'state',
+                                               'exercises': [{'question': 'Normalise a state.', 'origin': 'self_created'}]})
+                self.assertTrue(wait_for_state(), events)
+                self.assertNotIn({'type': 'changed', 'scope': 'library'}, events, 'the library shows nothing exercises change')
+                events.clear()
+                execute(Path(root) / 'alpha', {'op': 'memory.note', 'turn_id': 't', 'concept_id': 'state', 'interaction_ids': [],
+                                               'note': {'entries': [{'kind': 'taught_term', 'text': 'ket'}]}})
+                self.assertTrue(wait_for_state(), events)
+
     def test_a_course_summary_is_read_again_only_after_the_course_changes(self):
         from guided_learning import library
         with tempfile.TemporaryDirectory() as root:

@@ -79,6 +79,26 @@ class ReviewContext(unittest.TestCase):
         self.assertIn('r1', self.context(T0)['a']['recent_misses'], 'a wrong recall answer is a miss')
         self.assertEqual(self.context(T0 + 3 * DAY)['a']['days_since_practised'], 2, 'a recall answer is practice')
 
+    def test_a_question_across_sections_counts_each_part_for_its_own_section(self):
+        self.lesson('a', T0)
+        self.lesson('b', T0)
+        parts = [{'label': '(a)', 'text': 'Use A', 'concept_ids': ['a']}, {'label': '(b)', 'text': 'Use B', 'concept_ids': ['b']}]
+        self.task('both', 'a', origin='review', kind='apply', tests_concept_ids=['a', 'b'], parts=parts, status='attempted',
+                  history=[{'action': 'assess', 'outcome': 'needs_work', 'parts': ['correct', 'not_yet'], 'evidence_id': 'e-both'}])
+        self.store.put('evidence', 'e-both', {'id': 'e-both', 'concept_id': 'a', 'assessment_id': 'i-both', 'assessed_at': T0 + 5 * DAY})
+        sections = self.context(T0 + 6 * DAY)
+        self.assertEqual((sections['a']['recent_misses'], sections['b']['recent_misses']), ([], ['both']), 'the miss is B part')
+        self.assertEqual((sections['a']['days_since_practised'], sections['b']['days_since_practised']), (1, 1),
+                         'the assessment is practice of every section it tests, not only the one its evidence is for')
+
+    def test_a_question_whose_parts_name_no_sections_counts_against_every_section_it_tests(self):
+        self.lesson('a', T0)
+        self.lesson('b', T0)
+        self.task('old', 'a', origin='review', kind='apply', tests_concept_ids=['a', 'b'], parts=['Use A', 'Use B'], status='attempted',
+                  history=[{'action': 'assess', 'outcome': 'needs_work', 'parts': ['correct', 'not_yet']}])
+        sections = self.context(T0)
+        self.assertEqual((sections['a']['recent_misses'], sections['b']['recent_misses']), (['old'], ['old']))
+
     def test_only_an_option_of_a_recall_question_can_be_chosen(self):
         self.lesson('a', T0)
         self.task('r', 'a', origin='review', set_id='s', kind='recall', options=[{'text': 'x', 'explanation': ''}, {'text': 'y', 'explanation': ''}], correct=1)

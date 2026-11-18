@@ -122,7 +122,7 @@
       requestAnimationFrame(() => document.getElementById('question-input')?.focus());
     } else if (event.key === '[') step(-1);
     else if (event.key === ']') step(1);
-    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
+    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source'); // on the Overview, its Sources tab
     else if (event.key === 'n') app.panelShown && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
     else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse();
@@ -225,9 +225,10 @@
   }
 
   /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
+  /* The Overview sets its own widths: wide for Studio and the reader, a reading width for its lists. */
   .layout.overview {
     grid-template-columns: minmax(0, 1fr);
-    max-width: calc(var(--measure) + 24rem);
+    max-width: none;
   }
 
   .layout.folded {
@@ -238,12 +239,17 @@
 
   .layout.overview.folded {
     grid-template-columns: minmax(0, 1fr);
-    max-width: calc(var(--measure) + 24rem);
+    max-width: none;
   }
 
   main {
     min-width: 0;
     padding: 2.5rem clamp(1rem, 4vw, 3.5rem) 6rem;
+  }
+
+  /* Studio or a document fills the window to just above its bottom edge. */
+  main:has(> :global(.page.filling)) {
+    padding-bottom: 1.25rem;
   }
 
   .loading {

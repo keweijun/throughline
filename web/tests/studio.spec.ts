@@ -23,12 +23,13 @@ test('files Codex links to open: a course source in the reader, any other file o
   await outline.click();
   await expect(reply.getByRole('status')).toHaveText('Opened.');
 
-  // A course source opens in the reader at the line Codex named.
+  // A course source opens in the reader at the line Codex named: the Overview's Sources tab, as it has no side panel.
   const reading = reply.getByRole('button', { name: 'the reading' });
   await expect(reading).toHaveAttribute('title', 'waves/inputs/reading.md, line 3');
   await reading.click();
-  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
-  await expect(page.locator('.source-view .line.cited')).toHaveText(/The line Codex links to\./);
+  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#auxiliary')).toBeHidden();
+  await expect(page.locator('#course-sources .source-view .line.cited')).toHaveText(/The line Codex links to\./);
   expect(errors).toEqual([]);
 });
 
@@ -110,11 +111,18 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('writing to Studio scrolls the course header away under the pinned tabs, without moving the box', async ({ page, course }) => {
+test('Studio fills the window under the course header, and writing scrolls the header away without moving the box', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const frame = page.locator('#course-studio .frame');
   await expect(frame.getByRole('heading', { name: 'What would you like to change in this course?' })).toBeVisible();
+  // The frame ends just above the window's foot, whatever the window's height.
+  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('#course-studio .frame')!.getBoundingClientRect().bottom);
+  await expect.poll(foot).toBeGreaterThan(8);
+  expect(await foot()).toBeLessThan(32);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await expect.poll(foot).toBeLessThan(32);
+  expect(await foot()).toBeGreaterThan(8);
   const box = page.locator('#studio-input');
   const before = (await box.boundingBox())!;
   const height = (await frame.boundingBox())!.height;
@@ -125,6 +133,8 @@ test('writing to Studio scrolls the course header away under the pinned tabs, wi
   await expect(page.getByRole('tab', { name: 'Studio' })).toBeInViewport();
   expect((await frame.boundingBox())!.height).toBeGreaterThan(height + 50);
   expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
+  expect(await foot()).toBeLessThan(32);
+  expect(await foot()).toBeGreaterThan(8);
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/studio-working.png` });
 
   // Another tab gives the header back its room.

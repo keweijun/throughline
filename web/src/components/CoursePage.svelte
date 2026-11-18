@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { t } from '../lib/i18n.svelte';
   import { app, type CoursePart } from '../lib/store.svelte';
   import { exportNotes } from '../lib/notes';
@@ -7,6 +7,7 @@
   import TeachingPreferences from './TeachingPreferences.svelte';
   import StudioChats from './StudioChats.svelte';
   import SourceList from './SourceList.svelte';
+  import SourceViewer from './SourceViewer.svelte';
   import CourseShare from './CourseShare.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
@@ -49,39 +50,62 @@
     exporting = false;
   }
 
-  // Once the learner writes to Studio, the course's header steps aside: the page scrolls it away under the pinned tabs
-  // and Studio's frame grows upward by as much, so its box stays exactly where it was. Leaving the tab gives it back.
-  let grown = $state<number | null>(null);
-  // A page shorter than the window cannot scroll that far by itself; this much room under the frame lets it.
-  let room = $state(0);
+  // Studio and an open document fill the window below the tabs, measured rather than guessed, since the header above
+  // them is as tall as the course's goal and notices make it.
+  let fill = $state(0);
+  let head = $state<HTMLElement>();
   let barHeight = $state(0);
-  let frame = $state<HTMLElement>();
+  const reading = $derived(!!app.source || app.sourceLoading);
+  const filling = $derived(app.coursePart === 'studio' ? studio.available !== false : app.coursePart === 'sources' && reading);
+  const shownPart = () => document.getElementById(`course-${app.coursePart}`);
+  const contentTop = (node: Element, stage: HTMLElement) => node.getBoundingClientRect().top - stage.getBoundingClientRect().top + stage.scrollTop;
 
-  async function startWork() {
+  function measure() {
     const stage = document.getElementById('stage');
-    if (grown !== null || !stage || !frame) return;
-    const gap = parseFloat(getComputedStyle(frame.closest('.page')!).rowGap) || 0;
-    const by = Math.max(0, Math.round(frame.getBoundingClientRect().top - stage.getBoundingClientRect().top - barHeight - gap));
-    grown = by;
-    await tick();
-    const from = stage.scrollTop;
-    stage.scrollBy({ top: by, behavior: 'instant' });
-    const short = by - (stage.scrollTop - from);
-    if (short < 1) return;
-    room = short;
-    await tick();
-    stage.scrollBy({ top: short, behavior: 'instant' });
+    const part = shownPart();
+    if (!stage || !part || part.hidden) return;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const bottom = parseFloat(getComputedStyle(part.closest('main')!).paddingBottom) || 0;
+    fill = Math.max(24 * rem, stage.clientHeight - contentTop(part, stage) - bottom);
   }
 
   $effect(() => {
-    if (app.courseOpen && app.coursePart === 'studio') return;
-    grown = null;
-    room = 0;
+    const stage = document.getElementById('stage');
+    if (!stage || !head) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(stage);
+    observer.observe(head);
+    return () => observer.disconnect();
+  });
+  $effect(() => {
+    void [app.coursePart, filling];
+    measure();
   });
 
-  // A turn that starts by any other way than the box, such as a hand-off from a lesson, counts as writing too.
+  // Once the learner works in Studio, or opens a document, the course's header steps aside: the page scrolls it away
+  // under the pinned tabs and the frame grows upward by as much, so it stays exactly where it was. Leaving gives it back.
+  let grown = $state<number | null>(null);
+
+  async function startWork() {
+    const stage = document.getElementById('stage');
+    const part = shownPart();
+    if (grown !== null || !stage || !part || !filling) return;
+    const gap = parseFloat(getComputedStyle(part.closest('.page')!).rowGap) || 0;
+    grown = Math.max(0, contentTop(part, stage) - barHeight - gap);
+    await tick();
+    stage.scrollTo({ top: grown, behavior: 'instant' });
+  }
+
+  // A turn that starts by any other way than the box, such as a hand-off from a lesson, counts as working too.
+  let grownFor: string | null = null;
   $effect(() => {
-    if (studio.running && app.courseOpen && app.coursePart === 'studio') void startWork();
+    const at = app.courseOpen ? `${app.coursePart}:${filling}` : null;
+    const working = filling && (app.coursePart === 'sources' || studio.running);
+    untrack(() => {
+      if (at !== grownFor) grown = null;
+      grownFor = at;
+      if (working) void startWork();
+    });
   });
 
   // One tab at a time at full height, so Studio has the room and nothing scrolls inside something else that scrolls.
@@ -96,8 +120,8 @@
   }
 </script>
 
-<article class="page still" aria-labelledby="course-title">
-  <header class="head">
+<article class="page still" class:filling aria-labelledby="course-title" style:--fill="{fill}px" style:--grown={grown === null ? null : `${grown}px`}>
+  <header class="head" bind:this={head}>
     <h1 id="course-title">{app.state?.course.title}</h1>
     {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}
     {#if imported}
@@ -193,9 +217,6 @@
       <div
         class="frame studio-frame"
         data-scroller
-        bind:this={frame}
-        style:--grown={grown === null ? null : `${grown}px`}
-        style:margin-bottom={room ? `${room}px` : null}
         onfocusin={(event) => (event.target as Element).closest('.cm-editor') && void startWork()}
       >
         <Studio active={app.courseOpen && app.coursePart === 'studio'} />
@@ -210,21 +231,29 @@
     </div>
   </div>
 
-  <div class="part" id="course-sources" role="tabpanel" aria-labelledby="course-tab-sources" hidden={app.coursePart !== 'sources'}>
-    <p class="lead">{t('Every document in the course; choose one to open it in the reader.')}</p>
-    <SourceList page />
+  <!-- A document opens here rather than in the side panel, which the Overview does not have (ADR 0017); the list
+       narrows to a column beside it, so another is one click away. -->
+  <div class="part" id="course-sources" role="tabpanel" aria-labelledby="course-tab-sources" hidden={app.coursePart !== 'sources'} class:reading class:narrow={!reading}>
+    {#if reading}
+      <div class="sources-list"><SourceList page /></div>
+      <div class="sources-reader"><SourceViewer page /></div>
+    {:else}
+      <p class="lead">{t('Every document in the course; choose one to open it in the reader.')}</p>
+      <SourceList page />
+    {/if}
   </div>
 
-  <div class="part" id="course-share" role="tabpanel" aria-labelledby="course-tab-share" hidden={app.coursePart !== 'share'}>
+  <div class="part narrow" id="course-share" role="tabpanel" aria-labelledby="course-tab-share" hidden={app.coursePart !== 'share'}>
     <CourseShare active={app.courseOpen && app.coursePart === 'share'} />
   </div>
 
-  <div class="part" id="course-notes" role="tabpanel" aria-labelledby="course-tab-notes" hidden={app.coursePart !== 'notes'}>
+  <div class="part narrow" id="course-notes" role="tabpanel" aria-labelledby="course-tab-notes" hidden={app.coursePart !== 'notes'}>
     <p class="lead">
       {notes === 1 ? t('1 highlight, note or bookmark') : t('{count} highlights, notes and bookmarks', { count: notes })}.
       {t('Export them as one Markdown file, by chapter and section; notes with images come as a ZIP with an images folder.')}
     </p>
     <div class="actions">
+      <!-- Notes are kept beside what is read, so they open in Learn's side panel. -->
       <button class="btn btn-small" onclick={() => app.openPanel('notes')}>{t('Open notes')}</button>
       <button class="btn btn-small" disabled={!notes || exporting} onclick={exportAll}>{exporting ? t('Exporting…') : t('Export notes')}</button>
     </div>
@@ -232,8 +261,9 @@
 </article>
 
 <style>
+  /* Wide, for Studio and the reader; the tabs that are lists and forms keep a reading width inside it. */
   .page {
-    max-width: calc(var(--measure) + 20rem);
+    max-width: 88rem;
     margin-inline: auto;
     display: grid;
     gap: 1.5rem;
@@ -387,6 +417,36 @@
     display: none;
   }
 
+  .part.narrow {
+    max-width: calc(var(--measure) + 20rem);
+  }
+
+  /* An open document: the list as a column beside it, each scrolling on its own within the window. */
+  .part.reading {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    gap: 1.25rem;
+    height: calc(var(--fill) + var(--grown, 0px));
+  }
+
+  .sources-list {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sources-list :global(.source-list) {
+    flex: 1;
+    min-height: 0;
+    padding-right: 0.25rem;
+  }
+
+  .sources-reader {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
   h2 {
     font-family: var(--serif);
     font-size: var(--step-1);
@@ -400,7 +460,13 @@
     align-items: start;
   }
 
-  @media (min-width: 72rem) {
+  /* Whether the aside fits beside Studio depends on the page's width, not the window's: the route or a narrow window
+     takes from it. */
+  #course-studio {
+    container-type: inline-size;
+  }
+
+  @container (min-width: 60rem) {
     .studio-row {
       grid-template-columns: minmax(0, 1fr) 17rem;
     }
@@ -414,14 +480,14 @@
   }
 
   /* Where the aside drops below Studio, the chats are Studio's own pinned bar instead; beside it, the bar steps aside. */
-  @media (max-width: 71.99rem) {
+  @container (max-width: 59.99rem) {
     .studio-aside :global(.chats) {
       display: none;
     }
   }
 
-  @media (min-width: 72rem) {
-    #course-studio :global(.studio > .panel-head) {
+  @container (min-width: 60rem) {
+    .studio-main :global(.studio > .panel-head) {
       display: none;
     }
   }
@@ -430,6 +496,14 @@
     display: grid;
     gap: 0.75rem;
     min-width: 0;
+  }
+
+  /* A wide frame keeps the chat to one centred column at a readable width, with its box under it, as Codex does. */
+  #course-studio :global(.studio > .transcript > *),
+  #course-studio :global(.studio > .panel-foot) {
+    width: 100%;
+    max-width: 50rem;
+    margin-inline: auto;
   }
 
   /* Studio brings its own heading; on the page its tab already names it. */
@@ -475,7 +549,7 @@
   /* Studio's frame keeps one height, which Studio fills with its box at the bottom, so content loading inside it (the
      welcome, a reopened chat) never moves the box from under the learner's pointer. */
   .studio-frame {
-    height: calc(max(24rem, 100vh - var(--topbar) - 22rem) + var(--grown, 0px));
+    height: calc(var(--fill) + var(--grown, 0px));
     max-height: none;
     /* Scrolling past the transcript's ends never carries on into the page, which would move the frame away. */
     overscroll-behavior: contain;

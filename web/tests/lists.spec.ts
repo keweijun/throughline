@@ -59,6 +59,6 @@ test('the source tab lists every course document and returns to the open one', a
   await list.locator('li button').filter({ hasText: 'lecture-2.pdf' }).click();
   await expect(page.locator('.source-list')).toBeHidden();
   await expect(page.locator('.source-view h2')).toHaveText('lecture-2.pdf');
-  await expect(page.locator('.source-view .meta')).toContainText('From lecture-2.pptx');
+  await expect(page.locator('.source-view .headline')).toContainText('From lecture-2.pptx');
   expect(errors).toEqual([]);
 });

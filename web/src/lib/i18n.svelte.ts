@@ -494,6 +494,7 @@ const messages = {
   "You are here": "当前位置",
   "Lesson ready": "课已备好",
   "Close": "关闭",
+  "Close {title}": "关闭 {title}",
   ", never inside a course folder.": "，不会存入课程目录。",
   "Name": "名称",
   "ID": "标识",

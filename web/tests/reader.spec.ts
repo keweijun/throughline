@@ -121,32 +121,83 @@ test('the top bar is the only navigation for the side panel and focus returns to
   await expect(page.locator('#toggle-notes')).toBeFocused();
 });
 
-test('Overview puts the side panel aside, and Learn and Review bring it back as it was', async ({ page, course }) => {
+test('the Overview has no side panel: Source opens its Sources tab, and Questions and Notes go back to Learn', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   const panel = page.locator('#auxiliary');
   await page.locator('#toggle-notes').click();
   await expect(panel).toBeVisible();
 
-  // Overview has its own Sources and notes, and Studio needs the width.
+  // The Overview has its own Sources, and Studio and the reader need the width; Learn gives the panel back as it was.
   await page.locator('#open-course').click();
   await expect(panel).toBeHidden();
   await expect(page.locator('#toggle-notes')).toHaveAttribute('aria-pressed', 'false');
   await page.locator('#open-study').click();
   await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
 
-  // Opening it on Overview shows it there; it was the learner's choice.
+  // Source on the Overview is its Sources tab.
+  await page.keyboard.press('m');
+  await page.keyboard.press('s');
+  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#toggle-source')).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel).toBeHidden();
+
+  // Questions and notes are about what is being read, so they take the learner back to Learn with the panel open.
+  await page.locator('#toggle-questions').click();
+  await expect(page.locator('#course-title')).toHaveCount(0);
+  await expect(page.getByRole('complementary', { name: 'Questions' })).toBeVisible();
   await page.keyboard.press('m');
   await expect(panel).toBeHidden();
-  await page.keyboard.press('s');
-  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
-  await expect(page.locator('#toggle-source')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('n');
+  await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
+  await expect(page.locator('#course-title')).toHaveCount(0);
 
   // Review keeps the panel: a missed question is checked against its source or asked about.
-  await page.keyboard.press('m');
-  await page.keyboard.press('m');
-  await expect(panel).toBeHidden();
   await page.locator('#open-review').click();
-  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a document opens in the Overview's Sources tab beside the list and fills the window", async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.locator('#open-course').click();
+  await page.getByRole('tab', { name: 'Sources' }).click();
+  const tab = page.locator('#course-sources');
+  await expect(tab.getByText('Every document in the course')).toBeVisible();
+  await tab.getByRole('button', { name: /lecture-2\.pdf/ }).click();
+  await expect(tab.locator('.pdf-page.cited canvas')).toBeVisible();
+
+  // The list stays beside it, the document marked; the header steps aside and the reader ends at the window's foot.
+  await expect(tab.locator('.source-list [aria-current="true"]')).toContainText('lecture-2.pdf');
+  await expect(page.locator('#course-title')).not.toBeInViewport();
+  await expect(page.getByRole('tab', { name: 'Sources' })).toBeInViewport();
+  const foot = await page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.getElementById('course-sources')!.getBoundingClientRect().bottom);
+  expect(foot).toBeGreaterThan(8);
+  expect(foot).toBeLessThan(32);
+
+  // One line of header: the note on an unchecked location unfolds from its status; bookmark and original sit with the
+  // PDF's controls.
+  const header = tab.locator('.source-view header');
+  await expect(header.getByText(/Not yet checked against the original/)).toHaveCount(0);
+  await header.getByRole('button', { name: 'Not checked yet' }).click();
+  await expect(header.getByText(/Not yet checked against the original/)).toBeVisible();
+  const toolbar = tab.getByRole('toolbar', { name: 'PDF reader' });
+  await expect(toolbar.getByRole('button', { name: 'Bookmark page' })).toBeVisible();
+  await expect(toolbar.getByRole('link', { name: 'Open PDF ↗' })).toBeVisible();
+
+  // Learn's panel shows the same document at the cited page, though its own reader was hidden when it opened.
+  await page.locator('#open-study').click();
+  await page.keyboard.press('s');
+  const side = page.getByRole('complementary', { name: 'Source' });
+  await expect(side.getByRole('textbox', { name: 'Page number' })).toHaveValue('2');
+  await expect
+    .poll(() => side.locator('.pages').evaluate((pages) => Math.abs(pages.scrollTop - ((pages.querySelector('.cited') as HTMLElement).offsetTop - 12))))
+    .toBeLessThan(3);
+
+  // Closing the document gives the tab back to the whole list.
+  await page.keyboard.press('m');
+  await tab.getByRole('button', { name: 'Close lecture-2.pdf' }).click();
+  await expect(tab.getByText('Every document in the course')).toBeVisible();
+  await expect(tab.locator('.source-view')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

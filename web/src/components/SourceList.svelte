@@ -78,7 +78,7 @@
       <ul>
         {#each group.items as entry (entry.id)}
           <li>
-            <button class="open" disabled={!entry.target} onclick={() => entry.target && app.openSource(entry.target)}>
+            <button class="open" disabled={!entry.target} aria-current={app.source?.source_id === entry.id ? 'true' : undefined} onclick={() => entry.target && app.openSource(entry.target)}>
               <span class="name">{entry.name}</span>
               <span class="meta">
                 <span class="kind">{entry.kind}</span>
@@ -156,6 +156,12 @@
 
   .open:hover:not(:disabled) {
     border-color: var(--accent);
+  }
+
+  /* The document open in the reader beside the list. */
+  .open[aria-current='true'] {
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
 
   .open:disabled {

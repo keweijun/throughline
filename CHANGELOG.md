@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.49.4
+
+- A PDF in the reader stays on the line you were reading when you zoom it or change the panel's width. Before, it jumped to another place in the document, further the deeper you were in it.
+- Zooming a long PDF no longer leaves pages blank: every page in view is drawn again at the new size.
+
 ## 0.49.3
 
 - A course made in Studio on the library page now always finds the chat that made it in its own Studio. Before, if the page was reloaded or closed while Codex built the course, or the chat was opened again later, the chat stayed with the library and the course's Studio showed no chats.

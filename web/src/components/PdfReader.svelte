@@ -160,21 +160,58 @@
     r.page?.cleanup();
   }
 
-  // Redraw visible pages when the scale changes (zoom, or the panel being resized in fit mode). Page images just stretch.
+  // A new scale (the panel resized in Fit width, or a zoom) changes every page's height, so the same scroll offset would
+  // land elsewhere in the document. Where the view is, as a page and a share of the way down it, is taken before the
+  // pages are resized and restored after, so the reader stays on the same line; the browser's own anchoring is off.
+  let shownScale = 0;
+  let place: { page: number; within: number; across: number } | null = null;
+  $effect.pre(() => {
+    const s = scale;
+    untrack(() => {
+      if (shownScale && s !== shownScale && scroller && jumping === null) place = where(scroller);
+      shownScale = s;
+    });
+  });
+
+  // Once the view is back in place, the pages near it are drawn at the new scale and the others freed. Every page near
+  // the view is drawn here rather than left to the observer, which only reports a page that newly comes near, so a page
+  // that stays in view through a zoom would otherwise stay blank. Page images just stretch.
   $effect(() => {
     const s = scale;
-    if (images) return;
-    for (const [number, r] of rendered) {
-      if (r.scale === s) continue;
-      const element = elements.get(number);
-      if (element && visible(element)) {
-        r.task?.cancel();
-        rendered.delete(number);
-        void draw(number); // the old canvas stays, stretched, until the new one replaces it
-      } else free(number);
-    }
-
+    untrack(() => {
+      const to = place;
+      place = null;
+      const element = to && elements.get(to.page);
+      if (element && scroller) {
+        scroller.scrollTop = element.offsetTop + to.within * element.offsetHeight;
+        scroller.scrollLeft = to.across * scroller.scrollWidth - scroller.clientWidth / 2;
+      }
+      if (images || !scroller) return;
+      for (const number of pages) {
+        const page = elements.get(number);
+        const r = rendered.get(number);
+        if (!page || r?.scale === s) continue;
+        if (visible(page)) {
+          if (r) {
+            r.task?.cancel();
+            rendered.delete(number); // the old canvas stays, stretched, until the new one replaces it
+          }
+          void draw(number);
+        } else if (r) free(number);
+      }
+    });
   });
+
+  function where(node: HTMLElement) {
+    const across = (node.scrollLeft + node.clientWidth / 2) / node.scrollWidth;
+    for (const number of pages) {
+      const element = elements.get(number);
+      if (element && element.offsetTop + element.offsetHeight > node.scrollTop) {
+        return { page: number, within: (node.scrollTop - element.offsetTop) / element.offsetHeight, across };
+      }
+    }
+    return null;
+  }
 
   function visible(element: HTMLElement) {
     const box = element.getBoundingClientRect();
@@ -304,16 +341,12 @@
   }
 
   function setZoom(value: number) {
-    const keep = current;
     zoom = Math.min(Math.max(value, 0.5), 3);
     fit = false;
-    requestAnimationFrame(() => go(keep, 'instant'));
   }
 
   function fitWidth() {
-    const keep = current;
     fit = true;
-    requestAnimationFrame(() => go(keep, 'instant'));
   }
 </script>
 
@@ -431,6 +464,7 @@
     align-items: safe center;
     gap: 1rem;
     outline: none;
+    overflow-anchor: none;
   }
 
   .pdf-page {

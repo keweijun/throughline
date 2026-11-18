@@ -14,6 +14,14 @@ export function courseOperation(folder: string, request: Record<string, unknown>
   return JSON.parse(result.stdout);
 }
 
+/** A text PDF with one page per list of lines, written by tests/sample_pdf.py. */
+export function samplePdf(pages: string[][]) {
+  const script = 'import json, sys, tempfile, pathlib\nfrom tests.sample_pdf import write_pdf\nwith tempfile.TemporaryDirectory() as d:\n    p = pathlib.Path(d) / "s.pdf"\n    write_pdf(p, json.load(sys.stdin))\n    sys.stdout.buffer.write(p.read_bytes())';
+  const result = spawnSync(python, ['-c', script], { cwd: root, input: JSON.stringify(pages) });
+  if (result.status !== 0) throw new Error(result.stderr.toString());
+  return result.stdout;
+}
+
 /** Starts a disposable course host from a Python fixture module and opens it. */
 async function open(page: Page, module: string, children: ChildProcess[]) {
   // The launch update check never reaches GitHub from a test; tests that need an answer route /api/update themselves.

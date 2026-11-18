@@ -486,6 +486,7 @@ const messages = {
   "Look at that section": "查看该小节",
   "Back to the passage": "回到原段落",
   "Back to the question": "回到问题",
+  "All questions": "全部问题",
   "Foundation supplement": "基础补讲",
   "Foundation:": "基础：",
   "Return to the lesson": "返回讲解",

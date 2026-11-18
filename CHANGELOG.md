@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.53.1
+
+- Running an older and a newer Throughline side by side, or going back a version, no longer loses settings the newer one saved: your teacher settings, Studio's access and chats, dismissed tips, and a course's preferences.
+- Throughline now installs only versions of the libraries it runs on that it is known to work with, so a future release of one of them can't break it.
+
 ## 0.51.0
 
 - On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.

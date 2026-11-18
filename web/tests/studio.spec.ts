@@ -374,6 +374,36 @@ test("the library page has its own Studio for new courses; a course card's actio
   expect(errors).toEqual([]);
 });
 
+test('a library chat reloaded while it makes a course still moves into that course when it ends', async ({ page, course }) => {
+  const { base, errors } = await course('studio_browser_fixture');
+  await page.locator('#open-courses').click();
+  await page.getByRole('button', { name: 'New course', exact: true }).click();
+  const box = page.locator('#studio-input');
+  await box.pressSequentially('wait');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+  // The page reloads during the build, which forgets what the browser knew; the host kept the courses there were.
+  await page.reload();
+  await page.locator('#open-courses').click();
+  const root = (await (await page.request.get(base + '/api/library')).json()).root;
+  const optics = `${root}/optics`;
+  courseOperation(optics, { op: 'course.init', title: 'Optics' });
+  courseOperation(optics, { op: 'curriculum.save', concepts: [{ id: 'lens', title: 'Thin lenses' }], route: ['lens'], coverage: [] });
+  // The library lists the new course before the chat is opened again, as after a long build.
+  await expect(page.getByRole('heading', { name: 'Optics', level: 2 })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Open the chat' }).click();
+  await expect(page.locator('.studio-part .user').first()).toContainText('wait');
+
+  // Once the turn ends, the chat moves into the course it made and the course opens at its Studio.
+  await box.pressSequentially('go on');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('#course-switcher')).toContainText('Optics', { timeout: 15_000 });
+  await expect(page.locator('#course-studio')).toBeVisible();
+  expect((await (await page.request.get(base + '/api/studio?scope=library')).json()).threads).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
 test('a long turn can be read back while it runs, then folds behind its answer, and the chat gets a title', async ({ page, course }) => {
   const { errors } = await course('studio_browser_fixture');
   await page.locator('#open-course').click();

@@ -125,7 +125,14 @@ export type StudioOrigin = { label: string; text: string };
 /** How Codex marks a hand-off's context in a message (`CONTEXT` in server/studio.py). */
 export const CONTEXT = 'Context from Throughline: ';
 
-type History = { id: string; turns: StudioTurn[]; active_turn: string | null; pending: StudioRequest[] };
+type History = {
+  id: string;
+  turns: StudioTurn[];
+  active_turn: string | null;
+  pending: StudioRequest[];
+  /** For a chat begun on the library page, the courses there were then, as the host recorded them. */
+  courses_before?: string[] | null;
+};
 type Activity = { running: string[]; waiting: StudioRequest[] };
 
 /** Where Studio works: the open course, or the library page before a course is open (#109). */
@@ -134,7 +141,8 @@ export type StudioScope = 'course' | 'library';
 class StudioStore {
   /** The course whose Overview shows Studio, or the library page; switching starts from that place's chats. */
   scope = $state<StudioScope>('course');
-  /** On the library page, the courses there were when this chat began, so a course Codex makes can be offered. */
+  /** On the library page, the courses there were when this chat began, so a course Codex makes can be offered. The
+   * host keeps them with the chat, so they survive a reload or reopening the chat later. */
   coursesBefore = $state<string[] | null>(null);
   /** Null until asked; false when this Codex cannot run Studio, which then hands off to a Codex chat instead. */
   available = $state<boolean | null>(null);
@@ -340,6 +348,7 @@ class StudioStore {
 
   async open(id: string) {
     this.#chosen = true;
+    if (id !== this.threadId) this.coursesBefore = null;
     this.threadId = id;
     await this.read(id);
   }
@@ -354,6 +363,7 @@ class StudioStore {
       this.turns = history.turns;
       this.activeTurn = history.active_turn;
       this.pending = history.pending;
+      if (this.scope === 'library' && history.courses_before) this.coursesBefore = history.courses_before;
       // The host's copy also corrects the top bar for this thread, whose first events may have come before its name.
       this.working = [...this.working.filter((t) => t !== id), ...(history.active_turn ? [id] : [])];
       this.waiting = [...this.waiting.filter((p) => p.params.threadId !== id), ...history.pending];

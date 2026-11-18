@@ -76,6 +76,71 @@ class LibraryStudioTest(unittest.TestCase):
         self.assertEqual(self.threads(scope=''), [thread])
         self.assertGreaterEqual(self.client.post(f'/api/studio/threads/{thread}/course', json={'name': 'nowhere'}).status_code, 400)
 
+    def course(self, name, routed=True):
+        course = self.library / name
+        course.mkdir()
+        call_cli(self, course, 'course.init', title=name.title())
+        if routed:
+            call_cli(self, course, 'curriculum.save', concepts=[{'id': 'a', 'title': 'A'}], route=['a'], coverage=[])
+        return course
+
+    def ended(self, thread):
+        for _ in range(100):
+            if thread not in self.client.get('/api/studio/activity', params={'scope': 'library'}).json()['running']:
+                return
+            time.sleep(0.05)
+        self.fail(f'the turn in {thread} never ended')
+
+    def test_a_library_chat_moves_into_the_course_it_made_even_when_no_page_watched_the_turn_end(self):
+        # The host keeps the courses there were when the chat began, so a page reloaded or closed during a long build
+        # does not decide whether the chat follows its course.
+        self.course('optics')
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Make a course'}).json()['thread']
+        self.ended(thread)
+        # A course without a route is still being made, and one that was there before is not this chat's.
+        self.course('physics', routed=False)
+        self.assertEqual(self.threads(), [thread])
+        call_cli(self, self.library / 'physics', 'curriculum.save', concepts=[{'id': 'a', 'title': 'A'}], route=['a'], coverage=[])
+
+        # Opening the course it made lists the chat there, with no library page asking to move it.
+        self.client.post('/api/library/open', json={'name': 'physics'})
+        self.assertEqual(self.threads(scope=''), [thread])
+        self.assertEqual(self.threads(), [])
+        self.client.post('/api/library/open', json={'name': 'optics'})
+        self.assertEqual(self.threads(scope=''), [])
+
+        # A library page still showing the chat reads it, and moving it there again changes nothing.
+        history = self.client.get(f'/api/studio/threads/{thread}', params={'scope': 'library'}).json()
+        self.assertEqual(history['courses_before'], ['optics'])
+        self.assertEqual(self.client.post(f'/api/studio/threads/{thread}/course', json={'name': 'physics'}).status_code, 200)
+        self.client.post('/api/library/open', json={'name': 'physics'})
+        self.assertEqual(self.threads(scope=''), [thread])
+
+    def test_a_library_chat_that_made_two_courses_waits_for_the_learner(self):
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Make two courses'}).json()['thread']
+        self.ended(thread)
+        self.course('optics')
+        self.course('physics')
+        self.assertEqual(self.threads(), [thread])
+
+    def test_a_library_chat_from_before_the_host_kept_its_courses_stays_in_the_library(self):
+        import json
+        config = self.tmp / 'config' / 'studio.json'
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Make a course'}).json()['thread']
+        self.ended(thread)
+        data = json.loads(config.read_text(encoding='utf-8'))
+        self.assertEqual(data['began'], {thread: []})
+        del data['began']
+        config.write_text(json.dumps(data), encoding='utf-8')
+        self.course('optics')
+        self.assertEqual(self.threads(), [thread])
+        self.assertIsNone(self.client.get(f'/api/studio/threads/{thread}', params={'scope': 'library'}).json()['courses_before'])
+        # Archiving a chat forgets what it began with.
+        thread = self.client.post('/api/studio/messages', params={'scope': 'library'}, json={'text': 'Another'}).json()['thread']
+        self.ended(thread)
+        self.client.delete(f'/api/studio/threads/{thread}', params={'scope': 'library'})
+        self.assertEqual(json.loads(config.read_text(encoding='utf-8'))['began'], {})
+
 
 if __name__ == '__main__':
     unittest.main()

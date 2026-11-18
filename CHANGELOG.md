@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.49.3
+
+- A course made in Studio on the library page now always finds the chat that made it in its own Studio. Before, if the page was reloaded or closed while Codex built the course, or the chat was opened again later, the chat stayed with the library and the course's Studio showed no chats.
+
 ## 0.49.2
 
 - When Throughline closes, it now waits for its last check for changes Codex made, so it never quits with a course's database still open.

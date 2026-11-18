@@ -1,4 +1,4 @@
-import { test, expect, dragSelect } from './fixture';
+import { test, expect, dragSelect, samplePdf } from './fixture';
 
 test('a PDF citation opens the reader at the cited page, and its text can be quoted', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
@@ -168,6 +168,82 @@ test('the reading column scrolls beside the open panel, not past it', async ({ p
   await page.locator('main').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('PageDown');
   await expect.poll(() => page.locator('#stage').evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+});
+
+test('a PDF keeps its place when the panel is resized or the page zoomed', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'View source p. 2' }).first().click();
+  const cited = page.locator('.pdf-page.cited');
+  await expect(cited.locator('canvas')).toBeVisible();
+  const pages = page.locator('.source-view .pages');
+  // How far down the cited page the top of the view is, as a share of the page's height.
+  const within = () => pages.evaluate((node) => {
+    const element = node.querySelector<HTMLElement>('.pdf-page.cited')!;
+    return (node.scrollTop - element.offsetTop) / element.offsetHeight;
+  });
+  await pages.evaluate((node) => node.scrollBy({ top: node.querySelector<HTMLElement>('.pdf-page.cited')!.offsetHeight / 3, behavior: 'instant' }));
+  const before = await within();
+  expect(before).toBeGreaterThan(0.2);
+
+  // In Fit width the page grows with the panel, and the view stays on the same line of it.
+  const handle = page.getByRole('separator');
+  await handle.focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
+  await expect.poll(within).toBeCloseTo(before, 1);
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('2');
+
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect.poll(within).toBeCloseTo(before, 1);
+  await page.getByRole('button', { name: 'Fit width' }).click();
+  await expect.poll(within).toBeCloseTo(before, 1);
+  expect(errors).toEqual([]);
+});
+
+test('every page in view is drawn again at the new zoom', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  // A long document, so pages far from the view are freed and drawn again as the reader nears them.
+  const pdf = samplePdf(Array.from({ length: 40 }, (_, i) => [`Page ${i + 1}`]));
+  await page.route('**/api/sources/**format=pdf', (route) => route.fulfill({ contentType: 'application/pdf', body: pdf }));
+  await page.getByRole('button', { name: 'View source p. 2' }).first().click();
+  await expect(page.locator('.pdf-page.cited canvas')).toBeVisible();
+  await page.getByRole('textbox', { name: 'Page number' }).fill('20');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('20');
+  const pages = page.locator('.source-view .pages');
+  // Pages that show in the reader and have no canvas drawn at their current size.
+  const blank = () => pages.evaluate((node) => {
+    const view = node.getBoundingClientRect();
+    return [...node.querySelectorAll<HTMLElement>('.pdf-page')]
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        if (box.bottom <= view.top || box.top >= view.bottom) return false;
+        const canvas = element.querySelector('canvas');
+        return !canvas || Math.abs(canvas.width / devicePixelRatio - element.clientWidth) > 2;
+      })
+      .map((element) => element.dataset.page);
+  });
+  const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = page.getByRole('button', { name: 'Zoom out' });
+  for (const button of [zoomIn, zoomIn, zoomIn, zoomOut, zoomOut, zoomOut, zoomOut, zoomOut]) {
+    await button.click();
+    await expect.poll(blank).toEqual([]);
+  }
+  await pages.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }));
+  await zoomIn.click();
+  await expect.poll(blank).toEqual([]);
+
+  // Hidden behind another view, the reader draws nothing, and it comes back where it was.
+  await page.getByRole('button', { name: 'Fit width' }).click();
+  await page.getByRole('textbox', { name: 'Page number' }).fill('20');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('20');
+  await page.locator('#toggle-notes').click();
+  await page.waitForTimeout(500);
+  expect(await page.locator('.source-view .pdf-page canvas').count()).toBeLessThan(10);
+  await page.locator('#toggle-source').click();
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('20');
+  await expect.poll(blank).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 test('a Markdown citation opens the whole note at the cited line', async ({ page, course }) => {

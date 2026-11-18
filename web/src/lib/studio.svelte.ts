@@ -103,7 +103,14 @@ export type StudioRequest =
 export type StudioThread = { id: string; name: string; preview: string; updated_at: number | null; running: boolean };
 export type StudioSkill = { name: string; path: string; title: string; description: string };
 export type StudioFile = { name: string; path: string; absolute: string };
-export type StudioAccess = { full_access: boolean; saved: boolean; forced: boolean };
+export type StudioAccess = {
+  full_access: boolean;
+  saved: boolean;
+  /** Windows without Codex's sandbox: Library access cannot run until it is set up. */
+  sandbox_missing: boolean;
+  setting_up: boolean;
+  setup_error: string | null;
+};
 /** Studio's own model and effort; empty follows the teacher's (ADR 0016). */
 export type StudioChoice = { model: string; effort: string };
 export type StudioEvent = { type: 'studio'; method: string; params: Record<string, any> };
@@ -330,6 +337,13 @@ class StudioStore {
     return this.access;
   }
 
+  /** Asks Codex to set up its Windows sandbox; a `studio/access` event says how it went. */
+  async setUpSandbox() {
+    this.#accessWrites++;
+    this.access = await api.post<StudioAccess>('/api/studio/sandbox');
+    return this.access;
+  }
+
   /** Studio's model and effort from the next turn on; empty strings follow the teacher's. */
   async setChoice(choice: StudioChoice) {
     this.choice = await api.put<StudioChoice>('/api/studio/model', choice);
@@ -477,6 +491,11 @@ class StudioStore {
       return;
     }
     if (method === 'studio/threads') return void this.refreshThreads();
+    if (method === 'studio/access') {
+      this.#accessWrites++;
+      this.access = params as StudioAccess;
+      return;
+    }
     if (method === 'studio/request') {
       const request = params as StudioRequest;
       if (!this.waiting.some((p) => p.id === request.id)) this.waiting.push(request);

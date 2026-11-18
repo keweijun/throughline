@@ -118,6 +118,9 @@ class CourseLibrary(unittest.TestCase):
                 self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'another course changing leaves the open one alone')
                 execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
                 self.assertTrue(wait_for('state'), events)
+            # Closing waits for a poll in progress, which reads the courses' databases; Windows cannot remove a course
+            # folder while its database is open (#196).
+            self.assertFalse(app.state.courses.watcher.is_alive())
 
     def test_the_hosts_own_writes_do_not_reload_its_tabs(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:

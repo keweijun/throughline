@@ -7,8 +7,11 @@ LEVELS = ('none', 'some', 'solid')
 
 
 def status(store, request):
+    """The course, position, sources and learner profile; a course imported from someone else (ADR 0020) adds
+    `imported` and `built_for`, what the sender's profile said the course was built for."""
+    shared = {key: store.get('course', key) for key in ('imported', 'built_for') if store.get('course', key)}
     return {'course': store.get('course', 'metadata'), 'position': store.get('course', 'position'), 'sources': readings.annotate(store, store.list('sources')),
-            'profile': store.get('course', 'profile')}
+            'profile': store.get('course', 'profile'), **shared}
 
 
 def save_profile(store, request):

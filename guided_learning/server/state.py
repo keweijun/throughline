@@ -67,7 +67,9 @@ def public_question(branch):
 
 def _course(host):
     status = host.operation({'op': 'course.status'})
-    return {'course': status['course'], 'position': status['position'], 'sources': [_pick(s, SOURCE) for s in status['sources']]}
+    # A course started fresh from someone else's package: the goal it was built for, until the learner gives their own.
+    shared = {'imported': status.get('imported'), 'built_for': status.get('built_for') if not status.get('profile') else None}
+    return {'course': {**status['course'], **shared}, 'position': status['position'], 'sources': [_pick(s, SOURCE) for s in status['sources']]}
 
 
 def _practice(host):

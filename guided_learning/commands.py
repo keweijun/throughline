@@ -308,7 +308,7 @@ def open_app():
         if not record:
             print(f'Throughline did not start; see {library.state_dir() / "host.log"}.')
             return False
-        url = f"http://127.0.0.1:{record['port']}/"
+        url = app_url(record['port'])
         print(f'Throughline is open at {url}')
         # With no display, webbrowser would pick a console browser and take over the terminal Codex is reading.
         if platform() == 'linux' and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
@@ -319,10 +319,15 @@ def open_app():
         return False
 
 
+def app_url(port):
+    """The address that opens the library and signs the browser in."""
+    return f'http://127.0.0.1:{port}/?key={library.host_key()}'
+
+
 def _call(port, method, path, body=None, timeout=2):
     data = None if body is None else json.dumps(body).encode()
-    request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method,
-                                     headers={'Content-Type': 'application/json'} if data else {})
+    headers = {'X-Throughline-Key': library.host_key(), **({'Content-Type': 'application/json'} if data else {})}
+    request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read() or b'{}')
 
@@ -395,7 +400,7 @@ def open_course(args):
         except (urllib.error.URLError, OSError) as exc:
             print(_error_text(exc), file=sys.stderr)
             return 1
-    url = f"http://127.0.0.1:{record['port']}/"
+    url = app_url(record['port'])
     print(f'Throughline is open at {url}')
     if not args.no_browser:
         try:

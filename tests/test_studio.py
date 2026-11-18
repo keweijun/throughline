@@ -81,7 +81,8 @@ class StudioTest(unittest.TestCase):
         thread = self.send('first')['thread']
         self.history(thread, lambda h: self.replies(h) == ['done'] and not h['active_turn'])
         access = self.client.put('/api/studio/access', json={'full_access': True}).json()
-        self.assertEqual(access, {'full_access': True, 'saved': True, 'forced': False})
+        self.assertEqual(access, {'full_access': True, 'saved': True, 'sandbox_missing': False, 'setting_up': False,
+                                  'setup_error': None})
         self.send('second', thread_id=thread)
         turn = self.received('turn/start')[-1]
         self.assertEqual((turn['approvalPolicy'], turn['sandboxPolicy']), ('never', {'type': 'dangerFullAccess'}))
@@ -236,6 +237,54 @@ class StudioTest(unittest.TestCase):
         view = client.get('/api/studio').json()
         self.assertFalse(view['available'])
         self.assertIn('newer Codex', view['error'])
+
+    def windows(self, sandbox):
+        """A client for another course whose Studio runs on Windows, with Codex's sandbox as `sandbox` says."""
+        other = self.tmp / 'library' / 'optics'
+        other.mkdir()
+        call_cli(self, other, 'course.init', title='Optics')
+        client = self.open(sandbox, course=other)
+        client.app.state.courses.studio.windows = True
+        return client
+
+    def test_without_windows_sandbox_studio_asks_before_running_with_full_access(self):
+        client = self.windows('unsandboxed-fail')
+        access = client.get('/api/studio/access').json()
+        self.assertEqual((access['full_access'], access['sandbox_missing']), (False, True))
+        refused = client.post('/api/studio/messages', json={'text': 'first'})
+        self.assertEqual((refused.status_code, refused.json()['code']), (409, 'studio_needs_sandbox'))
+        self.assertEqual(self.received('turn/start'), [])
+        client.put('/api/studio/access', json={'full_access': True})
+        self.assertEqual(client.post('/api/studio/messages', json={'text': 'first'}).status_code, 200)
+        turn = self.received('turn/start')[-1]
+        self.assertEqual((turn['approvalPolicy'], turn['sandboxPolicy']), ('never', {'type': 'dangerFullAccess'}))
+
+    def test_setting_up_the_windows_sandbox_lets_studio_run_with_library_access(self):
+        client = self.windows('unsandboxed')
+        client.get('/api/studio/access')
+        client.post('/api/studio/sandbox')
+        for _ in range(100):
+            access = client.get('/api/studio/access').json()
+            if not access['setting_up']:
+                break
+            time.sleep(.05)
+        self.assertEqual((access['sandbox_missing'], access['setup_error']), (False, None))
+        self.assertEqual([p['mode'] for p in self.received('windowsSandbox/setupStart')], ['elevated'])
+        self.assertEqual(client.post('/api/studio/messages', json={'text': 'first'}).status_code, 200)
+        self.assertEqual(self.received('turn/start')[-1]['sandboxPolicy']['type'], 'workspaceWrite')
+
+    def test_a_failed_setup_tries_without_administrator_rights_then_says_why(self):
+        client = self.windows('unsandboxed-fail')
+        client.get('/api/studio/access')
+        client.post('/api/studio/sandbox')
+        for _ in range(100):
+            access = client.get('/api/studio/access').json()
+            if access['setup_error']:
+                break
+            time.sleep(.05)
+        self.assertEqual(access['setup_error'], 'The learner declined')
+        self.assertTrue(access['sandbox_missing'])
+        self.assertEqual([p['mode'] for p in self.received('windowsSandbox/setupStart')], ['elevated', 'unelevated'])
 
 
 class UploadTest(unittest.TestCase):

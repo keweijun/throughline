@@ -4,6 +4,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Called when the host refuses a browser without its key (a tab opened some other way than the launcher). */
+export const signIn = { refused: () => {} };
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
@@ -17,6 +20,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError('The learning host is not reachable. Check that it is still running in your terminal.');
   }
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401 && data.code === 'not_signed_in') signIn.refused();
   if (!response.ok) throw new ApiError(data.error ?? `Request failed (${response.status})`, data.code, response.status);
   return data as T;
 }

@@ -160,8 +160,8 @@
     </div>
   {:else if open === 'access'}
     <div class="menu" role="group" transition:pop aria-label={t("Access")}>
-      {#if studio.access?.forced}
-        <p class="note">{t("Codex's sandbox is not set up on this Windows computer, so Studio runs with full access, as Codex does here.")}</p>
+      {#if studio.access?.sandbox_missing}
+        <p class="note">{t("Codex's sandbox is not set up on this Windows computer: Library access needs it.")}</p>
       {/if}
       {#if shared}
         <!-- A course from someone else's package (ADR 0020): its documents and lessons reach Codex's prompts. -->
@@ -169,12 +169,12 @@
       {/if}
       <div class="options" role="radiogroup" aria-label={t("Access")}>
         <label class="option">
-          <input type="radio" name="studio-access" checked={!studio.access?.full_access} disabled={saving || !!studio.access?.forced} onchange={() => pickAccess(false)} />
+          <input type="radio" name="studio-access" checked={!studio.access?.full_access} disabled={saving} onchange={() => pickAccess(false)} />
           <span class="name">{t("Library access")}</span>
           <span class="meta">{t("Codex writes only inside your Throughline folder and asks before anything else.")}</span>
         </label>
         <label class="option">
-          <input type="radio" name="studio-access" checked={!!studio.access?.full_access} disabled={saving || !!studio.access?.forced} onchange={() => pickAccess(true)} />
+          <input type="radio" name="studio-access" checked={!!studio.access?.full_access} disabled={saving} onchange={() => pickAccess(true)} />
           <span class="name">{t("Full access")}</span>
           <span class="meta">{t("Codex can change files anywhere and runs commands without asking.")}</span>
         </label>

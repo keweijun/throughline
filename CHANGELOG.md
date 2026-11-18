@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.52.0
+
+- Only you can use Throughline on your computer. It now opens with a key that only your account can read. Other people's programs on a shared computer can no longer read your courses or start Codex through it. Open Throughline from its launcher or with `guided-learning open` as before. A browser opened another way shows how to get in.
+- On Windows, Studio no longer gives Codex full access by itself when Codex's sandbox isn't set up. It asks first: set the sandbox up once (Windows may ask for permission), or choose Full access.
+- On a Mac, a link in Studio to an app or installer shows it in Finder instead of starting it.
+- On Windows, no other program can take over the port Throughline listens on.
+
 ## 0.51.0
 
 - On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.

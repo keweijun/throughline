@@ -38,13 +38,15 @@ def main():
     args = parser.parse_args()
     settings = TeacherSettings(args.config, override={'model': args.model, 'small_model': args.small_model, 'effort': args.effort, 'small_effort': args.small_effort})
 
+    key = library.host_key()
+
     def ready(port):
         if args.record:
             _record(port)
-        print(f'Learning interface: http://127.0.0.1:{port}', flush=True)
+        print(f'Learning interface: http://127.0.0.1:{port}/?key={key}', flush=True)
     try:
         serve(args.workspace, port=args.port, settings=settings, on_ready=ready,
-              library_root=args.library or library.default_root())
+              library_root=args.library or library.default_root(), key=key)
     finally:
         if args.record:
             _forget()

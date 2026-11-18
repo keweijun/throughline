@@ -12,7 +12,8 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from guided_learning.api import execute
-from guided_learning.server import create_app
+from guided_learning.server import Host, create_app
+from guided_learning.server import host as host_module
 from guided_learning.server.settings import TeacherSettings
 from support import ROOT
 
@@ -117,6 +118,9 @@ class CourseLibrary(unittest.TestCase):
                 self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'another course changing leaves the open one alone')
                 execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
                 self.assertTrue(wait_for('state'), events)
+            # Closing waits for a poll in progress, which reads the courses' databases; Windows cannot remove a course
+            # folder while its database is open (#196).
+            self.assertFalse(app.state.courses.watcher.is_alive())
 
     def test_the_hosts_own_writes_do_not_reload_its_tabs(self):
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
@@ -140,6 +144,57 @@ class CourseLibrary(unittest.TestCase):
                 self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'the host announces its own changes')
                 execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
                 self.assertTrue(wait_for('state'), events)
+
+    def test_codexs_write_during_one_of_the_hosts_is_still_its_own_change(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'alpha'
+            course(path, 'Alpha')
+            host = Host(path, runner=Idle())
+            try:
+                real = host_module.execute
+
+                def writing(workspace, request, **options):
+                    result = real(workspace, request, **options)
+                    if request['op'] == 'memory.save' and request['id'] == 'pref':  # Codex commits as the host does
+                        execute(path, {'op': 'memory.save', 'id': 'other', 'kind': 'preference', 'concept_id': 'state', 'text': 'Examples first'})
+                    return result
+                host.operation({'op': 'memory.save', 'id': 'mine', 'kind': 'preference', 'concept_id': 'state', 'text': 'Short answers'})
+                self.assertFalse(host.outside_change(), "the host's own write")
+                with mock.patch.object(host_module, 'execute', writing):
+                    host.operation({'op': 'memory.save', 'id': 'pref', 'kind': 'preference', 'concept_id': 'state', 'text': 'Diagrams'})
+                self.assertTrue(host.outside_change(), "Codex's write, though the host wrote at the same moment")
+                self.assertFalse(host.outside_change(), 'told once')
+            finally:
+                host.close()
+
+    def test_codex_changes_beyond_the_route_reach_open_tabs(self):
+        # Studio adds exercises and notes memory through the skill, outside the host; the open course shows them at once.
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
+            course(Path(root) / 'alpha', 'Alpha')
+            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
+                             library_root=root, watch_interval=0.05)
+            with TestClient(app, base_url='http://127.0.0.1:8765'):
+                events = []
+                app.state.courses.events.publish = events.append
+
+                def wait_for_state():
+                    for _ in range(100):
+                        if {'type': 'changed', 'scope': 'state'} in events:
+                            return True
+                        time.sleep(0.05)
+                    return False
+                for op in ('course.status', 'practice.list', 'memory.view', 'review.context'):
+                    execute(Path(root) / 'alpha', {'op': op})
+                time.sleep(0.3)
+                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'reading the course changes nothing')
+                execute(Path(root) / 'alpha', {'op': 'practice.add', 'id': 'ps1', 'concept_id': 'state',
+                                               'exercises': [{'question': 'Normalise a state.', 'origin': 'self_created'}]})
+                self.assertTrue(wait_for_state(), events)
+                self.assertNotIn({'type': 'changed', 'scope': 'library'}, events, 'the library shows nothing exercises change')
+                events.clear()
+                execute(Path(root) / 'alpha', {'op': 'memory.note', 'turn_id': 't', 'concept_id': 'state', 'interaction_ids': [],
+                                               'note': {'entries': [{'kind': 'taught_term', 'text': 'ket'}]}})
+                self.assertTrue(wait_for_state(), events)
 
     def test_a_course_summary_is_read_again_only_after_the_course_changes(self):
         from guided_learning import library

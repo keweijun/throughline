@@ -117,10 +117,10 @@ class StreamWrites(unittest.TestCase):
         self.writes = []
         real = host_module.execute
 
-        def counting(workspace, request):
+        def counting(workspace, request, **options):
             if request['op'] in ('stream.event', 'stream.events'):
                 self.writes.append(request)
-            return real(workspace, request)
+            return real(workspace, request, **options)
         host_module.execute = counting
         self.addCleanup(setattr, host_module, 'execute', real)
 

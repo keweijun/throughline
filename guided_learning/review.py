@@ -58,6 +58,21 @@ def outcome(task):
     return 'missed' if any(p in MISSES for p in last.get('parts') or ['not_yet']) else 'partly'
 
 
+def missed_sections(task):
+    """The sections a missed or partly answered question counts against (ADR 0014): those of its parts not yet right,
+    when its parts name their sections, else every section it tests. A part that names none stands for them all."""
+    if outcome(task) not in ('missed', 'partly'):
+        return []
+    tested = _tested(task)
+    parts, last = task.get('parts') or [], next(iter(reversed(_assessments(task))), None)
+    statuses = (last or {}).get('parts') or []
+    if task.get('answer') or len(statuses) != len(parts) or not any(isinstance(p, dict) and p.get('concept_ids') for p in parts):
+        return tested
+    behind = {cid for part, status in zip(parts, statuses) if status != 'correct'
+              for cid in (part.get('concept_ids') if isinstance(part, dict) else None) or tested}
+    return [cid for cid in tested if cid in behind] or tested
+
+
 def last_practised(store):
     """When each section was last practised: its latest lesson, assessment or review answer."""
     times = {}
@@ -68,13 +83,17 @@ def last_practised(store):
     for turn in store.digest('streams', streaming.brief):
         if turn['channel'] == 'mainline' and turn['status'] == 'completed' and not turn.get('chapter_id'):
             seen(turn['concept_id'], turn.get('started_at'))
+    assessed = {}
     for item in store.list('evidence'):
         if 'assessment_id' in item:
             seen(item['concept_id'], item.get('assessed_at'))
+            assessed[item['id']] = item.get('assessed_at')
+    # An answer's evidence is for the first section it tests, but the answer practised every section it tests.
     for task in store.list('practice_tasks'):
-        if task.get('answer'):
-            for cid in _tested(task):
-                seen(cid, task['answer'].get('at'))
+        answered_at = [task['answer'].get('at')] if task.get('answer') else [assessed.get(h.get('evidence_id')) for h in _assessments(task)]
+        for cid in _tested(task):
+            for at in answered_at:
+                seen(cid, at)
     return times
 
 
@@ -110,7 +129,7 @@ def context(store, request):
     for cid in sections:
         concept = concepts.get(cid, {})
         mine = [t for t in tasks if cid in _tested(t) and t.get('status') not in ('replaced', 'retired')]
-        misses = [t['question'] for t in mine if outcome(t) in ('missed', 'partly')][-RECENT_MISSES:]
+        misses = [t['question'] for t in mine if cid in missed_sections(t)][-RECENT_MISSES:]
         entry = {'id': cid, 'title': concept.get('title', cid),
                  **{k: concept[k] for k in ('core_question', 'objective') if concept.get(k)},
                  'days_since_practised': int((now - practised[cid]) // DAY) if cid in practised else None,

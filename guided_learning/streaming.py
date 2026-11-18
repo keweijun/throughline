@@ -157,7 +157,7 @@ def reveal(store, turn):
     """A prepared step becomes the mainline turn the learner asked for with Continue; a completed one is now taught."""
     if turn['channel'] != PREPARED_STEP:
         raise OperationError('invalid_transition', 'Only a prepared step is revealed')
-    turn.update(channel='mainline', record_user=True)
+    turn.update(channel='mainline', record_user=True, revealed_at=time.time())
     record_interaction(store, {'id':'stream-user:'+turn['id'], 'role':'user', 'text':turn['prompt'], 'concept_id':turn['concept_id']})
     if turn['status'] == 'completed':
         record_interaction(store, {'id':'stream:'+turn['id'], 'role':'assistant', 'text':turn['final_text'], 'concept_id':turn['concept_id'], 'source_refs':turn.get('source_refs',[])})

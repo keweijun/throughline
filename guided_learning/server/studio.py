@@ -13,6 +13,7 @@ import subprocess
 import threading
 from pathlib import Path
 
+from .. import library
 from ..codex import find_codex
 from ..store import OperationError
 from .settings import EFFORTS, default_path
@@ -203,7 +204,8 @@ class Studio:
         self.missing = None  # why this Codex cannot run Studio, once known
         self.forced = None  # True when Windows has no ready sandbox, so Studio runs with full access
 
-    # Per-user record: Full access, Studio's own model and effort, and the threads of each course, newest first.
+    # Per-user record: Full access, Studio's own model and effort, the threads of each course, newest first, and for
+    # each chat begun on the library page the courses the library had then, so the course it makes can be told apart.
 
     def _config(self):
         try:
@@ -211,8 +213,9 @@ class Studio:
         except (OSError, ValueError):
             data = {}
         courses = data.get('courses') if isinstance(data.get('courses'), dict) else {}
+        began = data.get('began') if isinstance(data.get('began'), dict) else {}
         model, effort = data.get('model'), data.get('effort')
-        return {'full_access': data.get('full_access') is True, 'courses': courses,
+        return {'full_access': data.get('full_access') is True, 'courses': courses, 'began': began,
                 'model': model.strip() if isinstance(model, str) else '',
                 'effort': effort if effort in EFFORTS else ''}
 
@@ -393,6 +396,51 @@ class Studio:
 
     # Threads.
 
+    def _courses(self):
+        """The names of the library's courses, from their folders, without opening them."""
+        if self.root is None or not self.root.is_dir():
+            return []
+        return sorted(p.name for p in self.root.iterdir() if p.is_dir() and library.is_course(p))
+
+    def _began(self, thread):
+        """The courses the library had when this chat began on the library page, or None for any other chat."""
+        before = self._config()['began'].get(thread)
+        return before if isinstance(before, list) else None
+
+    def made(self, thread):
+        """The courses a library chat made: in the library now, with a route, and not there when the chat began. The
+        host keeps what was there, so a reload, a closed page or a restart during a long build loses nothing."""
+        before = self._began(thread)
+        if before is None or self.root is None:
+            return []
+        found = []
+        for name in self._courses():
+            if name in before:
+                continue
+            try:
+                routed = library.summary(self.root / name).get('concepts')
+            except Exception:  # a course that cannot be read yet (still being written, or broken) has made nothing
+                routed = False
+            if routed:
+                found.append(name)
+        return found
+
+    def settle(self):
+        """File each library chat that has finished making one course under that course, as the library page does
+        when it watches the turn end, so the course's Studio shows the chat even when nobody watched."""
+        if self.root is None:
+            return
+        for thread in self._ids(LIBRARY):
+            made = [] if thread in self.active else self.made(thread)
+            if len(made) == 1:
+                self.refile(thread, library.course_path(self.root, made[0]).resolve())
+
+    def _home(self, thread):
+        """Where a chat is filed now: a library chat that moved into its course is read there."""
+        if thread in self._ids(LIBRARY):
+            return LIBRARY
+        return next((course for course, ids in self._config()['courses'].items() if thread in ids), LIBRARY)
+
     def _owns(self, course, thread):
         if thread not in self._ids(course):
             raise StudioError('unknown_studio_thread', f'No Studio thread {thread} for this course')
@@ -415,6 +463,7 @@ class Studio:
                 'waiting': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') in ids]}
 
     def threads(self, course):
+        self.settle()
         ids = self._ids(course)
         if not ids:
             return []
@@ -423,17 +472,25 @@ class Studio:
         return [_summary(found[t], t in self.active) for t in ids if t in found]
 
     def history(self, course, thread):
-        server = self._load(course, thread)
+        # The library page may still show a chat the host has just filed under the course it made, until it follows.
+        began = self._began(thread) if course == LIBRARY else None
+        server = self._load(self._home(thread) if began is not None else course, thread)
         page = server.call('thread/turns/list', {'threadId': thread, 'itemsView': 'full', 'sortDirection': 'desc',
                                                  'limit': HISTORY})
         return {'id': thread, 'turns': list(reversed(page.get('data', []))), 'active_turn': self.active.get(thread),
-                'pending': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') == thread]}
+                'pending': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') == thread],
+                'courses_before': began}
 
     def start(self, course):
         server = self._server()
         result = server.call('thread/start', {**self._thread_settings(course), 'ephemeral': False, 'serviceName': CLIENT})
         thread = result['thread']['id']
         self.owned.add(thread)
+        if course == LIBRARY:
+            with self.lock:
+                data = self._config()
+                data['began'][thread] = self._courses()
+                self._save(data)
         self._record(course, thread)
         self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
         return thread
@@ -520,10 +577,14 @@ class Studio:
         return self.root / '.intake'
 
     def refile(self, thread, course):
-        """File a library thread under the course it made, so the course's Overview shows it from now on."""
-        self._owns(LIBRARY, thread)
-        self._record(LIBRARY, thread, keep=False)
-        self._record(course, thread)
+        """File a library thread under the course it made, so the course's Overview shows it from now on. Filing it
+        again is no change, since the host may have filed it before the library page asks."""
+        with self.lock:
+            if thread in self._ids(course) and thread not in self._ids(LIBRARY):
+                return {'thread': thread, 'course': str(course)}
+            self._owns(LIBRARY, thread)
+            self._record(LIBRARY, thread, keep=False)
+            self._record(course, thread)
         return {'thread': thread, 'course': str(course)}
 
     def rename(self, course, thread, name):
@@ -536,7 +597,11 @@ class Studio:
         self._owns(course, thread)
         self._server().call('thread/archive', {'threadId': thread})
         self.owned.discard(thread)
-        self._record(course, thread, keep=False)
+        with self.lock:
+            self._record(course, thread, keep=False)
+            data = self._config()
+            if data['began'].pop(thread, None) is not None:
+                self._save(data)
         self.events.publish({'type': 'studio', 'method': 'studio/threads', 'params': {}})
         return {'thread': thread}
 
@@ -600,14 +665,16 @@ class Studio:
             raise StudioError('invalid_studio_file', 'The file needs a name')
         folder = Path(folder) if folder else Path(course) / 'inputs'
         folder.mkdir(parents=True, exist_ok=True)
-        target, stem, suffix = folder / name, Path(name).stem, Path(name).suffix
-        for n in itertools.count(2):
-            if not target.exists():
+        stem, suffix = Path(name).stem, Path(name).suffix
+        for target in itertools.chain([folder / name], (folder / f'{stem} ({n}){suffix}' for n in itertools.count(2))):
+            try:  # claiming the name and creating the file are one step, so a concurrent upload of the same name takes the next
+                out = target.open('xb')
                 break
-            target = folder / f'{stem} ({n}){suffix}'
+            except FileExistsError:
+                continue
         size = 0
-        try:
-            with target.open('xb') as out:
+        try:  # from here the file is this upload's own
+            with out:
                 for chunk in chunks:
                     size += len(chunk)
                     if size > MAX_UPLOAD:

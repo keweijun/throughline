@@ -259,6 +259,7 @@ class Courses:
         self.host = None
         self.watch_interval = watch_interval
         self.stopping = threading.Event()
+        self.watcher = None  # the thread running `watch`, once the app has started
         self._stamps = {}  # path -> (file stamp, fingerprint) from the last poll
 
     def _fingerprints(self):
@@ -279,13 +280,13 @@ class Courses:
         while not self.stopping.wait(self.watch_interval):
             host = self.host
             current = self._fingerprints()
-            # The host announces its own writes; only a change made outside it, by Codex say, reloads the course.
-            outside = host is not None and not host.own_change(self._stamps.get(host.workspace, (None,))[0])
             if current != seen:
                 self.events.publish({'type': 'changed', 'scope': 'library'})
-                if host and outside and current.get(host.workspace) != seen.get(host.workspace):
-                    self.events.publish({'type': 'changed', 'scope': 'state'})
-                    host._wake_background()
+            # The host announces its own writes; any write made outside it, by Codex say, reloads the open course,
+            # whatever it changed: exercises, review sets, memory and readings are not in the library's fingerprint.
+            if host and host.outside_change():
+                self.events.publish({'type': 'changed', 'scope': 'state'})
+                host._wake_background()
             seen = current
 
     def open(self, path):
@@ -323,6 +324,8 @@ class Courses:
 
     def close(self):
         self.stopping.set()
+        if self.watcher:  # a poll in progress still reads the courses' databases, and may wake the host
+            self.watcher.join(5)
         self.studio.close()
         with self.lock:
             if self.host:
@@ -356,7 +359,8 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @asynccontextmanager
     async def lifespan(app):
-        threading.Thread(target=courses.watch, args=(courses._fingerprints(),), name='library-watch', daemon=True).start()
+        courses.watcher = threading.Thread(target=courses.watch, args=(courses._fingerprints(),), name='library-watch', daemon=True)
+        courses.watcher.start()
         try:
             yield
         finally:

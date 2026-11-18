@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { api, newId } from '../lib/api';
@@ -88,6 +89,15 @@
     else if (openId === q.id) openId = null;
     // A quote waits for the box it was taken for; switching threads leaves it behind.
     if (app.quote && (app.quote.questionId ?? null) !== openId) app.quote = null;
+  }
+
+  // Leaving a thread goes back to the list, at the question just left: a long answer may have scrolled the rest away.
+  async function closeThread() {
+    const target = thread;
+    if (!target) return;
+    setOpen(target, false);
+    await tick();
+    document.getElementById(`thread-${target.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }
 
   const draftKey = $derived(thread ? `followup:${thread.id}` : 'question');
@@ -191,10 +201,19 @@
     {/if}
   {/snippet}
   <div class="panel-foot">
-    {#if thread && canReturn}
-      <button type="button" class="btn btn-quiet btn-small btn-flush back" disabled={busy} onclick={backToLesson}>
-        ← {thread.selection && thread.selected_turn_id ? t("Back to the passage") : t("Return to the lesson")}
-      </button>
+    <!-- Ways out of an open thread stay in view however long its answers are, and whether or not the box is resting. -->
+    {#if thread}
+      <div class="foot-nav">
+        {#if canReturn}
+          <button type="button" class="btn btn-quiet btn-small btn-flush back" disabled={busy} onclick={backToLesson}>
+            ← {thread.selection && (thread.selected_turn_id || thread.selected_task_id) ? t("Back to the passage") : t("Return to the lesson")}
+          </button>
+        {/if}
+        <button type="button" class="btn btn-quiet btn-small all" onclick={closeThread}>
+          <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h12M4 10h12M4 14h12" /></svg>
+          {t("All questions")}
+        </button>
+      </div>
     {/if}
     <Composer
       id="question-input"
@@ -206,7 +225,7 @@
       disabled={busy || !canReply}
       onsubmit={send}
       header={target}
-      onclose={thread ? () => setOpen(thread, false) : undefined}
+      onclose={thread ? closeThread : undefined}
       closeLabel={t("Ask a new question instead")}
       quote={quote ? { text: quote.text, source: thread ? undefined : quote.source, id: thread ? undefined : 'branch-selection' } : null}
       onremovequote={() => (app.quote = null)}
@@ -249,9 +268,23 @@
     letter-spacing: -0.05em;
   }
 
+  .foot-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.75rem;
+  }
+
   .back {
-    justify-self: start;
     color: var(--accent);
+  }
+
+  .all {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    /* Lines its text up with the box's right edge, as the flush button beside it does on the left. */
+    margin: 0 -0.6rem 0 auto;
   }
 
   .target-title {

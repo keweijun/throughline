@@ -9,10 +9,15 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - The reader's header takes one line: the document, the place in it, and whether it was checked. The note on a location not yet checked opens from its status, and Bookmark and Open original sit with the PDF's page and zoom controls.
 - A document you open on the Overview now opens at its cited page when you show it in Learn's panel. A Markdown source no longer scrolls the page around it when it opens.
 
-## 0.50.1
+## 0.50.2
 
 - A PDF in the reader stays on the line you were reading when you zoom it or change the panel's width. Before, it jumped to another place in the document, further the deeper you were in it.
 - Zooming a long PDF no longer leaves pages blank: every page in view is drawn again at the new size.
+
+## 0.50.1
+
+- "Back to the passage" in a side question now lands on the passage you asked about and briefly marks it, including a passage from a section you were previewing, from a lesson's check question or from an exercise. Before, a passage from an earlier section took you to the current section instead, and one in a check question or an exercise brought back only roughly where you had been reading.
+- An open question now always shows **All questions** under its answers, beside "Back to the passage", to go back to the list. Before, the only way back was the close button in the writing box, which is hidden while the box is empty.
 
 ## 0.50.0
 

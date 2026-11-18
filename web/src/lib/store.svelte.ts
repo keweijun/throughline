@@ -720,10 +720,14 @@ class AppStore {
     await tick();
     requestAnimationFrame(() => {
       const lesson = turnId ? document.getElementById(`turn-${turnId}`) : null;
-      const body = lesson?.querySelector<HTMLElement>('.lesson-body');
-      const range = !body || !passage ? null
-        : options.occurrence !== undefined ? (occurrences(body, passage)[options.occurrence] ?? locate(body, passage))
-        : locate(body, passage, options.near);
+      // A passage may be in the lesson's text or in the check question that ends it.
+      const blocks = lesson ? [...lesson.querySelectorAll<HTMLElement>('.lesson-body, [data-check]')] : [];
+      let range: Range | null = null;
+      for (const block of passage ? blocks : []) {
+        range = options.occurrence !== undefined ? (occurrences(block, passage!)[options.occurrence] ?? locate(block, passage!))
+          : locate(block, passage!, options.near);
+        if (range) break;
+      }
       let top: number | null = null;
       if (range) top = stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3;
       else if (options.fallback !== undefined) top = options.fallback;
@@ -733,19 +737,48 @@ class AppStore {
     });
   }
 
-  /** Brings the reading column back to the passage a question was about, falling back to where the learner was reading. */
+  /** Once the page has re-rendered, scrolls to a passage in an exercise's question or feedback, else to the exercise. */
+  async #scrollToTask(taskId: string, passage: string | null | undefined, options: { occurrence?: number; flash?: boolean } = {}) {
+    await tick();
+    requestAnimationFrame(() => {
+      const exercise = document.getElementById(`exercise-${taskId}`);
+      if (!exercise) return;
+      const range = passage
+        ? [...exercise.querySelectorAll<HTMLElement>('[data-exercise], [data-check]')].map((block) => occurrences(block, passage)[options.occurrence ?? 0]).find(Boolean)
+        : undefined;
+      if (range) scrollStage(Math.max(0, stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3));
+      else exercise.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (range && options.flash) flash(range);
+    });
+  }
+
+  /**
+   * Brings the reading column back to the passage a question was about, on the page that shows it (its section, a
+   * chapter page or the review page), and marks it; without one, back to where the learner was reading.
+   */
   returnTo(question: Question) {
-    const turnId = question.selected_turn_id ?? question.main_turn_id;
-    const chapter = this.ownerChapter({ turn_id: turnId });
-    if (chapter) {
-      this.viewChapter(chapter);
-      return this.#scrollToLesson(turnId, question.selection);
+    const task = question.selected_task_id ? this.state?.practice.tasks.find((t) => t.id === question.selected_task_id) : undefined;
+    if (task && question.selection) {
+      if (task.origin === 'review') this.showReview();
+      else if (task.chapter_id) this.viewChapter(task.chapter_id);
+      else this.view(task.concept_id);
+      return this.#scrollToTask(task.id, question.selection, { flash: true });
     }
-    if (this.currentId) this.view(this.currentId);
-    const sameSection = question.anchor?.concept_id === this.currentId && question.anchor.scroll_y != null;
+    const turnId = question.selected_turn_id ?? question.main_turn_id;
+    const turn = this.turn(turnId);
+    const marked = !!question.selected_turn_id;
+    if (turn?.chapter_id) {
+      this.viewChapter(turn.chapter_id);
+      return this.#scrollToLesson(turnId, question.selection, { flash: marked });
+    }
+    // A passage from a section the learner was previewing is in that section's lesson, not the current one.
+    const section = turn?.concept_id ?? this.currentId;
+    if (section) this.view(section);
+    const sameSection = question.anchor?.concept_id === section && question.anchor.scroll_y != null;
     return this.#scrollToLesson(turnId, question.selection, {
       near: sameSection ? question.anchor.scroll_y! + stageHeight() / 2 : undefined,
       fallback: sameSection ? question.anchor.scroll_y! : undefined,
+      flash: marked,
     });
   }
 
@@ -898,18 +931,7 @@ class AppStore {
     if (chapter) this.viewChapter(chapter);
     else this.view(annotation.concept_id);
     if (annotation.task_id) {
-      await tick();
-      requestAnimationFrame(() => {
-        const exercise = document.getElementById(`exercise-${annotation.task_id}`);
-        if (!exercise) return;
-        // The passage may be in the question or the teacher's feedback; land on it, else on the exercise.
-        const range = annotation.passage
-          ? [...exercise.querySelectorAll<HTMLElement>('[data-exercise]')].map((block) => occurrences(block, annotation.passage)[annotation.occurrence ?? 0]).find(Boolean)
-          : undefined;
-        if (range) scrollStage(Math.max(0, stageOffset(range.getBoundingClientRect().top) - stageHeight() / 3));
-        else exercise.scrollIntoView({ block: 'center', behavior: 'instant' });
-        if (range && marked) flash(range);
-      });
+      await this.#scrollToTask(annotation.task_id, annotation.passage, { occurrence: annotation.occurrence ?? 0, flash: marked });
       return;
     }
     if (annotation.turn_id) await this.#scrollToLesson(annotation.turn_id, annotation.passage, { occurrence: annotation.occurrence ?? 0, flash: marked });

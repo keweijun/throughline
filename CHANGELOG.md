@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.53.0
+
+- When a lesson can't start because of Codex, the message now says what to do: your usage limit is reached, Codex isn't signed in, there's no internet connection, or your account can't use the chosen model. When Codex isn't installed, it says how to install it.
+- Throughline now keeps a log of problems in your library's `.throughline/host.log`, with what Codex reported when it failed. The log never grows past a few megabytes. `guided-learning doctor` shows where it is, along with your system and Python version, which helps when you report a problem.
+
 ## 0.51.0
 
 - On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.

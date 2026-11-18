@@ -166,6 +166,15 @@ class SavedThreads(unittest.TestCase):
         self.codex = codex
         self.addCleanup(setattr, codex, 'THREADS', codex.THREADS)
         codex.THREADS = codex.SavedThreads()
+        # Deleting and sweeping threads run Codex in the background; record those runs so a test can wait for them
+        # before it reads the calls, and before its folder is removed while a late one still writes there.
+        self.tidying = []
+        later = codex.THREADS._later
+        def tracked(*args, **kwargs):
+            before = set(threading.enumerate())
+            later(*args, **kwargs)
+            self.tidying += [t for t in threading.enumerate() if t not in before]
+        codex.THREADS._later = tracked
 
     def turns(self, tmp, prompts, mode='ok'):
         script = Path(tmp)/'server.py'
@@ -178,6 +187,7 @@ class SavedThreads(unittest.TestCase):
         return self.calls(tmp)
 
     def calls(self, tmp):
+        for t in self.tidying: t.join()
         folder = Path(tmp)/'calls'
         return [json.loads(f.read_text()) for f in sorted(folder.glob('*.json'))] if folder.is_dir() else []
 
@@ -225,10 +235,6 @@ class SavedThreads(unittest.TestCase):
 
     def test_the_first_turn_in_a_folder_deletes_threads_an_earlier_run_left_archived(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.turns(tmp, [self.teaching('one')])
-            for _ in range(50):
-                calls = self.calls(tmp)
-                if ['thread/delete', {'threadId': 'old'}] in calls: break
-                time.sleep(.1)
+            calls = self.turns(tmp, [self.teaching('one')])
             self.assertEqual([p.get('archived') for m, p in calls if m == 'thread/list'], [False, True])
             self.assertEqual(calls.count(['thread/delete', {'threadId': 'old'}]), 1)

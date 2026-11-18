@@ -2,17 +2,20 @@
 
 It logs every message it receives to <log> as JSON lines. A turn's text picks its script: "approve" asks to run a
 command and replies with the learner's decision, "ask" asks a question and replies with the answer, "wait" keeps
-running until it is steered or interrupted, "busy" works through a long turn with lots of output, "interview" asks
-two questions in its answer as newer Codex does, and a reply to them is read back; "links" answers with links to files
+running until it is steered or interrupted, "busy" works through a long turn with lots of output until the test
+ends it, "interview" asks two questions in its answer as newer Codex does, and a reply to them is read back; "links" answers with links to files
 in the library folder, the Studio fixture's course, the web and the page; anything else replies "done". A
 turn with an output schema writes a chat's title from the first words of its prompt. With `old` it lacks
 `turn/steer`, as an older Codex would."""
 import json
 import sys
 import time
+from pathlib import Path
 
 log = open(sys.argv[1], 'a', encoding='utf-8')
 old = len(sys.argv) > 2 and sys.argv[2] == 'old'
+# 'unsandboxed': Windows without Codex's sandbox until a setup; 'unsandboxed-fail': a setup that never works.
+sandbox = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2].startswith('unsandboxed') else 'ready'
 threads, turns = {}, {}
 waiting = {}  # server request id -> (thread, turn, kind)
 asked = iter(range(900, 10000))
@@ -43,12 +46,13 @@ def message(tid, turn, text, item='m'):
 
 def busy(tid, turn, steps):
     """A long turn as Codex works through a big request: commentary, reasoning, reads, searches and commands with
-    long output, streamed in small pieces with pauses, then the answer."""
+    long output, streamed in small pieces; then a command that prints a line every 50 ms until the test creates
+    `busy.release` beside the log, and the answer. A test reads the transcript while it runs however fast this computer
+    is, and lets it end."""
     def item(entry, deltas=(), method=None, key='delta'):
         note('item/started', {'threadId': tid, 'turnId': turn, 'item': {**entry, 'status': 'inProgress'} if 'status' in entry else entry})
         for delta in deltas:
             note(method, {'threadId': tid, 'turnId': turn, 'itemId': entry['id'], key: delta})
-            time.sleep(0.02)
         note('item/completed', {'threadId': tid, 'turnId': turn, 'item': entry})
         turns[turn]['items'].append(entry)
 
@@ -65,6 +69,18 @@ def busy(tid, turn, steps):
               'status': 'completed', 'commandActions': [{'type': 'unknown', 'command': f'python build.py {n}'}],
               'aggregatedOutput': ''.join(output), 'exitCode': 0},
              [''.join(output[i:i + 20]) for i in range(0, len(output), 20)], 'item/commandExecution/outputDelta')
+    release = Path(sys.argv[1]).with_name('busy.release')
+    watch = {'type': 'commandExecution', 'id': f'{turn}-watch', 'command': "/bin/zsh -lc 'python build.py --watch'", 'cwd': '.',
+             'status': 'completed', 'commandActions': [{'type': 'unknown', 'command': 'python build.py --watch'}], 'exitCode': 0}
+    note('item/started', {'threadId': tid, 'turnId': turn, 'item': {**watch, 'status': 'inProgress'}})
+    printed = []
+    while not release.exists():
+        printed.append(f'watching line {len(printed)} ' + 'x' * 60 + LINE)
+        note('item/commandExecution/outputDelta', {'threadId': tid, 'turnId': turn, 'itemId': watch['id'], 'delta': printed[-1]})
+        time.sleep(0.05)
+    watch['aggregatedOutput'] = ''.join(printed)
+    note('item/completed', {'threadId': tid, 'turnId': turn, 'item': watch})
+    turns[turn]['items'].append(watch)
     message(tid, turn, 'All parts are built.')
     finish(tid, turn)
 
@@ -188,5 +204,14 @@ for line in sys.stdin:
                            {'root': params['roots'][0], 'path': 'backups/course-format-6.sqlite3', 'file_name': 'course-format-6.sqlite3', 'score': 1},
                            {'root': params['roots'][0], 'path': 'inputs/waves.sqlite3', 'file_name': 'waves.sqlite3', 'score': 1}]}
     elif method == 'windowsSandbox/readiness':
-        reply = {'status': 'ready'}  # so the tests see the same sandboxed turns on Windows
+        # 'ready' unless asked otherwise, so the tests see the same sandboxed turns on Windows
+        reply = {'status': 'ready' if sandbox == 'ready' else 'notConfigured'}
+    elif method == 'windowsSandbox/setupStart':
+        send({'id': rid, 'result': {'started': True}})
+        works = sandbox == 'unsandboxed'
+        if works:
+            sandbox = 'ready'
+        note('windowsSandbox/setupCompleted', {'mode': params['mode'], 'success': works,
+                                               'error': None if works else 'The learner declined'})
+        continue
     send({'id': rid, 'result': reply})

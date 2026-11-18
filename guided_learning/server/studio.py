@@ -6,6 +6,7 @@ threads it has open to the interface, and holds the approvals and questions Code
 answers them."""
 import itertools
 import json
+import logging
 import os
 import queue
 import re
@@ -14,10 +15,12 @@ import threading
 from pathlib import Path
 
 from .. import library
-from ..codex import find_codex
+from ..codex import NOT_FOUND, find_codex
+from ..logs import Tail
 from ..store import OperationError
-from .settings import EFFORTS, default_path
+from .settings import EFFORTS, default_path, write_json
 
+log = logging.getLogger(__name__)
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
 # Notifications about a thread that the interface draws; moderation, predictions and read state it ignores.
 FORWARDED = re.compile(r'^((thread|turn|item)/|error$)')
@@ -80,8 +83,10 @@ class AppServer:
 
     def __init__(self, command, cwd, on_message, on_exit):
         self.process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace',
+                                        stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
                                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        self.stderr = Tail(self.process.stderr)
+        self.closing = False
         self.on_message, self.on_exit = on_message, on_exit
         self.ids = itertools.count(1)
         self.waiting = {}  # request id -> queue for its reply
@@ -103,6 +108,8 @@ class AppServer:
                     pass
         for reply in list(self.waiting.values()):
             reply.put(None)
+        if not self.closing:
+            self.stderr.log(log, "Studio's Codex App Server stopped")
         self.on_exit(self)
 
     def alive(self):
@@ -143,6 +150,7 @@ class AppServer:
         self._send({'id': request, 'error': {'code': -32601, 'message': message}})
 
     def close(self):
+        self.closing = True
         try:
             self.process.stdin.close()
             self.process.wait(timeout=3)
@@ -188,6 +196,8 @@ def message_input(text, elements=(), skills=(), mentions=(), images=(), context=
 class Studio:
     """Studio threads of the course library, over one App Server started on first use and again if it exits."""
 
+    windows = os.name == 'nt'  # Codex's sandbox there needs setting up first; tests set this elsewhere
+
     def __init__(self, root, events, settings, command=None, path=None):
         self.root = Path(root).resolve() if root else None
         self.events, self.settings = events, settings
@@ -202,7 +212,8 @@ class Studio:
         self.titling = {}  # side thread writing a chat's title -> where its events go
         self.named = set()  # chats the learner named, which a title written later must not overwrite
         self.missing = None  # why this Codex cannot run Studio, once known
-        self.forced = None  # True when Windows has no ready sandbox, so Studio runs with full access
+        self.unsandboxed = None  # True when Windows has no ready sandbox, so Library access cannot run (ADR 0016)
+        self.setup = None  # the Windows sandbox setup under way ('elevated', then 'unelevated'), or why it failed
 
     # Per-user record: Full access, Studio's own model and effort, the threads of each course, newest first, and for
     # each chat begun on the library page the courses the library had then, so the course it makes can be told apart.
@@ -220,10 +231,7 @@ class Studio:
                 'effort': effort if effort in EFFORTS else ''}
 
     def _save(self, data):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
-        os.replace(temporary, self.path)
+        write_json(self.path, data)
 
     def _record(self, course, thread, keep=True):
         with self.lock:
@@ -258,7 +266,7 @@ class Studio:
             try:
                 server = AppServer(command, self.root or Path.home(), self._message, self._exit)
             except OSError as exc:
-                raise StudioError('studio_unavailable', 'Codex CLI not found; install Codex or set CODEX_CLI_PATH') from exc
+                raise StudioError('studio_unavailable', NOT_FOUND) from exc
             try:
                 server.call('initialize', {'clientInfo': {'name': CLIENT, 'title': 'Throughline Studio', 'version': '1'},
                                            'capabilities': {'experimentalApi': True}})
@@ -270,8 +278,8 @@ class Studio:
                         if exc.code == 'studio_unsupported':
                             self.missing = 'Studio needs a newer Codex; update Codex to use it'
                             raise StudioError('studio_unavailable', self.missing) from exc
-                if self.forced is None:
-                    self.forced = os.name == 'nt' and self._readiness(server) != 'ready'
+                if self.unsandboxed is None:
+                    self.unsandboxed = self.windows and self._readiness(server) != 'ready'
             except StudioError:
                 server.close()
                 raise
@@ -284,6 +292,33 @@ class Studio:
             return server.call('windowsSandbox/readiness', {}, timeout=10).get('status')
         except StudioError:
             return None
+
+    def set_up_sandbox(self):
+        """Ask Codex to set up its Windows sandbox, as Codex's app does: with administrator rights, which Windows
+        asks the learner for, and without them if that fails. Settings hears how it went from a studio event."""
+        server = self._server()
+        if not self.unsandboxed:
+            return self.access()
+        self.setup = 'elevated'
+        self._start_setup(server, 'elevated')
+        return self.access()
+
+    def _start_setup(self, server, mode):
+        try:
+            server.call('windowsSandbox/setupStart', {'mode': mode, 'cwd': str(self.root or Path.home())}, timeout=30)
+        except StudioError as exc:
+            self._setup_done(mode, False, str(exc))
+
+    def _setup_done(self, mode, success, error=None):
+        if success or (self.server and self._readiness(self.server) == 'ready'):
+            self.unsandboxed, self.setup = False, None
+        elif mode == 'elevated' and self.server:
+            self.setup = 'unelevated'
+            threading.Thread(target=self._start_setup, args=(self.server, 'unelevated'), name='studio-sandbox', daemon=True).start()
+            return
+        else:
+            self.setup = 'failed: ' + (error or 'Codex could not set up its sandbox')
+        self.events.publish({'type': 'studio', 'method': 'studio/access', 'params': self.access()})
 
     def _exit(self, server):
         with self.lock:
@@ -305,6 +340,11 @@ class Studio:
                 self.events.publish({'type': 'studio', 'method': 'studio/request', 'params': entry})
             elif self.server:
                 self.server.refuse(message['id'], 'Throughline Studio does not handle this request')
+            return
+        if method == 'windowsSandbox/setupCompleted':
+            # Readiness is asked from a thread of its own: this one reads the App Server's replies.
+            threading.Thread(target=self._setup_done, args=(params.get('mode'), params.get('success'), params.get('error')),
+                             name='studio-sandbox', daemon=True).start()
             return
         if method == 'serverRequest/resolved':
             resolved = self.pending.pop(str(params.get('requestId')), None)
@@ -337,12 +377,14 @@ class Studio:
 
     def access(self):
         saved = self._config()['full_access']
-        return {'full_access': saved or bool(self.forced), 'saved': saved, 'forced': bool(self.forced)}
+        failed = (self.setup or '').startswith('failed: ')
+        return {'full_access': saved, 'saved': saved, 'sandbox_missing': bool(self.unsandboxed),
+                'setting_up': bool(self.setup) and not failed, 'setup_error': self.setup[8:] if failed else None}
 
     def checked_access(self):
         """Access as Settings shows it. On Windows, whether Codex's sandbox is ready is only known from Codex, so
         this starts the App Server once if nothing has yet."""
-        if os.name == 'nt' and self.forced is None:
+        if self.windows and self.unsandboxed is None:
             try:
                 self._server()
             except StudioError:
@@ -509,6 +551,10 @@ class Studio:
     def send(self, course, thread, items):
         """Start a turn with the learner's message, or steer the running one with it, as Codex does. A new chat's
         first message also has its title written beside the turn."""
+        self._server()  # also learns whether Windows has Codex's sandbox
+        if self.unsandboxed and not self.access()['full_access']:
+            raise StudioError('studio_needs_sandbox', "Codex's sandbox is not set up on this Windows computer. Set it up, "
+                                                      'or choose Full access to let Codex work without it.')
         fresh = thread is None
         if fresh:
             thread = self.start(course)

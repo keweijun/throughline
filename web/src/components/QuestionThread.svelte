@@ -39,7 +39,8 @@
   $effect(() => {
     if (app.focusThread !== question.id || !node || !app.panelShown) return;
     open = true;
-    requestAnimationFrame(() => node!.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    // By the next frame the thread may have been drawn again, say for the section the learner went back to.
+    requestAnimationFrame(() => node?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     flash = true;
     app.focusThread = null;
     const timer = setTimeout(() => (flash = false), 1600);

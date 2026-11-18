@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import time
@@ -38,6 +39,28 @@ def legacy_roots():
 def state_dir():
     """Host bookkeeping, kept out of sight inside the library."""
     return default_root() / '.throughline'
+
+
+def host_key():
+    """The secret a browser or command shows to use the host, so other people's programs on a shared computer can't.
+
+    Kept across launches, so a tab left open keeps working when the host restarts on the same port (an update), and
+    readable only by this user: the program that reads it could read the courses anyway."""
+    path = state_dir() / 'host-key'
+    try:
+        key = path.read_text(encoding='ascii').strip()
+        if re.fullmatch(r'[0-9a-f]{64}', key):
+            return key
+    except (OSError, UnicodeDecodeError):
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(32)
+    partial = path.with_name(f'host-key.{os.getpid()}.partial')
+    descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, 'w', encoding='ascii') as out:
+        out.write(key)
+    os.replace(partial, path)
+    return key
 
 
 def acquire_lease(workspace):
@@ -88,8 +111,17 @@ def fingerprint(path):
     return hashlib.sha256(repr(rows).encode()).hexdigest()
 
 
+# How long after a database file was written its stamp is trusted. A file's modification time moves in ticks of the
+# file system's clock (a few milliseconds, up to two seconds on FAT), and once the write-ahead log has wrapped, a
+# commit rewrites it at the same size; two commits within one tick then leave the same stamp.
+SETTLED = 2
+
+
 def stamp(path):
-    """The course database files' sizes and modification times: every commit changes the database or its log."""
+    """The course database files' sizes and modification times, which every commit changes, or None while a file was
+    written too recently for a later commit to be told apart: what was read under a stamp is reused only while the
+    stamp is the same."""
+    now = time.time_ns()
     def stat(file):
         try:
             info = file.stat()
@@ -97,7 +129,10 @@ def stamp(path):
             return None
         return (info.st_mtime_ns, info.st_size) if info.st_size else None  # an empty log holds nothing
     database = Path(path) / 'course.sqlite3'
-    return stat(database), stat(database.with_name('course.sqlite3-wal'))
+    stamps = stat(database), stat(database.with_name('course.sqlite3-wal'))
+    if any(s and now - s[0] < SETTLED * 10**9 for s in stamps):
+        return None
+    return stamps
 
 
 # Each course's summary and the database stamp it was read at: the library lists every course on each visit, and most
@@ -110,7 +145,7 @@ def summary(path):
     path = Path(path).resolve()
     taken = stamp(path)  # before reading, so a write during the read is seen next time
     cached = _summaries.get(path)
-    if cached and cached[0] == taken:
+    if cached and taken is not None and cached[0] == taken:
         return dict(cached[1])
     value = _summary(path)
     _summaries[path] = (taken, value)

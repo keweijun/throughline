@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, expect, editorText, courseOperation } from './fixture';
 
 /** Studio (ADR 0016) against the scripted App Server in tests/fake_studio_server.py. */
@@ -415,7 +417,10 @@ test('a library chat reloaded while it makes a course still moves into that cour
 });
 
 test('a long turn can be read back while it runs, then folds behind its answer, and the chat gets a title', async ({ page, course }) => {
-  const { errors } = await course('studio_browser_fixture');
+  const { base, errors } = await course('studio_browser_fixture');
+  // The fake Codex keeps printing output until this file exists beside its log, in the folder holding the library.
+  const { root } = await (await page.request.get(`${base}/api/library`)).json();
+  const release = path.join(path.dirname(root), 'busy.release');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
   const frame = panel.locator('.studio-frame');
@@ -437,6 +442,7 @@ test('a long turn can be read back while it runs, then folds behind its answer, 
   expect(await page.locator('#stage').evaluate((s) => s.scrollTop)).toBe(stage);
 
   // The answer arrives and the work before it folds behind how long it took, as in Codex.
+  fs.writeFileSync(release, '');
   await expect(panel.locator('.said-by-codex:not(.commentary)')).toHaveText('All parts are built.', { timeout: 20_000 });
   const fold = panel.getByRole('button', { name: /^Worked for \d+s$/ });
   await expect(fold).toHaveAttribute('aria-expanded', 'false');
@@ -515,5 +521,33 @@ test('chats are listed beside Studio on a wide page, and pinned above the transc
   expect((await stop.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
   expect((await stop.boundingBox())!.x).toBeLessThan((await send.boundingBox())!.x);
   await stop.click();
+  expect(errors).toEqual([]);
+});
+
+test('on Windows without Codex sandbox, Studio asks before working with Full access', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  // The fixture's Codex has its sandbox; this one reports it missing, as on a Windows computer that never set it up.
+  const missing = { full_access: false, saved: false, sandbox_missing: true, setting_up: false, setup_error: null };
+  await page.route(/\/api\/studio(\/access)?(\?.*)?$/, async (route) => {
+    const response = await route.fetch();
+    const view = await response.json();
+    const access = view.access ?? view;
+    const shown = access.full_access ? access : missing;
+    await route.fulfill({ response, json: view.access ? { ...view, access: shown } : shown });
+  });
+  await page.route('**/api/studio/sandbox', (route) =>
+    route.fulfill({ json: { ...missing, setup_error: 'The learner declined' } }));
+  await page.locator('#open-course').click();
+  const card = page.getByRole('region', { name: "Codex's sandbox" });
+  await expect(card).toContainText('not set up on this Windows computer');
+
+  await card.getByRole('button', { name: 'Set up the sandbox' }).click();
+  await expect(card.getByRole('status')).toHaveText('The sandbox was not set up: The learner declined');
+  await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible();
+
+  // Full access is the learner's choice, then the card goes and the access chip says so.
+  await card.getByRole('button', { name: 'Use Full access' }).click();
+  await expect(card).toBeHidden();
+  await expect(page.locator('#studio-access')).toHaveText('Full access');
   expect(errors).toEqual([]);
 });

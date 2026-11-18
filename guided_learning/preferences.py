@@ -25,7 +25,9 @@ def save(store, request):
         changes['language'] = validate_language(request['language'])
     if not changes:
         raise OperationError('invalid_request', 'Give language')
-    store.put('course', 'preferences', {**view(store, request)['preferences'], **changes})
+    # Onto what is stored, not the view: a key this version does not know (a newer Throughline's) is kept.
+    stored = store.get('course', 'preferences', {})
+    store.put('course', 'preferences', {**DEFAULTS, **(stored if isinstance(stored, dict) else {}), **changes})
     return view(store, request)
 
 

@@ -1,5 +1,6 @@
 """HTTP surface of the learning host. Loopback only; course operations stay the state authority."""
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -16,7 +17,7 @@ from typing import Any, Literal, Optional, Union
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.background import BackgroundTask
@@ -280,7 +281,7 @@ class Courses:
         for path in paths:
             stamp = library.stamp(path)  # taken before reading, so a write during the read shows at the next poll
             known = self._stamps.get(path)
-            stamps[path] = known if known and known[0] == stamp else (stamp, library.fingerprint(path))
+            stamps[path] = known if known and stamp is not None and known[0] == stamp else (stamp, library.fingerprint(path))
         self._stamps = stamps
         return {path: fingerprint for path, (_, fingerprint) in stamps.items()}
 
@@ -411,9 +412,10 @@ class ActiveHost:
 
 
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None,
-               launcher=None, checks=None, opener=None):
+               launcher=None, checks=None, opener=None, key=None):
     """`launcher`, `checks` (a `CodexStatus`) and `opener` (a `files.Opener`) stand in for this computer's launcher,
-    Codex and file manager in tests."""
+    Codex and file manager in tests. With a `key` (`library.host_key()`), the API answers only a browser signed in
+    with it, by opening `/?key=…`, or a request that sends it in `X-Throughline-Key`."""
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     seen = Seen(courses.settings.path.with_name('seen.json'))
     launcher = launcher or Launcher()
@@ -424,6 +426,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     host = ActiveHost(courses)
     allowed = {f'127.0.0.1:{port}', f'localhost:{port}'}
     origins = {'http://' + h for h in allowed}
+    cookie = f'throughline-key-{port}'  # cookies ignore the port, and another library's host has its own key
+
+    def signed_in(request):
+        shown = request.cookies.get(cookie) or request.headers.get('x-throughline-key') or ''
+        return hmac.compare_digest(shown.encode(), key.encode())
 
     @asynccontextmanager
     async def lifespan(app):
@@ -460,6 +467,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         site = request.headers.get('sec-fetch-site')
         if request.url.path.startswith('/api/') and site is not None and site not in ('same-origin', 'none'):
             return JSONResponse({'error': 'Invalid local origin'}, 403)
+        # Any program on this computer can reach loopback; the key keeps out other people's on a shared one.
+        if key and request.url.path.startswith('/api/') and request.url.path != '/api/health' and not signed_in(request):
+            return JSONResponse({'error': 'This browser is not signed in to Throughline. Open Throughline from its launcher, '
+                                          'or run "guided-learning open".', 'code': 'not_signed_in'}, 401)
         content_type = request.headers.get('content-type', '').split(';')[0].strip()
         if has_body and size and not upload and not (content_type.startswith('image/') if image else content_type == 'application/json'):
             return JSONResponse({'error': 'An image is required' if image else 'JSON required'}, 415)
@@ -905,6 +916,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         courses.events.publish({'type': 'changed', 'scope': 'settings'})
         return result
 
+    @app.post('/api/studio/sandbox')
+    def studio_sandbox():
+        """Set up Codex's Windows sandbox, so Studio can run with Library access."""
+        return studio.set_up_sandbox()
+
     @app.put('/api/studio/model')
     def studio_choice(body: StudioChoice):
         """Studio's own model and effort, from the next turn on; empty follows the teacher's."""
@@ -1022,7 +1038,14 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         app.mount('/assets', StaticFiles(directory=DIST / 'assets'), name='assets')
 
     @app.get('/')
-    def index():
+    def index(request: Request):
+        given = request.query_params.get('key')
+        if key and given is not None:
+            # Sign this browser in and take the key out of the address bar and history.
+            response = RedirectResponse('/', 303)
+            if hmac.compare_digest(given.encode(), key.encode()):
+                response.set_cookie(cookie, key, max_age=400 * 24 * 3600, httponly=True, samesite='strict')
+            return response
         if not (DIST / 'index.html').is_file():
             return JSONResponse({'error': 'The interface is not built. Run npm run build in web/.'}, 503)
         return FileResponse(DIST / 'index.html')
@@ -1035,17 +1058,22 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
 
 def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None,
-          launcher=None, checks=None, opener=None):
+          launcher=None, checks=None, opener=None, key=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if os.name == 'nt':
+        # Windows' SO_REUSEADDR would let another program bind the same port and take the learner's requests.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    else:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # rebinding right after a restart
     sock.bind(('127.0.0.1', port))
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
     app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
-                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener)
-    server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
+                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener, key=key)
+    # log_config=None: uvicorn's own warnings reach the host log rather than a console nobody sees.
+    server = uvicorn.Server(uvicorn.Config(app, log_level='warning', log_config=None, timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:
         on_ready(actual)

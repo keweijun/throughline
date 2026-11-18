@@ -469,7 +469,9 @@ class PreparedSteps(LessonHost):
         self.until(lambda: self.read(prepared)['status'] == 'completed', 'the next step is written without Continue')
         self.assertIn('This reply teaches step 2:', self.runner.prompts[1])
         state = self.state()
-        self.assertEqual([t['id'] for t in state['turns']], ['one'], 'a prepared step is not in the state the interface reads')
+        # Preparing the next section starts once the lesson does, and may have begun by now.
+        self.assertEqual([t['id'] for t in state['turns'] if t['channel'] != 'preparation'], ['one'],
+                         'a prepared step is not in the state the interface reads')
         self.assertEqual([s.get('turn_id') for s in state['lessons'][0]['steps']], ['one', None, None], 'nor counted as taught')
         self.assertFalse({'stream:' + prepared, 'stream-user:' + prepared} & self.interactions(), 'nor an interaction the teacher sees')
         self.assertEqual(self.generated(), [])
@@ -572,25 +574,22 @@ class PreparedSteps(LessonHost):
         self.assertNotIn('prepared', self.lesson(), 'leaving the section drops it')
 
     def test_continue_reveals_a_written_step_at_once(self):
-        """Timing with a model that takes DELAY seconds per step: reading for longer than that, Continue shows the next
-        step complete; with nothing prepared, the learner waits the whole step."""
-        DELAY = .8  # long enough that a slow CI runner still tells a shown step from a written one
+        """With a model that takes DELAY seconds per step: once the next step is written while the learner reads,
+        Continue shows it complete, without waiting for the model; with nothing prepared, the learner waits the whole
+        step."""
+        DELAY = .5
         self.runner.delay = DELAY
-        self.begin()
-        time.sleep(DELAY + .2)  # the learner reads step one
-        start = time.monotonic()
-        self.proceed('two')
+        prepared = self.begin()
+        self.until(lambda: self.read(prepared)['status'] == 'completed', 'the next step is written while the learner reads')
+        revealed = self.proceed('two')['turn']
+        self.assertEqual((revealed['id'], revealed['status']), (prepared, 'completed'), 'Continue shows the written step')
         self.finish('two')
-        revealed = time.monotonic() - start
         settle(self.host)
         self.host.navigation.discard_prepared()  # as a pause would
         start = time.monotonic()
-        self.proceed('three')
+        self.assertEqual(self.proceed('three')['turn']['status'], 'running', 'with nothing prepared, Continue starts the step')
         self.finish('three')
-        written = time.monotonic() - start
-        self.assertLess(revealed, DELAY / 4, (revealed, written))
-        self.assertGreaterEqual(written, DELAY)
-
+        self.assertGreaterEqual(time.monotonic() - start, DELAY)
 
 if __name__ == '__main__':
     unittest.main()

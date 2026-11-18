@@ -3,13 +3,14 @@
   import type { EditorView } from '@codemirror/view';
   import { insertChip, type ChipRange } from '../lib/editor';
   import { t, type MessageKey } from '../lib/i18n.svelte';
-  import { api } from '../lib/api';
+  import { api, ApiError } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { untrack } from 'svelte';
   import { studio, type StudioMessage, type StudioScope } from '../lib/studio.svelte';
   import Composer from './Composer.svelte';
   import StudioTurn from './StudioTurn.svelte';
   import StudioRequest from './StudioRequest.svelte';
+  import StudioSandbox from './StudioSandbox.svelte';
   import CodexLink from './CodexLink.svelte';
   import StudioControls from './StudioControls.svelte';
 
@@ -164,7 +165,9 @@
     try {
       await studio.send({ ...sent, images: attached });
     } catch (e) {
-      app.error = e instanceof Error ? e.message : String(e);
+      // Without Windows' sandbox, the choice to make shows in the transcript rather than as an error.
+      if (e instanceof ApiError && e.code === 'studio_needs_sandbox') void studio.loadAccess();
+      else app.error = e instanceof Error ? e.message : String(e);
       if (!app.drafts.get(key)) app.drafts.set(key, text);
       if (!app.drafts.images(key).length) app.drafts.setImages(key, attached);
     }
@@ -339,6 +342,7 @@
     {#each studio.pending as request, i (request.id)}
       <StudioRequest {request} focus={active && i === 0} />
     {/each}
+    {#if studio.available}<StudioSandbox />{/if}
     {#if studio.error && studio.available}<p class="error" role="alert">{studio.error}</p>{/if}
   </div>
 

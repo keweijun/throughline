@@ -1,4 +1,4 @@
-import { test, expect, dragSelect, editorText } from './fixture';
+import { test, expect, dragSelect, editorText, untilStill } from './fixture';
 
 test('highlight and note a lesson passage, bookmark the section, and find them in Notes', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
@@ -42,7 +42,10 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await expect.poll(() => editorText(sectionNote)).toBe('Overall:\nrevisit\ninterference');
   await sectionNote.press('Control+Enter');
   await expect.poll(() => editorText(sectionNote)).toBe('');
-  await expect(page.locator('.notes-panel .item.note')).toContainText('revisit');
+  const added = page.locator('.notes-panel .item.note');
+  await expect(added).toContainText('revisit');
+  // Once saved, the box empties and the list scrolls smoothly to the new note in the next frame.
+  await untilStill(added, (item) => item.getBoundingClientRect().top);
 
   // A note is deleted after an inline confirmation beside it; a bookmark without a note goes at once.
   page.on('dialog', () => errors.push('native dialog'));

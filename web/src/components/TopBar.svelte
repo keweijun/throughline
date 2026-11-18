@@ -58,9 +58,11 @@
   const review = $derived(app.state?.review);
 
   // The side panel's views are switched only from here: picking another view swaps it, picking the open one closes the panel.
-  const showing = (tab: PanelTab) => studying && app.panelShown && app.panelTab === tab;
+  // The Overview has no side panel: Source is its Sources tab, and Questions and Notes go back to Learn (ADR 0017).
+  const showing = (tab: PanelTab) =>
+    studying && (app.courseOpen ? tab === 'source' && app.coursePart === 'sources' : app.panelShown && app.panelTab === tab);
   function toggle(tab: PanelTab) {
-    if (showing(tab)) app.panelOpen = false;
+    if (showing(tab) && !app.courseOpen) app.panelOpen = false;
     else app.openPanel(tab);
   }
 </script>

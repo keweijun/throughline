@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
-  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack, type Snippet } from 'svelte';
   import type { PDFDocumentProxy, PDFPageProxy, PageViewport, RenderTask } from 'pdfjs-dist/legacy/build/pdf.mjs';
   import { openPdf, pdfjs } from '../lib/pdf';
   import { mark, clear, type Passage } from '../lib/highlight';
@@ -13,6 +13,7 @@
     highlights = [],
     pageImages = null,
     current = $bindable(target),
+    tools,
   }: {
     url: string;
     /** Identifies the file whatever page the URL was asked for, so the loaded document is reused. */
@@ -23,6 +24,8 @@
     /** Pages rendered by the host, shown when the browser cannot open the PDF itself (one of 2 GB or more, say). */
     pageImages?: { count: number; url: (page: number) => string } | null;
     current?: number;
+    /** What the reader around it offers for the document, such as a bookmark, at the toolbar's end. */
+    tools?: Snippet;
   } = $props();
 
   let scroller: HTMLDivElement | undefined = $state();
@@ -100,22 +103,38 @@
       release.observe(element);
     }
     width = scroller.clientWidth;
-    // A hidden reader (another panel view, the panel closed) measures nothing; it keeps the width it was shown at.
+    // A hidden reader (another panel view, the panel closed) measures nothing; it keeps the width it was shown at, and
+    // lands on a page it was sent to meanwhile once it is shown.
     resize = new ResizeObserver(() => {
-      if (scroller!.clientWidth) width = scroller!.clientWidth;
+      if (!scroller!.clientWidth) return;
+      width = scroller!.clientWidth;
+      if (waiting === null) return;
+      const page = waiting;
+      waiting = null;
+      void tick().then(() => go(page, 'instant'));
     });
     resize.observe(scroller);
     await tick();
     ready = true;
   });
 
-  // Open at the cited page, and follow later citations into the same document without rebuilding the reader.
+  // Open at the cited page, and follow later citations into the same document without rebuilding the reader. A hidden
+  // reader has no layout to scroll, so it waits to be shown (a document opened on the Overview while Learn's panel
+  // holds its own reader of it, say).
   let landed = false;
+  let waiting: number | null = null;
   $effect(() => {
     const page = target;
     if (!ready) return;
-    untrack(() => go(page, landed ? 'smooth' : 'instant'));
-    landed = true;
+    untrack(() => {
+      if (!scroller!.clientHeight) {
+        waiting = current = page;
+        pageInput = String(page);
+        return;
+      }
+      go(page, landed ? 'smooth' : 'instant');
+      landed = true;
+    });
   });
 
   function markPage(number: number) {
@@ -373,6 +392,7 @@
     {#if current !== target}
       <button class="btn btn-small cited-jump" onclick={() => go(target)}>{t("Back to cited page")}</button>
     {/if}
+    {#if tools}<div class="group tools">{@render tools()}</div>{/if}
   </div>
 
   <!-- Focusable so the pages can be scrolled with the keyboard. -->
@@ -455,6 +475,10 @@
 
   .cited-jump {
     border-color: var(--marker);
+  }
+
+  .tools {
+    margin-left: auto;
   }
 
   .pages {

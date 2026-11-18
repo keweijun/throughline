@@ -11,8 +11,12 @@
 
   let container: HTMLElement | undefined = $state();
 
+  // Centres the cited line by scrolling the document's own box only; scrollIntoView would move the page around it too.
   onMount(() => {
-    container?.querySelector('.cited')?.scrollIntoView({ block: 'center' });
+    const cited = container?.querySelector('.cited');
+    if (!container || !cited) return;
+    const line = cited.getBoundingClientRect();
+    container.scrollTop += line.top - container.getBoundingClientRect().top - (container.clientHeight - line.height) / 2;
   });
 
   $effect(() => {

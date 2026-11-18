@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.51.0
+
+- On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.
+- A document chosen on the Overview's Sources tab opens right there and fills the page, with the list of sources in a column beside it. Links to a source in Studio open there too. The Overview no longer shows the side panel: Source opens the Sources tab, and Questions and Notes take you back to Learn with that panel open.
+- The reader's header takes one line: the document, the place in it, and whether it was checked. The note on a location not yet checked opens from its status, and Bookmark and Open original sit with the PDF's page and zoom controls.
+- A document you open on the Overview now opens at its cited page when you show it in Learn's panel. A Markdown source no longer scrolls the page around it when it opens.
+
 ## 0.50.2
 
 - A PDF in the reader stays on the line you were reading when you zoom it or change the panel's width. Before, it jumped to another place in the document, further the deeper you were in it.

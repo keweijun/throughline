@@ -2,10 +2,17 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
-## 0.49.4
+## 0.50.1
 
 - A PDF in the reader stays on the line you were reading when you zoom it or change the panel's width. Before, it jumped to another place in the document, further the deeper you were in it.
 - Zooming a long PDF no longer leaves pages blank: every page in view is drawn again at the new size.
+
+## 0.50.0
+
+- Share a course with someone, or keep a copy, from the course's Overview → **Share**: choose the route alone, the route with the lessons and exercises written so far (never your answers, progress or what the teacher remembers about you), or everything. The file always holds the course's source documents.
+- **Import a course** on the library, or drop a `.throughline` file on it, shows what the file holds and asks how to take it: continue where it was left (your own course from another computer, or a backup), start fresh, or start fresh keeping the sender's notes and questions to read. A shared lesson is shown step by step as you study it, with no wait for the teacher, and every section starts unstudied.
+- A shared course says what goal it was built for and offers to tell Studio yours. With Full access on, Studio warns that the course came from someone else.
+- From the command line: `guided-learning export <course> --level route|lessons|everything` and `guided-learning import <file> --fresh` or `--keep-notes`.
 
 ## 0.49.3
 

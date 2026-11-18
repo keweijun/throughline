@@ -89,6 +89,7 @@
     if (questionTurnIds(question).some((id) => app.isRunning(id))) return { label: t("Answering"), tone: 'accent', live: true };
     if (answer && answer.status !== 'completed') return { label: t(lessonStatus[answer.status].label), tone: lessonStatus[answer.status].tone };
     if (supplement && supplement.status !== 'completed') return { label: t(lessonStatus[supplement.status].label), tone: lessonStatus[supplement.status].tone };
+    if (question.from_sender) return { label: t("From the shared course"), tone: 'plain' };
     if (question.status === 'suggested') return { label: t("Foundation suggested"), tone: 'caution' };
     if (scheduled?.status === 'pending') return { label: t("Explanation pending"), tone: 'accent' };
     if (scheduled?.status === 'resolved') return { label: t("Explained"), tone: 'good' };
@@ -112,7 +113,8 @@
   <SuggestedChange turnId={turn.id} />
 {/snippet}
 
-<article class="thread" class:flash class:open id="thread-{question.id}" bind:this={node} data-question-id={question.id}>
+<!-- A question that came with a shared course (ADR 0020) takes no follow-ups: a passage asked about in it starts a new question. -->
+<article class="thread" class:flash class:open id="thread-{question.id}" bind:this={node} data-question-id={question.from_sender ? undefined : question.id}>
   <div class="head" bind:this={head}>
     <button
       class="toggle"

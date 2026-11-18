@@ -58,6 +58,8 @@ def list_annotations(store, request):
 def save(store, request):
     identifier = require_text(request, 'id')
     previous = store.get('annotations', identifier)
+    if previous and previous.get('from_sender'):
+        raise OperationError('read_only', "A note that came with a shared course is the sender's; it can be deleted but not changed")
     note = _text(request, 'note', MAX_NOTE)
     images = _images(store, request, previous)
     if previous:

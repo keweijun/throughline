@@ -1,4 +1,4 @@
-import { test, expect } from './fixture';
+import { test, expect, untilStill } from './fixture';
 
 test('preview never moves the learning position', async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
@@ -31,11 +31,13 @@ test('lesson streams, renders math safely, survives reload and opens sources', a
   await expect(page.locator('.source-view')).toContainText('Not checked yet');
 
   await page.locator('#close-aux').click();
+  // The wheel scrolls what is under the pointer: the lesson, once the panel has gone.
+  await expect(page.locator('#close-aux')).toBeHidden();
+  await page.locator('.lesson-body p').first().hover();
   await page.mouse.wheel(0, 1500);
-  await page.waitForTimeout(200);
   const scrolled = () => page.locator('#stage').evaluate((stage) => stage.scrollTop);
-  const before = await scrolled();
-  expect(before).toBeGreaterThan(0);
+  await expect.poll(scrolled).toBeGreaterThan(0);
+  const before = await untilStill(page.locator('#stage'), (stage) => stage.scrollTop);
   await page.evaluate(() => fetch('/api/preparation/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }));
   await page.waitForTimeout(600);
   expect(Math.abs((await scrolled()) - before)).toBeLessThan(3);

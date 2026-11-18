@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.53.2
+
+- The library notices every change to a course's title, route or sources, also two made within a moment of each other. Before, such a change could go unseen until the course changed again.
+- Going to another section right after a side question is answered no longer shows an error in the page.
+
 ## 0.51.0
 
 - On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.

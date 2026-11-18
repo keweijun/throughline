@@ -62,6 +62,31 @@ export async function dragSelect(page: Page, locator: ReturnType<Page['locator']
   return page.evaluate(() => window.getSelection()!.toString());
 }
 
+/**
+ * Waits until `measure` gives the same value on the element for three frames in a row, and returns it: a smooth
+ * scroll, or one the wheel started, has come to rest. A click while something scrolls lands on whatever passes under
+ * the pointer.
+ */
+export function untilStill<T extends Element>(locator: ReturnType<Page['locator']>, measure: (element: T) => number) {
+  return locator.evaluate(
+    (element, source) =>
+      new Promise<number>((done) => {
+        const read = new Function(`return (${source})`)() as (element: Element) => number;
+        let last = NaN;
+        let still = 0;
+        const frame = () => {
+          const value = read(element);
+          still = value === last ? still + 1 : 0;
+          last = value;
+          if (still >= 3) done(value);
+          else requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+    measure.toString(),
+  );
+}
+
 /** Language lives in the Settings dialog, under Appearance, its first pane; choose it there and close the dialog again. */
 export async function chooseLanguage(page: Page, language: 'en' | 'zh-CN') {
   await page.getByRole('button', { name: /^(Settings|设置)$/ }).click();

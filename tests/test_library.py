@@ -4,8 +4,10 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
 
@@ -14,6 +16,8 @@ from fastapi.testclient import TestClient
 from guided_learning.api import execute
 from guided_learning.server import Host, create_app
 from guided_learning.server import host as host_module
+from guided_learning.server.builds import ChapterBuilds
+from guided_learning.server.features import Preparation
 from guided_learning.server.settings import TeacherSettings
 from support import ROOT
 
@@ -28,6 +32,53 @@ def cli(home, *args, stdin='', **extra):
            'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata')}
     return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
+
+
+def written_ago(path, seconds):
+    """Date the course database's files back, as for a course last written that long ago."""
+    for file in (Path(path) / 'course.sqlite3', Path(path) / 'course.sqlite3-wal'):
+        if file.exists():
+            then = file.stat().st_mtime - seconds
+            os.utime(file, (then, then))
+
+
+@contextmanager
+def watched(root, also=()):
+    """The app on a library holding the course `alpha`, open, and the courses `also`, all last written a while ago; with
+    what the app publishes and `polls()`, which returns once the library watcher has made a whole poll that began after
+    the call. The host's preparation and chapter builds do not run: they write to the course and publish on their own
+    schedule, which a slow computer stretches into the test's."""
+    for name in ('alpha', *also):
+        course(Path(root) / name, name.title())
+    config = tempfile.TemporaryDirectory()
+    with config, mock.patch.object(Preparation, 'start'), mock.patch.object(ChapterBuilds, 'start'):
+        app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config.name) / 's.json'),
+                         library_root=root, watch_interval=0.01)
+        for name in ('alpha', *also):
+            written_ago(Path(root) / name, 10)
+        courses = app.state.courses
+        events = []
+        courses.events.publish = events.append
+        done = threading.Condition()
+        count = [0]
+        fingerprints = courses._fingerprints
+
+        def counted():  # the watcher's poll begins here, then announces what it found
+            with done:
+                count[0] += 1
+                done.notify_all()
+            return fingerprints()
+        courses._fingerprints = counted
+
+        def polls():
+            # The poll under way may have looked before the call; the next one begins after it, and has announced
+            # what it found once the one after that begins.
+            with done:
+                target = count[0] + 2
+                if not done.wait_for(lambda: count[0] >= target, timeout=60):
+                    raise AssertionError('the library watcher stopped polling')
+        with TestClient(app, base_url='http://127.0.0.1:8765'):
+            yield app, events, polls
 
 
 class Idle:
@@ -99,51 +150,28 @@ class CourseLibrary(unittest.TestCase):
             self.assertIn('Kept your own', again.stdout)
 
     def test_codex_changes_reach_open_tabs(self):
-        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
-            course(Path(root) / 'alpha', 'Alpha')
-            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
-                             library_root=root, watch_interval=0.05)
-            with TestClient(app, base_url='http://127.0.0.1:8765'):
-                events = []
-                app.state.courses.events.publish = events.append
-
-                def wait_for(scope):
-                    for _ in range(100):
-                        if {'type': 'changed', 'scope': scope} in events:
-                            return True
-                        time.sleep(0.05)
-                    return False
-                course(Path(root) / 'beta', 'Beta')
-                self.assertTrue(wait_for('library'), events)
-                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'another course changing leaves the open one alone')
-                execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
-                self.assertTrue(wait_for('state'), events)
-            # Closing waits for a poll in progress, which reads the courses' databases; Windows cannot remove a course
-            # folder while its database is open (#196).
-            self.assertFalse(app.state.courses.watcher.is_alive())
+        with tempfile.TemporaryDirectory() as root, watched(root) as (app, events, polls):
+            course(Path(root) / 'beta', 'Beta')
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'library'}, events)
+            self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'another course changing leaves the open one alone')
+            execute(Path(root) / 'alpha', {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'state'}, events)
+        # Closing waits for a poll in progress, which reads the courses' databases; Windows cannot remove a course
+        # folder while its database is open (#196).
+        self.assertFalse(app.state.courses.watcher.is_alive())
 
     def test_the_hosts_own_writes_do_not_reload_its_tabs(self):
-        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
-            course(Path(root) / 'alpha', 'Alpha')
-            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
-                             library_root=root, watch_interval=0.05)
-            with TestClient(app, base_url='http://127.0.0.1:8765'):
-                events = []
-                app.state.courses.events.publish = events.append
-
-                def wait_for(scope):
-                    for _ in range(100):
-                        if {'type': 'changed', 'scope': scope} in events:
-                            return True
-                        time.sleep(0.05)
-                    return False
-                route = {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []}
-                app.state.courses.host.operation(route)
-                self.assertTrue(wait_for('library'), events)
-                time.sleep(0.2)
-                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'the host announces its own changes')
-                execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
-                self.assertTrue(wait_for('state'), events)
+        with tempfile.TemporaryDirectory() as root, watched(root) as (app, events, polls):
+            route = {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []}
+            app.state.courses.host.operation(route)
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'library'}, events)
+            self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'the host announces its own changes')
+            execute(Path(root) / 'alpha', {**route, 'concepts': route['concepts'] + [{'id': 'last', 'title': 'Last'}], 'route': ['state', 'more', 'last']})
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'state'}, events)
 
     def test_codexs_write_during_one_of_the_hosts_is_still_its_own_change(self):
         with tempfile.TemporaryDirectory() as root:
@@ -169,42 +197,48 @@ class CourseLibrary(unittest.TestCase):
 
     def test_codex_changes_beyond_the_route_reach_open_tabs(self):
         # Studio adds exercises and notes memory through the skill, outside the host; the open course shows them at once.
-        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
-            course(Path(root) / 'alpha', 'Alpha')
-            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
-                             library_root=root, watch_interval=0.05)
-            with TestClient(app, base_url='http://127.0.0.1:8765'):
-                events = []
-                app.state.courses.events.publish = events.append
-
-                def wait_for_state():
-                    for _ in range(100):
-                        if {'type': 'changed', 'scope': 'state'} in events:
-                            return True
-                        time.sleep(0.05)
-                    return False
-                for op in ('course.status', 'practice.list', 'memory.view', 'review.context'):
-                    execute(Path(root) / 'alpha', {'op': op})
-                time.sleep(0.3)
-                self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'reading the course changes nothing')
-                execute(Path(root) / 'alpha', {'op': 'practice.add', 'id': 'ps1', 'concept_id': 'state',
-                                               'exercises': [{'question': 'Normalise a state.', 'origin': 'self_created'}]})
-                self.assertTrue(wait_for_state(), events)
-                self.assertNotIn({'type': 'changed', 'scope': 'library'}, events, 'the library shows nothing exercises change')
-                events.clear()
-                execute(Path(root) / 'alpha', {'op': 'memory.note', 'turn_id': 't', 'concept_id': 'state', 'interaction_ids': [],
-                                               'note': {'entries': [{'kind': 'taught_term', 'text': 'ket'}]}})
-                self.assertTrue(wait_for_state(), events)
+        with tempfile.TemporaryDirectory() as root, watched(root) as (app, events, polls):
+            for op in ('course.status', 'practice.list', 'memory.view', 'review.context'):
+                execute(Path(root) / 'alpha', {'op': op})
+            polls()
+            self.assertNotIn({'type': 'changed', 'scope': 'state'}, events, 'reading the course changes nothing')
+            execute(Path(root) / 'alpha', {'op': 'practice.add', 'id': 'ps1', 'concept_id': 'state',
+                                           'exercises': [{'question': 'Normalise a state.', 'origin': 'self_created'}]})
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'state'}, events)
+            self.assertNotIn({'type': 'changed', 'scope': 'library'}, events, 'the library shows nothing exercises change')
+            events.clear()
+            execute(Path(root) / 'alpha', {'op': 'memory.note', 'turn_id': 't', 'concept_id': 'state', 'interaction_ids': [],
+                                           'note': {'entries': [{'kind': 'taught_term', 'text': 'ket'}]}})
+            polls()
+            self.assertIn({'type': 'changed', 'scope': 'state'}, events)
 
     def test_a_course_summary_is_read_again_only_after_the_course_changes(self):
         from guided_learning import library
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / 'alpha'
             course(path, 'Alpha')
+            written_ago(path, 10)
             self.assertEqual(library.summary(path)['concepts'], 1)
             with mock.patch.object(library, '_summary', side_effect=AssertionError('read again')):
                 self.assertEqual(library.summary(path)['title'], 'Alpha')
             execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
+            self.assertEqual(library.summary(path)['concepts'], 2)
+
+    def test_a_commit_that_leaves_the_files_stamp_as_it_was_is_still_seen(self):
+        # Within one tick of the file system's clock, and once the write-ahead log has wrapped, a commit can leave the
+        # database files' modification times and sizes as they were; a course written that recently is read again.
+        from guided_learning import library
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'alpha'
+            course(path, 'Alpha')
+            files = [f for f in (path / 'course.sqlite3', path / 'course.sqlite3-wal') if f.exists()]
+            before = [(f.stat().st_mtime_ns, f.stat().st_size) for f in files]
+            self.assertEqual(library.summary(path)['concepts'], 1)
+            execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'S'}, {'id': 'b', 'title': 'B'}], 'route': ['state', 'b'], 'coverage': []})
+            for f, (mtime, _) in zip(files, before):
+                os.utime(f, ns=(mtime, mtime))
+            self.assertEqual([(f.stat().st_mtime_ns, f.stat().st_size) for f in files], before, 'the same stamp')
             self.assertEqual(library.summary(path)['concepts'], 2)
 
     def test_one_broken_course_is_listed_with_its_error_beside_the_others(self):
@@ -237,23 +271,14 @@ class CourseLibrary(unittest.TestCase):
 
     def test_the_watcher_reads_only_courses_whose_files_changed(self):
         from guided_learning import library
-        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
-            course(Path(root) / 'alpha', 'Alpha')
-            course(Path(root) / 'beta', 'Beta')
-            app = create_app(Path(root) / 'alpha', runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'),
-                             library_root=root, watch_interval=0.02)
+        with tempfile.TemporaryDirectory() as root, watched(root, also=['beta']) as (app, events, polls):
             read = []
             real = library.fingerprint
-            with TestClient(app, base_url='http://127.0.0.1:8765'), \
-                    mock.patch.object(library, 'fingerprint', side_effect=lambda p: read.append(Path(p).name) or real(p)):
-                time.sleep(0.3)
+            with mock.patch.object(library, 'fingerprint', side_effect=lambda p: read.append(Path(p).name) or real(p)):
+                polls()
                 self.assertEqual(read, [], 'idle courses are not read')
                 execute(Path(root) / 'beta', {'op': 'preferences.save', 'language': 'zh-CN'})
-                for _ in range(100):
-                    if read:
-                        break
-                    time.sleep(0.02)
-                time.sleep(0.1)
+                polls()
                 self.assertEqual(set(read), {'beta'})
 
     def test_host_switches_between_library_courses(self):

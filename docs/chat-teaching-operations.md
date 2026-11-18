@@ -1,6 +1,6 @@
 # Chat-teaching operations (deprecated)
 
-Teaching a course inside a Codex chat is deprecated (ADR 0004): the Throughline app teaches every lesson, side question and exercise, and the skill only builds courses and opens them. The operations below keep their names and semantics so existing scripts and courses keep working, but the skill no longer uses them and new features are not added to them. The app's own side questions use `branch.*` and its practice uses `practice.*`; `session.resume` reports both kinds of open question.
+Teaching a course inside a Codex chat is deprecated (ADR 0004): the Throughline app teaches every lesson, side question and exercise, and the skill only builds courses and opens them. The operations below keep their names and semantics so existing scripts and courses keep working, but the skill no longer uses them and new features are not added to them. They are frozen through 1.x and may be removed in 2.0 (`docs/stability.md`). The app's own side questions use `branch.*` and its practice uses `practice.*`; `session.resume` reports both kinds of open question.
 
 ## Teaching with a persistent mainline
 

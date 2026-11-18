@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import platform as host_platform
 import shutil
 import subprocess
 import sys
@@ -14,7 +15,7 @@ import uuid
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
-from . import library
+from . import library, logs
 from .codex import find_codex
 from .store import OperationError
 
@@ -306,9 +307,9 @@ def open_app():
     try:
         record = running() or _spawn(8765) or _spawn(0)
         if not record:
-            print(f'Throughline did not start; see {library.state_dir() / "host.log"}.')
+            print(f'Throughline did not start; see {logs.output_path()} and {logs.log_path()}.')
             return False
-        url = f"http://127.0.0.1:{record['port']}/"
+        url = app_url(record['port'])
         print(f'Throughline is open at {url}')
         # With no display, webbrowser would pick a console browser and take over the terminal Codex is reading.
         if platform() == 'linux' and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
@@ -319,10 +320,15 @@ def open_app():
         return False
 
 
+def app_url(port):
+    """The address that opens the library and signs the browser in."""
+    return f'http://127.0.0.1:{port}/?key={library.host_key()}'
+
+
 def _call(port, method, path, body=None, timeout=2):
     data = None if body is None else json.dumps(body).encode()
-    request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method,
-                                     headers={'Content-Type': 'application/json'} if data else {})
+    headers = {'X-Throughline-Key': library.host_key(), **({'Content-Type': 'application/json'} if data else {})}
+    request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read() or b'{}')
 
@@ -365,12 +371,13 @@ def detached():
 
 
 def _spawn(port):
-    log = library.state_dir() / 'host.log'
+    # What the host prints before its own log starts, a crash on import say; each launch starts it afresh.
+    log = logs.output_path()
     log.parent.mkdir(parents=True, exist_ok=True)
     command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
     launch_id = str(uuid.uuid4())
     options = {**detached(), 'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
-    with log.open('ab') as output:
+    with log.open('wb') as output:
         process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -387,7 +394,7 @@ def _spawn(port):
 def open_course(args):
     record = running() or _spawn(args.port) or _spawn(0)
     if not record:
-        print(f'The learning host did not start; see {library.state_dir() / "host.log"}.', file=sys.stderr)
+        print(f'The learning host did not start; see {logs.output_path()} and {logs.log_path()}.', file=sys.stderr)
         return 1
     if args.course:
         try:
@@ -395,7 +402,7 @@ def open_course(args):
         except (urllib.error.URLError, OSError) as exc:
             print(_error_text(exc), file=sys.stderr)
             return 1
-    url = f"http://127.0.0.1:{record['port']}/"
+    url = app_url(record['port'])
     print(f'Throughline is open at {url}')
     if not args.no_browser:
         try:
@@ -458,6 +465,8 @@ def doctor(args):
     launcher = launcher_path()
     host = running()
     print(f'Throughline {version()}')
+    print(f'  {host_platform.platform()}, Python {host_platform.python_version()} ({sys.executable})')
+    print(f'  Host log: {logs.log_path()}')
     found = checks.codex_checks()
     rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
             for check in found]

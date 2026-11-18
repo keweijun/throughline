@@ -333,8 +333,9 @@ class CourseLibrary(unittest.TestCase):
                 for _ in range(100):
                     if not (Path(home) / '.throughline' / 'host.json').exists():
                         try:
-                            # Windows can retain the child's log handle briefly after record cleanup.
-                            (Path(home) / '.throughline' / 'host.log').unlink(missing_ok=True)
+                            # Windows can retain the child's log handles briefly after record cleanup.
+                            for name in ('host-output.log', 'host.log'):
+                                (Path(home) / '.throughline' / name).unlink(missing_ok=True)
                             break
                         except PermissionError:
                             pass

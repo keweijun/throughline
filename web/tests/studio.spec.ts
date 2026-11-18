@@ -523,3 +523,31 @@ test('chats are listed beside Studio on a wide page, and pinned above the transc
   await stop.click();
   expect(errors).toEqual([]);
 });
+
+test('on Windows without Codex sandbox, Studio asks before working with Full access', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  // The fixture's Codex has its sandbox; this one reports it missing, as on a Windows computer that never set it up.
+  const missing = { full_access: false, saved: false, sandbox_missing: true, setting_up: false, setup_error: null };
+  await page.route(/\/api\/studio(\/access)?(\?.*)?$/, async (route) => {
+    const response = await route.fetch();
+    const view = await response.json();
+    const access = view.access ?? view;
+    const shown = access.full_access ? access : missing;
+    await route.fulfill({ response, json: view.access ? { ...view, access: shown } : shown });
+  });
+  await page.route('**/api/studio/sandbox', (route) =>
+    route.fulfill({ json: { ...missing, setup_error: 'The learner declined' } }));
+  await page.locator('#open-course').click();
+  const card = page.getByRole('region', { name: "Codex's sandbox" });
+  await expect(card).toContainText('not set up on this Windows computer');
+
+  await card.getByRole('button', { name: 'Set up the sandbox' }).click();
+  await expect(card.getByRole('status')).toHaveText('The sandbox was not set up: The learner declined');
+  await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible();
+
+  // Full access is the learner's choice, then the card goes and the access chip says so.
+  await card.getByRole('button', { name: 'Use Full access' }).click();
+  await expect(card).toBeHidden();
+  await expect(page.locator('#studio-access')).toHaveText('Full access');
+  expect(errors).toEqual([]);
+});

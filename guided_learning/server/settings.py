@@ -12,6 +12,22 @@ from ..store import OperationError
 EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
 
 
+def write_json(path, data):
+    """Write a per-user JSON file atomically, keeping any keys this version does not know, which a newer
+    Throughline (run before a downgrade, or beside this one) may have saved there. Returns the written object."""
+    path = Path(path)
+    try:
+        kept = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        kept = {}
+    merged = {**(kept if isinstance(kept, dict) else {}), **data}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    temporary.write_text(json.dumps(merged, indent=2), encoding='utf-8')
+    os.replace(temporary, path)
+    return merged
+
+
 def default_path():
     if os.environ.get('GUIDED_LEARNING_CONFIG'):
         return Path(os.environ['GUIDED_LEARNING_CONFIG'])
@@ -65,10 +81,7 @@ class TeacherSettings:
     def save(self, model, effort, small_model='', service_tier='', small_effort=''):
         data = _clean(model, effort, small_model, service_tier, small_effort)
         with self.lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.path.with_suffix('.tmp')
-            temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
-            os.replace(temporary, self.path)
+            write_json(self.path, data)
             self.override = {}
         return self.public()
 
@@ -106,8 +119,5 @@ class Seen:
             seen = self._saved()
             if item not in seen:
                 seen.append(item)
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                temporary = self.path.with_suffix('.tmp')
-                temporary.write_text(json.dumps({'seen': seen}, indent=2), encoding='utf-8')
-                os.replace(temporary, self.path)
+                write_json(self.path, {'seen': seen})
             return seen

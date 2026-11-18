@@ -31,8 +31,15 @@ test('the teacher suggests a preference inline, and the Overview lists the confi
   await taught.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(taught.locator('.katex')).toBeVisible();
 
-  page.once('dialog', (dialog) => dialog.accept());
+  // Deleting is confirmed beside the entry, never in a popup; Escape keeps it.
+  page.on('dialog', () => errors.push('native dialog'));
   await taught.locator('.item').getByRole('button', { name: 'Delete' }).click();
+  const confirmation = taught.getByRole('group', { name: /Delete this from the course memory/ });
+  await expect(confirmation.getByRole('button', { name: 'Delete' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(confirmation).toHaveCount(0);
+  await taught.locator('.item').getByRole('button', { name: 'Delete' }).click();
+  await confirmation.getByRole('button', { name: 'Delete' }).click();
   await expect(taught.locator('.item')).toHaveCount(0);
 
   await page.reload();

@@ -71,11 +71,15 @@ test('the last section links to the chapter page, whose recap is a lesson that n
 test('skipping a chapter moves on; its sections show as not studied and can be studied from there', async ({ page, course }) => {
   const { base, errors } = await course('chapters_browser_fixture');
   await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
-  page.once('dialog', (dialog) => {
-    expect(dialog.message()).toContain('Possible outcomes');
-    void dialog.accept();
-  });
+  // Skipping is confirmed beside its button, naming the later sections that build on the chapter, never in a popup.
+  page.on('dialog', () => errors.push('native dialog'));
   await page.getByRole('button', { name: 'Skip to the next chapter' }).click();
+  const confirmation = page.getByRole('group', { name: /Later sections build on this chapter/ });
+  await expect(confirmation).toContainText('Possible outcomes');
+  await confirmation.getByRole('button', { name: 'Keep studying it' }).click();
+  await expect(confirmation).toHaveCount(0);
+  await page.getByRole('button', { name: 'Skip to the next chapter' }).click();
+  await confirmation.getByRole('button', { name: 'Skip this chapter' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
   const rail = page.locator('#route');
   await rail.getByRole('button', { name: /Chapter 1 · States/ }).click();

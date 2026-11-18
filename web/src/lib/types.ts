@@ -425,7 +425,12 @@ export type LibraryCourse = {
   goal?: string | null;
   updated?: number;
   error?: string;
+  /** Left out of the library's list, under Archived courses (ADR 0022). */
+  archived?: boolean;
 };
+
+/** A course waiting in the library's trash (ADR 0022). */
+export type DeletedCourse = { id: string; name: string; title: string | null; deleted: number | null };
 
 /** A course started fresh from someone else's package (ADR 0020). */
 export type ImportedFrom = { title: string; level: ShareLevel; notes: boolean; at: number };
@@ -440,7 +445,7 @@ export type WaitingPackage = {
   built_for?: BuiltFor; sources: number; modes: ImportMode[];
 };
 
-export type Library = { root: string | null; active: string | null; courses: LibraryCourse[] };
+export type Library = { root: string | null; active: string | null; courses: LibraryCourse[]; trash?: DeletedCourse[]; trash_folder?: string | null };
 
 /** This computer's launcher, as the library card and Settings → About describe it; `darwin-home` is ~/Applications. */
 export type LauncherStatus = { platform: 'nt' | 'darwin' | 'darwin-home' | 'linux'; path: string; exists: boolean; dismissed: boolean };

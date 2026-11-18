@@ -79,6 +79,7 @@ This folder is the learner's Throughline course library. Each subfolder containi
 
 - Use the `$throughline` skill for all course work: creating a course, adding files, rebuilding a route, reviewing pages.
 - Copy a course's source files into `<course>/inputs/` before registering them. Never edit `course.sqlite3`, `sources/`, `backups/` or `.throughline/` by hand.
+- Courses the learner deleted wait in `.throughline/trash/` until they restore them in the app; they are not courses, so never list, open or change them.
 - When course work is done, run `guided-learning open <course>` so the learner can study it in the Throughline app.
 - Studying happens in the app. If the learner asks to be taught in this chat, open the course in the app instead.
 

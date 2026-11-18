@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.background import BackgroundTask
 
 from .. import checks as codex_checks, files, images as attached, library, packages, updates
+from ..api import execute
 from ..launcher import Launcher
 from ..commands import version
 from ..store import OperationError
@@ -187,6 +188,14 @@ class OpenCourseRequest(Body):
     name: str
 
 
+class RenameCourseRequest(Body):
+    title: str
+
+
+class ArchiveCourseRequest(Body):
+    archived: bool
+
+
 class ImportRequest(Body):
     mode: Literal['continue', 'fresh', 'fresh-with-notes']
     name: Optional[str] = None
@@ -309,6 +318,63 @@ class Courses:
             raise OperationError('unknown_course', f'No course named {name} in {self.root}')
         return self.open(path)
 
+    # Looking after the library's courses (ADR 0022). Renaming and archiving are safe while a course is open: a rename
+    # is one operation through the course's own host, and archiving writes only to the library's own folder. Deleting
+    # moves the folder, so it waits for anything being written in the course.
+
+    def _named(self, name):
+        if self.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        path = library.course_path(self.root, name)
+        if not library.is_course(path):
+            raise OperationError('unknown_course', f'No course named {name} in {self.root}')
+        return path
+
+    def rename(self, name, title):
+        path = self._named(name)
+        host = self.host
+        if host and host.workspace == path:
+            result = host.operation({'op': 'course.rename', 'title': title})
+            self.events.publish({'type': 'changed', 'scope': 'state'})
+        else:
+            result = execute(path, {'op': 'course.rename', 'title': title})
+        self.events.publish({'type': 'changed', 'scope': 'library'})
+        return {'name': name, 'title': result['course']['title']}
+
+    def archive(self, name, value):
+        self._named(name)
+        result = library.set_archived(self.root, name, value)
+        self.events.publish({'type': 'changed', 'scope': 'library'})
+        return result
+
+    def delete(self, name):
+        path = self._named(name)
+        activity = self.studio.activity(path)
+        if activity['running'] or activity['waiting']:
+            raise OperationError('course_busy', 'Studio is working in this course. Wait for it to finish, or stop it, then delete the course.')
+        closed = False
+        with self.lock:
+            host = self.host
+            if host and host.workspace == path:
+                if host.writing():
+                    raise OperationError('course_busy', 'Something is being written in this course. Wait for it to finish, then delete the course.')
+                host.close()  # pauses background work and lets the course go; open tabs reload to the library
+                self.host = None
+                closed = True
+            entry = library.trash(self.root, name)
+        self.studio.move(path, entry['path'])
+        self.events.publish({'type': 'changed', 'scope': 'course' if closed else 'library'})
+        return {k: entry[k] for k in ('id', 'name', 'title', 'deleted')}
+
+    def restore(self, entry):
+        if self.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        with self.lock:
+            restored = library.restore(self.root, entry)
+        self.studio.move(restored['trash_path'], restored['path'])
+        self.events.publish({'type': 'changed', 'scope': 'library'})
+        return {k: restored[k] for k in ('name', 'title')}
+
     def require(self):
         host = self.host
         if host is None:
@@ -320,7 +386,9 @@ class Courses:
         active = str(self.host.workspace) if self.host else None
         if active and not any(c['path'] == active for c in courses):
             courses.insert(0, library.summary(active))
-        return {'root': str(self.root) if self.root else None, 'active': active, 'courses': courses}
+        return {'root': str(self.root) if self.root else None, 'active': active, 'courses': courses,
+                'trash': [{k: e[k] for k in ('id', 'name', 'title', 'deleted')} for e in library.trashed(self.root)] if self.root else [],
+                'trash_folder': str(library.trash_dir(self.root)) if self.root else None}
 
     def close(self):
         self.stopping.set()
@@ -865,6 +933,30 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def open_course(body: OpenCourseRequest):
         # The interface reloads after opening a course, so the library listing is left for it to ask for.
         return {'active': str(courses.open_named(body.name).workspace)}
+
+    @app.put('/api/library/courses/{name}/title')
+    def rename_course(name: str, body: RenameCourseRequest):
+        return courses.rename(name, body.title)
+
+    @app.put('/api/library/courses/{name}/archived')
+    def archive_course(name: str, body: ArchiveCourseRequest):
+        return courses.archive(name, body.archived)
+
+    @app.delete('/api/library/courses/{name}')
+    def delete_course(name: str):
+        return courses.delete(name)
+
+    @app.post('/api/library/trash/{entry}/restore')
+    def restore_course(entry: str):
+        return courses.restore(entry)
+
+    @app.post('/api/library/trash/show')
+    def show_trash():
+        if courses.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        folder = library.trash_dir(courses.root)
+        folder.mkdir(parents=True, exist_ok=True)
+        return opener.open(folder)
 
     # Course packages (ADR 0020). A package to import is uploaded first, so the learner can see what it holds and
     # choose how to take it; it waits in the library's own folder until imported or dropped.

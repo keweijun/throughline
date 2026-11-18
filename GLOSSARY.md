@@ -88,8 +88,14 @@ _Avoid_: Skipped section (retired: passed-over sections are no longer marked), e
 **Return section**: The section the learner comes back to after choosing to study another section out of route order, kept with the position as `return_to` until they go back to it or move past it (ADR 0006).
 _Avoid_: Mainline restore point (where a side question returns to), bookmark, skipped section.
 
-**Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. The list never edits a course; changes happen in Studio or a Codex chat.
+**Course library**: The learner's Throughline folder holding every course workspace; and the app view that lists courses for opening, with Studio at its top. From the list a course is only renamed, archived or deleted (ADR 0022); changes to what it teaches happen in Studio or a Codex chat.
 _Avoid_: Course manager, a second store of progress, Studio (where courses are changed).
+
+**Archived course**: A course left out of the library's list and the course switcher, shown under Archived courses, where it can still be opened. Archiving is recorded in the library's own folder and changes nothing in the course (ADR 0022).
+_Avoid_: Finished, completed, closed, hidden forever.
+
+**Course trash**: The library's `.throughline/trash/` folder, where a deleted course waits whole, with its progress, notes and questions, until it is restored. The app never empties it (ADR 0022).
+_Avoid_: Recycle bin (the system's), permanent deletion, backups (copies kept before a format update).
 
 **Course package**: One file holding a copy of a course at a share level, with its sources, to give to someone else or to move or back up one's own. Importing it makes a new course; nothing syncs back (ADR 0020).
 _Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never read back).

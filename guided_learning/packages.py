@@ -277,12 +277,7 @@ def _manifest(package, archive, entries):
 
 def suggested_name(root, suggested):
     """The name an import gives a course when none is asked for: the package's, made unique in the library."""
-    base = suggested if isinstance(suggested, str) and library.NAME.match(suggested) else 'imported-course'
-    for number in range(1, 1000):
-        candidate = base if number == 1 else f'{base[:60]}-{number}'
-        if not (Path(root) / candidate).exists():
-            return candidate
-    raise OperationError('course_exists', f'Courses named {base} already exist; choose a name')
+    return library.free_name(root, suggested if isinstance(suggested, str) and library.NAME.match(suggested) else 'imported-course')
 
 
 def _target(root, name, suggested):

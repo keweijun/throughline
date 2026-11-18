@@ -103,6 +103,8 @@ export type Question = {
   restore_point: Position;
   main_turn_id: string | null;
   selected_turn_id: string | null;
+  /** The exercise or review question the passage was selected in. */
+  selected_task_id?: string | null;
   turn_id: string;
   status: 'unanswered' | 'answered' | 'suggested' | 'supplement';
   decision: Decision | null;

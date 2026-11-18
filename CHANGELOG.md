@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.50.1
+
+- "Back to the passage" in a side question now lands on the passage you asked about and briefly marks it, including a passage from a section you were previewing, from a lesson's check question or from an exercise. Before, a passage from an earlier section took you to the current section instead, and one in a check question or an exercise brought back only roughly where you had been reading.
+- An open question now always shows **All questions** under its answers, beside "Back to the passage", to go back to the list. Before, the only way back was the close button in the writing box, which is hidden while the box is empty.
+
 ## 0.50.0
 
 - Share a course with someone, or keep a copy, from the course's Overview → **Share**: choose the route alone, the route with the lessons and exercises written so far (never your answers, progress or what the teacher remembers about you), or everything. The file always holds the course's source documents.

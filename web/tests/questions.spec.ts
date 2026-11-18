@@ -238,3 +238,58 @@ test("an open thread's question scrolls away with its answers and leaves a strip
   await expect(thread.locator('.head .title')).toBeInViewport();
   await expect(strip).toHaveCount(0);
 });
+
+test('returning to a passage asked about while previewing an earlier section goes back to that section and marks it', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByRole('region', { name: 'Step 1 of 4' })).toBeVisible();
+  const rail = page.locator('#route');
+  await rail.getByRole('button', { name: /Classical waves/ }).click();
+  const passage = page.locator('.lesson-body p').filter({ hasText: 'A long lesson saved as one reply.' });
+  await dragSelect(page, passage, 120);
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await page.getByRole('textbox', { name: 'Side question' }).fill('Why one reply?');
+  await page.locator('#branch-panel').getByRole('button', { name: 'Ask', exact: true }).click();
+  await expect(page.locator('#branch-panel article').filter({ hasText: 'Why one reply?' })).toBeVisible();
+
+  await rail.getByRole('button', { name: /Wave superposition/ }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wave superposition');
+  await page.locator('#branch-panel .panel-foot').getByRole('button', { name: 'Back to the passage' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Classical waves');
+  await expect(passage).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('found')?.values().next().value?.toString())).toContain('A long lesson');
+  expect(errors).toEqual([]);
+});
+
+test('a passage in a check question is found again on return', async ({ page, course }) => {
+  await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const check = page.getByRole('region', { name: 'Step 1 of 4' }).locator('[data-check]').getByText('What does a path carry?');
+  await expect(check).toBeVisible();
+  const excerpt = await dragSelect(page, check, 100);
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await page.getByRole('textbox', { name: 'Side question' }).fill('What is a path here?');
+  await page.locator('#branch-panel').getByRole('button', { name: 'Ask', exact: true }).click();
+  const back = page.locator('#branch-panel .panel-foot').getByRole('button', { name: 'Back to the passage' });
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect.poll(() => page.evaluate(() => CSS.highlights.get('found')?.values().next().value?.toString())).toBe(excerpt.trim());
+});
+
+test('an open thread always offers the way back to all questions, even while its box rests', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  const panel = page.locator('#branch-panel');
+  await page.locator('#question-input').fill('What does the phase do?');
+  await panel.getByRole('button', { name: 'Ask', exact: true }).click();
+  const thread = panel.locator('.thread').filter({ hasText: 'What does the phase do?' });
+  await expect(thread).toHaveClass(/open/);
+  // Unfocused and empty, the follow-up box rests as one line and hides its own close button.
+  await page.locator('#branch-panel h2').click();
+  await expect(panel.getByRole('button', { name: 'Ask a new question instead' })).toBeHidden();
+  await panel.locator('.panel-foot').getByRole('button', { name: 'All questions' }).click();
+  await expect(thread).not.toHaveClass(/open/);
+  await expect(thread).toBeInViewport();
+  await expect(panel.getByRole('textbox', { name: 'Side question' })).toBeVisible();
+  await expect(panel.locator('.panel-foot').getByRole('button', { name: 'All questions' })).toHaveCount(0);
+});

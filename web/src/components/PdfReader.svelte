@@ -100,7 +100,10 @@
       release.observe(element);
     }
     width = scroller.clientWidth;
-    resize = new ResizeObserver(() => (width = scroller!.clientWidth));
+    // A hidden reader (another panel view, the panel closed) measures nothing; it keeps the width it was shown at.
+    resize = new ResizeObserver(() => {
+      if (scroller!.clientWidth) width = scroller!.clientWidth;
+    });
     resize.observe(scroller);
     await tick();
     ready = true;
@@ -168,7 +171,7 @@
   $effect.pre(() => {
     const s = scale;
     untrack(() => {
-      if (shownScale && s !== shownScale && scroller && jumping === null) place = where(scroller);
+      if (shownScale && s !== shownScale && scroller?.clientHeight && jumping === null) place = where(scroller);
       shownScale = s;
     });
   });
@@ -214,6 +217,7 @@
   }
 
   function visible(element: HTMLElement) {
+    if (!scroller!.clientHeight) return false; // hidden: every box measures zero
     const box = element.getBoundingClientRect();
     const view = scroller!.getBoundingClientRect();
     return box.bottom > view.top - NEAR && box.top < view.bottom + NEAR;

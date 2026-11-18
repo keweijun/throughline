@@ -231,6 +231,18 @@ test('every page in view is drawn again at the new zoom', async ({ page, course 
   await pages.evaluate((node) => node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }));
   await zoomIn.click();
   await expect.poll(blank).toEqual([]);
+
+  // Hidden behind another view, the reader draws nothing, and it comes back where it was.
+  await page.getByRole('button', { name: 'Fit width' }).click();
+  await page.getByRole('textbox', { name: 'Page number' }).fill('20');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('20');
+  await page.locator('#toggle-notes').click();
+  await page.waitForTimeout(500);
+  expect(await page.locator('.source-view .pdf-page canvas').count()).toBeLessThan(10);
+  await page.locator('#toggle-source').click();
+  await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('20');
+  await expect.poll(blank).toEqual([]);
   expect(errors).toEqual([]);
 });
 

@@ -65,7 +65,9 @@ class Opener:
         return {'opened': str(target), 'shown': not document}
 
     def _command(self, path, document):
-        reveal = path.is_file() and not document
+        # A macOS folder named like Notes.app or Setup.pkg is a bundle, which `open` would launch.
+        bundle = self.platform == 'darwin' and path.is_dir() and bool(path.suffix)
+        reveal = path.is_file() and not document or bundle
         if self.platform == 'nt':
             return ['explorer', f'/select,{path}'] if reveal else ['explorer', str(path)]
         if self.platform == 'darwin':

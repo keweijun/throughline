@@ -1,5 +1,6 @@
 """Owned Codex App Server transport. Never writes teacher-generated lecture files."""
 import json
+import logging
 import os
 import queue
 import shutil
@@ -7,6 +8,12 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+
+from .logs import Tail
+
+log = logging.getLogger(__name__)
+NOT_FOUND = ('Codex was not found. Install Codex (the codex command or the Codex app), or set CODEX_CLI_PATH to where it '
+             'is, then try again.')
 
 
 def find_codex():
@@ -36,14 +43,47 @@ def _explain(summary, detail):
     return f'{summary}: {detail}' if detail else summary
 
 
+# What a learner can do about a turn Codex refused, by the reason it gives (`codexErrorInfo` of a TurnError).
+ADVICE = {
+    'usageLimitExceeded': 'Your Codex usage limit is reached. Lessons continue once it resets; Codex shows when.',
+    'sessionBudgetExceeded': 'Your Codex usage limit is reached. Lessons continue once it resets; Codex shows when.',
+    'rateLimitExceeded': 'Codex is getting too many requests right now. Try again in a minute.',
+    'serverOverloaded': 'Codex is busy right now. Try again in a minute.',
+    'unauthorized': 'Codex is not signed in. Sign in in the Codex app, or run "codex login", then try again.',
+    'modelNotFound': 'Your Codex account cannot use the chosen model. Choose another one in Settings.',
+}
+
+
+def _advice(error):
+    """A sentence on what to do about a Codex error, or '' when Codex gave no known reason."""
+    info = error.get('codexErrorInfo') if isinstance(error, dict) else None
+    if isinstance(info, dict) and set(info) & {'httpConnectionFailed', 'responseStreamConnectionFailed'}:
+        return 'Codex could not reach OpenAI. Check your internet connection, then try again.'
+    return ADVICE.get(info, '') if isinstance(info, str) else ''
+
+
+def _failed(summary, error, fallback=''):
+    """The error a failed turn reports: advice the learner can act on first, then what Codex said."""
+    detail = _message(error) or fallback
+    advice = _advice(error)
+    return f'{advice} ({detail})' if advice and detail else advice or _explain(summary, detail)
+
+
+def _start(command, **options):
+    """Start Codex's App Server, keeping the end of what it writes to stderr for the log."""
+    try:
+        process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, encoding='utf-8', errors='replace',
+                                   creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0), **options)
+    except OSError as exc:
+        raise RuntimeError(NOT_FOUND) from exc
+    return process, Tail(process.stderr)
+
+
 def list_models(command=None, timeout=20):
     """The models the signed-in Codex account can use, from the App Server's paginated model/list."""
     command = command or [find_codex() or 'codex','app-server','--stdio']
-    try:
-        process = subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
-                                   text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    except OSError as exc:
-        raise RuntimeError('Codex CLI not found; install Codex or set CODEX_CLI_PATH') from exc
+    process, tail = _start(command)
     incoming = queue.Queue()
     def reader():
         for line in process.stdout:
@@ -65,7 +105,7 @@ def list_models(command=None, timeout=20):
                 raise RuntimeError('Codex closed before listing models')
             if event.get('id') != request or 'method' in event: continue
             if 'error' in event:
-                raise RuntimeError(_explain('Codex could not list models; check CLI authentication', _message(event['error'])))
+                raise RuntimeError(_failed('Codex could not list models; check CLI authentication', event['error']))
             result = event.get('result') or {}
             if request == 1:
                 send({'method':'initialized','params':{}})
@@ -81,6 +121,9 @@ def list_models(command=None, timeout=20):
             request += 1
             send({'id':request,'method':'model/list','params':{'cursor':result['nextCursor']} if result.get('nextCursor') else {}})
         raise TimeoutError('Codex took too long to list models')
+    except Exception as exc:
+        tail.log(log, f'Listing models failed ({exc})')
+        raise
     finally:
         try:
             process.stdin.close()
@@ -88,6 +131,7 @@ def list_models(command=None, timeout=20):
         except (OSError,subprocess.TimeoutExpired):
             process.kill(); process.wait()
         process.stdout.close()
+        process.stderr.close()
 
 
 def _tidy(command, cwd, delete=(), sweep_before=None, timeout=20):
@@ -212,8 +256,7 @@ class CodexRunner:
         pooled = instructions is not None and THREADS.enabled
         key = (str(cwd), self.model, self.service_tier)
         saved = THREADS.take(key, command) if pooled else None
-        process = subprocess.Popen(command,cwd=cwd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
-                                   text=True,encoding='utf-8',errors='replace',creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        process, tail = _start(command, cwd=cwd)
         incoming = queue.Queue()
         def reader():
             for line in process.stdout:
@@ -230,7 +273,7 @@ class CodexRunner:
         order = []
         interrupted_at = None
         started = last_heard = time.monotonic()
-        last_error = ''
+        last_error = {}
         settled = False
         def settle():
             """Revert the finished turn and archive the thread, which keeps it out of the learner's Codex session list,
@@ -266,14 +309,14 @@ class CodexRunner:
                 except queue.Empty: continue
                 last_heard = time.monotonic()
                 if event is None:
-                    raise RuntimeError(_explain('Model connection closed before completion', last_error))
+                    raise RuntimeError(_failed('Model connection closed before completion', last_error, (tail.text().splitlines() or [''])[-1]))
                 if event.get('error') and event.get('id') == 2 and saved:
                     THREADS.drop(key, saved, command)  # gone or unusable: start another
                     saved = None
                     send({'id':2,'method':'thread/start','params':{**thread,'ephemeral':False}})
                     continue
                 if event.get('error') and event.get('id') in (1,2,3):
-                    raise RuntimeError(_explain('Codex rejected initialization or generation; check CLI authentication and model configuration', _message(event['error'])))
+                    raise RuntimeError(_failed('Codex rejected initialization or generation; check CLI authentication and model configuration', event['error']))
                 if event.get('id') == 1 and 'result' in event:
                     send({'method':'initialized','params':{}})
                     thread = {'cwd':str(cwd),'approvalPolicy':'never','sandbox':'read-only','config':{'model_reasoning_effort':self.effort}}
@@ -299,8 +342,8 @@ class CodexRunner:
                 if 'id' in event and method:
                     send({'id':event['id'],'error':{'code':-32601,'message':'Interactive tool requests are unavailable'}})
                 if params.get('threadId',thread_id) != thread_id: continue
-                if method == 'error':
-                    last_error = _message(params.get('error')) or last_error
+                if method == 'error' and _message(params.get('error')):
+                    last_error = params['error']
                 if method == 'turn/started': turn_id = params['turn']['id']
                 if params.get('turnId',turn_id) != turn_id: continue
                 if method in ('item/started','item/completed'):
@@ -325,7 +368,7 @@ class CodexRunner:
                 if method == 'turn/completed':
                     if cancel.is_set(): return
                     if params['turn'].get('status') != 'completed':
-                        raise RuntimeError(_explain('Model turn did not complete successfully', _message(params['turn'].get('error')) or last_error))
+                        raise RuntimeError(_failed('Model turn did not complete successfully', params['turn'].get('error') or last_error))
                     if not any(phases.get(k)=='final_answer' for k in finals):
                         raise RuntimeError('Model finished without an authoritative final answer')
                     emit({'kind':'complete','usage':usage} if usage else {'kind':'complete'})
@@ -334,6 +377,9 @@ class CodexRunner:
                         settle()
                     return
             raise TimeoutError('Model generation exceeded time limit')
+        except Exception as exc:
+            tail.log(log, f'A teaching turn failed ({exc})')
+            raise
         finally:
             if pooled and thread_id and not settled:
                 THREADS.drop(key, thread_id, command)
@@ -346,3 +392,4 @@ class CodexRunner:
                 try: process.wait(timeout=5)
                 except subprocess.TimeoutExpired: process.kill(); process.wait()
             process.stdout.close()
+            process.stderr.close()

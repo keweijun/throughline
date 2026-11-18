@@ -7,6 +7,18 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - Running an older and a newer Throughline side by side, or going back a version, no longer loses settings the newer one saved: your teacher settings, Studio's access and chats, dismissed tips, and a course's preferences.
 - Throughline now installs only versions of the libraries it runs on that it is known to work with, so a future release of one of them can't break it.
 
+## 0.53.0
+
+- When a lesson can't start because of Codex, the message now says what to do: your usage limit is reached, Codex isn't signed in, there's no internet connection, or your account can't use the chosen model. When Codex isn't installed, it says how to install it.
+- Throughline now keeps a log of problems in your library's `.throughline/host.log`, with what Codex reported when it failed. The log never grows past a few megabytes. `guided-learning doctor` shows where it is, along with your system and Python version, which helps when you report a problem.
+
+## 0.52.0
+
+- Only you can use Throughline on your computer. It now opens with a key that only your account can read. Other people's programs on a shared computer can no longer read your courses or start Codex through it. Open Throughline from its launcher or with `guided-learning open` as before. A browser opened another way shows how to get in.
+- On Windows, Studio no longer gives Codex full access by itself when Codex's sandbox isn't set up. It asks first: set the sandbox up once (Windows may ask for permission), or choose Full access.
+- On a Mac, a link in Studio to an app or installer shows it in Finder instead of starting it.
+- On Windows, no other program can take over the port Throughline listens on.
+
 ## 0.51.0
 
 - On the Overview, Studio now uses the width of a large screen and reaches the bottom of the window. Its conversation stays in one centred column that is easy to read.

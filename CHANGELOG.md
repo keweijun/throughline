@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.53.1
+
+- Running an older and a newer Throughline side by side, or going back a version, no longer loses settings the newer one saved: your teacher settings, Studio's access and chats, dismissed tips, and a course's preferences.
+- Throughline now installs only versions of the libraries it runs on that it is known to work with, so a future release of one of them can't break it.
+
 ## 0.53.0
 
 - When a lesson can't start because of Codex, the message now says what to do: your usage limit is reached, Codex isn't signed in, there's no internet connection, or your account can't use the chosen model. When Codex isn't installed, it says how to install it.

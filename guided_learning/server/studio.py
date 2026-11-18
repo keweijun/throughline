@@ -18,7 +18,7 @@ from .. import library
 from ..codex import NOT_FOUND, find_codex
 from ..logs import Tail
 from ..store import OperationError
-from .settings import EFFORTS, default_path
+from .settings import EFFORTS, default_path, write_json
 
 log = logging.getLogger(__name__)
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
@@ -231,10 +231,7 @@ class Studio:
                 'effort': effort if effort in EFFORTS else ''}
 
     def _save(self, data):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
-        os.replace(temporary, self.path)
+        write_json(self.path, data)
 
     def _record(self, course, thread, keep=True):
         with self.lock:

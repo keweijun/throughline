@@ -1,10 +1,11 @@
 """Command-line entry for the local learning interface."""
 import argparse
+import logging
 import json
 import os
 
-from . import library
-from .commands import host_record
+from . import library, logs
+from .commands import host_record, version
 from .server.settings import EFFORTS, TeacherSettings
 from .server import serve
 
@@ -36,6 +37,9 @@ def main():
     parser.add_argument('--config', help='Teacher settings file (default: per-user config directory)')
     parser.add_argument('--record', action='store_true', help='Record this host for `guided-learning open` and `stop`')
     args = parser.parse_args()
+    if args.record:
+        # The host the launcher starts writes its own rotating log; one run in a terminal prints there as before.
+        logs.configure()
     settings = TeacherSettings(args.config, override={'model': args.model, 'small_model': args.small_model, 'effort': args.effort, 'small_effort': args.small_effort})
 
     key = library.host_key()
@@ -43,6 +47,7 @@ def main():
     def ready(port):
         if args.record:
             _record(port)
+            logging.getLogger('guided_learning').info('Throughline %s started on port %s', version(), port)
         print(f'Learning interface: http://127.0.0.1:{port}/?key={key}', flush=True)
     try:
         serve(args.workspace, port=args.port, settings=settings, on_ready=ready,

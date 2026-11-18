@@ -980,7 +980,8 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     actual = sock.getsockname()[1]
     app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
                      studio_command=studio_command, launcher=launcher, checks=checks, opener=opener, key=key)
-    server = uvicorn.Server(uvicorn.Config(app, log_level='warning', timeout_graceful_shutdown=3))
+    # log_config=None: uvicorn's own warnings reach the host log rather than a console nobody sees.
+    server = uvicorn.Server(uvicorn.Config(app, log_level='warning', log_config=None, timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)
     if on_ready:
         on_ready(actual)

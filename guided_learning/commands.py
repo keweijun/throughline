@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import platform as host_platform
 import shutil
 import subprocess
 import sys
@@ -14,7 +15,7 @@ import uuid
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
-from . import library
+from . import library, logs
 from .codex import find_codex
 from .store import OperationError
 
@@ -306,7 +307,7 @@ def open_app():
     try:
         record = running() or _spawn(8765) or _spawn(0)
         if not record:
-            print(f'Throughline did not start; see {library.state_dir() / "host.log"}.')
+            print(f'Throughline did not start; see {logs.output_path()} and {logs.log_path()}.')
             return False
         url = app_url(record['port'])
         print(f'Throughline is open at {url}')
@@ -370,12 +371,13 @@ def detached():
 
 
 def _spawn(port):
-    log = library.state_dir() / 'host.log'
+    # What the host prints before its own log starts, a crash on import say; each launch starts it afresh.
+    log = logs.output_path()
     log.parent.mkdir(parents=True, exist_ok=True)
     command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
     launch_id = str(uuid.uuid4())
     options = {**detached(), 'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
-    with log.open('ab') as output:
+    with log.open('wb') as output:
         process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -392,7 +394,7 @@ def _spawn(port):
 def open_course(args):
     record = running() or _spawn(args.port) or _spawn(0)
     if not record:
-        print(f'The learning host did not start; see {library.state_dir() / "host.log"}.', file=sys.stderr)
+        print(f'The learning host did not start; see {logs.output_path()} and {logs.log_path()}.', file=sys.stderr)
         return 1
     if args.course:
         try:
@@ -463,6 +465,8 @@ def doctor(args):
     launcher = launcher_path()
     host = running()
     print(f'Throughline {version()}')
+    print(f'  {host_platform.platform()}, Python {host_platform.python_version()} ({sys.executable})')
+    print(f'  Host log: {logs.log_path()}')
     found = checks.codex_checks()
     rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
             for check in found]

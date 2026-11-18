@@ -6,6 +6,7 @@ threads it has open to the interface, and holds the approvals and questions Code
 answers them."""
 import itertools
 import json
+import logging
 import os
 import queue
 import re
@@ -14,10 +15,12 @@ import threading
 from pathlib import Path
 
 from .. import library
-from ..codex import find_codex
+from ..codex import NOT_FOUND, find_codex
+from ..logs import Tail
 from ..store import OperationError
 from .settings import EFFORTS, default_path
 
+log = logging.getLogger(__name__)
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
 # Notifications about a thread that the interface draws; moderation, predictions and read state it ignores.
 FORWARDED = re.compile(r'^((thread|turn|item)/|error$)')
@@ -80,8 +83,10 @@ class AppServer:
 
     def __init__(self, command, cwd, on_message, on_exit):
         self.process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.DEVNULL, text=True, encoding='utf-8', errors='replace',
+                                        stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
                                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        self.stderr = Tail(self.process.stderr)
+        self.closing = False
         self.on_message, self.on_exit = on_message, on_exit
         self.ids = itertools.count(1)
         self.waiting = {}  # request id -> queue for its reply
@@ -103,6 +108,8 @@ class AppServer:
                     pass
         for reply in list(self.waiting.values()):
             reply.put(None)
+        if not self.closing:
+            self.stderr.log(log, "Studio's Codex App Server stopped")
         self.on_exit(self)
 
     def alive(self):
@@ -143,6 +150,7 @@ class AppServer:
         self._send({'id': request, 'error': {'code': -32601, 'message': message}})
 
     def close(self):
+        self.closing = True
         try:
             self.process.stdin.close()
             self.process.wait(timeout=3)
@@ -250,7 +258,7 @@ class Studio:
             try:
                 server = AppServer(command, self.root or Path.home(), self._message, self._exit)
             except OSError as exc:
-                raise StudioError('studio_unavailable', 'Codex CLI not found; install Codex or set CODEX_CLI_PATH') from exc
+                raise StudioError('studio_unavailable', NOT_FOUND) from exc
             try:
                 server.call('initialize', {'clientInfo': {'name': CLIENT, 'title': 'Throughline Studio', 'version': '1'},
                                            'capabilities': {'experimentalApi': True}})

@@ -89,6 +89,15 @@ class StudioFiles(unittest.TestCase):
             opener.open(script)
             self.assertEqual(started, [document, program], platform)
 
+    def test_a_macos_bundle_is_shown_not_launched(self):
+        app = self.course / 'Installer.app'
+        (app / 'Contents').mkdir(parents=True)
+        started = []
+        opener = Opener(platform='darwin', start=started.append)
+        self.assertEqual(opener.open(app), {'opened': str(app), 'shown': True})
+        opener.open(self.course)  # a plain folder still opens in Finder
+        self.assertEqual(started, [['open', '-R', str(app)], ['open', str(self.course)]])
+
     def test_a_bad_request_is_refused(self):
         self.assertEqual(self.client.post('/api/studio/files/open', json={'path': ''}).status_code, 400)
         self.assertEqual(self.client.post('/api/studio/files/open', json={'path': 'x.md', 'line': 0}).status_code, 400)

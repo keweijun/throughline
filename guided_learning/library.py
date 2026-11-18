@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import re
+import secrets
 import sqlite3
 from pathlib import Path
 
@@ -34,6 +35,28 @@ def legacy_roots():
 def state_dir():
     """Host bookkeeping, kept out of sight inside the library."""
     return default_root() / '.throughline'
+
+
+def host_key():
+    """The secret a browser or command shows to use the host, so other people's programs on a shared computer can't.
+
+    Kept across launches, so a tab left open keeps working when the host restarts on the same port (an update), and
+    readable only by this user: the program that reads it could read the courses anyway."""
+    path = state_dir() / 'host-key'
+    try:
+        key = path.read_text(encoding='ascii').strip()
+        if re.fullmatch(r'[0-9a-f]{64}', key):
+            return key
+    except (OSError, UnicodeDecodeError):
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(32)
+    partial = path.with_name(f'host-key.{os.getpid()}.partial')
+    descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, 'w', encoding='ascii') as out:
+        out.write(key)
+    os.replace(partial, path)
+    return key
 
 
 def acquire_lease(workspace):

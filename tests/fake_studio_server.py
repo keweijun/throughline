@@ -13,6 +13,8 @@ import time
 
 log = open(sys.argv[1], 'a', encoding='utf-8')
 old = len(sys.argv) > 2 and sys.argv[2] == 'old'
+# 'unsandboxed': Windows without Codex's sandbox until a setup; 'unsandboxed-fail': a setup that never works.
+sandbox = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2].startswith('unsandboxed') else 'ready'
 threads, turns = {}, {}
 waiting = {}  # server request id -> (thread, turn, kind)
 asked = iter(range(900, 10000))
@@ -188,5 +190,14 @@ for line in sys.stdin:
                            {'root': params['roots'][0], 'path': 'backups/course-format-6.sqlite3', 'file_name': 'course-format-6.sqlite3', 'score': 1},
                            {'root': params['roots'][0], 'path': 'inputs/waves.sqlite3', 'file_name': 'waves.sqlite3', 'score': 1}]}
     elif method == 'windowsSandbox/readiness':
-        reply = {'status': 'ready'}  # so the tests see the same sandboxed turns on Windows
+        # 'ready' unless asked otherwise, so the tests see the same sandboxed turns on Windows
+        reply = {'status': 'ready' if sandbox == 'ready' else 'notConfigured'}
+    elif method == 'windowsSandbox/setupStart':
+        send({'id': rid, 'result': {'started': True}})
+        works = sandbox == 'unsandboxed'
+        if works:
+            sandbox = 'ready'
+        note('windowsSandbox/setupCompleted', {'mode': params['mode'], 'success': works,
+                                               'error': None if works else 'The learner declined'})
+        continue
     send({'id': rid, 'result': reply})

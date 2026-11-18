@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import { locale, t, type Language } from './i18n.svelte';
-import { api, ApiError, newId } from './api';
+import { api, ApiError, newId, signIn } from './api';
 import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
@@ -160,6 +160,8 @@ class AppStore {
   /** Why the course or the library could not be loaded at all: said in place of the page, with a way to try again. */
   stateError = $state<string | null>(null);
   libraryError = $state<string | null>(null);
+  /** The host wants its key from this browser: the page says how to open Throughline instead of anything else. */
+  signedOut = $state(false);
   library = $state<Library | null>(null);
   libraryOpen = $state(false);
   /** The library page shows the course list, or New course: the library's Studio across the page. */
@@ -1211,3 +1213,4 @@ class AppStore {
 }
 
 export const app = new AppStore();
+signIn.refused = () => (app.signedOut = true);

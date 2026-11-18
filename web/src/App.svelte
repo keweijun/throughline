@@ -140,7 +140,12 @@
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
 <div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
-  {#if app.libraryOpen}
+  {#if app.signedOut}
+    <main id="main" class="loading" role="alert">
+      <h1 class="signed-out">{t('Open Throughline from its launcher')}</h1>
+      <p>{t('This browser is not signed in to Throughline. Open it from the Throughline launcher, or run "guided-learning open" in a terminal, and this page opens signed in. This keeps other people on this computer out of your courses.')}</p>
+    </main>
+  {:else if app.libraryOpen}
     <Library />
   {:else if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
@@ -260,6 +265,17 @@
 
   .loading .problem {
     color: var(--danger);
+  }
+
+  .signed-out {
+    margin-bottom: 0.6rem;
+    color: var(--ink);
+    font-size: var(--step-1);
+  }
+
+  .loading:has(.signed-out) p {
+    max-width: 34rem;
+    margin-inline: auto;
   }
 
   .scrim {

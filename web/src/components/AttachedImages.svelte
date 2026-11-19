@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { courseUrl } from '../lib/api';
   import { t } from '../lib/i18n.svelte';
 
   // Images attached to an answer, a question or a note, as they were sent; `small` for the side panel's lists.
   let { images, small = false }: { images: string[]; small?: boolean } = $props();
-  const url = (name: string) => `/api/images/${encodeURIComponent(name)}`;
+  const url = (name: string) => courseUrl(`/api/images/${encodeURIComponent(name)}`);
 </script>
 
 {#if images.length}

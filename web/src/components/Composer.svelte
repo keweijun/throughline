@@ -5,7 +5,7 @@
   import type { CompletionSource } from '@codemirror/autocomplete';
   import type { EditorView } from '@codemirror/view';
   import { markdown, hasMath } from '../lib/markdown';
-  import { api } from '../lib/api';
+  import { api, courseUrl } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { locale, t } from '../lib/i18n.svelte';
 
@@ -164,7 +164,7 @@
 
   let filePicker = $state<HTMLInputElement>();
 
-  const url = (name: string) => `/api/images/${encodeURIComponent(name)}${imageScope ? `?scope=${imageScope}` : ''}`;
+  const url = (name: string) => (imageScope ? `/api/images/${encodeURIComponent(name)}?scope=${imageScope}` : courseUrl(`/api/images/${encodeURIComponent(name)}`));
 </script>
 
 <form

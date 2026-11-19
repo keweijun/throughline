@@ -140,7 +140,7 @@ class WebLearning(unittest.TestCase):
                 asyncio.run(collect())
             finally:
                 host.close()
-            self.assertIn({'type': 'delta', 'id': 'live', 'attempt': 1, 'sequence': 1, 'text': 'Hello '}, seen)
+            self.assertIn({'type': 'delta', 'id': 'live', 'attempt': 1, 'sequence': 1, 'text': 'Hello ', 'course': host.course_id}, seen)
             self.assertEqual(seen[0]['type'], 'turn')
             self.assertEqual(seen[0]['turn']['status'], 'running')
 

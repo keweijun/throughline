@@ -1,5 +1,6 @@
 """HTTP surface of the learning host. Loopback only; course operations stay the state authority."""
 import asyncio
+import contextvars
 import hashlib
 import hmac
 import json
@@ -46,6 +47,25 @@ FILE_UPLOAD = '/api/studio/files'
 PACKAGE_UPLOAD = '/api/library/packages'
 MAX_PACKAGE = 4 * 1024 * 1024 * 1024
 PACKAGE_TOKEN = re.compile(r'[0-9a-f]{32}')
+
+# Routes for the library, Studio as a whole or this computer; every other /api/ route acts on the open course
+# (`course_scoped`). A prefix covers the routes below it.
+LIBRARY_ROUTES = ('/api/events', '/api/seen', '/api/settings', '/api/models', '/api/about', '/api/update', '/api/launcher',
+                  '/api/checks', '/api/health', '/api/library', '/api/shutdown', '/api/studio/access', '/api/studio/sandbox',
+                  '/api/studio/model', '/api/studio/requests', '/api/sign-in')
+COURSE_HEADER = 'x-throughline-course'
+# The host a course-scoped request was checked against, for its whole duration; unset outside one (`ActiveHost`).
+PINNED = contextvars.ContextVar('pinned_host')
+
+
+def course_scoped(request):
+    """Whether a request acts on the open course, so it must be for the course the page loaded (docs/architecture.md)."""
+    path = request.url.path
+    if not path.startswith('/api/') or request.query_params.get('scope') == 'library':
+        return False
+    if path.startswith('/api/studio/threads/') and path.endswith('/course'):  # moves a library chat to a course
+        return False
+    return not any(path == route or path.startswith(route + '/') for route in LIBRARY_ROUTES)
 
 
 class Body(BaseModel):
@@ -378,8 +398,13 @@ class Courses:
         self.events.publish({'type': 'changed', 'scope': 'library'})
         return {k: restored[k] for k in ('name', 'title')}
 
+    def current(self):
+        """The open course's host, or during a course-scoped request the one it was checked against."""
+        pinned = PINNED.get(None)
+        return pinned[0] if pinned else self.host
+
     def require(self):
-        host = self.host
+        host = self.current()
         if host is None:
             raise OperationError('no_course', 'Choose a course from the library')
         return host
@@ -404,7 +429,8 @@ class Courses:
 
 
 class ActiveHost:
-    """Forwards to whichever course is open, so routes need not track course switches."""
+    """Forwards to the course a request was checked against (`Courses.current`), so routes need not track course
+    switches, and a switch while a request runs leaves it on the course it began with."""
 
     def __init__(self, courses):
         self._courses = courses
@@ -509,7 +535,21 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         content_type = request.headers.get('content-type', '').split(';')[0].strip()
         if has_body and size and not upload and not (content_type.startswith('image/') if image else content_type == 'application/json'):
             return JSONResponse({'error': 'An image is required' if image else 'JSON required'}, 415)
-        response = await call_next(request)
+        pinned = None
+        if course_scoped(request):
+            # A page names the course it loaded; another course opened since (in another tab, say) must not take
+            # what the page sends, nor hand it that course's records. Nothing is read or written before this check.
+            current = courses.host
+            wanted = request.headers.get(COURSE_HEADER) or request.query_params.get('course')
+            if wanted and (current is None or current.course_id != wanted):
+                return JSONResponse({'error': 'Another course was opened since this page loaded; reload to continue',
+                                     'code': 'course_changed'}, 409)
+            pinned = PINNED.set((current,))
+        try:
+            response = await call_next(request)
+        finally:
+            if pinned:
+                PINNED.reset(pinned)
         response.headers['Cache-Control'] = 'no-store'
         response.headers['X-Content-Type-Options'] = 'nosniff'
         return response
@@ -916,7 +956,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def studio_open_file(body: StudioFile, scope: str = ''):
         """A file Codex linked in a reply: a source of the open course opens in its reader, anything else on this computer."""
         path = files.resolve(body.path, courses.root or course_folder())
-        course = courses.host if scope != 'library' else None
+        course = courses.current() if scope != 'library' else None
         if course is not None:
             ref = files.source_location(course.operation({'op': 'course.status'})['sources'], path, body.line)
             if ref and ref['unit_id'] not in ('page-1', 'line-1'):

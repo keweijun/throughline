@@ -44,6 +44,23 @@ class EventBus:
                 self.unsubscribe((loop, queue))
 
 
+class CourseEvents:
+    """One course's view of the event bus: what its host publishes names the course, so a page that loaded another
+    course can tell the event is not for it (see `X-Throughline-Course` in docs/architecture.md)."""
+
+    def __init__(self, bus, course_id):
+        self.bus, self.course_id = bus, course_id
+
+    def publish(self, event):
+        self.bus.publish({**event, 'course': self.course_id})
+
+    def subscribe(self):
+        return self.bus.subscribe()
+
+    def unsubscribe(self, subscriber):
+        self.bus.unsubscribe(subscriber)
+
+
 def _offer(queue, event):
     if queue.full():
         queue.get_nowait()
@@ -63,7 +80,6 @@ class Host:
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
-        self.events = events or EventBus()
         self.lock = threading.RLock()
         self.closing = False
         self.workers = {}
@@ -77,7 +93,9 @@ class Host:
         # The last token an outside write left (`api.CHANGED`) that the library watcher has seen; the host announces its
         # own changes, so its writes leave none.
         self._seen_change = self._outside_token()
-        self.operation({'op': 'course.status'})
+        # The course's ID never changes, so requests and events can name the course they are for.
+        self.course_id = self.operation({'op': 'course.status'})['course']['id']
+        self.events = CourseEvents(events or EventBus(), self.course_id)
         self._lease = library.acquire_lease(self.workspace)
         self._held = hold(self.workspace)
         self.operation({'op': 'stream.recover'})

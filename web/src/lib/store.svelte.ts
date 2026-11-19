@@ -1,6 +1,6 @@
 import { tick } from 'svelte';
 import { locale, t, type Language } from './i18n.svelte';
-import { api, ApiError, newId, signIn } from './api';
+import { api, ApiError, course, newId, signIn } from './api';
 import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
@@ -405,6 +405,8 @@ class AppStore {
     try {
       const state = await api.get<State>('/api/state');
       const missed = this.#inflight;
+      // The page belongs to this course from now on; the host refuses its requests once another one is open.
+      course.id = state.course.id;
       this.drafts.open(state.course.id);
       this.state = state;
       for (const delta of missed) this.#delta(delta);
@@ -642,6 +644,8 @@ class AppStore {
   }
 
   #apply(event: HostEvent) {
+    // What another course's host published, before this page learned the course switched, is not for this page.
+    if ('course' in event && event.course && course.id && event.course !== course.id) return;
     if (event.type === 'studio') {
       studio.apply(event);
       return;

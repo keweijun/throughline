@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .api import MOVING, execute
 from .store import OperationError
+from .userfiles import locked, write_json
 
 log = logging.getLogger(__name__)
 NAME = re.compile(r'^[a-z0-9][a-z0-9-]{0,63}$')
@@ -210,12 +211,12 @@ def _settings(root):
     return data if isinstance(data, dict) else {}
 
 
-def _save_settings(root, data):
+def _change_archived(root, change):
+    """Save `change(archived names)` as the archive list, read and written under the file's lock so a host and a
+    command (or two versions) archiving at once both count."""
     target = _settings_file(root)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix('.tmp')
-    temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
-    os.replace(temporary, target)
+    with locked(target):
+        write_json(target, {'archived': sorted(change(archived(root)))})
 
 
 def archived(root):
@@ -228,10 +229,7 @@ def set_archived(root, name, value):
     path = course_path(root, name)
     if not is_course(path):
         raise OperationError('unknown_course', f'No course named {name} in {root}')
-    data = _settings(root)
-    names = archived(root) - {name}
-    data['archived'] = sorted(names | {name} if value else names)
-    _save_settings(root, data)
+    _change_archived(root, lambda names: names | {name} if value else names - {name})
     return {'name': name, 'archived': bool(value)}
 
 
@@ -281,9 +279,7 @@ def trash(root, name):
         raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
     _summaries.pop(path.resolve(), None)
     if name in archived(root):  # a course restored later comes back to the main list
-        data = _settings(root)
-        data['archived'] = sorted(archived(root) - {name})
-        _save_settings(root, data)
+        _change_archived(root, lambda names: names - {name})
     return {'id': entry, 'path': str(folder / name), **record}
 
 

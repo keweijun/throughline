@@ -6,26 +6,11 @@ from pathlib import Path
 
 from ..codex import CodexRunner, list_models
 from ..store import OperationError
+from ..userfiles import locked, write_json
 
 # The reasoning efforts Throughline offers, lowest first; each model offers its own subset (`model/list`). Codex's
 # `ultra` is left out on purpose.
 EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
-
-
-def write_json(path, data):
-    """Write a per-user JSON file atomically, keeping any keys this version does not know, which a newer
-    Throughline (run before a downgrade, or beside this one) may have saved there. Returns the written object."""
-    path = Path(path)
-    try:
-        kept = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        kept = {}
-    merged = {**(kept if isinstance(kept, dict) else {}), **data}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
-    temporary.write_text(json.dumps(merged, indent=2), encoding='utf-8')
-    os.replace(temporary, path)
-    return merged
 
 
 def default_path():
@@ -115,7 +100,7 @@ class Seen:
             return self._saved()
 
     def add(self, item):
-        with self.lock:
+        with self.lock, locked(self.path):
             seen = self._saved()
             if item not in seen:
                 seen.append(item)

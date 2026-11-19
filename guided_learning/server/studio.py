@@ -12,13 +12,15 @@ import queue
 import re
 import subprocess
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from .. import library
 from ..codex import NOT_FOUND, find_codex
 from ..logs import Tail
 from ..store import OperationError
-from .settings import EFFORTS, default_path, write_json
+from ..userfiles import locked, write_json
+from .settings import EFFORTS, default_path
 
 log = logging.getLogger(__name__)
 CLIENT = 'throughline_studio'  # also the threads' originator, which keeps them apart from teaching threads
@@ -241,8 +243,15 @@ class Studio:
     def _save(self, data):
         write_json(self.path, data)
 
+    @contextmanager
+    def _editing(self):
+        """Hold the record for a read, change and save: against this host's other threads, and against another
+        Throughline process writing `studio.json` too, which would otherwise lose the chats or settings saved between."""
+        with self.lock, locked(self.path):
+            yield
+
     def _record(self, course, thread, keep=True):
-        with self.lock:
+        with self._editing():
             data = self._config()
             ids = [t for t in data['courses'].get(str(course), []) if t != thread]
             data['courses'][str(course)] = [thread, *ids] if keep else ids
@@ -251,7 +260,7 @@ class Studio:
     def move(self, old, new):
         """File a course's chats under its new folder, when it goes to the trash or comes back from it, so a course made
         later with the old name does not list them."""
-        with self.lock:
+        with self._editing():
             data = self._config()
             ids = data['courses'].pop(str(old), None)
             if ids is None:
@@ -401,7 +410,7 @@ class Studio:
         return self.access()
 
     def set_full_access(self, on):
-        with self.lock:
+        with self._editing():
             data = self._config()
             data['full_access'] = bool(on)
             self._save(data)
@@ -417,7 +426,7 @@ class Studio:
         model, effort = str(model or '').strip(), str(effort or '').strip()
         if effort not in ('', *EFFORTS):
             raise OperationError('invalid_settings', f"Reasoning effort must be one of {', '.join(EFFORTS)}")
-        with self.lock:
+        with self._editing():
             data = self._config()
             data['model'], data['effort'] = model, effort
             self._save(data)
@@ -549,7 +558,7 @@ class Studio:
         thread = result['thread']['id']
         self.owned.add(thread)
         if course == LIBRARY:
-            with self.lock:
+            with self._editing():
                 data = self._config()
                 data['began'][thread] = self._courses()
                 self._save(data)
@@ -656,7 +665,7 @@ class Studio:
     def refile(self, thread, course):
         """File a library thread under the course it made, so the course's Overview shows it from now on. Filing it
         again is no change, since the host may have filed it before the library page asks."""
-        with self.lock:
+        with self._editing():
             if thread in self._ids(course) and thread not in self._ids(LIBRARY):
                 return {'thread': thread, 'course': str(course)}
             self._owns(LIBRARY, thread)
@@ -674,7 +683,7 @@ class Studio:
         self._owns(course, thread)
         self._server().call('thread/archive', {'threadId': thread})
         self.owned.discard(thread)
-        with self.lock:
+        with self._editing():
             self._record(course, thread, keep=False)
             data = self._config()
             if data['began'].pop(thread, None) is not None:

@@ -8,6 +8,7 @@ from . import library, logs
 from .commands import host_record, version
 from .server.settings import EFFORTS, TeacherSettings
 from .server import serve
+from .server.app import SignIn
 
 
 def _record(port):
@@ -42,16 +43,19 @@ def main():
         logs.configure()
     settings = TeacherSettings(args.config, override={'model': args.model, 'small_model': args.small_model, 'effort': args.effort, 'small_effort': args.small_effort})
 
-    key = library.host_key()
+    sign_in = SignIn(library.host_key())
 
     def ready(port):
         if args.record:
+            # What this prints goes to host-output.log; `open` signs the browser in with a code of its own.
             _record(port)
             logging.getLogger('guided_learning').info('Throughline %s started on port %s', version(), port)
-        print(f'Learning interface: http://127.0.0.1:{port}/?key={key}', flush=True)
+            print(f'Learning interface: http://127.0.0.1:{port}/', flush=True)
+        else:
+            print(f'Learning interface: http://127.0.0.1:{port}/?code={sign_in.issue()}', flush=True)
     try:
         serve(args.workspace, port=args.port, settings=settings, on_ready=ready,
-              library_root=args.library or library.default_root(), key=key)
+              library_root=args.library or library.default_root(), sign_in=sign_in)
     finally:
         if args.record:
             _forget()

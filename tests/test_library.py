@@ -13,7 +13,9 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
+from guided_learning import api, library, sources
 from guided_learning.api import execute
+from guided_learning.store import OperationError, Store
 from guided_learning.server import Host, create_app
 from guided_learning.server import host as host_module
 from guided_learning.server.builds import ChapterBuilds
@@ -325,6 +327,13 @@ class CourseLibrary(unittest.TestCase):
                 again = cli(home, 'open', '--port', '0', '--no-browser')
                 self.assertIn(f"127.0.0.1:{record['port']}", again.stdout, 'a running host is reused')
                 self.assertEqual(json.loads((Path(home) / '.throughline' / 'host.json').read_text(encoding='utf-8'))['pid'], record['pid'])
+                # The browser is signed in with a one-time code; the key itself is in no address or log.
+                self.assertIn('/?code=', again.stdout)
+                key = (Path(home) / '.throughline' / 'host.key').read_text(encoding='ascii')
+                output = Path(home) / '.throughline' / 'host-output.log'
+                self.assertNotIn(key, first.stdout + again.stdout + output.read_text(encoding='utf-8', errors='replace'))
+                if os.name != 'nt':
+                    self.assertEqual(output.stat().st_mode & 0o777, 0o600)
                 with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home}):
                     from guided_learning.commands import _call
                     self.assertTrue(_call(record['port'], 'GET', '/api/library')['active'].endswith('alpha'))
@@ -447,6 +456,34 @@ class LookingAfterCourses(unittest.TestCase):
         restored = self.client.post(f"/api/library/trash/{entry['id']}/restore").json()
         self.assertEqual(restored, {'name': 'alpha-2', 'title': 'Alpha'})
         self.assertEqual({n: c['title'] for n, c in self.listed().items()}, {'alpha': 'Another alpha', 'alpha-2': 'Alpha', 'beta': 'Beta'})
+
+    def test_a_write_running_when_a_course_is_deleted_finishes_first(self):
+        writer = sqlite3.connect(self.root / 'alpha' / 'course.sqlite3')
+        writer.execute('BEGIN IMMEDIATE')  # a command-line write halfway through
+        deleting = threading.Thread(target=library.trash, args=(self.root, 'alpha'))
+        deleting.start()
+        deleting.join(0.5)
+        self.assertTrue((self.root / 'alpha' / 'course.sqlite3').is_file(), 'the course waits for the write')
+        writer.rollback()
+        writer.close()
+        deleting.join(10)
+        self.assertFalse((self.root / 'alpha').exists())
+
+    def test_a_write_that_opened_a_course_before_it_was_deleted_is_refused(self):
+        source = self.root / 'notes.md'
+        source.write_text('# Notes\nA state is a ray.', encoding='utf-8')
+        stale = Store(self.root / 'alpha')  # Codex's command opened the course, then the learner deleted it
+        deleted = library.trash(self.root, 'alpha')
+        try:
+            with self.assertRaises(OperationError) as refused:
+                api._write(stale, sources.register, {'op': 'source.register', 'path': str(source)})
+        finally:
+            stale.db.close()
+        self.assertEqual(refused.exception.code, 'course_moved')
+        self.assertFalse((self.root / 'alpha').exists(), 'nothing was written where the course used to be')
+        library.restore(self.root, deleted['id'])
+        self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+        execute(self.root / 'alpha', {'op': 'source.register', 'path': str(source)})  # a restored course takes writes again
 
     def test_the_trash_is_left_out_of_the_command_listing_and_imports(self):
         self.client.delete('/api/library/courses/alpha')

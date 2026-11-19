@@ -12,6 +12,8 @@ Each course card in the library has a small **⋯ menu** beside Open, with Renam
 
 The trash is inside `.throughline/` because everything that walks the library looks only at its top level, or skips hidden folders: the library listing and the `courses` command list folders holding `course.sqlite3`, Studio's `@` search leaves out paths starting with `.`, imports pick a free name among the library's own folders, and the library's `AGENTS.md` tells Codex never to touch `.throughline/`. A deleted course therefore takes no name, appears nowhere and is not course material.
 
+Moving a course is never done under a write: before the move, `library.trash` leaves `.moving` in the course while holding its write lock, so a write already running (Codex registering a source from the command line, say) finishes first, and every later one finds the marker, or no course at its path, and is refused with `course_moved`. Restoring removes the marker. Setup moving courses from an old library location takes that library's trash and archive list along, and deletes only the bookkeeping files it knows from the old library's own folder.
+
 **Throughline never empties the trash.** Learning records are never removed by the app; a learner who wants the space back deletes folders from the trash themselves, and Deleted courses says so, with **Show the trash folder**, which opens it in the file manager. An in-app "Delete forever" would be a second, irreversible confirmation for something learners rarely need, and the large part of a course is usually Codex's working files, not the records.
 
 ### Courses in use

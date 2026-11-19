@@ -178,6 +178,28 @@ class MovingOldLibraries(unittest.TestCase):
             moved, skipped = commands.migrate(self.root)
         self.assertEqual((moved, skipped), (['waves'], [str(self.old / 'optics')]))
 
+    def test_the_old_librarys_trash_and_archive_come_along(self):
+        deleted = commands.library.trash_dir(self.old) / '20261101-120000-abcdef'
+        (deleted / 'atoms').mkdir(parents=True)
+        (deleted / 'atoms' / 'course.sqlite3').write_bytes(b'')
+        (deleted / 'deleted.json').write_text('{"name": "atoms"}', encoding='utf-8')
+        commands.library.set_archived(self.old, 'optics', True)
+        moved, skipped = commands.migrate(self.root)
+        self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))
+        self.assertTrue((commands.library.trash_dir(self.root) / deleted.name / 'atoms' / 'course.sqlite3').is_file(),
+                        'a deleted course stays restorable')
+        self.assertEqual(commands.library.archived(self.root), {'optics'})
+        self.assertFalse(self.old.exists())
+
+    def test_what_setup_does_not_know_in_the_old_librarys_own_folder_stays(self):
+        own = commands.library.own_dir(self.old)
+        own.mkdir()
+        (own / 'host.json').write_text('{}', encoding='utf-8')
+        (own / 'someone-elses.txt').write_text('keep me', encoding='utf-8')
+        commands.migrate(self.root)
+        self.assertFalse((own / 'host.json').exists())
+        self.assertEqual((own / 'someone-elses.txt').read_text(encoding='utf-8'), 'keep me')
+
     def test_an_emptied_old_library_is_removed(self):
         moved, skipped = commands.migrate(self.root)
         self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))

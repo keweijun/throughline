@@ -108,6 +108,56 @@ class SharedLessons(LessonHost):
         self.assertEqual(len(mainline), 3, "the plan's last step is written by the recipient's teacher")
         self.assertTrue(any('step 3' in p for p in runner.prompts))
 
+    def personalise(self):
+        """The sender asked for the lesson in their own words, and the teacher's first reply noted something about them."""
+        db = sqlite3.connect(self.root / 'course.sqlite3')
+        try:
+            (lesson,), = db.execute("SELECT value FROM documents WHERE namespace='lessons' AND key='one'")
+            lesson = {**json.loads(lesson), 'request': 'Explain it for my resit on Friday, I failed it in June'}
+            db.execute("UPDATE documents SET value=? WHERE namespace='lessons' AND key='one'", (json.dumps(lesson),))
+            (turn,), = db.execute("SELECT value FROM documents WHERE namespace='streams' AND key=?", (self.turn_id('one'),))
+            turn = json.loads(turn)
+            note = '\n<course-memory>{"kind": "difficulty", "text": "Failed this exam in June"}</course-memory>'
+            turn.update(prompt=lesson['request'], text=turn['text'] + note, final_text=turn['final_text'] + note)
+            db.execute("UPDATE documents SET value=? WHERE namespace='streams' AND key=?", (json.dumps(turn), turn['id']))
+            db.commit()
+        finally:
+            db.close()
+
+    def test_a_shared_lesson_carries_neither_the_senders_request_nor_the_teachers_notes_about_them(self):
+        self.personalise()
+        course = self.share('lessons')
+        everything = json.dumps(list(records(course).values()), ensure_ascii=False)
+        for private in ('resit on Friday', 'Failed this exam', 'course-memory'):
+            self.assertNotIn(private, everything)
+        self.assertIn('Step one text.', everything, 'what the teacher wrote travels')
+        self.client.__exit__(None, None, None)
+        self.client, self.host = host_client(course, runner=Runner(), port=8769)
+        self.client.__enter__()
+        self.post('/api/lessons', {'id': 'r1'})
+        said = records(course)[('interactions', 'stream-user:' + self.turn_id('one'))]
+        self.assertEqual(said['text'], 'Teach this section step by step, starting with the first step.',
+                         "the recipient's reveal records the Start they pressed")
+        self.assertEqual([k for (n, k) in records(course) if n in ('memory', 'memory_notes')], [], 'nothing of the sender reaches their memory')
+
+    def test_a_shared_course_shared_again_keeps_its_lessons(self):
+        course = self.share('lessons')
+        again = Path(self.tmp.name) / 'again.throughline'
+        exported = packages.export(course, again, 'lessons')
+        self.assertEqual(exported['contents']['lessons'], 1)
+        library = Path(tempfile.mkdtemp(dir=self.tmp.name))
+        kept = records(Path(packages.import_package(again, library)['path']))
+        self.assertEqual([s.get('written') for s in kept[('lessons', 'one')]['steps']], [self.turn_id('one'), self.turn_id('two'), None])
+        # And partway through: the recipient has seen the first step, the second is still hidden.
+        self.client.__exit__(None, None, None)
+        self.client, self.host = host_client(course, runner=Runner(), port=8770)
+        self.client.__enter__()
+        self.post('/api/lessons', {'id': 'r1'})
+        packages.export(course, again, 'lessons')
+        library = Path(tempfile.mkdtemp(dir=self.tmp.name))
+        kept = records(Path(packages.import_package(again, library)['path']))
+        self.assertEqual([s.get('written') for s in kept[('lessons', 'one')]['steps']], [self.turn_id('one'), self.turn_id('two'), None])
+
     def test_route_carries_no_lessons_or_exercises(self):
         kept = records(self.share('route'))
         self.assertEqual({n for n, _ in kept} & {'lessons', 'streams', 'practice_tasks'}, set())

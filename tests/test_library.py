@@ -473,6 +473,15 @@ class LookingAfterCourses(unittest.TestCase):
         source = self.root / 'notes.md'
         source.write_text('# Notes\nA state is a ray.', encoding='utf-8')
         stale = Store(self.root / 'alpha')  # Codex's command opened the course, then the learner deleted it
+        if os.name == 'nt':
+            # Windows refuses to move a folder with an open file, so the course stays, and takes writes once it closes.
+            with self.assertRaises(OperationError) as refused:
+                library.trash(self.root, 'alpha')
+            stale.db.close()
+            self.assertEqual(refused.exception.code, 'course_in_use')
+            self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+            execute(self.root / 'alpha', {'op': 'source.register', 'path': str(source)})
+            return
         deleted = library.trash(self.root, 'alpha')
         try:
             with self.assertRaises(OperationError) as refused:

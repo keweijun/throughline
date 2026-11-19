@@ -93,10 +93,21 @@ class CurriculumCLI(unittest.TestCase):
         model = self.model()
         model['coverage'][0]['concept_ids'] = ['projection']
         self.call('curriculum.save', error='invalid_coverage', **model)
+        partial = self.model()
+        partial['coverage'] = partial['coverage'][1:]
+        self.call('curriculum.save', **partial)
         path = self.base / 'lecture.md'
         path.write_text('Revised', encoding='utf-8')
         self.call('source.register', path=str(path))
-        self.call('curriculum.save', error='invalid_coverage', **self.model())
+        self.call('curriculum.save', error='invalid_coverage', **self.model())  # a new mapping to the old revision
+        changed = self.model()
+        changed['coverage'] = changed['coverage'][1:]
+        changed['coverage'][0]['verification'] = 'verified'
+        changed['coverage'][0]['verification_note'] = 'Checked'
+        self.call('curriculum.save', error='invalid_coverage', **changed)  # or a changed one
+        self.call('curriculum.save', **partial)  # the mappings saved before the revision stay as they were
+        self.assertEqual(self.call('curriculum.view')['coverage'], partial['coverage'])
+        self.assertEqual(len(self.call('curriculum.coverage')['stale_mappings']), 1)
 
 
 class ChapterCLI(CurriculumCLI):
@@ -167,6 +178,23 @@ class ChapterCLI(CurriculumCLI):
         chapters = self.call('curriculum.view')['chapters']
         chapters[1]['concept_ids'].append('extra')
         self.call('curriculum.save', chapters=chapters, **model)
+
+    def test_updating_one_chapters_source_does_not_block_saving_another_chapter(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        self.chapter([state], [self.model()['coverage'][0]], chapter_id='states')
+        problems = self.model()['coverage'][2]
+        self.chapter([projection], [problems], chapter_id='measure')
+        path = self.base / 'lecture.md'
+        path.write_text('Revised states\nProjection', encoding='utf-8')
+        self.call('source.register', path=str(path))
+        self.chapter([{**projection, 'objective': 'Compute a coefficient'}], [problems], chapter_id='measure', title='Measuring')
+        model = self.call('curriculum.view')
+        self.assertEqual(model['chapters'][1]['title'], 'Measuring')
+        self.assertIn(self.model()['coverage'][0], model['coverage'], "the States chapter's mapping is kept for review")
+        self.assertEqual(len(self.call('curriculum.coverage')['stale_mappings']), 1)
+        self.chapter([state], [{**self.model()['coverage'][0], 'verification': 'verified', 'verification_note': 'Read it'}],
+                     chapter_id='states', error='invalid_coverage')  # changing it still needs the current revision
 
     def test_a_source_unit_shared_by_two_chapters_keeps_both_mappings(self):
         self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])

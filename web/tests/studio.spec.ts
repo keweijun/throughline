@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, expect, editorText, courseOperation } from './fixture';
 
 /** Studio (ADR 0016) against the scripted App Server in tests/fake_studio_server.py. */
@@ -415,7 +417,10 @@ test('a library chat reloaded while it makes a course still moves into that cour
 });
 
 test('a long turn can be read back while it runs, then folds behind its answer, and the chat gets a title', async ({ page, course }) => {
-  const { errors } = await course('studio_browser_fixture');
+  const { base, errors } = await course('studio_browser_fixture');
+  // The fake Codex keeps printing output until this file exists beside its log, in the folder holding the library.
+  const { root } = await (await page.request.get(`${base}/api/library`)).json();
+  const release = path.join(path.dirname(root), 'busy.release');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
   const frame = panel.locator('.studio-frame');
@@ -437,6 +442,7 @@ test('a long turn can be read back while it runs, then folds behind its answer, 
   expect(await page.locator('#stage').evaluate((s) => s.scrollTop)).toBe(stage);
 
   // The answer arrives and the work before it folds behind how long it took, as in Codex.
+  fs.writeFileSync(release, '');
   await expect(panel.locator('.said-by-codex:not(.commentary)')).toHaveText('All parts are built.', { timeout: 20_000 });
   const fold = panel.getByRole('button', { name: /^Worked for \d+s$/ });
   await expect(fold).toHaveAttribute('aria-expanded', 'false');

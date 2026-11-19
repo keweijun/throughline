@@ -272,7 +272,7 @@ class Courses:
         for path in paths:
             stamp = library.stamp(path)  # taken before reading, so a write during the read shows at the next poll
             known = self._stamps.get(path)
-            stamps[path] = known if known and known[0] == stamp else (stamp, library.fingerprint(path))
+            stamps[path] = known if known and stamp is not None and known[0] == stamp else (stamp, library.fingerprint(path))
         self._stamps = stamps
         return {path: fingerprint for path, (_, fingerprint) in stamps.items()}
 

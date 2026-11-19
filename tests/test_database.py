@@ -7,12 +7,15 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from guided_learning import api
 from guided_learning.api import execute
 from guided_learning.server import Host
 from guided_learning.server import host as host_module
+from guided_learning.server.builds import ChapterBuilds
+from guided_learning.server.features import Preparation
 from support import ROOT, call_cli
 
 
@@ -134,24 +137,49 @@ class StreamWrites(unittest.TestCase):
         return execute(self.workspace, {'op': 'stream.read', 'id': identifier})['turn']
 
     def test_a_streamed_lesson_is_written_a_few_times_while_every_delta_is_published_in_order(self):
-        runner = Gate(deltas=100, pause=0.002)
-        runner.release.set()
-        host = self.host(runner, 0.1)
+        # Streamed text is stored when the host's batching timer fires; the test fires it after every ten deltas, as a
+        # steady model and the timer would, so a slow computer cannot change how many batches there are.
+        timers = []
+
+        class Timer:
+            def __init__(self, interval, function):
+                self.function, self.daemon = function, False
+                timers.append(self)
+
+            def start(self):
+                pass
+
+        class Batched:
+            def run(self, prompt, cwd, emit, cancel):
+                for i in range(100):
+                    emit({'kind': 'delta', 'text': f'w{i} '})
+                    if i % 10 == 9:
+                        timers.pop().function()
+                emit({'kind': 'final', 'text': 'Whole lesson.'})
+                emit({'kind': 'complete'})
+        # Every host operation stores streamed text first; the host's preparation and chapter builds run operations on
+        # their own schedule, so they do not run.
+        with mock.patch.object(Preparation, 'start'), mock.patch.object(ChapterBuilds, 'start'):
+            host = self.host(Batched(), 0.1)
         seen = []
 
         async def collect():
             subscriber = host.events.subscribe()
-            await asyncio.to_thread(host.start_turn, {'id': 'l', 'concept_id': 'state', 'prompt': 'Explain'})
-            while True:
-                event = await asyncio.wait_for(subscriber[1].get(), 5)
-                seen.append(event)
-                if event['type'] == 'turn' and event['turn']['status'] == 'completed':
-                    return
+            with mock.patch.object(host_module.threading, 'Timer', Timer):
+                await asyncio.to_thread(host.start_turn, {'id': 'l', 'concept_id': 'state', 'prompt': 'Explain'})
+                while True:
+                    event = await asyncio.wait_for(subscriber[1].get(), 5)
+                    seen.append(event)
+                    if event['type'] == 'turn' and event['turn']['status'] == 'completed':
+                        return
         asyncio.run(collect())
         deltas = [e for e in seen if e['type'] == 'delta']
         self.assertEqual([e['sequence'] for e in deltas], list(range(1, 101)))
         self.assertEqual(''.join(e['text'] for e in deltas), ''.join(f'w{i} ' for i in range(100)))
-        self.assertLess(len(self.writes), 15, f'{len(self.writes)} stream writes for 100 deltas')
+        self.assertEqual(timers, [], 'each batch starts one timer')
+        # The finished lesson starts practice, whose turn streams too.
+        lesson = [w for w in self.writes if w['id'] == 'l']
+        self.assertEqual(len(lesson), 12, 'ten batches of deltas, then the final reply and the completion')
         turn = self.stored('l')
         self.assertEqual((turn['status'], turn['text'], turn['sequence']), ('completed', 'Whole lesson.', 102))
 

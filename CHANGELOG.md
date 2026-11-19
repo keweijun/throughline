@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.53.2
+
+- The library notices every change to a course's title, route or sources, also two made within a moment of each other. Before, such a change could go unseen until the course changed again.
+- Going to another section right after a side question is answered no longer shows an error in the page.
+
 ## 0.53.1
 
 - Running an older and a newer Throughline side by side, or going back a version, no longer loses settings the newer one saved: your teacher settings, Studio's access and chats, dismissed tips, and a course's preferences.

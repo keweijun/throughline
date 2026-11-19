@@ -371,7 +371,6 @@ const messages = {
   "Original page image unavailable: install the project pdf extra. You can still open the original PDF.": "原页图像未显示：需要安装项目 pdf 扩展。仍可打开原 PDF 核对。",
   "Dismiss": "关闭提示",
   "Opening your course…": "正在打开课程…",
-  "Ask for another pass": "再讲一次",
   "For example: go deeper on the derivation, or explain it with a different example": "例如：深入推导，或换一个例子说明",
   "Teach again": "再讲一次",
   "What to ask for": "要讲什么",

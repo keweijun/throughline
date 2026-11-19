@@ -3,7 +3,7 @@ import { test, expect } from './fixture';
 test('Shift twice searches the course: a section opens, a lesson opens on the passage, and a source opens at its page', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const search = page.getByRole('dialog', { name: 'Search this course' });
   const field = search.getByRole('combobox');
 

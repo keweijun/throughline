@@ -31,7 +31,8 @@ def course(path, title):
 
 def cli(home, *args, stdin='', **extra):
     env = {**os.environ, **extra, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
-           'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata')}
+           'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata'),
+           'GUIDED_LEARNING_CONFIG': str(Path(home) / '.config' / 'settings.json')}
     return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
 
@@ -365,7 +366,7 @@ class Migration(unittest.TestCase):
             course(old / 'alpha', 'Alpha')
             (old / 'AGENTS.md').write_text('<!-- Written by guided-learning setup; rerunning setup replaces this file. -->', encoding='utf-8')
             env = {**os.environ, 'HOME': home, 'USERPROFILE': home, 'XDG_DATA_HOME': str(Path(home) / '.xdg'),
-                   'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills')}
+                   'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'), 'GUIDED_LEARNING_CONFIG': str(Path(home) / 's.json')}
             env.pop('GUIDED_LEARNING_HOME', None)
             result = subprocess.run([sys.executable, '-m', 'guided_learning', 'setup', '--no-open', '--no-launcher'], text=True, capture_output=True,
                                     cwd=ROOT, env=env, timeout=60)

@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import sqlite3
+import tempfile
 import time
 import uuid
 import zipfile
@@ -56,8 +57,12 @@ BUILT_FOR = ('goal', 'depth', 'focus')
 _SEGMENT = r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}'
 # The only entries a package may hold. Anything else, a path out of the course folder included, refuses the package.
 ENTRY = re.compile(rf'(?:manifest\.json|course\.sqlite3|sources/{_SEGMENT}/[0-9a-f]{{64}}|{images.FOLDER}/{images.NAME.pattern})')
+# Against a package that unpacks to far more than it holds (a zip bomb): what its entries declare, which unpacking never
+# exceeds, is capped, and beyond RATIO_FLOOR may be at most MAX_RATIO times the package's size. Below the floor any ratio
+# is accepted, since a long text source can compress a thousandfold; the export refuses a course that would not fit.
 MAX_UNPACKED = 8 << 30
-MAX_RATIO = 50  # unpacked bytes per packed byte, well beyond what databases and text compress to
+MAX_RATIO = 50  # unpacked bytes per packed byte, well beyond what databases and most text compress to
+RATIO_FLOOR = 1 << 30
 MAX_MANIFEST = 1 << 20
 
 
@@ -171,13 +176,11 @@ def export(workspace, destination, level='everything'):
     workspace = Path(workspace).resolve()
     status = execute(workspace, {'op': 'course.status'})  # migrates the course first, so the package is current
     destination = Path(destination).resolve()
-    partial = destination.with_name('.' + destination.name + '.partial')
-    copy = destination.with_name('.' + destination.name + '.sqlite3')
-    shared = destination.with_name('.' + destination.name + '.shared.sqlite3')
-    folders = ('sources', images.FOLDER) if level == 'everything' else ('sources',)  # images belong to answers and notes
+    # Every export builds in a folder of its own beside the destination, so exports overlapping on one destination
+    # never touch each other's files, and the finished package still replaces the destination in one rename.
+    work = Path(tempfile.mkdtemp(prefix='.' + destination.name + '.', suffix='.partial', dir=destination.parent))
+    partial, copy, shared = work / 'package.zip', work / 'course.sqlite3', work / 'shared.sqlite3'
     try:
-        for path in (copy, shared):
-            path.unlink(missing_ok=True)
         live = sqlite3.connect(workspace / 'course.sqlite3', timeout=30)
         try:
             live.execute('VACUUM INTO ?', (str(copy),))  # one consistent, compacted file, taken beside writers
@@ -189,11 +192,19 @@ def export(workspace, destination, level='everything'):
         rows = list(_rows(copy))
         # Listed after the snapshot: a source registered meanwhile wrote its file before its record, so every source
         # the snapshot holds has its file here. One that doesn't would make a package that imports with a gap.
-        files = sorted(path for folder in folders for path in (workspace / folder).rglob('*')
+        files = sorted(path for path in (workspace / 'sources').rglob('*')
                        if path.is_file() and ENTRY.fullmatch(path.relative_to(workspace).as_posix()))
         missing = _missing_sources(rows, {path.relative_to(workspace).as_posix() for path in files})
         if missing:
             raise OperationError('source_missing', f'The course is missing the saved copy of {missing[0]}; register that source again, then export')
+        # A copy whose bytes no longer match its revision would refuse the import, so the package would be no backup.
+        damaged = _damaged_sources(rows, workspace)
+        if damaged:
+            raise OperationError('source_missing', f'The saved copy of {damaged[0]} is damaged; register that source again, then export')
+        # Attached images travel with the records that use them, which only Everything carries; one whose bytes no
+        # longer match its name is left out, as the import would refuse it.
+        if level == 'everything':
+            files += [path for path in sorted(workspace / images.FOLDER / name for name in _images_used(rows)) if path.is_file() and _intact(path)]
         course = {key: json.loads(value) for namespace, key, value in rows if namespace == 'course'}
         manifest = {'format': FORMAT, 'level': level, 'schema': (course.get('schema') or {}).get('version', 1),
                     'throughline': version(), 'name': workspace.name, 'title': status['course']['title'],
@@ -206,10 +217,13 @@ def export(workspace, destination, level='everything'):
             archive.write(copy, 'course.sqlite3')
             for path in files:
                 archive.write(path, path.relative_to(workspace).as_posix())
+        with zipfile.ZipFile(partial) as archive:
+            if not _fits(archive.infolist(), partial.stat().st_size):
+                raise OperationError('package_too_large', 'This course would make a package Throughline cannot import: larger than '
+                                     f'{MAX_UNPACKED >> 30} GB unpacked, or so compressible that an import would take it for a damaged file')
         os.replace(partial, destination)
     finally:
-        for path in (partial, copy, shared):
-            path.unlink(missing_ok=True)
+        shutil.rmtree(work, ignore_errors=True)
     return {'path': str(destination), 'size': destination.stat().st_size, 'level': level, 'title': manifest['title'],
             'sources': len(manifest['sources']), 'contents': manifest['contents']}
 
@@ -246,8 +260,9 @@ def import_package(package, root, name=None, mode=None):
                 shutil.copyfileobj(source, out)
             level = manifest['level'] if mode == 'continue' else LEVELS[min(LEVELS.index(manifest['level']), LEVELS.index('lessons'))]
             _copy_records(archive_db, course, level, mode, manifest)
+            used = {images.FOLDER + '/' + name for name in _images_used(_rows(course / 'course.sqlite3'))}
             for entry in entries:
-                if entry.filename.startswith('sources/') or mode != 'fresh' and entry.filename.startswith(images.FOLDER + '/'):
+                if entry.filename.startswith('sources/') or entry.filename in used:
                     _unpack(archive, entry, course / entry.filename)
             unpacked = {p.relative_to(course).as_posix() for p in (course / 'sources').rglob('*') if p.is_file()}
             missing = _missing_sources(_rows(course / 'course.sqlite3'), unpacked)
@@ -279,8 +294,7 @@ def _manifest(package, archive, entries):
         raise OperationError('invalid_package', f'The package holds an unexpected entry: {unexpected}')
     if len(set(names)) != len(names) or 'manifest.json' not in names or 'course.sqlite3' not in names:
         raise OperationError('invalid_package', 'The package is incomplete or holds an entry twice')
-    unpacked = sum(entry.file_size for entry in entries)
-    if unpacked > MAX_UNPACKED or unpacked > MAX_RATIO * max(package.stat().st_size, 1 << 20):
+    if not _fits(entries, package.stat().st_size):
         raise OperationError('invalid_package', 'The package would unpack far beyond its size')
     if archive.getinfo('manifest.json').file_size > MAX_MANIFEST:
         raise OperationError('invalid_package', 'The package manifest is too large')
@@ -308,6 +322,33 @@ def _target(root, name, suggested):
     if target.exists():
         raise OperationError('course_exists', f'A course named {target.name} already exists')
     return target
+
+
+def _fits(entries, size):
+    """Whether a package of `size` bytes with these entries passes the import's guard against zip bombs."""
+    unpacked = sum(entry.file_size for entry in entries)
+    return unpacked <= MAX_UNPACKED and unpacked <= max(MAX_RATIO * size, RATIO_FLOOR)
+
+
+def _intact(path):
+    """Whether a stored file's bytes still match the hash that names it, as the import checks (`_unpack`)."""
+    digest = hashlib.sha256()
+    with path.open('rb') as file:
+        while chunk := file.read(1 << 20):
+            digest.update(chunk)
+    return path.name.startswith(digest.hexdigest())
+
+
+def _damaged_sources(rows, workspace):
+    """The sources whose saved copy no longer matches the revision that names it."""
+    return [Path(str(snapshot.get('path') or snapshot.get('source_id'))).name
+            for snapshot in (json.loads(value) for namespace, _, value in rows if namespace == 'source_revisions')
+            if not _intact(workspace / 'sources' / str(snapshot.get('source_id')) / str(snapshot.get('revision')))]
+
+
+def _images_used(rows):
+    """The attached images that records name, wherever in a record they do."""
+    return {match[0] for _, _, value in rows for match in re.finditer(images.NAME.pattern, value)}
 
 
 def _missing_sources(rows, present):
@@ -370,11 +411,12 @@ def _copy_records(package_db, course, level, mode, manifest):
     """Copy the package's records, as the import takes them, into a new course database. A fresh start is marked as
     imported, which Studio warns about under Full access."""
     store = Store(course, create=True)
-    # A package already holds only its level's records; sharing applies only when the recipient takes less.
-    take = 'everything' if level == manifest['level'] else level
     try:
         with store.db:
-            store.db.executemany('INSERT INTO documents VALUES (?, ?, ?)', share(_rows(package_db), take, notes=mode == 'fresh-with-notes'))
+            # Below Everything the package's records are shared again at the level taken, even when the package holds
+            # just that level: Throughline 0.54.0 and earlier left the sender's own lesson requests and the teacher's notes
+            # about them in a Route and lessons package, and sharing is unchanged by sharing again.
+            store.db.executemany('INSERT INTO documents VALUES (?, ?, ?)', share(_rows(package_db), level, notes=mode == 'fresh-with-notes'))
             metadata = store.get('course', 'metadata')
             if not isinstance(metadata, dict) or not isinstance(metadata.get('title'), str):
                 raise OperationError('invalid_package', 'The package database holds no course')

@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.55.1
+
+- A course with a very long text source, such as a full transcript, can now be imported from its package. Before, the import could refuse a package Throughline had just exported, so a backup of such a course could not be restored.
+- Exporting a course whose saved copy of a source is damaged now says so and asks you to register that source again, instead of making a package that would not import.
+- Exporting the same course twice at once to the same file, say once to share and once as a backup, no longer mixes the two: a Route package can no longer pick up your notes or progress from the other export.
+- Importing a Route and lessons package made by Throughline 0.54.0 or earlier no longer carries the sender's own wording of their lesson requests, or the teacher's notes about them, into your course.
+- A whole-course package now holds only the images attached to your answers, questions and notes, not every image the course folder kept.
+
 ## 0.55.0
 
 - A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.

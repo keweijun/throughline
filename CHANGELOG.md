@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.54.6
+
+- On a Mac, opening Throughline from Finder, Spotlight or the Dock now finds a Codex you installed only for the terminal (the `codex` command), so lessons and Studio work there too. Before, Throughline could say Codex was not found unless the Codex app was installed. This also applies to app-menu launchers on Linux. Run setup again (or update) to pick up where your Codex is.
+
 ## 0.54.4
 
 - If Codex stops responding in Studio, Stop now works: Throughline restarts Codex and says so, instead of leaving the chat working until you quit. Before, a stuck Codex also kept you from updating Throughline or deleting a course. Your chats are kept; send a message to carry on.

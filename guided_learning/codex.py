@@ -16,13 +16,62 @@ NOT_FOUND = ('Codex was not found. Install Codex (the codex command or the Codex
              'is, then try again.')
 
 
+def _explicit_or_on_path():
+    """The codex binary named by CODEX_CLI_PATH, else the one on PATH, as an absolute path when it can be resolved."""
+    named = os.environ.get('CODEX_CLI_PATH')
+    if named:
+        return shutil.which(named) or named
+    return shutil.which('codex')
+
+
+def _settings_path():
+    from .server.settings import default_path  # imported here: the settings module imports this one
+    return default_path()
+
+
+def _usable(path):
+    return isinstance(path, str) and os.path.isabs(path) and os.path.isfile(path) and os.access(path, os.X_OK)
+
+
+def saved_codex():
+    """The codex binary setup found, saved in the per-user settings, while it is still there and executable."""
+    try:
+        path = json.loads(_settings_path().read_text(encoding='utf-8')).get('codex_path')
+    except (OSError, ValueError, AttributeError):
+        return None
+    return path if _usable(path) else None
+
+
+def remember_codex():
+    """Save where setup found codex (CODEX_CLI_PATH or PATH), so a host started without that PATH, from Finder,
+    Spotlight or an app menu, still finds it. Returns the saved path, or None when there was nothing to save."""
+    found = _explicit_or_on_path()
+    if not found:
+        return None
+    found = os.path.abspath(found)
+    if not _usable(found):
+        return None
+    from .server.settings import write_json
+    try:
+        write_json(_settings_path(), {'codex_path': found})
+    except OSError:
+        return None
+    return found
+
+
 def find_codex():
-    """The codex binary: CODEX_CLI_PATH, then PATH, then the copy bundled with the Codex desktop app."""
-    if os.environ.get('CODEX_CLI_PATH'):
-        return os.environ['CODEX_CLI_PATH']
-    found = shutil.which('codex')
+    """The codex binary: CODEX_CLI_PATH, then PATH, then where setup last found it, then the copy bundled with the
+    Codex desktop app."""
+    found = _explicit_or_on_path()
     if found:
         return found
+    saved = saved_codex()
+    if saved:
+        # A codex installed with npm is a Node script; its node usually sits beside it, in a folder this PATH lacks.
+        folder = os.path.dirname(saved)
+        if folder not in os.environ.get('PATH', '').split(os.pathsep):
+            os.environ['PATH'] = os.pathsep.join(filter(None, (os.environ.get('PATH', ''), folder)))
+        return saved
     bundled = ['/Applications/Codex.app/Contents/Resources/codex', os.path.expanduser('~/Applications/Codex.app/Contents/Resources/codex')]
     if os.environ.get('LOCALAPPDATA'):
         # The Windows app unpacks its CLI into a per-version folder; prefer the newest.

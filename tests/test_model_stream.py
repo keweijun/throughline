@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -114,7 +115,7 @@ class FindCodex(unittest.TestCase):
     def test_explicit_path_then_path_then_desktop_app(self):
         from unittest import mock
         from guided_learning import codex
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(codex.os.environ, {'GUIDED_LEARNING_CONFIG': str(Path(tmp) / 's.json')}):
             bundled = Path(tmp) / 'OpenAI' / 'Codex' / 'bin' / 'codex.exe'
             bundled.parent.mkdir(parents=True)
             bundled.write_text('')
@@ -127,6 +128,85 @@ class FindCodex(unittest.TestCase):
                 codex.os.environ.pop('CODEX_CLI_PATH', None)
                 self.assertEqual(codex.find_codex(), str(bundled))
 
+
+class SavedCodex(unittest.TestCase):
+    """A host the macOS launcher starts from Finder or Spotlight has no shell PATH: setup's saved codex stands in."""
+
+    def setUp(self):
+        from unittest import mock
+        from guided_learning import codex
+        self.codex = codex
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name)
+        self.cli = self.home / 'npm' / 'bin' / ('codex.exe' if os.name == 'nt' else 'codex')
+        self.cli.parent.mkdir(parents=True)
+        self.cli.write_text('')
+        self.cli.chmod(0o755)
+        self.settings = self.home / 'config' / 'settings.json'
+        self.settings.parent.mkdir()
+        self.settings.write_text(json.dumps({'model': 'gpt-6-luna', 'future_key': 1}), encoding='utf-8')
+        self.app = self.home / 'OpenAI' / 'Codex' / 'bin' / 'codex.exe'  # the desktop app's copy, the last resort
+        self.app.parent.mkdir(parents=True)
+        self.app.write_text('')
+        environment = mock.patch.dict(codex.os.environ, {'GUIDED_LEARNING_CONFIG': str(self.settings), 'LOCALAPPDATA': str(self.home),
+                                                         'PATH': str(self.cli.parent)})
+        environment.start()
+        self.addCleanup(environment.stop)
+        codex.os.environ.pop('CODEX_CLI_PATH', None)
+
+    def assertSamePath(self, found, expected):
+        self.assertEqual(os.path.normcase(str(found)), os.path.normcase(str(expected)))  # Windows' which upper-cases .EXE
+
+    def launcher_environment(self):
+        """What a host started by the launcher sees: a PATH without the folder codex is in."""
+        self.codex.os.environ['PATH'] = str(self.home / 'system')
+
+    def test_setup_saves_codex_and_a_launcher_started_host_finds_it(self):
+        self.assertSamePath(self.codex.remember_codex(), self.cli)
+        saved = json.loads(self.settings.read_text(encoding='utf-8'))
+        self.assertSamePath(saved.pop('codex_path'), self.cli)
+        self.assertEqual(saved, {'model': 'gpt-6-luna', 'future_key': 1}, 'the settings and keys it does not know stay')
+        self.launcher_environment()
+        self.assertSamePath(self.codex.find_codex(), self.cli)
+        self.assertIn(str(self.cli.parent), self.codex.os.environ['PATH'].split(os.pathsep), 'so an npm codex finds its node')
+
+    def test_path_and_the_explicit_override_come_before_the_saved_codex(self):
+        self.codex.remember_codex()
+        other = self.home / 'brew' / self.cli.name
+        other.parent.mkdir()
+        other.write_text('')
+        other.chmod(0o755)
+        self.codex.os.environ['PATH'] = str(other.parent)
+        self.assertSamePath(self.codex.find_codex(), other)
+        self.codex.os.environ['CODEX_CLI_PATH'] = '/opt/codex'
+        self.assertEqual(self.codex.find_codex(), '/opt/codex')
+
+    def test_a_saved_codex_that_is_gone_is_ignored(self):
+        self.codex.remember_codex()
+        self.cli.unlink()
+        self.launcher_environment()
+        self.assertSamePath(self.codex.find_codex(), self.app)
+
+    def test_rerunning_setup_refreshes_the_saved_codex_and_keeps_it_when_codex_is_not_on_path(self):
+        self.codex.remember_codex()
+        moved = self.home / 'moved' / self.cli.name
+        moved.parent.mkdir()
+        moved.write_text('')
+        moved.chmod(0o755)
+        self.codex.os.environ['PATH'] = str(moved.parent)
+        self.assertSamePath(self.codex.remember_codex(), moved)
+        self.launcher_environment()
+        self.assertIsNone(self.codex.remember_codex())
+        self.assertSamePath(json.loads(self.settings.read_text(encoding='utf-8'))['codex_path'], moved)
+        self.assertSamePath(self.codex.find_codex(), moved)
+
+    def test_teacher_settings_keep_the_saved_codex(self):
+        from guided_learning.server.settings import TeacherSettings
+        self.codex.remember_codex()
+        TeacherSettings(self.settings).save('gpt-6-sol', 'high')
+        self.launcher_environment()
+        self.assertSamePath(self.codex.find_codex(), self.cli)
 
 # Each call is its own file: the teaching turn and the thread sweep run servers at once, and Windows does not append atomically.
 SAVED_SERVER = '''import sys,json,os,time

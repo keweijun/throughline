@@ -542,7 +542,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
             # what the page sends, nor hand it that course's records. Nothing is read or written before this check.
             current = courses.host
             wanted = request.headers.get(COURSE_HEADER) or request.query_params.get('course')
-            if wanted and (current is None or current.course_id != wanted):
+            if wanted and (current is None or current.course_key != wanted):
                 return JSONResponse({'error': 'Another course was opened since this page loaded; reload to continue',
                                      'code': 'course_changed'}, 409)
             pinned = PINNED.set((current,))

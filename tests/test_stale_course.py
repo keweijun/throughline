@@ -42,9 +42,9 @@ class StalePages(unittest.TestCase):
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
         self.client.post('/api/library/open', json={'name': 'alpha'})
-        self.alpha = self.client.get('/api/state').json()['course']['id']
+        self.alpha = self.client.get('/api/state').json()['course']['key']
         self.client.post('/api/library/open', json={'name': 'beta'})  # in another tab
-        self.beta = self.client.get('/api/state').json()['course']['id']
+        self.beta = self.client.get('/api/state').json()['course']['key']
 
     def note(self, course):
         return self.client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'intro', 'note': 'Meant for Alpha'},
@@ -71,6 +71,18 @@ class StalePages(unittest.TestCase):
     def test_reads_of_the_state_are_refused_too(self):
         self.assertEqual(self.client.get('/api/state', headers={'X-Throughline-Course': self.alpha}).json()['code'], 'course_changed')
         self.assertEqual(self.client.get('/api/state?only=memory', headers={'X-Throughline-Course': self.alpha}).status_code, 409)
+
+    def test_a_copy_of_a_course_folder_is_another_course(self):
+        # The learner copied alpha's folder while it was closed; the copy keeps alpha's ID.
+        shutil.copytree(self.root / 'alpha', self.root / 'alpha-copy')
+        self.client.post('/api/library/open', json={'name': 'alpha-copy'})  # in another tab
+        response = self.note(self.alpha)
+        self.assertEqual((response.status_code, response.json()['code']), (409, 'course_changed'))
+        self.assertEqual(notes(self.root / 'alpha-copy'), [], 'a page of the original writes nothing into the copy')
+        stale = self.client.get('/api/course/package/everything?course=' + self.alpha)
+        self.assertEqual(stale.status_code, 409, "nor downloads the copy's package")
+        copy = self.client.get('/api/state').json()['course']['key']
+        self.assertEqual(self.note(copy).status_code, 200)
 
     def test_a_page_whose_course_was_closed_is_told_the_course_changed(self):
         self.client.delete('/api/library/courses/beta')

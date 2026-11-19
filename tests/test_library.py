@@ -495,6 +495,49 @@ class LookingAfterCourses(unittest.TestCase):
         self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
         execute(self.root / 'alpha', {'op': 'source.register', 'path': str(source)})  # a restored course takes writes again
 
+    def mark_as_trash_would(self, name):
+        db = sqlite3.connect(self.root / name / 'course.sqlite3')
+        db.execute('BEGIN IMMEDIATE')
+        (self.root / name / api.MOVING).write_text(f'{os.getpid()}\n', encoding='utf-8')
+        db.rollback()
+        db.close()
+
+    def test_a_course_whose_deletion_died_before_the_move_works_again(self):
+        # The host was killed after marking the course and before moving it: the course never left the library.
+        self.mark_as_trash_would('alpha')
+        source = self.root / 'notes.md'
+        source.write_text('# Notes\nA state is a ray.', encoding='utf-8')
+        execute(self.root / 'alpha', {'op': 'source.register', 'path': str(source)})
+        self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+        self.mark_as_trash_would('alpha')
+        self.assertEqual(self.client.post('/api/library/open', json={'name': 'alpha'}).status_code, 200)
+        self.assertEqual(self.client.post('/api/annotations', json={'kind': 'note', 'concept_id': 'state', 'note': 'Kept'}).status_code, 200)
+        self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+        self.assertEqual(self.client.delete('/api/library/courses/alpha').status_code, 200, 'and it can be deleted')
+
+    def test_a_course_being_moved_takes_no_writes_until_the_move_ends(self):
+        from guided_learning import moving
+        lock_path = moving._move_lock(self.root / 'alpha')
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock = moving.try_lock(lock_path)  # a move running in another process
+        self.mark_as_trash_would('alpha')
+        try:
+            with self.assertRaises(OperationError) as refused:
+                execute(self.root / 'alpha', {'op': 'memory.save', 'id': 'pref-2', 'kind': 'preference', 'text': 'Short'})
+            self.assertEqual(refused.exception.code, 'course_moved')
+            self.assertTrue((self.root / 'alpha' / api.MOVING).exists())
+        finally:
+            lock.close()
+        # The move died without moving the course; nothing holds the lock any more.
+        execute(self.root / 'alpha', {'op': 'memory.save', 'id': 'pref-2', 'kind': 'preference', 'text': 'Short'})
+        self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+
+    def test_a_deleted_course_takes_no_writes_in_the_trash(self):
+        entry = library.trash(self.root, 'alpha')
+        with self.assertRaises(OperationError) as refused:
+            execute(entry['path'], {'op': 'memory.save', 'id': 'pref-2', 'kind': 'preference', 'text': 'Short'})
+        self.assertEqual(refused.exception.code, 'course_moved')
+
     def test_the_trash_is_left_out_of_the_command_listing_and_imports(self):
         self.client.delete('/api/library/courses/alpha')
         from guided_learning import library, packages

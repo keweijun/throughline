@@ -12,20 +12,21 @@ export const signIn = { refused: () => {} };
  * (`course_changed`); the page then reloads into the open course, as it does when told the course switched.
  */
 export const course = {
-  id: null as string | null,
+  /** The course's key: its ID and its folder, so a copy of the course folder is another course. */
+  key: null as string | null,
   changed: () => location.reload(),
 };
 
 /** A plain link to a course-scoped endpoint (a download or an image), which cannot send the header, names the course. */
 export function courseUrl(path: string) {
-  return course.id ? `${path}${path.includes('?') ? '&' : '?'}course=${encodeURIComponent(course.id)}` : path;
+  return course.key ? `${path}${path.includes('?') ? '&' : '?'}course=${encodeURIComponent(course.key)}` : path;
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
     const file = body instanceof Blob;
-    const headers: Record<string, string> = course.id ? { 'X-Throughline-Course': course.id } : {};
+    const headers: Record<string, string> = course.key ? { 'X-Throughline-Course': course.key } : {};
     if (body !== undefined) headers['Content-Type'] = file ? body.type : 'application/json';
     response = await fetch(path, {
       method,

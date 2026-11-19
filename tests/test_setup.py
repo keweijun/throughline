@@ -1,8 +1,11 @@
 """Setup's last steps: opening the app, the welcome guide and where the launcher goes."""
 import argparse
+import errno
 import io
 import os
+import sqlite3
 import tempfile
+import threading
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -228,6 +231,63 @@ class MovingOldLibraries(unittest.TestCase):
         moved, skipped = commands.migrate(self.root)
         self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))
         self.assertFalse(self.old.exists())
+
+    def test_a_write_running_when_setup_moves_a_course_finishes_first(self):
+        writer = sqlite3.connect(self.old / 'waves' / 'course.sqlite3')
+        writer.execute('BEGIN IMMEDIATE')  # Codex registering a source from the command line, halfway through
+        moving = threading.Thread(target=commands.migrate, args=(self.root,))
+        moving.start()
+        moving.join(0.5)
+        self.assertTrue((self.old / 'waves' / 'course.sqlite3').is_file(), 'the course waits for the write')
+        writer.rollback()
+        writer.close()
+        moving.join(10)
+        self.assertTrue((self.root / 'waves' / 'course.sqlite3').is_file())
+        self.assertFalse((self.root / 'waves' / '.moving').exists(), 'a moved course takes writes')
+        self.assertFalse(self.old.exists())
+
+    def test_a_course_whose_move_is_refused_stays_whole_where_it_was(self):
+        # Windows refuses to move a folder holding an open file.
+        rename, replace = os.rename, os.replace
+
+        def refuse(real):
+            def move(source, target, *args, **kwargs):
+                if Path(source).name == 'optics':
+                    raise PermissionError(13, 'The process cannot access the file', str(source))
+                return real(source, target, *args, **kwargs)
+            return move
+        with mock.patch('os.rename', refuse(rename)), mock.patch('os.replace', refuse(replace)):
+            moved, skipped = commands.migrate(self.root)
+        self.assertEqual((moved, skipped), (['waves'], [str(self.old / 'optics')]))
+        self.assertTrue((self.old / 'optics' / 'course.sqlite3').is_file())
+        self.assertFalse((self.old / 'optics' / '.moving').exists(), 'the course left behind still takes writes')
+        self.assertFalse((self.root / 'optics').exists(), 'no half copy in the library')
+
+    def test_a_course_moved_between_disks_is_copied_whole(self):
+        replace = os.replace
+
+        def across(source, target, *args, **kwargs):
+            if Path(source).parent == self.old and Path(target).parent != self.old:
+                raise OSError(errno.EXDEV, 'Invalid cross-device link')
+            return replace(source, target, *args, **kwargs)
+        with mock.patch('os.replace', across):
+            moved, skipped = commands.migrate(self.root)
+        self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], []))
+        self.assertEqual(sorted(p.name for p in self.root.iterdir()), ['optics', 'waves'])
+        self.assertFalse((self.root / 'waves' / '.moving').exists())
+        self.assertFalse(self.old.exists())
+
+    def test_only_the_courses_an_old_librarys_archive_list_names_are_archived(self):
+        # Two old libraries each hold a course named waves; only the second archived its own, which setup leaves
+        # behind because the first one's took the name.
+        second = self.home / 'second'
+        (second / 'waves').mkdir(parents=True)
+        (second / 'waves' / 'course.sqlite3').write_bytes(b'')
+        commands.library.set_archived(second, 'waves', True)
+        with mock.patch.object(commands.library, 'legacy_roots', return_value=[self.old, second]):
+            moved, skipped = commands.migrate(self.root)
+        self.assertEqual((sorted(moved), skipped), (['optics', 'waves'], [str(second / 'waves')]))
+        self.assertEqual(commands.library.archived(self.root), set(), 'the waves that moved was never archived')
 
 
 class Doctor(unittest.TestCase):

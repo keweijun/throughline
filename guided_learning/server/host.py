@@ -1,6 +1,8 @@
 """The learning host: owns a course workspace and runs every model turn through one engine."""
 import asyncio
+import hashlib
 import logging
+import os
 import threading
 import time
 import uuid
@@ -48,11 +50,11 @@ class CourseEvents:
     """One course's view of the event bus: what its host publishes names the course, so a page that loaded another
     course can tell the event is not for it (see `X-Throughline-Course` in docs/architecture.md)."""
 
-    def __init__(self, bus, course_id):
-        self.bus, self.course_id = bus, course_id
+    def __init__(self, bus, course_key):
+        self.bus, self.course_key = bus, course_key
 
     def publish(self, event):
-        self.bus.publish({**event, 'course': self.course_id})
+        self.bus.publish({**event, 'course': self.course_key})
 
     def subscribe(self):
         return self.bus.subscribe()
@@ -70,6 +72,14 @@ def _offer(queue, event):
 turn_summary = summarize
 # What a finished background turn changes besides itself: the interface reloads only that part of the state.
 FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': 'memory'}
+
+
+def course_key(course_id, workspace):
+    """What a page names the course it loaded by (`X-Throughline-Course`): the course's ID, which never changes, and
+    its folder. A copy of a course folder keeps the ID, so the ID alone would let a page of the original act on the
+    copy; and a new course made where a deleted one was has the folder but not the ID."""
+    folder = os.path.normcase(str(Path(workspace).resolve()))
+    return f'{course_id}.{hashlib.sha256(folder.encode()).hexdigest()[:16]}'
 
 
 class Host:
@@ -93,9 +103,9 @@ class Host:
         # The last token an outside write left (`api.CHANGED`) that the library watcher has seen; the host announces its
         # own changes, so its writes leave none.
         self._seen_change = self._outside_token()
-        # The course's ID never changes, so requests and events can name the course they are for.
-        self.course_id = self.operation({'op': 'course.status'})['course']['id']
-        self.events = CourseEvents(events or EventBus(), self.course_id)
+        # Requests and events name the course they are for by its key.
+        self.course_key = course_key(self.operation({'op': 'course.status'})['course']['id'], self.workspace)
+        self.events = CourseEvents(events or EventBus(), self.course_key)
         self._lease = library.acquire_lease(self.workspace)
         self._held = hold(self.workspace)
         self.operation({'op': 'stream.recover'})

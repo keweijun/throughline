@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.55.3
+
+- Stop in Studio no longer leaves Studio busy when Codex agrees to stop but keeps working. If the turn has not ended a few seconds after Stop, Throughline restarts Codex, so you can update Throughline, delete a course and start a new chat again. Your chats are kept.
+- Throughline now finds a Codex you installed with npm when it is opened from Finder, Spotlight or an app menu even if `node` lives in a different folder from `codex` (as with nvm, Homebrew or Volta). Run setup again (or update) to pick this up.
+- After you run setup again and it finds Codex somewhere new, an open Throughline uses the new Codex right away instead of the old one until it is restarted.
+
 ## 0.55.0
 
 - A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.

@@ -1,11 +1,13 @@
 """HTTP surface of the learning host. Loopback only; course operations stay the state authority."""
 import asyncio
 import contextvars
+import hashlib
 import hmac
 import json
 import logging
 import os
 import re
+import secrets
 import shutil
 import socket
 import tempfile
@@ -50,7 +52,7 @@ PACKAGE_TOKEN = re.compile(r'[0-9a-f]{32}')
 # (`course_scoped`). A prefix covers the routes below it.
 LIBRARY_ROUTES = ('/api/events', '/api/seen', '/api/settings', '/api/models', '/api/about', '/api/update', '/api/launcher',
                   '/api/checks', '/api/health', '/api/library', '/api/shutdown', '/api/studio/access', '/api/studio/sandbox',
-                  '/api/studio/model', '/api/studio/requests')
+                  '/api/studio/model', '/api/studio/requests', '/api/sign-in')
 COURSE_HEADER = 'x-throughline-course'
 # The host a course-scoped request was checked against, for its whole duration; unset outside one (`ActiveHost`).
 PINNED = contextvars.ContextVar('pinned_host')
@@ -437,11 +439,45 @@ class ActiveHost:
         return getattr(self._courses.require(), name)
 
 
+class SignIn:
+    """Who may use the host's API: a command that sends the host key in `X-Throughline-Key`, or a browser holding the
+    sign-in cookie. A browser gets the cookie by opening `/?code=…` with a one-time code, which a command asks for
+    (`POST /api/sign-in`), so the key itself never goes in an address, a browser's history or a log. The cookie holds
+    a token derived from the key, not the key."""
+    LIFETIME = 300  # seconds a code waits for the browser to open it
+
+    def __init__(self, key):
+        self.key = key
+        self.codes = {}
+        self.lock = threading.Lock()
+        self.token = hmac.new(key.encode(), b'throughline-browser', hashlib.sha256).hexdigest()
+
+    def issue(self):
+        code = secrets.token_hex(16)
+        now = time.monotonic()
+        with self.lock:
+            self.codes = {c: until for c, until in self.codes.items() if until > now}
+            self.codes[code] = now + self.LIFETIME
+        return code
+
+    def redeem(self, code):
+        with self.lock:
+            until = self.codes.pop(code, None)
+        return until is not None and until > time.monotonic()
+
+    def allows(self, request, cookie):
+        command = request.headers.get('x-throughline-key')
+        if command is not None:
+            return hmac.compare_digest(command.encode(), self.key.encode())
+        return hmac.compare_digest((request.cookies.get(cookie) or '').encode(), self.token.encode())
+
+
 def create_app(workspace=None, port=8765, runner=None, settings=None, library_root=None, watch_interval=1.5, studio_command=None,
-               launcher=None, checks=None, opener=None, key=None):
+               launcher=None, checks=None, opener=None, key=None, sign_in=None):
     """`launcher`, `checks` (a `CodexStatus`) and `opener` (a `files.Opener`) stand in for this computer's launcher,
-    Codex and file manager in tests. With a `key` (`library.host_key()`), the API answers only a browser signed in
-    with it, by opening `/?key=…`, or a request that sends it in `X-Throughline-Key`."""
+    Codex and file manager in tests. With a `key` (`library.host_key()`) or a `SignIn` made from it, the API answers
+    only a command that sends the key or a browser signed in with a one-time code (`SignIn`)."""
+    sign_in = sign_in or (SignIn(key) if key else None)
     courses = Courses(library_root, runner, settings or TeacherSettings(), watch_interval, studio_command)
     seen = Seen(courses.settings.path.with_name('seen.json'))
     launcher = launcher or Launcher()
@@ -452,11 +488,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     host = ActiveHost(courses)
     allowed = {f'127.0.0.1:{port}', f'localhost:{port}'}
     origins = {'http://' + h for h in allowed}
-    cookie = f'throughline-key-{port}'  # cookies ignore the port, and another library's host has its own key
+    cookie = f'throughline-{port}'  # cookies ignore the port, and another library's host has its own key
 
     def signed_in(request):
-        shown = request.cookies.get(cookie) or request.headers.get('x-throughline-key') or ''
-        return hmac.compare_digest(shown.encode(), key.encode())
+        return sign_in.allows(request, cookie)
 
     @asynccontextmanager
     async def lifespan(app):
@@ -494,7 +529,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         if request.url.path.startswith('/api/') and site is not None and site not in ('same-origin', 'none'):
             return JSONResponse({'error': 'Invalid local origin'}, 403)
         # Any program on this computer can reach loopback; the key keeps out other people's on a shared one.
-        if key and request.url.path.startswith('/api/') and request.url.path != '/api/health' and not signed_in(request):
+        if sign_in and request.url.path.startswith('/api/') and request.url.path != '/api/health' and not signed_in(request):
             return JSONResponse({'error': 'This browser is not signed in to Throughline. Open Throughline from its launcher, '
                                           'or run "guided-learning open".', 'code': 'not_signed_in'}, 401)
         content_type = request.headers.get('content-type', '').split(';')[0].strip()
@@ -1067,6 +1102,11 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         return FileResponse(folder / name, media_type='application/zip', filename=name,
                             background=BackgroundTask(shutil.rmtree, folder, ignore_errors=True))
 
+    @app.post('/api/sign-in')
+    def sign_in_code():
+        """A one-time code for the address a command opens in the browser (`guided-learning open`)."""
+        return {'code': sign_in.issue() if sign_in else None}
+
     @app.post('/api/shutdown')
     def shutdown():
         if app.state.stop is None:
@@ -1079,12 +1119,12 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
     @app.get('/')
     def index(request: Request):
-        given = request.query_params.get('key')
-        if key and given is not None:
-            # Sign this browser in and take the key out of the address bar and history.
+        given = request.query_params.get('code')
+        if sign_in and given is not None:
+            # Sign this browser in and take the code out of the address bar.
             response = RedirectResponse('/', 303)
-            if hmac.compare_digest(given.encode(), key.encode()):
-                response.set_cookie(cookie, key, max_age=400 * 24 * 3600, httponly=True, samesite='strict')
+            if sign_in.redeem(given):
+                response.set_cookie(cookie, sign_in.token, max_age=400 * 24 * 3600, httponly=True, samesite='strict')
             return response
         if not (DIST / 'index.html').is_file():
             return JSONResponse({'error': 'The interface is not built. Run npm run build in web/.'}, 503)
@@ -1098,7 +1138,7 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
 
 
 def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, library_root=None, studio_command=None,
-          launcher=None, checks=None, opener=None, key=None):
+          launcher=None, checks=None, opener=None, key=None, sign_in=None):
     """Bind loopback first so port 0 resolves before the host checks Host headers."""
     import uvicorn
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1111,7 +1151,7 @@ def serve(workspace=None, port=8765, runner=None, settings=None, on_ready=None, 
     sock.listen(128)  # connections made right after on_ready wait in the backlog
     actual = sock.getsockname()[1]
     app = create_app(workspace, port=actual, runner=runner, settings=settings, library_root=library_root,
-                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener, key=key)
+                     studio_command=studio_command, launcher=launcher, checks=checks, opener=opener, key=key, sign_in=sign_in)
     # log_config=None: uvicorn's own warnings reach the host log rather than a console nobody sees.
     server = uvicorn.Server(uvicorn.Config(app, log_level='warning', log_config=None, timeout_graceful_shutdown=3))
     app.state.stop = lambda: setattr(server, 'should_exit', True)

@@ -20,6 +20,10 @@ A turn's frozen prompt carries the sender's course memory, profile and session (
 
 ### Written lessons are revealed as the recipient studies
 
+What the sender asked for stays theirs: a shared lesson and its turns carry the request a plain Start lesson or Continue makes, not the sender's own wording, and a turn's text loses the teacher's notes about the sender (`<course-memory>`, `<course-change>`). Revealing a step records the recipient's Start or Continue, and nothing of the sender reaches the recipient's course memory. A step still hidden in an imported course is shared again as written, so a course passed on keeps its lessons.
+
+An export lists the course's files after taking its database snapshot, and refuses (`source_missing`) a course whose records name a source copy it lacks; an import refuses a package that does (`invalid_package`). A package therefore never imports with a gap that shows only when a passage is opened.
+
 A lesson in a Route and lessons package keeps each written step as a hidden turn, the way a step written ahead waits for Continue (ADR 0009). Every section starts unstudied. Start lesson reveals the first written step and Continue each next one, at once and with no teacher turn, and nothing is written ahead while the next step is already written. Steps of the plan that the sender never reached are written by the recipient's teacher as usual. A section with a written lesson that the recipient asks to be taught differently, with a request of their own, gets a new lesson.
 
 A lesson step written after the sender missed a check question opens with a repair aimed at that miss (ADR 0009). Route and lessons keeps those steps as written; rewriting them is not worth a teacher turn.

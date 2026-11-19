@@ -6,6 +6,15 @@ What changed for learners in each release of Throughline, newest first. Each rel
 
 - A page left open on one course no longer writes into another. If you opened a different course since, in another tab say, a note, answer or other change sent from the old page is no longer saved into the course that is open now: the page reloads into the course that is open instead. The same goes for downloading a course package from Share, which could hand out the other course's file.
 
+## 0.54.1
+
+- Sharing a course at Route and lessons no longer passes on what you asked your teacher in your own words, or what the teacher noted about you. The person you share it with sees the lessons as if they had pressed Start lesson and Continue themselves.
+- A course someone shared with you keeps its lessons when you share it on.
+- A backup made while Codex was adding a document now always holds that document's saved copy. Throughline refuses to export a course that is missing one, and to import a package that is, instead of making a course with a gap you would find only later.
+- Deleting a course while Codex is saving something to it waits for Codex to finish, and Codex can no longer save into a course on its way to the trash.
+- Setup no longer loses courses in the trash of a library at an old location: they move to your library's trash with the rest, and archived courses stay archived.
+- The address that opens Throughline no longer contains your key. The launcher signs your browser in with a code that works once, and the key is replaced when you update, since earlier versions wrote it to a log file. Open Throughline from its launcher once after updating.
+
 ## 0.54.0
 
 - Look after your courses from the library: each course has a **⋯** menu beside Open, with **Rename**, **Archive** and **Delete…**. Renaming changes the title you see; the course stays where it is and keeps its Studio chats.

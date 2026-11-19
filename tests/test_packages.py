@@ -1,12 +1,14 @@
 import ast
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 from pathlib import Path
 
 from guided_learning import images, migrations, packages
@@ -138,6 +140,41 @@ class CoursePackages(unittest.TestCase):
             self.assertEqual(refused.exception.code, code)
             self.assertNothingImported()
             self.package.write_bytes(original)
+
+    def test_a_source_registered_during_an_export_is_in_the_package_whole(self):
+        later = self.home / 'later.md'
+        later.write_text('# Later\nRegistered while the export ran.', encoding='utf-8')
+        real = sqlite3.connect
+
+        def connect(database, *args, **kwargs):
+            if sys._getframe(1).f_code.co_name == 'export' and not getattr(connect, 'done', False):
+                connect.done = True  # just before the export takes its snapshot
+                execute(self.course, {'op': 'source.register', 'path': str(later)})
+            return real(database, *args, **kwargs)
+        with mock.patch('guided_learning.packages.sqlite3.connect', connect):
+            exported = packages.export(self.course, self.package)
+        self.assertEqual(exported['sources'], 2)
+        course = Path(packages.import_package(self.package, self.recipient)['path'])
+        sources = execute(course, {'op': 'course.status'})['sources']
+        self.assertEqual({Path(s['path']).name for s in sources}, {'notes.md', 'later.md'})
+        for source in sources:
+            self.assertTrue((course / 'sources' / source['id'] / source['revision']).is_file())
+
+    def test_a_package_missing_a_sources_saved_copy_is_refused(self):
+        packages.export(self.course, self.package)
+        self.rewrite(lambda folder: shutil.rmtree(folder / 'sources'))
+        with self.assertRaises(OperationError) as refused:
+            packages.import_package(self.package, self.recipient)
+        self.assertEqual(refused.exception.code, 'invalid_package')
+        self.assertIn('notes.md', str(refused.exception))
+        self.assertNothingImported()
+
+    def test_a_course_missing_a_sources_saved_copy_is_not_exported(self):
+        shutil.rmtree(self.course / 'sources')
+        with self.assertRaises(OperationError) as refused:
+            packages.export(self.course, self.package)
+        self.assertEqual(refused.exception.code, 'source_missing')
+        self.assertFalse(self.package.exists())
 
     def test_unexpected_entries_refuse_the_package(self):
         packages.export(self.course, self.package)

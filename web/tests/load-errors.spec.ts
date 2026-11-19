@@ -29,8 +29,10 @@ test('a browser without the host key is told how to open Throughline, and the la
   await expect(screen).toContainText('guided-learning open');
   await expect(screen.getByRole('button')).toHaveCount(0);
 
-  // The address the launcher opens carries the key once; the host then drops it from the address bar.
-  await page.goto(`${base}/?key=${'a'.repeat(64)}`);
+  // The address the launcher opens carries a one-time code; the host then drops it from the address bar.
+  const signIn = await page.request.post(`${base}/api/sign-in`, { headers: { 'X-Throughline-Key': 'a'.repeat(64) }, data: {} });
+  const { code } = await signIn.json();
+  await page.goto(`${base}/?code=${code}`);
   await expect(page).toHaveURL(`${base}/`);
   await expect(page.locator('#library-studio, .courses, .library').first()).toBeVisible();
   await expect(screen).toHaveCount(0);

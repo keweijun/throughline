@@ -72,9 +72,17 @@ def _read(store, handler, request):
         store.db.execute('PRAGMA query_only=0')
 
 
+# Left in a course while the library moves it to the trash (`library.trash`).
+MOVING = '.moving'
+
+
 def _write(store, handler, request):
     with store.db:
         store.db.execute('BEGIN IMMEDIATE')
+        # Checked under the write lock: the course was moved (or is being moved) since this connection opened it, and
+        # what this write saves, a source's snapshot say, would land outside it.
+        if (store.workspace / MOVING).exists() or not (store.workspace / 'course.sqlite3').is_file():
+            raise OperationError('course_moved', 'This course was moved to the trash; restore it to change it')
         if store.get('course', 'metadata') is None:
             if request['op'] != 'course.init':
                 raise OperationError('course_not_initialized', 'Run course.init first')

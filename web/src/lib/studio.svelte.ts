@@ -382,6 +382,8 @@ class StudioStore {
       this.working = [...this.working.filter((t) => t !== id), ...(history.active_turn ? [id] : [])];
       this.waiting = [...this.waiting.filter((p) => p.params.threadId !== id), ...history.pending];
     } catch (e) {
+      // A read Codex's restart cut off: the restart already says so.
+      if (e instanceof ApiError && e.code === 'studio_restarted') return;
       if (reading === this.#reading) this.error = e instanceof Error ? e.message : String(e);
     } finally {
       this.#readsOut--;
@@ -487,7 +489,11 @@ class StudioStore {
       this.pending = [];
       this.working = [];
       this.waiting = [];
-      this.error = t('Codex stopped. Send a message to start it again.');
+      // Its turns ended with it, whatever they last said.
+      for (const turn of this.turns) if (turn.status === 'inProgress') turn.status = 'interrupted';
+      this.error = (params as { restarted?: boolean }).restarted
+        ? t('Codex stopped answering, so Throughline restarted it. Send a message to carry on.')
+        : t('Codex stopped. Send a message to start it again.');
       return;
     }
     if (method === 'studio/threads') return void this.refreshThreads();

@@ -8,7 +8,7 @@ from pathlib import Path
 from guided_learning.api import execute
 from guided_learning.files import Opener
 from guided_learning.launcher import Launcher
-from guided_learning.server import serve
+from guided_learning.server import serve, studio
 from guided_learning.server.settings import TeacherSettings
 
 scratch = tempfile.TemporaryDirectory()
@@ -23,6 +23,7 @@ execute(course, {'op': 'curriculum.save', 'concepts': [{'id': 'wave', 'title': '
 (course / 'inputs' / 'reading.md').write_text('# Reading\nFirst line.\nThe line Codex links to.\n', encoding='utf-8')
 execute(course, {'op': 'source.register', 'path': str(course / 'inputs' / 'reading.md')})
 (course / 'outline.md').write_text('# Outline\n', encoding='utf-8')
+studio.STOP_TIMEOUT = 1  # a hung fake Codex is restarted without a long wait
 fake = [sys.executable, str(Path(__file__).with_name('fake_studio_server.py')), str(Path(scratch.name) / 'studio.log')]
 
 

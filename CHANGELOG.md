@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.54.4
+
+- If Codex stops responding in Studio, Stop now works: Throughline restarts Codex and says so, instead of leaving the chat working until you quit. Before, a stuck Codex also kept you from updating Throughline or deleting a course. Your chats are kept; send a message to carry on.
+
 ## 0.54.3
 
 - After you update a document that one chapter uses, Codex can still build or fix the other chapters. Before, saving any chapter failed until every mapping to the old version of that document had been redone.

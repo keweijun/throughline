@@ -147,6 +147,23 @@ class StudioTest(unittest.TestCase):
         history = self.history(thread, lambda h: not h['active_turn'])
         self.assertEqual(history['turns'][-1]['status'], 'interrupted')
 
+    def test_stop_restarts_a_codex_that_stopped_answering_so_nothing_waits_on_its_turn(self):
+        thread = self.send('go silent')['thread']
+        for _ in range(100):  # the activity is the host's own, so a hung Codex can still be asked it
+            if self.client.get('/api/studio/activity').json()['running'] == [thread]:
+                break
+            time.sleep(.05)
+        else:
+            self.fail('The turn never started')
+        hung = self.client.app.state.courses.studio.server.process
+        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 0.5):
+            stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
+        self.assertEqual(stopped.json(), {'thread': thread, 'restarted': True})
+        self.assertIsNotNone(hung.poll(), 'the hung App Server was stopped')
+        self.assertEqual(self.client.get('/api/studio/activity').json()['running'], [], 'its turn no longer counts as running')
+        fresh = self.send('carry on')['thread']
+        self.assertEqual(self.replies(self.history(fresh, lambda h: self.replies(h))), ['done'], 'Studio starts Codex again')
+
     def named(self, thread):
         for _ in range(100):
             found = next((t for t in self.client.get('/api/studio').json()['threads'] if t['id'] == thread), None)

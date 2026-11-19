@@ -67,6 +67,7 @@ TITLE_PROMPT = LINE.join([
 TITLE_SCHEMA = {'type': 'object', 'properties': {'title': {'type': 'string', 'minLength': 1, 'maxLength': 60}},
                 'required': ['title'], 'additionalProperties': False}
 TITLE_TIMEOUT = 30
+STOP_TIMEOUT = 10  # how long Stop waits for Codex to answer before restarting its App Server
 
 
 def config_path():
@@ -75,6 +76,10 @@ def config_path():
 
 class StudioError(OperationError):
     pass
+
+
+class Unanswered(StudioError):
+    """The App Server did not answer at all: it is hung or gone, as opposed to answering with an error."""
 
 
 class AppServer:
@@ -87,6 +92,7 @@ class AppServer:
                                         creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         self.stderr = Tail(self.process.stderr)
         self.closing = False
+        self.restarted = False  # stopped by Throughline because it stopped answering
         self.on_message, self.on_exit = on_message, on_exit
         self.ids = itertools.count(1)
         self.waiting = {}  # request id -> queue for its reply
@@ -127,13 +133,15 @@ class AppServer:
             self._send({'id': request, 'method': method, 'params': params})
             message = reply.get(timeout=timeout)
         except (OSError, ValueError) as exc:
-            raise StudioError('studio_failed', 'Codex stopped answering') from exc
+            raise Unanswered('studio_failed', 'Codex stopped answering') from exc
         except queue.Empty:
-            raise StudioError('studio_failed', f'Codex did not answer {method} in time') from None
+            raise Unanswered('studio_failed', f'Codex did not answer {method} in time') from None
         finally:
             self.waiting.pop(request, None)
         if message is None:
-            raise StudioError('studio_failed', 'Codex closed')
+            if self.restarted:
+                raise Unanswered('studio_restarted', 'Codex stopped answering, so Throughline restarted it')
+            raise Unanswered('studio_failed', 'Codex closed')
         if 'error' in message:
             error = message['error'] or {}
             code = 'studio_unsupported' if error.get('code') == -32601 else 'studio_failed'
@@ -320,7 +328,8 @@ class Studio:
             self.setup = 'failed: ' + (error or 'Codex could not set up its sandbox')
         self.events.publish({'type': 'studio', 'method': 'studio/access', 'params': self.access()})
 
-    def _exit(self, server):
+    def _exit(self, server, restarted=False):
+        """Forget an App Server that stopped: its turns, and the questions it was waiting on, end with it."""
         with self.lock:
             if self.server is not server:
                 return
@@ -329,7 +338,7 @@ class Studio:
             self.active.clear()
             self.ended.clear()
             self.pending.clear()
-        self.events.publish({'type': 'studio', 'method': 'studio/closed', 'params': {}})
+        self.events.publish({'type': 'studio', 'method': 'studio/closed', 'params': {'restarted': restarted}})
 
     def _message(self, message):
         method, params = message['method'], message.get('params') or {}
@@ -620,10 +629,21 @@ class Studio:
                     pass
 
     def interrupt(self, course, thread):
+        """Stop a thread's turn. An App Server that does not answer is hung: it is stopped, and with it every turn it
+        was running, so Studio, updates and deleting a course are not held up by a turn nothing will finish. Its
+        chats are saved by Codex and carry on in the next App Server."""
         server = self._load(course, thread)
         turn = self.active.get(thread)
         if turn:
-            server.call('turn/interrupt', {'threadId': thread, 'turnId': turn})
+            try:
+                server.call('turn/interrupt', {'threadId': thread, 'turnId': turn}, timeout=STOP_TIMEOUT)
+            except Unanswered:
+                log.warning("Studio's Codex App Server did not answer Stop; restarting it")
+                self._exit(server, restarted=True)
+                server.restarted = True
+                server.process.kill()  # a hung App Server would not close when asked
+                server.close()
+                return {'thread': thread, 'restarted': True}
         return {'thread': thread}
 
     def intake(self):

@@ -750,6 +750,8 @@ class AppStore {
     await tick();
     requestAnimationFrame(() => {
       const lesson = turnId ? document.getElementById(`turn-${turnId}`) : null;
+      // A lesson a New lesson replaced rests folded (ADR 0023); unfold what holds it so the passage shows.
+      for (let fold = lesson?.closest('details'); fold; fold = fold.parentElement?.closest('details')) fold.open = true;
       // A passage may be in the lesson's text or in the check question that ends it.
       const blocks = lesson ? [...lesson.querySelectorAll<HTMLElement>('.lesson-body, [data-check]')] : [];
       let range: Range | null = null;

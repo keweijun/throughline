@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.55.4
+
+- If you updated while an older Throughline (0.54.0 or earlier) was still running, the launcher and `guided-learning open` now stop it and start the new version, and `guided-learning stop` stops it. Before, the browser opened on the old version without signing in, and the old one could not be stopped.
+- On Windows, the host key and the host's output log are now readable by your account alone, as they already were on macOS and Linux. Before, they took the permissions of your Throughline folder.
+- After a document of a course is updated, Codex can save a chapter again with its links moved to the new version of the document. Before, that save was refused.
+- "Back to the passage" on a side question now unfolds an earlier lesson that a new lesson replaced, and shows the passage in it.
+
 ## 0.55.0
 
 - A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.

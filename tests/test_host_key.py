@@ -122,7 +122,10 @@ class Key(unittest.TestCase):
         old.parent.mkdir(parents=True)
         old.write_text('c' * 64, encoding='ascii')
         self.assertNotEqual(library.host_key(), 'c' * 64)
+        self.assertEqual(library.legacy_host_key(), 'c' * 64, 'kept to stop a host of theirs still running')
+        library.forget_legacy_host_key()
         self.assertFalse(old.exists())
+        self.assertIsNone(library.legacy_host_key())
 
     def test_a_damaged_key_is_replaced(self):
         path = library.state_dir() / 'host.key'

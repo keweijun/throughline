@@ -4,6 +4,7 @@ import json
 import os
 import platform as host_platform
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -359,7 +360,7 @@ def setup(args):
 def open_app():
     """Start the host and open the library in the browser, as setup's last step. Never fails setup."""
     try:
-        record = running() or _spawn(8765) or _spawn(0)
+        record = current() or _spawn(8765) or _spawn(0)
         if not record:
             print(f'Throughline did not start; see {logs.output_path()} and {logs.log_path()}.')
             return False
@@ -383,9 +384,9 @@ def app_url(port):
     return f'http://127.0.0.1:{port}/' + (f'?code={code}' if code else '')
 
 
-def _call(port, method, path, body=None, timeout=2):
+def _call(port, method, path, body=None, timeout=2, key=None):
     data = None if body is None else json.dumps(body).encode()
-    headers = {'X-Throughline-Key': library.host_key(), **({'Content-Type': 'application/json'} if data else {})}
+    headers = {'X-Throughline-Key': key or library.host_key(), **({'Content-Type': 'application/json'} if data else {})}
     request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.loads(response.read() or b'{}')
@@ -405,6 +406,62 @@ def running():
         return record if health.get('pid') == record.get('pid') else None
     except (OSError, ValueError, KeyError, urllib.error.URLError):
         return None
+
+
+def current():
+    """The recorded host, if it is one this version can use. A host from before sign-in codes, or one holding a key
+    this computer no longer has (an update with the old host still running, or host.key deleted), turns the current
+    key away, so it is stopped another way and None returned for a current host to start in its place."""
+    record = running()
+    if record and not _accepts_key(record):
+        _stop_other(record)
+        record = running()
+        if record and not _accepts_key(record):
+            raise OperationError('host_running', f'An older learning host still runs (process {record.get("pid")}) and would not stop; '
+                                                 'end it, or restart the computer, and open Throughline again.')
+    library.forget_legacy_host_key()  # no host of the versions that kept it runs now
+    return record
+
+
+def _accepts_key(record):
+    """Whether the host gives this key a sign-in code. A busy host that does not answer in time is taken as current."""
+    try:
+        _call(record['port'], 'POST', '/api/sign-in', {})['code']
+        return True
+    except urllib.error.HTTPError as exc:
+        return exc.code not in (401, 403, 404, 405)
+    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError):
+        return True
+
+
+def _stop_other(record):
+    """Stop a host that turns the current key away: by request with the key its version kept, else by ending its process."""
+    def gone(seconds):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if running() != record:
+                return True
+            time.sleep(0.2)
+        return False
+    try:
+        _call(record['port'], 'POST', '/api/shutdown', {}, key=library.legacy_host_key() or library.host_key())
+        refused = False
+    except urllib.error.HTTPError:
+        refused = True
+    except (OSError, urllib.error.URLError):
+        refused = False
+    if gone(0.2 if refused else 10):
+        return
+    try:
+        health = _call(record['port'], 'GET', '/api/health')
+    except (OSError, ValueError, urllib.error.URLError):
+        return
+    if isinstance(record.get('pid'), int) and health.get('pid') == record['pid']:  # never end a process we cannot tell is that host
+        try:
+            os.kill(record['pid'], signal.SIGTERM)  # TerminateProcess on Windows
+        except OSError:
+            return
+        gone(10)
 
 
 def _error_text(exc):
@@ -437,8 +494,7 @@ def _spawn(port):
     options = {**detached(), 'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
     # Only this user reads it: it holds what the host printed, and paths of courses.
     with os.fdopen(os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'wb') as output:
-        if os.name != 'nt':
-            os.chmod(log, 0o600)  # one an earlier version made
+        library.keep_private(log)  # also one an earlier version made, or made on Windows without a user-only ACL
         process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
@@ -453,7 +509,11 @@ def _spawn(port):
 
 
 def open_course(args):
-    record = running() or _spawn(args.port) or _spawn(0)
+    try:
+        record = current() or _spawn(args.port) or _spawn(0)
+    except OperationError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     if not record:
         print(f'The learning host did not start; see {logs.output_path()} and {logs.log_path()}.', file=sys.stderr)
         return 1
@@ -475,7 +535,16 @@ def open_course(args):
 
 def stop(args):
     record = running()
+    if record and not _accepts_key(record):
+        _stop_other(record)  # one from before an update, which the current key cannot stop
+        if running():
+            print(f'An older learning host still runs (process {record.get("pid")}) and would not stop; end it, or restart the computer.', file=sys.stderr)
+            return 1
+        library.forget_legacy_host_key()
+        print('The learning host has stopped.')
+        return 0
     if not record:
+        library.forget_legacy_host_key()
         print('No learning host is running.')
         return 0
     try:

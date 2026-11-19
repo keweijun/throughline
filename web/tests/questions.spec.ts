@@ -276,6 +276,33 @@ test('a passage in a check question is found again on return', async ({ page, co
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('found')?.values().next().value?.toString())).toBe(excerpt.trim());
 });
 
+test('a passage in a lesson replaced by a new lesson is unfolded on return', async ({ page, course }) => {
+  const { errors } = await course('steps_browser_fixture');
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const sentence = page.getByRole('region', { name: 'Step 1 of 4' }).locator('.lesson-body p').filter({ hasText: 'Each path carries a complex amplitude.' });
+  await expect(sentence).toBeVisible();
+  const excerpt = await dragSelect(page, sentence, 120);
+  await page.getByRole('button', { name: 'Ask about this passage' }).click();
+  await page.getByRole('textbox', { name: 'Side question' }).fill('What is a path here?');
+  await page.locator('#branch-panel').getByRole('button', { name: 'Ask', exact: true }).click();
+  const back = page.locator('#branch-panel .panel-foot').getByRole('button', { name: 'Back to the passage' });
+  await expect(back).toBeVisible();
+
+  await page.getByRole('button', { name: 'Start a new lesson instead' }).click();
+  await page.getByRole('button', { name: 'Start new lesson' }).click();
+  const earlier = page.locator('details.replaced');
+  await expect(earlier.locator('summary')).toContainText('Earlier lesson');
+  await expect(earlier).not.toHaveAttribute('open');
+  await back.click();
+  await expect(earlier, 'the earlier lesson that holds the passage unfolds').toHaveAttribute('open');
+  await expect(earlier.locator('.lesson-body p').filter({ hasText: 'Each path carries a complex amplitude.' })).toBeInViewport();
+  await expect.poll(() => page.evaluate(() => {
+    const range = CSS.highlights.get('found')?.values().next().value as Range | undefined;
+    return range && !!range.startContainer.parentElement?.closest('details.replaced') && range.toString();
+  })).toBe(excerpt.trim());
+  expect(errors).toEqual([]);
+});
+
 test('an open thread always offers the way back to all questions, even while its box rests', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Questions', exact: true }).click();

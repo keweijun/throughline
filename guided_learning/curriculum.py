@@ -159,9 +159,14 @@ def store_model(store, model, confirm_reorder, written=None):
         if any(route.index(p) >= route.index(cid) for p in concepts[cid].get('prerequisites', [])):
             raise OperationError('invalid_route', 'Prerequisites must precede their dependents')
     previous = view(store, {})
-    # A mapping saved against a revision since replaced stays as it was, for coverage to report as needing review; only
-    # a mapping a save adds or changes must name the revision Codex can read now.
-    stored = [deepcopy(e) for e in previous['coverage']]
+    # A mapping saved against a revision since replaced stays as it was, for coverage to report as needing review, or
+    # loses concepts a chapter now maps at the new revision; only a mapping a save adds or changes must name the
+    # revision Codex can read now.
+    stored = {entry_key(e): deepcopy(e) for e in previous['coverage']}
+    def kept(entry):
+        before = stored.get(entry_key(entry))
+        return before is not None and {**entry, 'concept_ids': before.get('concept_ids', [])} == before \
+            and set(entry.get('concept_ids', [])) <= set(before.get('concept_ids', []))
     seen = set()
     for entry in model['coverage']:
         source_unit(store, entry)
@@ -185,8 +190,10 @@ def store_model(store, model, confirm_reorder, written=None):
         if any(cid not in concepts for cid in entry.get('concept_ids', [])):
             raise OperationError('invalid_reference', 'Unknown coverage concept')
         if disposition == 'mapped':
-            if entry not in stored and is_stale(store, entry):
-                raise OperationError('invalid_coverage', 'Mapped coverage must reference a currently readable revision')
+            if is_stale(store, entry):
+                if not kept(entry):
+                    raise OperationError('invalid_coverage', 'Mapped coverage must reference a currently readable revision')
+                continue  # kept for review as it was, though its concepts may since link the new revision
             for cid in entry['concept_ids']:
                 if not any(all(ref.get(k) == entry[k] for k in ('source_id', 'revision', 'unit_id')) for ref in concepts[cid].get('links', [])):
                     raise OperationError('invalid_coverage', 'Mapped concept must link the same source unit')
@@ -253,7 +260,18 @@ def chapter_save(store, request):
             # Listing a concept from another chapter moves it here.
             chapter = {**chapter, 'concept_ids': [cid for cid in chapter['concept_ids'] if cid not in ids]}
         chapters.append(chapter)
-    merged = {entry_key(e): e for e in previous['coverage']}
+    # This chapter's mappings of a unit at a revision since replaced give way to its mappings of that unit now.
+    remapped = {(e.get('source_id'), e.get('unit_id')): e.get('revision') for e in coverage
+                if all(isinstance(e.get(k), (str, int)) for k in ('source_id', 'revision', 'unit_id')) and not is_stale(store, e)}
+    merged = {}
+    for entry in previous['coverage']:
+        current = remapped.get((entry['source_id'], entry['unit_id']), entry['revision'])
+        if current != entry['revision'] and is_stale(store, entry):
+            others = [cid for cid in entry.get('concept_ids', []) if cid not in ids]
+            if not others:
+                continue
+            entry = {**entry, 'concept_ids': others}
+        merged[entry_key(entry)] = entry
     for entry in coverage:
         key = entry_key(entry)
         merged[key] = merge_entry(merged.get(key), entry, set(ids))

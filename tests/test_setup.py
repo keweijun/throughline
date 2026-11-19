@@ -8,7 +8,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import checks, commands
+from guided_learning import checks, codex, commands
 
 
 def setup_args(**options):
@@ -17,7 +17,8 @@ def setup_args(**options):
 
 class SetupOpensTheApp(unittest.TestCase):
     def run_setup(self, home, **options):
-        env = {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills')}
+        env = {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
+               'GUIDED_LEARNING_CONFIG': str(Path(home) / 'settings.json')}
         output = io.StringIO()
         with mock.patch.dict(os.environ, env), redirect_stdout(output):
             code = commands.setup(setup_args(**options))
@@ -62,6 +63,29 @@ class SetupOpensTheApp(unittest.TestCase):
             self.assertFalse(commands.open_app())
         browser.assert_not_called()
 
+
+class SetupRemembersCodex(unittest.TestCase):
+    def test_a_host_started_without_setups_path_finds_the_codex_setup_found(self):
+        # A CLI-only install, set up from a terminal whose PATH has codex; Finder and Spotlight start the macOS
+        # launcher with the system PATH only, so the host must not depend on that PATH.
+        with tempfile.TemporaryDirectory() as home:
+            cli = Path(home) / 'npm' / 'bin' / ('codex.exe' if os.name == 'nt' else 'codex')
+            cli.parent.mkdir(parents=True)
+            cli.write_text('')
+            cli.chmod(0o755)
+            env = {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
+                   'GUIDED_LEARNING_CONFIG': str(Path(home) / 'settings.json'), 'PATH': str(cli.parent),
+                   'LOCALAPPDATA': str(Path(home) / 'no-app')}
+            with mock.patch.dict(os.environ, env), mock.patch.object(commands, 'open_app', return_value=False), \
+                    redirect_stdout(io.StringIO()) as output:
+                os.environ.pop('CODEX_CLI_PATH', None)
+                self.assertEqual(commands.setup(setup_args()), 0)
+                self.assertNotIn('Codex was not found', output.getvalue())
+                os.environ['PATH'] = str(Path(home) / 'system')  # the launcher's PATH
+                with mock.patch.object(codex.os.path, 'expanduser', return_value=str(Path(home) / 'no-app')):
+                    found = codex.find_codex()
+            self.assertIsNotNone(found, 'the launcher lost the codex setup found')
+            self.assertEqual(os.path.normcase(found), os.path.normcase(str(cli)))
 
 class Welcome(unittest.TestCase):
     def test_the_guide_is_short_and_current(self):

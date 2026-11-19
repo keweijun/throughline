@@ -16,7 +16,7 @@ from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
 from . import library, logs
-from .codex import find_codex
+from .codex import find_codex, remember_codex
 from .store import OperationError
 
 SKILL = Path(__file__).resolve().parent / 'skill'
@@ -341,6 +341,7 @@ def setup(args):
         print(f'Launcher: {launcher}')
     elif not args.no_launcher:
         print('Warning: the launcher could not be created; open Throughline with "guided-learning open".')
+    remember_codex()  # the launcher starts the host without this shell's PATH
     if not find_codex():
         print('Warning: Codex was not found (neither the codex command nor the Codex app); lessons in the interface need it. Set CODEX_CLI_PATH if it is installed somewhere else.')
     try:

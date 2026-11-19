@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.54.6
+
+- On a Mac, opening Throughline from Finder, Spotlight or the Dock now finds a Codex you installed only for the terminal (the `codex` command), so lessons and Studio work there too. Before, Throughline could say Codex was not found unless the Codex app was installed. This also applies to app-menu launchers on Linux. Run setup again (or update) to pick up where your Codex is.
+
 ## 0.54.5
 
 - Running two versions of Throughline side by side, or a command while Throughline is open, no longer loses settings, Studio chats or archived courses. Before, when both saved at the same moment, one could overwrite what the other had just saved: a chat could drop out of a course's Studio list, or a course you archived could show up again.

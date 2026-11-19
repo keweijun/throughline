@@ -8,6 +8,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **Archive** a course you are done with to take it out of the list and the course switcher. Nothing in it changes: find it under **Archived courses** below the list, where you can still open it or unarchive it.
 - **Delete** asks first, right on the card, then moves the course to the trash with its progress, notes and questions. **Undo** brings it straight back, and **Deleted courses** below the list restores it later. Throughline never empties the trash; to free the space, delete folders from it yourself (**Show the trash folder** opens it). A course that is writing a lesson or that Studio is working on waits until it is done.
 - Skipping a chapter, deleting a note, removing a highlight that has a note and deleting something from How you're taught now ask for confirmation right where you clicked, instead of in a browser popup.
+- When Codex stops right as a lesson starts, because it isn't signed in say, the message now says what Codex reported instead of "Broken pipe".
 
 ## 0.53.2
 

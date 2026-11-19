@@ -92,8 +92,11 @@ def list_models(command=None, timeout=20):
         incoming.put(None)
     threading.Thread(target=reader,daemon=True).start()
     def send(value):
-        process.stdin.write(json.dumps(value)+'\n')
-        process.stdin.flush()
+        try:
+            process.stdin.write(json.dumps(value)+'\n')
+            process.stdin.flush()
+        except OSError:
+            pass  # Codex has exited; the reader reports the closed connection with what Codex wrote
     models, request = [], 1
     deadline = time.monotonic()+timeout
     try:
@@ -102,7 +105,7 @@ def list_models(command=None, timeout=20):
             try: event = incoming.get(timeout=.1)
             except queue.Empty: continue
             if event is None:
-                raise RuntimeError('Codex closed before listing models')
+                raise RuntimeError(_explain('Codex closed before listing models', (tail.text().splitlines() or [''])[-1]))
             if event.get('id') != request or 'method' in event: continue
             if 'error' in event:
                 raise RuntimeError(_failed('Codex could not list models; check CLI authentication', event['error']))
@@ -265,8 +268,11 @@ class CodexRunner:
             incoming.put(None)
         threading.Thread(target=reader,daemon=True).start()
         def send(value):
-            process.stdin.write(json.dumps(value,ensure_ascii=False)+'\n')
-            process.stdin.flush()
+            try:
+                process.stdin.write(json.dumps(value,ensure_ascii=False)+'\n')
+                process.stdin.flush()
+            except OSError:
+                pass  # Codex has exited (not signed in, say); the reader reports it with what Codex wrote
         thread_id = turn_id = None
         phases, chunks, finals = {}, {}, {}
         usage = {}

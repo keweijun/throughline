@@ -158,6 +158,10 @@ def store_model(store, model, confirm_reorder, written=None):
     for cid in route:
         if any(route.index(p) >= route.index(cid) for p in concepts[cid].get('prerequisites', [])):
             raise OperationError('invalid_route', 'Prerequisites must precede their dependents')
+    previous = view(store, {})
+    # A mapping saved against a revision since replaced stays as it was, for coverage to report as needing review; only
+    # a mapping a save adds or changes must name the revision Codex can read now.
+    stored = [deepcopy(e) for e in previous['coverage']]
     seen = set()
     for entry in model['coverage']:
         source_unit(store, entry)
@@ -181,7 +185,7 @@ def store_model(store, model, confirm_reorder, written=None):
         if any(cid not in concepts for cid in entry.get('concept_ids', [])):
             raise OperationError('invalid_reference', 'Unknown coverage concept')
         if disposition == 'mapped':
-            if is_stale(store, entry):
+            if entry not in stored and is_stale(store, entry):
                 raise OperationError('invalid_coverage', 'Mapped coverage must reference a currently readable revision')
             for cid in entry['concept_ids']:
                 if not any(all(ref.get(k) == entry[k] for k in ('source_id', 'revision', 'unit_id')) for ref in concepts[cid].get('links', [])):
@@ -191,7 +195,6 @@ def store_model(store, model, confirm_reorder, written=None):
         raise OperationError('invalid_chapters', 'Duplicate chapter id')
     if chapters and [cid for c in chapters for cid in c['concept_ids']] != route:
         raise OperationError('invalid_chapters', 'Chapters must list every route concept exactly once, in route order')
-    previous = view(store, {})
     previous_ids = set(previous['route'])
     if not previous_ids.issubset(concepts):
         raise OperationError('invalid_route', 'Preserve stable concept IDs; defer content instead of deleting it')

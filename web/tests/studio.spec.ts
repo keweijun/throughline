@@ -167,6 +167,18 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await expect(panel.locator('.ended')).toHaveText('Stopped');
 });
 
+test('Stop restarts a Codex that stopped answering, and says so', async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.keyboard.press('d');
+  const panel = page.locator('#course-studio');
+  await page.locator('#studio-input').pressSequentially('go silent');
+  await page.keyboard.press('Control+Enter');
+  await panel.getByRole('button', { name: 'Stop' }).click();
+  await expect(panel.getByText('Codex stopped answering, so Throughline restarted it. Send a message to carry on.')).toBeVisible();
+  await expect(panel.locator('.ended')).toHaveText('Stopped');
+  await expect(panel.getByRole('button', { name: 'Stop' })).toBeHidden();
+});
+
 test('a slow history read from opening Studio never overwrites a message sent meanwhile', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.keyboard.press('d');

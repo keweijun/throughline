@@ -822,6 +822,7 @@ const messages = {
   "Attach files · or drop them here": "附加文件 · 也可拖放到这里",
   "Codex is working": "Codex 正在工作",
   "Codex stopped. Send a message to start it again.": "Codex 已停止。发送消息即可重新启动。",
+  "Codex stopped answering, so Throughline restarted it. Send a message to carry on.": "Codex 没有响应，Throughline 已将其重启。发送消息即可继续。",
   "Read {files}": "读取了 {files}",
   "Listed files in {path}": "列出了 {path} 中的文件",
   "Searched for {query}": "搜索了 {query}",

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InlineConfirm from './InlineConfirm.svelte';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { open, solved } from '../lib/format';
@@ -68,13 +69,23 @@
       .filter((c) => c?.prerequisites?.some((p) => ids.includes(p))),
   );
 
-  function skip() {
-    const warning = dependents.length
+  // Skipping is confirmed beside its button, saying what later sections lose.
+  let confirmSkip = $state(false);
+  $effect(() => {
+    void chapterId;
+    confirmSkip = false;
+  });
+  const skipWarning = $derived(
+    dependents.length
       ? t("Later sections build on this chapter: {titles}. Skip it anyway? Its sections stay on the route, and you can study them at any time.", {
           titles: dependents.map((c) => c!.title).join(', '),
         })
-      : t("Skip to the next chapter? This chapter's remaining sections stay on the route, and you can study them at any time.");
-    if (confirm(warning)) void app.skipChapter(chapterId);
+      : t("Skip to the next chapter? This chapter's remaining sections stay on the route, and you can study them at any time."),
+  );
+
+  function skip() {
+    confirmSkip = false;
+    void app.skipChapter(chapterId);
   }
 </script>
 
@@ -148,8 +159,12 @@
       {#if isCurrent && following && app.chapterOf(following.id)?.id !== chapterId}
         <section class="actions" aria-label={t("Chapter actions")}>
           <div>
-            <button class="btn" onclick={skip}>{t("Skip to the next chapter")}</button>
-            <p class="note">{t("Sections you skip stay on the route. You can come back and study them at any time.")}</p>
+            {#if confirmSkip}
+              <InlineConfirm message={skipWarning} confirmLabel={t("Skip this chapter")} cancelLabel={t("Keep studying it")} onconfirm={skip} oncancel={() => (confirmSkip = false)} />
+            {:else}
+              <button class="btn" onclick={() => (confirmSkip = true)}>{t("Skip to the next chapter")}</button>
+              <p class="note">{t("Sections you skip stay on the route. You can come back and study them at any time.")}</p>
+            {/if}
           </div>
         </section>
       {/if}

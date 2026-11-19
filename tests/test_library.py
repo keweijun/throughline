@@ -364,3 +364,141 @@ class Migration(unittest.TestCase):
             self.assertIn('Moved 1 course(s)', result.stdout)
             self.assertTrue((Path(home) / 'Throughline' / 'alpha' / 'course.sqlite3').is_file())
             self.assertFalse(old.exists(), 'the emptied old library is removed')
+
+
+class LookingAfterCourses(unittest.TestCase):
+    """Renaming, archiving, deleting to the trash and restoring library courses (ADR 0022)."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp()).resolve()
+        self.config = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__('shutil').rmtree(self.root, ignore_errors=True))
+        self.addCleanup(lambda: __import__('shutil').rmtree(self.config, ignore_errors=True))
+        course(self.root / 'alpha', 'Alpha')
+        course(self.root / 'beta', 'Beta')
+        execute(self.root / 'alpha', {'op': 'memory.save', 'id': 'pref-1', 'kind': 'preference', 'text': 'Worked examples first'})
+        self.app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(self.config / 's.json'), library_root=self.root)
+        self.client = TestClient(self.app, base_url='http://127.0.0.1:8765')
+        self.client.__enter__()
+        self.addCleanup(self.client.__exit__, None, None, None)
+        self.courses = self.app.state.courses
+
+    def listed(self):
+        return {c['name']: c for c in self.client.get('/api/library').json()['courses']}
+
+    def test_renaming_changes_the_title_and_keeps_the_id_and_folder(self):
+        before = execute(self.root / 'alpha', {'op': 'course.status'})['course']
+        renamed = self.client.put('/api/library/courses/alpha/title', json={'title': '  Quantum, again '})
+        self.assertEqual(renamed.json(), {'name': 'alpha', 'title': 'Quantum, again'})
+        self.assertEqual(self.listed()['alpha']['title'], 'Quantum, again')
+        after = execute(self.root / 'alpha', {'op': 'course.status'})['course']
+        self.assertEqual(after['id'], before['id'], 'drafts and Studio chats refer to the id and folder')
+        self.assertTrue((self.root / 'alpha' / 'course.sqlite3').is_file())
+        self.assertEqual(self.client.put('/api/library/courses/alpha/title', json={'title': '  '}).status_code, 409)
+        self.assertEqual(self.client.put('/api/library/courses/gamma/title', json={'title': 'X'}).status_code, 404)
+        self.assertGreaterEqual(self.client.put('/api/library/courses/..%2Falpha/title', json={'title': 'X'}).status_code, 400)
+
+    def test_renaming_the_open_course_goes_through_its_host(self):
+        self.client.post('/api/library/open', json={'name': 'alpha'})
+        self.client.put('/api/library/courses/alpha/title', json={'title': 'Renamed'})
+        self.assertEqual(self.client.get('/api/state').json()['course']['title'], 'Renamed')
+
+    def test_archiving_hides_nothing_but_marks_the_course_and_never_writes_to_it(self):
+        database = self.root / 'alpha' / 'course.sqlite3'
+        stamp = library_stamp(self.root / 'alpha')
+        self.assertEqual(self.client.put('/api/library/courses/alpha/archived', json={'archived': True}).json(), {'name': 'alpha', 'archived': True})
+        listed = self.listed()
+        self.assertTrue(listed['alpha']['archived'])
+        self.assertFalse(listed['beta']['archived'])
+        self.assertEqual(library_stamp(self.root / 'alpha'), stamp, 'archiving changes nothing in the course')
+        self.assertTrue(database.is_file())
+        self.client.put('/api/library/courses/alpha/archived', json={'archived': False})
+        self.assertFalse(self.listed()['alpha']['archived'])
+        self.assertEqual(self.client.put('/api/library/courses/gamma/archived', json={'archived': True}).status_code, 404)
+
+    def test_a_deleted_course_leaves_the_listing_and_comes_back_whole(self):
+        self.client.put('/api/library/courses/alpha/archived', json={'archived': True})
+        deleted = self.client.delete('/api/library/courses/alpha')
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        entry = deleted.json()
+        self.assertEqual((entry['name'], entry['title']), ('alpha', 'Alpha'))
+        self.assertEqual(set(self.listed()), {'beta'})
+        self.assertFalse((self.root / 'alpha').exists())
+        waiting = self.root / '.throughline' / 'trash' / entry['id'] / 'alpha' / 'course.sqlite3'
+        self.assertTrue(waiting.is_file(), 'the course is moved, never removed')
+        view = self.client.get('/api/library').json()
+        self.assertEqual([(e['id'], e['name'], e['title']) for e in view['trash']], [(entry['id'], 'alpha', 'Alpha')])
+        self.assertEqual(view['trash_folder'], str(self.root / '.throughline' / 'trash'))
+        self.assertEqual(self.client.post('/api/library/open', json={'name': 'alpha'}).status_code, 404)
+
+        restored = self.client.post(f"/api/library/trash/{entry['id']}/restore")
+        self.assertEqual(restored.json(), {'name': 'alpha', 'title': 'Alpha'})
+        self.assertEqual(set(self.listed()), {'alpha', 'beta'})
+        self.assertFalse(self.listed()['alpha']['archived'], 'a restored course comes back to the main list')
+        self.assertEqual(self.client.get('/api/library').json()['trash'], [])
+        memory = execute(self.root / 'alpha', {'op': 'memory.view'})
+        self.assertIn('Worked examples first', json.dumps(memory), 'learning records come back with the course')
+        self.assertEqual(self.client.post(f"/api/library/trash/{entry['id']}/restore").status_code, 404)
+        self.assertEqual(self.client.post('/api/library/trash/..%2F..%2Fbeta/restore').status_code, 404)
+
+    def test_a_course_restored_after_its_name_was_taken_gets_a_free_one(self):
+        entry = self.client.delete('/api/library/courses/alpha').json()
+        course(self.root / 'alpha', 'Another alpha')
+        restored = self.client.post(f"/api/library/trash/{entry['id']}/restore").json()
+        self.assertEqual(restored, {'name': 'alpha-2', 'title': 'Alpha'})
+        self.assertEqual({n: c['title'] for n, c in self.listed().items()}, {'alpha': 'Another alpha', 'alpha-2': 'Alpha', 'beta': 'Beta'})
+
+    def test_the_trash_is_left_out_of_the_command_listing_and_imports(self):
+        self.client.delete('/api/library/courses/alpha')
+        from guided_learning import library, packages
+        self.assertEqual([c['name'] for c in library.list_courses(self.root)], ['beta'])
+        self.assertEqual(packages.suggested_name(self.root, 'alpha'), 'alpha', 'a deleted course does not take its name')
+
+    def test_studio_chats_follow_the_course_to_the_trash_and_back(self):
+        studio = self.courses.studio
+        studio._record(self.root / 'alpha', 'thread-1')
+        entry = self.client.delete('/api/library/courses/alpha').json()
+        self.assertEqual(studio._ids(self.root / 'alpha'), [], 'a new course named alpha does not list them')
+        self.client.post(f"/api/library/trash/{entry['id']}/restore")
+        self.assertEqual(studio._ids(self.root / 'alpha'), ['thread-1'])
+
+    def test_deleting_the_open_course_closes_it_when_nothing_is_being_written(self):
+        self.client.post('/api/library/open', json={'name': 'alpha'})
+        self.assertEqual(self.client.delete('/api/library/courses/alpha').status_code, 200)
+        self.assertEqual(self.client.get('/api/state').json()['code'], 'no_course')
+        self.assertIsNone(self.client.get('/api/library').json()['active'])
+
+    def test_deleting_waits_for_a_lesson_being_written(self):
+        self.client.post('/api/library/open', json={'name': 'alpha'})
+        host = self.courses.host
+        with host._streams:
+            host._live[('turn', 1)] = 'mainline'
+        refused = self.client.delete('/api/library/courses/alpha')
+        self.assertEqual((refused.status_code, refused.json()['code']), (409, 'course_busy'))
+        self.assertTrue((self.root / 'alpha' / 'course.sqlite3').is_file())
+        with host._streams:
+            host._live[('turn', 1)] = 'preparation'
+        self.assertFalse(host.writing(), 'background work does not hold a course')
+        with host._streams:
+            host._live.clear()
+
+    def test_deleting_waits_for_studio(self):
+        with mock.patch.object(self.courses.studio, 'activity', return_value={'running': ['thread-1'], 'waiting': []}):
+            refused = self.client.delete('/api/library/courses/beta')
+        self.assertEqual((refused.status_code, refused.json()['code']), (409, 'course_busy'))
+        self.assertIn('beta', self.listed())
+
+    def test_deleting_is_refused_while_another_host_holds_the_course(self):
+        other = Host(self.root / 'beta', runner=Idle(), settings=TeacherSettings(self.config / 'other.json'))
+        try:
+            refused = self.client.delete('/api/library/courses/beta')
+            self.assertEqual((refused.status_code, refused.json()['code']), (409, 'host_running'))
+            self.assertIn('beta', self.listed())
+            self.assertFalse(any((self.root / '.throughline' / 'trash').glob('*/')), 'nothing is left half moved')
+        finally:
+            other.close()
+
+
+def library_stamp(path):
+    from guided_learning import library
+    return library.stamp(path), (Path(path) / 'course.sqlite3').read_bytes()

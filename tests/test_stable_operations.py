@@ -11,7 +11,8 @@ from guided_learning import api
 SKILL = Path(api.__file__).resolve().parent / 'skill'
 
 STABLE = {
-    'annotations.delete', 'annotations.list', 'annotations.save', 'course.init', 'course.profile.save', 'course.status',
+    'annotations.delete', 'annotations.list', 'annotations.save', 'course.init', 'course.profile.save', 'course.rename',
+    'course.status',
     'curriculum.chapter.save', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage',
     'curriculum.outline', 'curriculum.save', 'curriculum.view', 'mainline.enter', 'memory.confirm', 'memory.save',
     'position.save', 'practice.add', 'practice.list', 'practice.retire', 'practice.revise', 'preferences.save',

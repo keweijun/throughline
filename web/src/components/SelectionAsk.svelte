@@ -132,6 +132,7 @@
     writing = false;
     note = '';
     target = null;
+    confirmRemove = false;
   }
 
   function startNote() {
@@ -175,10 +176,16 @@
     });
   }
 
+  // Removing a highlight that carries a note asks first, in the toolbar itself.
+  let confirmRemove = $state(false);
+
   function remove() {
     if (!target) return;
     const { id, note: text } = target;
-    if (text && !confirm(t("Delete this note?"))) return;
+    if (text && !confirmRemove) {
+      confirmRemove = true;
+      return;
+    }
     close();
     void app.removeAnnotation(id);
   }
@@ -232,12 +239,21 @@
   </form>
 {:else if visible && target}
   <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Your highlight")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
-    <button onpointerdown={(e) => e.preventDefault()} onclick={startNote}>
-      <span class="icon note" aria-hidden="true">✎</span>{target.note ? t("Edit note") : t("Add note")}
-    </button>
-    <button class="danger" onpointerdown={(e) => e.preventDefault()} onclick={remove}>
-      <span class="icon" aria-hidden="true">×</span>{t("Remove highlight")}
-    </button>
+    {#if confirmRemove}
+      <span class="asking">{t("Delete this note?")}</span>
+      <!-- svelte-ignore a11y_autofocus -->
+      <button class="danger" autofocus onpointerdown={(e) => e.preventDefault()} onclick={remove} onkeydown={(e) => e.key === 'Escape' && (confirmRemove = false)}>
+        <span class="icon" aria-hidden="true">×</span>{t("Delete")}
+      </button>
+      <button onpointerdown={(e) => e.preventDefault()} onclick={() => (confirmRemove = false)}>{t("Cancel")}</button>
+    {:else}
+      <button onpointerdown={(e) => e.preventDefault()} onclick={startNote}>
+        <span class="icon note" aria-hidden="true">✎</span>{target.note ? t("Edit note") : t("Add note")}
+      </button>
+      <button class="danger" onpointerdown={(e) => e.preventDefault()} onclick={remove}>
+        <span class="icon" aria-hidden="true">×</span>{t("Remove highlight")}
+      </button>
+    {/if}
   </div>
 {:else if visible}
   <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Selected passage")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
@@ -318,6 +334,13 @@
   .bar > button:hover,
   .bar > button:focus-visible {
     background: var(--accent-wash);
+  }
+
+  .bar > .asking {
+    padding: 0 0.5rem 0 0.6rem;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    white-space: nowrap;
   }
 
   .bar > button.danger:hover,

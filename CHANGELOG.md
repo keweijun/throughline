@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.54.0
+
+- Look after your courses from the library: each course has a **⋯** menu beside Open, with **Rename**, **Archive** and **Delete…**. Renaming changes the title you see; the course stays where it is and keeps its Studio chats.
+- **Archive** a course you are done with to take it out of the list and the course switcher. Nothing in it changes: find it under **Archived courses** below the list, where you can still open it or unarchive it.
+- **Delete** asks first, right on the card, then moves the course to the trash with its progress, notes and questions. **Undo** brings it straight back, and **Deleted courses** below the list restores it later. Throughline never empties the trash; to free the space, delete folders from it yourself (**Show the trash folder** opens it). A course that is writing a lesson or that Studio is working on waits until it is done.
+- Skipping a chapter, deleting a note, removing a highlight that has a note and deleting something from How you're taught now ask for confirmation right where you clicked, instead of in a browser popup.
+- When Codex stops right as a lesson starts, because it isn't signed in say, the message now says what Codex reported instead of "Broken pipe".
+
 ## 0.53.2
 
 - The library notices every change to a course's title, route or sources, also two made within a moment of each other. Before, such a change could go unseen until the course changed again.

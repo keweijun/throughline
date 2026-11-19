@@ -3,6 +3,7 @@
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import Composer from './Composer.svelte';
+  import InlineConfirm from './InlineConfirm.svelte';
   import type { MemoryEntry } from '../lib/types';
 
   /**
@@ -27,8 +28,12 @@
     if (await app.editMemory(entry.id, edit)) editing = null;
   }
 
+  // Deleting is confirmed beside the entry.
+  let confirming = $state<string | null>(null);
+
   function remove(entry: MemoryEntry) {
-    if (confirm(t('Delete this from the course memory? The teacher will not add it back.'))) void app.removeMemory(entry.id);
+    confirming = null;
+    void app.removeMemory(entry.id);
   }
 </script>
 
@@ -59,10 +64,20 @@
             />
           {:else}
             <div class="text prose" use:markdown={{ language: locale.language, text: entry.text }}></div>
-            <span class="actions">
-              <button class="btn btn-quiet btn-small" onclick={() => start(entry)}>{t('Edit')}</button>
-              <button class="btn btn-quiet btn-small" onclick={() => remove(entry)}>{t('Delete')}</button>
-            </span>
+            {#if confirming === entry.id}
+              <InlineConfirm
+                danger
+                message={t('Delete this from the course memory? The teacher will not add it back.')}
+                confirmLabel={t('Delete')}
+                onconfirm={() => remove(entry)}
+                oncancel={() => (confirming = null)}
+              />
+            {:else}
+              <span class="actions">
+                <button class="btn btn-quiet btn-small" onclick={() => start(entry)}>{t('Edit')}</button>
+                <button class="btn btn-quiet btn-small" onclick={() => (confirming = entry.id)}>{t('Delete')}</button>
+              </span>
+            {/if}
           {/if}
         </li>
       {/each}

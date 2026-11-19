@@ -42,6 +42,18 @@ def initialize(store, request):
         store.put('course', 'metadata', {'id': str(uuid.uuid4()), 'title': title})
     return status(store, request)
 
+def rename(store, request):
+    """Change the title the library and the app show. The course's id and folder stay, since Studio's chats, drafts
+    and the `--course` name refer to them."""
+    title = request.get('title')
+    if not isinstance(title, str) or not title.strip():
+        raise OperationError('invalid_request', 'title must be a nonempty string')
+    if len(title.strip()) > 200:
+        raise OperationError('invalid_request', 'title must be at most 200 characters')
+    metadata = {**store.get('course', 'metadata'), 'title': title.strip()}
+    store.put('course', 'metadata', metadata)
+    return {'course': metadata}
+
 def save_position(store, request):
     position = request.get('position')
     if not isinstance(position, dict):
@@ -49,4 +61,4 @@ def save_position(store, request):
     store.put('course', 'position', position)
     return {'position': position}
 
-OPERATIONS = {'course.init': initialize, 'course.status': status, 'course.profile.save': save_profile, 'position.save': save_position}
+OPERATIONS = {'course.init': initialize, 'course.status': status, 'course.rename': rename, 'course.profile.save': save_profile, 'position.save': save_position}

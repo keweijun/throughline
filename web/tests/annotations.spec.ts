@@ -47,6 +47,24 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   // Once saved, the box empties and the list scrolls smoothly to the new note in the next frame.
   await untilStill(added, (item) => item.getBoundingClientRect().top);
 
+  // A note is deleted after an inline confirmation beside it; a bookmark without a note goes at once.
+  page.on('dialog', () => errors.push('native dialog'));
+  const written = page.locator('.notes-panel .item.note').filter({ hasText: 'revisit' });
+  // The emptied section-note box folds to one line once it loses focus, which moves the list; let it settle first.
+  const deleteButton = written.getByRole('button', { name: 'Delete' });
+  await sectionNote.blur();
+  await expect.poll(async () => {
+    const before = await deleteButton.boundingBox();
+    await page.waitForTimeout(80);
+    return JSON.stringify(before) === JSON.stringify(await deleteButton.boundingBox());
+  }).toBe(true);
+  await deleteButton.click();
+  await written.getByRole('group', { name: 'Delete this note?' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(written.getByRole('button', { name: 'Edit' })).toBeVisible();
+  await written.getByRole('button', { name: 'Delete' }).click();
+  await written.getByRole('group', { name: 'Delete this note?' }).getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('.notes-panel .item.note').filter({ hasText: 'revisit' })).toHaveCount(0);
+
   await page.locator('.notes-panel .item.bookmark').getByRole('button', { name: 'Delete' }).click();
   await expect(page.locator('.head .bookmark')).toHaveAttribute('aria-pressed', 'false');
   expect(errors).toEqual([]);
@@ -263,11 +281,17 @@ test('highlights show before the host answers, preview on hover and can be noted
     return before.x === after.x && before.y === after.y;
   }).toBe(true);
 
-  // Removing it from the page asks first, since the note goes with it.
-  page.once('dialog', (dialog) => dialog.accept());
+  // Removing it from the page asks first, in the toolbar, since the note goes with it; never in a popup.
+  page.on('dialog', () => errors.push('native dialog'));
   ({ x, y } = await spot());
   await page.mouse.click(x, y);
   await toolbar.getByRole('button', { name: 'Remove highlight' }).click();
+  await expect(toolbar).toContainText('Delete this note?');
+  await toolbar.getByRole('button', { name: 'Cancel' }).click();
+  await expect(toolbar.getByRole('button', { name: 'Remove highlight' })).toBeVisible();
+  expect(await painted()).toBe(1);
+  await toolbar.getByRole('button', { name: 'Remove highlight' }).click();
+  await toolbar.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect.poll(painted).toBe(0);
   await expect(marker).toHaveCount(0);
   await page.reload();

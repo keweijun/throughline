@@ -74,6 +74,10 @@ class HostLog(unittest.TestCase):
         with self.assertRaises(RuntimeError) as failed:
             CodexRunner(command=[sys.executable, str(script)]).run('teach', self.tmp, lambda e: None, threading.Event())
         self.assertEqual(str(failed.exception), 'Model connection closed before completion: Error: not logged in')
+        # Codex may exit before or after Throughline writes to it; either way it says why, never "Broken pipe".
+        with self.assertRaises(RuntimeError) as failed:
+            list_models(command=[sys.executable, str(script)])
+        self.assertEqual(str(failed.exception), 'Codex closed before listing models: Error: not logged in')
 
     def test_a_missing_codex_says_how_to_install_it(self):
         missing = [str(self.tmp / 'no-codex-here')]

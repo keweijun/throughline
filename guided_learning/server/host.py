@@ -390,6 +390,13 @@ class Host:
                 self._launch(result['turn'])
             return result
 
+    def writing(self):
+        """Whether the learner is waiting on something this host writes: a lesson, an answer, feedback or a chapter.
+        Background work (preparation, memory and a step written ahead) can be stopped at any time."""
+        with self._streams:
+            channels = set(self._live.values())
+        return bool(channels - {PREPARED_STEP, *SMALL_MODEL})
+
     def worker_alive(self, turn):
         worker = self.workers.get((turn['id'], turn['attempt']))
         return bool(worker and worker[0].is_alive())

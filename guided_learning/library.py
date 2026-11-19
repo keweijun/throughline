@@ -1,11 +1,14 @@
 """The course library: the learner's Throughline folder, holding every course workspace."""
 import hashlib
+import json
 import logging
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import time
+import uuid
 from pathlib import Path
 
 from .api import execute
@@ -78,6 +81,11 @@ def acquire_lease(workspace):
         lease.close()
         raise OperationError('host_running', 'Another learning host already owns this course')
     return lease
+
+
+def own_dir(root):
+    """The library's own folder: host bookkeeping, packages waiting to be imported, archived courses and the trash."""
+    return Path(root).resolve() / '.throughline'
 
 
 def course_path(root, name):
@@ -162,9 +170,12 @@ def _summary(path):
 
 
 def list_courses(root):
+    """Every course in the library, most recently studied first, an archived one marked `archived`. Deleted courses wait
+    in the trash, which is not in the library's top level, so they are never listed here."""
     root = Path(root)
     if not root.is_dir():
         return []
+    hidden = archived(root)
     courses = []
     for path in sorted(p for p in root.iterdir() if p.is_dir() and is_course(p)):
         try:
@@ -175,4 +186,135 @@ def list_courses(root):
             log.exception('Could not list the course at %s', path)
             courses.append({'name': path.name, 'path': str(path.resolve()),
                             'error': f'{exc.__class__.__name__}: {exc} (details in the host log)'})
+    for course in courses:
+        course['archived'] = course['name'] in hidden
     return sorted(courses, key=lambda c: c.get('updated', 0), reverse=True)
+
+
+# Looking after the library (ADR 0022): archiving hides a course from the list without touching it, and deleting moves
+# it to the trash, from where it can be restored. Nothing here removes a course for good; the learner can empty the
+# trash folder themselves.
+
+def _settings_file(root):
+    return own_dir(root) / 'library.json'
+
+
+def _settings(root):
+    try:
+        data = json.loads(_settings_file(root).read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_settings(root, data):
+    target = _settings_file(root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix('.tmp')
+    temporary.write_text(json.dumps(data, indent=2), encoding='utf-8')
+    os.replace(temporary, target)
+
+
+def archived(root):
+    """The names of the archived courses: kept in the library's own folder, so archiving never writes to a course."""
+    names = _settings(root).get('archived')
+    return {name for name in names if isinstance(name, str)} if isinstance(names, list) else set()
+
+
+def set_archived(root, name, value):
+    path = course_path(root, name)
+    if not is_course(path):
+        raise OperationError('unknown_course', f'No course named {name} in {root}')
+    data = _settings(root)
+    names = archived(root) - {name}
+    data['archived'] = sorted(names | {name} if value else names)
+    _save_settings(root, data)
+    return {'name': name, 'archived': bool(value)}
+
+
+def trash_dir(root):
+    """Where deleted courses wait: `.throughline/trash/<entry>/<course folder>`, beside a `deleted.json` that says what
+    it was. Hidden from the library listing, Studio's file search and imports, which only look at the top level."""
+    return own_dir(root) / 'trash'
+
+
+ENTRY = re.compile(r'^\d{8}-\d{6}-[0-9a-f]{6}$')
+
+
+def free_name(root, base):
+    """`base`, or `base-2`, `base-3`… when a course of that name is already in the library."""
+    for number in range(1, 1000):
+        candidate = base if number == 1 else f'{base[:60]}-{number}'
+        if not (Path(root) / candidate).exists():
+            return candidate
+    raise OperationError('course_exists', f'Courses named {base} already exist; choose a name')
+
+
+def _title(path):
+    try:
+        return (execute(path, {'op': 'course.status'}).get('course') or {}).get('title')
+    except Exception:  # a broken course is deleted with the name it is listed under
+        return None
+
+
+def trash(root, name):
+    """Move a course to the trash. Refused while another host holds it; the caller closes this host's own first."""
+    path = course_path(root, name)
+    if not is_course(path):
+        raise OperationError('unknown_course', f'No course named {name} in {root}')
+    title = _title(path)
+    acquire_lease(path).close()  # released before the move, which Windows refuses for an open file
+    entry = time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
+    folder = trash_dir(root) / entry
+    folder.mkdir(parents=True)
+    record = {'name': name, 'title': title, 'deleted': time.time()}
+    (folder / 'deleted.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
+    try:
+        os.replace(path, folder / name)
+    except OSError as exc:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
+    _summaries.pop(path.resolve(), None)
+    if name in archived(root):  # a course restored later comes back to the main list
+        data = _settings(root)
+        data['archived'] = sorted(archived(root) - {name})
+        _save_settings(root, data)
+    return {'id': entry, 'path': str(folder / name), **record}
+
+
+def _entry(root, entry):
+    if not isinstance(entry, str) or not ENTRY.match(entry):
+        raise OperationError('unknown_deleted_course', 'This course is no longer in the trash')
+    folder = trash_dir(root) / entry
+    try:
+        record = json.loads((folder / 'deleted.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        record = None
+    name = record.get('name') if isinstance(record, dict) else None
+    if not isinstance(name, str) or not NAME.match(name) or not is_course(folder / name):
+        raise OperationError('unknown_deleted_course', 'This course is no longer in the trash')
+    return folder, {'id': entry, 'name': name, 'title': record.get('title'), 'deleted': record.get('deleted'),
+                    'path': str(folder / name)}
+
+
+def trashed(root):
+    """The deleted courses waiting in the trash, most recently deleted first."""
+    folder = trash_dir(root)
+    if not folder.is_dir():
+        return []
+    found = []
+    for path in folder.iterdir():
+        try:
+            found.append(_entry(root, path.name)[1])
+        except OperationError:
+            continue  # not a deleted course: something the learner put there, or one they emptied by hand
+    return sorted(found, key=lambda e: e['id'], reverse=True)
+
+
+def restore(root, entry):
+    """Put a deleted course back in the library, under its old name, or a free one when that is taken now."""
+    folder, record = _entry(root, entry)
+    target = Path(root).resolve() / free_name(root, record['name'])
+    os.replace(folder / record['name'], target)
+    shutil.rmtree(folder, ignore_errors=True)
+    return {**record, 'name': target.name, 'path': str(target), 'trash_path': record['path']}

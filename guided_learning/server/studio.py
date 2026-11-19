@@ -240,6 +240,17 @@ class Studio:
             data['courses'][str(course)] = [thread, *ids] if keep else ids
             self._save(data)
 
+    def move(self, old, new):
+        """File a course's chats under its new folder, when it goes to the trash or comes back from it, so a course made
+        later with the old name does not list them."""
+        with self.lock:
+            data = self._config()
+            ids = data['courses'].pop(str(old), None)
+            if ids is None:
+                return
+            data['courses'][str(new)] = [*ids, *[t for t in data['courses'].get(str(new), []) if t not in ids]]
+            self._save(data)
+
     def _ids(self, course):
         return self._config()['courses'].get(str(course), [])
 

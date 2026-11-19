@@ -29,7 +29,7 @@
   let switcher = $state<HTMLElement>();
   const others = $derived(
     (app.library?.courses ?? [])
-      .filter((c) => !c.error && c.concepts)
+      .filter((c) => !c.error && c.concepts && (!c.archived || c.path === app.library?.active))
       .sort((a, b) => Number(b.path === app.library?.active) - Number(a.path === app.library?.active)),
   );
   function toggleMenu() {

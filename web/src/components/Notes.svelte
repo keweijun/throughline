@@ -1,4 +1,5 @@
 <script lang="ts">
+  import InlineConfirm from './InlineConfirm.svelte';
   import Composer from './Composer.svelte';
   import AttachedImages from './AttachedImages.svelte';
   import PanelGroups from './PanelGroups.svelte';
@@ -76,8 +77,15 @@
     if (await app.editNote(item.id, text, images)) stopEditing(item);
   }
 
+  // Deleting a note, which the learner wrote, is confirmed beside it; a bare highlight or bookmark goes at once.
+  let confirming = $state<string | null>(null);
+
   function remove(item: Annotation) {
-    if (item.note && !confirm(t("Delete this note?"))) return;
+    if (item.note && confirming !== item.id) {
+      confirming = item.id;
+      return;
+    }
+    confirming = null;
     void app.removeAnnotation(item.id);
   }
 
@@ -143,6 +151,9 @@
         {:else}
           {#if item.note}<div class="text prose" use:markdown={{ language: locale.language, text: item.note, breaks: true }}></div>{/if}
           <AttachedImages images={item.images ?? []} small />
+          {#if confirming === item.id}
+            <InlineConfirm compact danger message={t("Delete this note?")} confirmLabel={t("Delete")} onconfirm={() => remove(item)} oncancel={() => (confirming = null)} />
+          {:else}
           <div class="actions">
             {#if item.kind !== 'note'}
               <button class="btn btn-quiet btn-small" onclick={() => app.goTo(item)}>{t("Go to")}</button>
@@ -153,6 +164,7 @@
             {/if}
             <button class="btn btn-quiet btn-small" onclick={() => remove(item)}>{t("Delete")}</button>
           </div>
+          {/if}
         {/if}
       </article>
     {/snippet}

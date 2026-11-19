@@ -1,3 +1,4 @@
+import { courseUrl } from './api';
 import { t } from './i18n.svelte';
 import { app } from './store.svelte';
 import { groupBySection } from './panel';
@@ -39,7 +40,7 @@ export async function exportNotes() {
   if (pictures.size) {
     const files = [{ path: `${name}.md`, data: new TextEncoder().encode(text) }];
     for (const image of pictures) {
-      const response = await fetch(`/api/images/${encodeURIComponent(image)}`).catch(() => null);
+      const response = await fetch(courseUrl(`/api/images/${encodeURIComponent(image)}`)).catch(() => null);
       if (response?.ok) files.push({ path: `images/${image}`, data: new Uint8Array(await response.arrayBuffer()) });
     }
     file = zip(files);

@@ -411,7 +411,8 @@ export type DeltaEvent = { type: 'delta'; id: string; attempt: number; sequence:
 
 export type ChangeScope = 'state' | 'course' | 'library' | 'settings' | 'preferences' | 'preparation' | 'builds' | 'memory';
 
-export type HostEvent = DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope } | StudioEvent;
+/** `course` names the course whose host published the event; events about the library or Studio name none. */
+export type HostEvent = ((DeltaEvent | { type: 'turn'; turn: Turn } | { type: 'changed'; scope: ChangeScope }) & { course?: string }) | StudioEvent;
 
 
 export type LibraryCourse = {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api } from '../lib/api';
+  import { api, courseUrl } from '../lib/api';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import type { PackageContents, ShareLevel } from '../lib/types';
@@ -63,7 +63,7 @@
 </fieldset>
 <p class="note">{t('The file holds the course’s source documents. Share it only with people allowed to have them.')}</p>
 <div class="actions">
-  <a class="btn btn-primary btn-small" class:disabled={!levels} href="/api/course/package/{level}" download="{name}.throughline">{t('Download the file')}</a>
+  <a class="btn btn-primary btn-small" class:disabled={!levels} href={courseUrl(`/api/course/package/${level}`)} download="{name}.throughline">{t('Download the file')}</a>
 </div>
 
 <style>

@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.54.2
+
+- A page left open on one course no longer writes into another. If you opened a different course since, in another tab say, a note, answer or other change sent from the old page is no longer saved into the course that is open now: the page reloads into the course that is open instead. The same goes for downloading a course package from Share, which could hand out the other course's file.
+
 ## 0.54.0
 
 - Look after your courses from the library: each course has a **⋯** menu beside Open, with **Rename**, **Archive** and **Delete…**. Renaming changes the title you see; the course stays where it is and keeps its Studio chats.

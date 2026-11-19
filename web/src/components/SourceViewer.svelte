@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { courseUrl } from '../lib/api';
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { verification } from '../lib/format';
@@ -103,7 +104,7 @@
           {label}
           bind:current={shown}
           pageImages={s.image_url && s.pages
-            ? { count: s.pages, url: (n) => `/api/sources/${s.source_id}/${s.revision}/page-${n}?format=image` }
+            ? { count: s.pages, url: (n) => courseUrl(`/api/sources/${s.source_id}/${s.revision}/page-${n}?format=image`) }
             : null}
           highlights={mine.map((a) => ({ page: Number(a.source!.unit_id.replace('page-', '')), passage: annotationPassage(a) }))}
           {tools}

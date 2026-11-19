@@ -227,3 +227,25 @@ test('a launch check that cannot reach GitHub shows nothing', async ({ page, cou
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('a note from a page whose course was switched elsewhere is not saved into the open course', async ({ page, course }) => {
+  // The switch happens in another tab; this page misses the event that would reload it, so its next request is stale.
+  await page.route('**/api/events', (route) => route.abort());
+  const { base, errors } = await course('library_browser_fixture');
+  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
+  await expect(page.locator('.topbar .course')).toHaveText('Linear Algebra');
+  expect((await page.request.post(base + '/api/library/open', { data: { name: 'quantum-v1' } })).ok()).toBe(true);
+
+  // Both courses have a section with the same ID, so the note would fit the other course.
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  const box = page.getByRole('textbox', { name: 'Add a note to this section' });
+  await box.fill('Meant for Linear Algebra');
+  await box.press('Control+Enter');
+  // The page reloads into the open course instead of showing an error.
+  await expect(page.locator('.topbar .course')).toHaveText('Introductory Quantum Mechanics');
+  await expect(page.getByRole('heading', { name: 'Superposition' }).first()).toBeVisible();
+  await expect(page.locator('.toast')).toBeHidden();
+  const state = await (await page.request.get(base + '/api/state')).json();
+  expect(state.annotations).toEqual([]);
+  expect(errors).toEqual([]);
+});

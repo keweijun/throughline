@@ -7,13 +7,29 @@ export class ApiError extends Error {
 /** Called when the host refuses a browser without its key (a tab opened some other way than the launcher). */
 export const signIn = { refused: () => {} };
 
+/**
+ * The course this page loaded, named in every request so the host refuses one meant for it once another course is open
+ * (`course_changed`); the page then reloads into the open course, as it does when told the course switched.
+ */
+export const course = {
+  id: null as string | null,
+  changed: () => location.reload(),
+};
+
+/** A plain link to a course-scoped endpoint (a download or an image), which cannot send the header, names the course. */
+export function courseUrl(path: string) {
+  return course.id ? `${path}${path.includes('?') ? '&' : '?'}course=${encodeURIComponent(course.id)}` : path;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
     const file = body instanceof Blob;
+    const headers: Record<string, string> = course.id ? { 'X-Throughline-Course': course.id } : {};
+    if (body !== undefined) headers['Content-Type'] = file ? body.type : 'application/json';
     response = await fetch(path, {
       method,
-      headers: body === undefined ? {} : { 'Content-Type': file ? body.type : 'application/json' },
+      headers,
       body: body === undefined ? undefined : file ? body : JSON.stringify(body),
     });
   } catch {
@@ -21,6 +37,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
   const data = await response.json().catch(() => ({}));
   if (response.status === 401 && data.code === 'not_signed_in') signIn.refused();
+  if (response.status === 409 && data.code === 'course_changed') {
+    // Not an error to show: what the page asked for belongs to a course no longer open, and the page is about to go.
+    course.changed();
+    return new Promise<T>(() => {});
+  }
   if (!response.ok) throw new ApiError(data.error ?? `Request failed (${response.status})`, data.code, response.status);
   return data as T;
 }

@@ -397,6 +397,8 @@ class Host:
                 position = self.operation({'op': 'course.status'})['position'] or {}
                 if not previous.get('chapter_id') and previous['concept_id'] != position.get('concept_id'):
                     raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
+                if (self.navigation.step_of(identifier)[0] or {}).get('replaced_by'):
+                    raise OperationError('lesson_replaced', 'A new lesson replaced this one; refresh the page')
                 self.ensure_single_mainline(identifier, 'Pause the current lesson before resuming another')
             worker = self.workers.get((identifier, previous['attempt']))
             if worker and worker[0].is_alive():

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import type { LessonKind } from '../lib/types';
   import Composer from './Composer.svelte';
 
-  let { conceptId, hasLesson }: { conceptId: string; hasLesson: boolean } = $props();
+  // `open`: the section's lesson has steps left, so Continue is the way on and this only offers to start it over.
+  let { conceptId, hasLesson, open = false }: { conceptId: string; hasLesson: boolean; open?: boolean } = $props();
 
   // The request is a draft per section, so it survives looking at another section.
   const draftKey = $derived(`lesson:${conceptId}`);
@@ -12,9 +14,12 @@
   let busy = $state(false);
   const running = $derived(app.runningLesson);
   // Before the first lesson the request is optional, so the card leads with starting and opens the box only on request
-  // (or when a draft is waiting in it).
+  // (or when a draft is waiting in it). Mid-lesson, starting over is a quiet offer until chosen.
   let focusing = $state(false);
-  const writing = $derived(hasLesson || focusing || prompt.trim() !== '');
+  const writing = $derived((hasLesson && !open) || focusing || prompt.trim() !== '');
+  // Over a taught section: another pass adds one reply to the lesson there; a New lesson replaces it (ADR 0023).
+  let chosen = $state<LessonKind>('pass');
+  const kind = $derived<LessonKind | undefined>(open ? 'new' : hasLesson ? chosen : undefined);
 
   function chooseFocus() {
     focusing = true;
@@ -31,9 +36,10 @@
     busy = true;
     const sent = prompt;
     const key = draftKey;
-    const result = await app.startLesson(sent);
+    const result = await app.startLesson(sent, kind);
     busy = false;
     if (result && app.drafts.get(key) === sent) app.drafts.set(key, '');
+    if (result) focusing = false;
   }
 </script>
 
@@ -47,8 +53,20 @@
         {:else}{t("The teacher connects this section to the previous one, then teaches it in short steps. You can pause at any time.")}{/if}
       </p>
     {/if}
-    {#snippet target()}{hasLesson ? t("Ask for another pass") : t("What the lesson focuses on · optional")}{/snippet}
-    {#if !writing}
+    {#snippet target()}
+      {#if open}{t("New lesson · replaces this one")}
+      {:else if hasLesson}
+        <div class="segmented" role="radiogroup" aria-label={t("What to ask for")}>
+          <label><input type="radio" name="lesson-kind-{conceptId}" value="pass" bind:group={chosen} />{t("Another pass")}</label>
+          <label><input type="radio" name="lesson-kind-{conceptId}" value="new" bind:group={chosen} />{t("New lesson")}</label>
+        </div>
+      {:else}{t("What the lesson focuses on · optional")}{/if}
+    {/snippet}
+    {#if open && !writing}
+      <div class="row">
+        <button class="btn btn-quiet btn-small" disabled={busy || !!running} onclick={chooseFocus}>{t("Start a new lesson instead")}</button>
+      </div>
+    {:else if !writing}
       <div class="row">
         <button class="btn btn-primary" disabled={busy || !!running} onclick={start}>{t("Start lesson")}</button>
         <button class="btn btn-quiet" onclick={chooseFocus}>{t("Choose a focus")}</button>
@@ -59,15 +77,20 @@
       value={prompt}
       onvalue={setPrompt}
       label={t("Lesson request")}
-      placeholder={hasLesson ? t("For example: go deeper on the derivation, or explain it with a different example") : t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}
-      submitLabel={hasLesson ? t("Teach again") : t("Start lesson")}
+      placeholder={kind === 'new' ? t("Leave empty to teach the whole section again in steps, or say what it should cover: only what the last lesson skipped, more rigour, the proofs")
+        : kind === 'pass' ? t("For example: go deeper on the derivation, or explain it with a different example")
+        : t("Leave empty for a full lesson: intuition, formulas and derivations, then an example.")}
+      submitLabel={kind === 'new' ? t("Start new lesson") : kind === 'pass' ? t("Teach again") : t("Start lesson")}
       disabled={busy || !!running}
       allowEmpty
       onsubmit={start}
       header={target}
-      onclose={hasLesson ? undefined : dropFocus}
-      closeLabel={t("Start without a focus")}
+      onclose={open ? dropFocus : hasLesson ? undefined : dropFocus}
+      closeLabel={open ? t("Keep this lesson") : t("Start without a focus")}
     />
+    {#if kind === 'new'}
+      <p class="hint">{open ? t("The steps you have read stay above, folded; the rest of this lesson's plan is dropped.") : t("The lesson you have read stays above, folded, with your answers and notes.")}</p>
+    {/if}
     {/if}
     {#if running}<p class="hint">{t("Another lesson is being written. Pause it first.")}</p>{/if}
   </div>

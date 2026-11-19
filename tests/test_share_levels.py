@@ -158,6 +158,15 @@ class SharedLessons(LessonHost):
         kept = records(Path(packages.import_package(again, library)['path']))
         self.assertEqual([s.get('written') for s in kept[('lessons', 'one')]['steps']], [self.turn_id('one'), self.turn_id('two'), None])
 
+    def test_a_lesson_replaced_by_a_new_lesson_is_not_shared(self):
+        self.runner.replies = [step_reply('A new lesson.')]
+        self.post('/api/lessons', {'id': 'new', 'kind': 'new'})
+        self.finish('new')
+        kept = records(self.share('lessons'))
+        self.assertEqual([k for (n, k) in kept if n == 'lessons'], ['new'], 'each section carries only its current lesson')
+        self.assertNotIn(('streams', self.turn_id('two')), kept)
+        self.assertEqual(records(self.root)[('lessons', 'one')]['replaced_by'], 'new', 'the sender keeps the replaced lesson')
+
     def test_route_carries_no_lessons_or_exercises(self):
         kept = records(self.share('route'))
         self.assertEqual({n for n, _ in kept} & {'lessons', 'streams', 'practice_tasks'}, set())

@@ -5,7 +5,7 @@ import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
@@ -351,21 +351,45 @@ class AppStore {
     return null;
   }
 
-  /** The section's stepped lesson that still has steps to teach, once its first step has started. */
+  /** The section's stepped lesson that still has steps to teach, once its first step has started. A lesson a New lesson
+   * replaced (ADR 0023) never goes on. */
   openLesson(conceptId: string | null) {
     return (this.state?.lessons ?? []).find(
-      (l) => l.concept_id === conceptId && !!this.turn(l.steps[0]?.turn_id) && l.steps.some((s) => !s.turn_id),
+      (l) => l.concept_id === conceptId && !l.replaced_by && !!this.turn(l.steps[0]?.turn_id) && l.steps.some((s) => !s.turn_id),
     );
+  }
+
+  /** The section's current stepped lesson once a New lesson has replaced an earlier one; null while it has only one. */
+  newLesson(conceptId: string | null) {
+    const own = (this.state?.lessons ?? []).filter((l) => l.concept_id === conceptId);
+    return own.some((l) => l.replaced_by) ? (own.find((l) => !l.replaced_by) ?? null) : null;
+  }
+
+  /** Whether a section's lesson turn belongs to what a New lesson replaced: a step of a replaced lesson, or a reply
+   * written before the current lesson began. Such turns are kept to read, folded above the current lesson. */
+  replaced(turn: Turn) {
+    const step = this.stepOf(turn.id);
+    if (step) return !!step.lesson.replaced_by;
+    const current = this.newLesson(turn.concept_id);
+    return !!current && turn.started_at < current.created_at;
   }
 
   hasLesson(conceptId: string | null) {
     return this.lessons(conceptId).some((t) => t.status === 'completed' || t.status === 'running');
   }
 
-  /** Whether the section's lesson is finished: one completed, none being written, and no planned step left to teach. */
+  /** Whether the section has a finished lesson: a reply without steps that completed, or a stepped lesson taught to its
+   * last step. A New lesson under way does not undo it (ADR 0023). */
   studied(conceptId: string | null) {
-    const lessons = this.lessons(conceptId);
-    return lessons.some((t) => t.status === 'completed') && !lessons.some((t) => t.status === 'running') && !this.openLesson(conceptId);
+    const done = this.lessons(conceptId).filter((t) => t.status === 'completed');
+    if (done.some((t) => !this.stepOf(t.id))) return true;
+    return (this.state?.lessons ?? []).some(
+      (l) =>
+        l.concept_id === conceptId &&
+        l.steps.every((s) => s.turn_id) &&
+        this.turn(l.steps.at(-1)?.turn_id)?.status !== 'running' &&
+        l.steps.some((s) => done.some((t) => t.id === s.turn_id)),
+    );
   }
 
   /** How far an unfinished stepped lesson has come: the steps taught so far, of those planned now. */
@@ -1162,8 +1186,9 @@ class AppStore {
     return this.#move(() => api.post('/api/sections/enter', { concept_id: conceptId, request_id: newId(), then_return: thenReturn }));
   }
 
-  startLesson(prompt: string) {
-    return this.act(() => api.post('/api/lessons', { id: newId(), prompt }));
+  /** Over a section with a lesson, `kind` asks for a New lesson that replaces it or another pass (ADR 0023). */
+  startLesson(prompt: string, kind?: LessonKind) {
+    return this.act(() => api.post('/api/lessons', { id: newId(), prompt, ...(kind ? { kind } : {}) }));
   }
 
   /** Continue: teach the next planned step of a stepped lesson. */

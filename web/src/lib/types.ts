@@ -77,8 +77,20 @@ export type CheckAnswer = { choice: CheckChoice; unsure: boolean; correct: boole
 
 export type LessonStep = { title: string; added: boolean; turn_id?: string; replied?: boolean; check?: CheckQuestion; answer?: CheckAnswer };
 
-/** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. */
-export type SteppedLesson = { id: string; concept_id: string; request: string; created_at: number; steps: LessonStep[] };
+/** A section's lesson taught in steps, one mainline turn each. Lessons saved before steps have no record. A New lesson
+ * replaces the section's lesson (ADR 0023), which is then kept only to read, with `replaced_by` naming the new one. */
+export type SteppedLesson = {
+  id: string;
+  concept_id: string;
+  request: string;
+  created_at: number;
+  steps: LessonStep[];
+  replaced_by?: string;
+  replaced_at?: number;
+};
+
+/** What a lesson request over a section that already has a lesson asks for: a New lesson or another pass (ADR 0023). */
+export type LessonKind = 'new' | 'pass';
 
 export type Decision = {
   depth: 'short' | 'long';

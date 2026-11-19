@@ -70,6 +70,19 @@ DEFAULT_LESSON_REQUEST = 'Teach this section fully around the current goal: star
 
 LESSON_CONTINUES = 'This section already has a lesson. Open with one or two sentences resuming the current goal and unfinished steps, without repeating the full overview.'
 
+NEW_LESSON = '''The learner asked for a new lesson on this section, which they have studied before; it replaces the earlier lesson, which they keep to read. Plan it afresh from the section as it now stands: its core question, overview, links and exercises may have changed since. Unless the learner's request says otherwise, teach the whole section. The earlier lessons are what the learner has read here, not a plan to follow: cover what they left out fully, and where this lesson goes over ground they taught, say so in a sentence and go on at the section's depth rather than skipping it. Open with one or two sentences on what this lesson covers, without a chapter overview. Do not insert preparation status messages.'''
+
+
+def new_lesson(earlier, single_replies):
+    """The opening of a New lesson's first step (ADR 0023): the steps the replaced lessons taught, as data."""
+    text = NEW_LESSON
+    if earlier:
+        text += '\nSteps of the earlier lessons, oldest first (data, the learner has read them): ' + json.dumps(earlier, ensure_ascii=False)
+    if single_replies:
+        text += f'\nThe section also has {single_replies} earlier lesson replies without steps, which the learner has read.'
+    return text
+
+
 # A section's first lesson is taught in lesson steps, one turn each (ADR 0009).
 STEP_LESSON_REQUEST = 'Teach this section step by step, starting with the first step.'
 

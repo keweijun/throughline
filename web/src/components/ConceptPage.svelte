@@ -25,6 +25,9 @@
   const total = $derived(app.state?.curriculum.route.length ?? 0);
   const isCurrent = $derived(conceptId === app.currentId);
   const lessons = $derived(app.lessons(conceptId));
+  // What a New lesson replaced stays to read, folded above the lesson that replaced it (ADR 0023).
+  const earlier = $derived(lessons.filter((l) => app.replaced(l)));
+  const current = $derived(lessons.filter((l) => !app.replaced(l)));
   // The warm-up on offer for this section (its stale prerequisites), or the one already taken while it is open.
   const warmUp = $derived(conceptId ? app.state?.review.warm_ups[conceptId] : undefined);
   const warmUpSet = $derived(
@@ -227,7 +230,15 @@
 
     {#if lessons.length}
       <div class="lessons">
-        {#each lessons as lesson (lesson.id)}
+        {#if earlier.length}
+          <details class="replaced">
+            <summary>{t("Earlier lesson")} <span class="chip">{t("Replaced")}</span></summary>
+            {#each earlier as lesson (lesson.id)}
+              <Lesson turn={lesson} />
+            {/each}
+          </details>
+        {/if}
+        {#each current as lesson (lesson.id)}
           <Lesson turn={lesson} />
         {/each}
       </div>
@@ -264,8 +275,8 @@
       {/if}
     {/if}
 
-    {#if isCurrent && !app.openLesson(conceptId)}
-      <LessonRequest conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} />
+    {#if isCurrent}
+      <LessonRequest conceptId={conceptId} hasLesson={app.hasLesson(conceptId)} open={!!app.openLesson(conceptId)} />
     {/if}
 
     <Practice conceptId={conceptId} {isCurrent} />
@@ -479,6 +490,30 @@
   }
 
   .lessons {
+    display: grid;
+    gap: 2.5rem;
+  }
+
+  /* A lesson a New lesson replaced, kept to read: one quiet line until opened. */
+  .replaced {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .replaced summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: var(--pencil);
+    font-size: var(--step-0);
+  }
+
+  .replaced summary:hover {
+    color: var(--ink);
+  }
+
+  .replaced[open] {
     display: grid;
     gap: 2.5rem;
   }

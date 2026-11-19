@@ -1,6 +1,9 @@
 """Stepped lessons (ADR 0009): a section's lesson is taught as lesson steps, one mainline turn each, following a plan
 the teacher may revise as it teaches. Each step may end with a check question, answered without a model turn and
-recorded as an interaction, never as evidence. Lessons saved before this module are single turns with no record here."""
+recorded as an interaction, never as evidence. Lessons saved before this module are single turns with no record here.
+
+A section has one current lesson: beginning another, a New lesson (ADR 0023), marks the ones before it replaced. A
+replaced lesson keeps what was taught and answered, to read, but is never continued, prepared ahead or answered again."""
 import random
 import time
 from .memory import from_check
@@ -58,6 +61,13 @@ def _read(store, identifier):
     return lesson
 
 
+def _current(lesson):
+    """A lesson that goes on: one a New lesson replaced is kept only to read."""
+    if lesson.get('replaced_by'):
+        raise OperationError('lesson_replaced', 'A new lesson replaced this one')
+    return lesson
+
+
 def _step_of(store, request):
     """The lesson, turn id and index of the step a request names by lesson `id` and `turn_id`."""
     lesson = _read(store, require_text(request, 'id'))
@@ -74,7 +84,8 @@ def _started(store, step):
 
 def begin(store, request):
     """A new stepped lesson for a section with its initial plan (titles, in order) and an optional `outline`: the steps to
-    fall back on when the first step's reply plans none."""
+    fall back on when the first step's reply plans none. It replaces the section's lessons so far, which stay to read
+    with `replaced_by` naming it; their prepared steps are dropped (the host stops any still being written)."""
     identifier = require_text(request, 'id')
     concept = require_text(request, 'concept_id')
     validate_concept(store, concept)
@@ -92,10 +103,17 @@ def begin(store, request):
     outline = request.get('outline') or []
     if not isinstance(outline, list) or len(outline) > MAX_STEPS:
         raise OperationError('invalid_plan', f'A lesson outline has at most {MAX_STEPS} steps')
-    lesson = {'id': identifier, 'concept_id': concept, 'request': focus.strip(), 'created_at': time.time(),
+    now = time.time()
+    lesson = {'id': identifier, 'concept_id': concept, 'request': focus.strip(), 'created_at': now,
               'steps': [{'title': _title(t), 'added': False} for t in titles],
               **({'outline': [_title(t) for t in outline]} if outline else {})}
-    return {'lesson': store.put('lessons', identifier, lesson), 'created': True}
+    replaced = []
+    for earlier in store.list('lessons'):
+        if earlier['concept_id'] == concept and not earlier.get('replaced_by'):
+            earlier.pop('prepared', None)
+            store.put('lessons', earlier['id'], {**earlier, 'replaced_by': identifier, 'replaced_at': now})
+            replaced.append(earlier['id'])
+    return {'lesson': store.put('lessons', identifier, lesson), 'created': True, 'replaced': replaced}
 
 
 def step(store, request):
@@ -108,6 +126,7 @@ def step(store, request):
     for index, item in enumerate(lesson['steps']):
         if item.get('turn_id') == turn_id or (request_id and item.get('request_id') == request_id):
             return {'lesson': lesson, 'number': index + 1, 'created': False}
+    _current(lesson)
     for item in lesson['steps']:
         if item.get('turn_id') and not _started(store, item):
             item.pop('turn_id')
@@ -138,6 +157,8 @@ def prepare(store, request):
     lesson = _read(store, require_text(request, 'id'))
     turn_id = request.get('turn_id')
     previous = lesson.get('prepared')
+    if turn_id is not None:
+        _current(lesson)
     if turn_id is None:
         lesson.pop('prepared', None)
     else:
@@ -210,6 +231,7 @@ def answer(store, request):
         if entry['answer']['choice'] != choice:
             raise OperationError('already_answered', 'This check question is already answered')
         return {'lesson': lesson, 'answer': entry['answer'], 'changed': False}
+    _current(lesson)
     if any(_started(store, item) for item in lesson['steps'][index + 1:]):
         raise OperationError('check_closed', 'The next step has started')
     chosen = "I'm not sure" if choice == UNSURE else check['options'][choice]['text']

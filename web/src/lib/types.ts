@@ -268,7 +268,7 @@ export type Preferences = { language: 'en' | 'zh-CN' };
 
 export type State = {
   preferences: Preferences;
-  course: { id: string; title: string; imported?: ImportedFrom | null; built_for?: BuiltFor | null };
+  course: { id: string; key: string; title: string; imported?: ImportedFrom | null; built_for?: BuiltFor | null };
   position: Position | null;
   sources: {
     id: string; path: string; revision: string; status: string; converted_from?: { path: string; revision: string };

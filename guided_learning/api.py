@@ -2,7 +2,8 @@ import sqlite3
 import uuid
 from importlib import import_module
 from pathlib import Path
-from . import migrations
+from . import migrations, moving
+from .moving import MOVING
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
@@ -72,17 +73,19 @@ def _read(store, handler, request):
         store.db.execute('PRAGMA query_only=0')
 
 
-# Left in a course while the library moves it to the trash (`library.trash`).
-MOVING = '.moving'
-
-
 def _write(store, handler, request):
     with store.db:
         store.db.execute('BEGIN IMMEDIATE')
         # Checked under the write lock: the course was moved (or is being moved) since this connection opened it, and
-        # what this write saves, a source's snapshot say, would land outside it.
-        if (store.workspace / MOVING).exists() or not (store.workspace / 'course.sqlite3').is_file():
-            raise OperationError('course_moved', 'This course was moved to the trash; restore it to change it')
+        # what this write saves, a source's snapshot say, would land outside it. A marker that a move left behind when
+        # it died before moving the course is cleared (`moving.leftover`).
+        marked = (store.workspace / MOVING).exists()
+        if marked and (store.workspace / 'course.sqlite3').is_file() and moving.leftover(store.workspace):
+            (store.workspace / MOVING).unlink(missing_ok=True)
+            marked = False
+        if marked or not (store.workspace / 'course.sqlite3').is_file():
+            raise OperationError('course_moved', 'This course was moved to the trash, or is being moved; restore it, '
+                                                 'or try again, to change it')
         if store.get('course', 'metadata') is None:
             if request['op'] != 'course.init':
                 raise OperationError('course_not_initialized', 'Run course.init first')

@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.55.2
+
+- A course whose deletion was cut short, because Throughline was closed or the computer shut down at that moment, works again the next time you open it or change it. Before, it stayed in the library but refused every change, telling you to restore it from a trash that did not hold it.
+- Setup moving your courses from where an earlier version kept them now waits for anything Codex is saving in a course to finish, so nothing is left behind in the old folder. On Windows a course that is still open somewhere stays where it is, whole, instead of being half copied. And a course archived in one old location no longer archives a different course of the same name.
+- A copy of a course folder you made yourself is now its own course to Throughline: a tab still showing the original reloads instead of saving your notes into the copy or downloading the copy when you export.
+
 ## 0.55.1
 
 - A course with a very long text source, such as a full transcript, can now be imported from its package. Before, the import could refuse a package Throughline had just exported, so a backup of such a course could not be restored.

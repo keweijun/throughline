@@ -15,7 +15,7 @@ import uuid
 from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 
-from . import library, logs
+from . import library, logs, moving
 from .codex import find_codex, remember_codex
 from .store import OperationError
 
@@ -215,21 +215,24 @@ def migrate(root):
             pass
         deadline = time.monotonic() + SHUTDOWN_WAIT
         left = False
+        here = []  # moved from this old library, whose archive list is the one that names them
         for course in sorted(p for p in old.iterdir() if p.is_dir() and library.is_course(p)):
-            if (root / course.name).exists() or not _free(course, deadline):
+            target = root / course.name
+            if target.exists() or not _free(course, deadline):
                 skipped.append(str(course))
                 left = True
                 continue
-            try:
-                shutil.move(str(course), str(root / course.name))
-                moved.append(course.name)
-            except OSError:
+            try:  # with nothing written meanwhile, as when deleting a course (ADR 0022)
+                moving.move_course(course, target, 'The course could not be moved')
+            except OperationError:  # in use: Windows will not move a folder with an open file
                 skipped.append(str(course))
                 left = True
-        archived = library.archived(old) & set(moved)
-        if archived:
-            for name in archived:
-                library.set_archived(root, name, True)
+                continue
+            (target / moving.MOVING).unlink(missing_ok=True)
+            here.append(course.name)
+        moved += here
+        for name in library.archived(old) & set(here):
+            library.set_archived(root, name, True)
         if not _move_trash(old, root):
             left = True
         if left:
@@ -248,7 +251,7 @@ def migrate(root):
 # What an old library's own folder may hold that setup can delete once its courses and trash have moved: host
 # bookkeeping, logs, imports that never finished and the archive list. Anything else stays, and so does the folder.
 DISPOSABLE = ('host.json', 'host.log', 'host-output.log', 'library.json', 'library.json.lock', 'imports', 'host-key',
-              'host.key')
+              'host.key', 'moving')
 
 
 def _move_trash(old, root):

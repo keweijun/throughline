@@ -47,7 +47,8 @@ class WindowsPermissions(unittest.TestCase):
         path = library.state_dir() / 'host.key'
         path.parent.mkdir(parents=True)
         path.write_text('d' * 64, encoding='ascii')
-        self.assertTrue(any('(I)' in e for e in entries(path)), 'a plain file inherits the folder')
+        subprocess.run(['icacls', str(path), '/grant', '*S-1-5-32-545:R'], capture_output=True, check=True)  # Users may read it
+        self.assertGreater(len(entries(path)), 1)
         library._kept_private.discard(path)
         self.assertEqual(library.host_key(), 'd' * 64)
         self.assert_only_me(path)

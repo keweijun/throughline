@@ -78,9 +78,9 @@ _sid = []
 
 def keep_private(path):
     """Let only this user's account read or change a file. On Windows, POSIX modes set no permissions, so the file
-    would take the library folder's, which can let every account on the computer read it: its inherited entries are
-    removed and this user alone granted full control (`icacls`, with the account's SID from `whoami`). A failure is
-    logged, never raised: the host still starts."""
+    would take the library folder's, which can let every account on the computer read it: its own entries are reset,
+    the inherited ones removed and this user alone granted full control (`icacls`, with the account's SID from
+    `whoami`). A failure is logged, never raised: the host still starts."""
     if os.name != 'nt':
         os.chmod(path, 0o600)
         return
@@ -92,8 +92,10 @@ def keep_private(path):
             if not found:
                 raise ValueError(f'no SID in {listed!r}')
             _sid.append(found.group())
-        subprocess.run(['icacls', str(path), '/inheritance:r', '/grant:r', f'*{_sid[0]}:F'], capture_output=True, timeout=30,
-                       check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        # /grant:r replaces only this user's entry, so first drop entries set on the file itself (SYSTEM, say).
+        for change in (['/reset'], ['/inheritance:r', '/grant:r', f'*{_sid[0]}:F']):
+            subprocess.run(['icacls', str(path), *change], capture_output=True, timeout=30, check=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
         _kept_private.add(Path(path))
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         log.warning('Could not limit %s to this user: %s', path, getattr(exc, 'stderr', None) or exc)

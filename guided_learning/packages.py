@@ -11,7 +11,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from . import images, library, migrations
+from . import images, library, memory, migrations
 from .api import execute
 from .store import OperationError, Store
 from .streaming import PREPARED_STEP
@@ -78,12 +78,17 @@ def share(rows, level, notes=False):
     streams, lessons, tasks = kept.pop('streams', {}), kept.pop('lessons', {}), kept.pop('practice_tasks', {})
     shared = {'streams': {}, 'lessons': {}, 'practice_tasks': {}}
     if level == 'lessons':
+        from .server import prompts  # the server's package imports this module
         for lesson in lessons.values():
             steps, written = _steps(lesson, streams)
             if written:
-                shared['lessons'][lesson['id']] = {**{k: lesson[k] for k in ('id', 'concept_id', 'request', 'created_at', 'outline') if k in lesson}, 'steps': steps}
-                for turn in written:
-                    shared['streams'][turn['id']] = _turn(turn, channel=PREPARED_STEP)
+                # What the sender asked for is theirs: the lesson and its steps carry the request a plain Start or
+                # Continue makes, which is what the recipient's reveal records.
+                shared['lessons'][lesson['id']] = {**{k: lesson[k] for k in ('id', 'concept_id', 'created_at', 'outline') if k in lesson},
+                                                   'request': prompts.STEP_LESSON_REQUEST, 'steps': steps}
+                for number, turn in enumerate(written):
+                    prompt = prompts.STEP_LESSON_REQUEST if number == 0 else prompts.STEP_CONTINUE_REQUEST
+                    shared['streams'][turn['id']] = {**_turn(turn, channel=PREPARED_STEP), 'prompt': prompt}
         for key, task in tasks.items():
             if task.get('origin') in ('source', 'self_created') and not task.get('chapter_id') and task.get('status') != 'replaced':
                 shared['practice_tasks'][key] = {**{k: task[k] for k in TASK_KEYS if k in task}, 'status': 'pending', 'history': []}
@@ -119,8 +124,9 @@ def _steps(lesson, streams):
     recipient's Start or Continue reveals, and the plan after the last such step stays a plan."""
     steps, written = [], []
     for step in lesson.get('steps', []):
-        turn = streams.get(step.get('turn_id'))
-        if turn and turn['status'] == 'completed' and turn['channel'] == 'mainline' and len(written) == len(steps):
+        # A step an imported course has not revealed yet is still `written`, with its turn hidden (prepared).
+        turn = streams.get(step.get('turn_id') or step.get('written'))
+        if turn and turn['status'] == 'completed' and turn['channel'] in ('mainline', PREPARED_STEP) and len(written) == len(steps):
             steps.append({**{k: step[k] for k in STEP_KEYS if k in step}, 'written': turn['id']})
             written.append(turn)
         else:
@@ -129,8 +135,12 @@ def _steps(lesson, streams):
 
 
 def _turn(turn, channel=None):
-    return {**{k: turn[k] for k in TURN_KEYS if k in turn}, 'channel': channel or turn['channel'], 'record_user': False,
-            'metrics': {}, 'attempts': [], 'resume_requests': []}
+    """A shared turn: what the teacher wrote, without its notes about the sender (course memory, a course change)."""
+    kept = {k: turn[k] for k in TURN_KEYS if k in turn}
+    for field in ('text', 'final_text'):
+        if isinstance(kept.get(field), str):
+            kept[field] = memory.strip(kept[field])
+    return {**kept, 'channel': channel or turn['channel'], 'record_user': False, 'metrics': {}, 'attempts': [], 'resume_requests': []}
 
 
 def contents(rows):
@@ -163,8 +173,6 @@ def export(workspace, destination, level='everything'):
     copy = destination.with_name('.' + destination.name + '.sqlite3')
     shared = destination.with_name('.' + destination.name + '.shared.sqlite3')
     folders = ('sources', images.FOLDER) if level == 'everything' else ('sources',)  # images belong to answers and notes
-    files = sorted(path for folder in folders for path in (workspace / folder).rglob('*')
-                   if path.is_file() and ENTRY.fullmatch(path.relative_to(workspace).as_posix()))
     try:
         for path in (copy, shared):
             path.unlink(missing_ok=True)
@@ -177,12 +185,20 @@ def export(workspace, destination, level='everything'):
             _write(shared, share(_rows(copy), level))
             os.replace(shared, copy)
         rows = list(_rows(copy))
+        # Listed after the snapshot: a source registered meanwhile wrote its file before its record, so every source
+        # the snapshot holds has its file here. One that doesn't would make a package that imports with a gap.
+        files = sorted(path for folder in folders for path in (workspace / folder).rglob('*')
+                       if path.is_file() and ENTRY.fullmatch(path.relative_to(workspace).as_posix()))
+        missing = _missing_sources(rows, {path.relative_to(workspace).as_posix() for path in files})
+        if missing:
+            raise OperationError('source_missing', f'The course is missing the saved copy of {missing[0]}; register that source again, then export')
         course = {key: json.loads(value) for namespace, key, value in rows if namespace == 'course'}
         manifest = {'format': FORMAT, 'level': level, 'schema': (course.get('schema') or {}).get('version', 1),
                     'throughline': version(), 'name': workspace.name, 'title': status['course']['title'],
                     'language': (course.get('preferences') or {}).get('language'), 'contents': contents(rows),
                     **({'built_for': course['built_for']} if course.get('built_for') else {}),
-                    'sources': [{'id': s['id'], 'revision': s['revision'], 'name': Path(s['path']).name} for s in status['sources']]}
+                    'sources': [{'id': s['id'], 'revision': s['revision'], 'name': Path(s['path']).name}
+                                for s in (json.loads(v) for namespace, _, v in rows if namespace == 'sources')]}
         with zipfile.ZipFile(partial, 'w', zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=1))
             archive.write(copy, 'course.sqlite3')
@@ -231,6 +247,10 @@ def import_package(package, root, name=None, mode=None):
             for entry in entries:
                 if entry.filename.startswith('sources/') or mode != 'fresh' and entry.filename.startswith(images.FOLDER + '/'):
                     _unpack(archive, entry, course / entry.filename)
+            unpacked = {p.relative_to(course).as_posix() for p in (course / 'sources').rglob('*') if p.is_file()}
+            missing = _missing_sources(_rows(course / 'course.sqlite3'), unpacked)
+            if missing:
+                raise OperationError('invalid_package', f'The package is missing the saved copy of {missing[0]}, so it would import incomplete')
             result = execute(course, {'op': 'course.status'})  # migrates an older course and proves it opens
             if target.exists():
                 raise OperationError('course_exists', f'A course named {target.name} already exists')
@@ -286,6 +306,17 @@ def _target(root, name, suggested):
     if target.exists():
         raise OperationError('course_exists', f'A course named {target.name} already exists')
     return target
+
+
+def _missing_sources(rows, present):
+    """The sources whose saved copy (`sources/<id>/<revision>`) a course's records name but `present` lacks."""
+    missing = []
+    for namespace, key, value in rows:
+        if namespace == 'source_revisions':
+            snapshot = json.loads(value)
+            if f"sources/{snapshot.get('source_id')}/{snapshot.get('revision')}" not in present:
+                missing.append(Path(str(snapshot.get('path') or snapshot.get('source_id'))).name)
+    return missing
 
 
 def _rows(database):

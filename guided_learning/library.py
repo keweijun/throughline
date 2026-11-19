@@ -11,7 +11,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .api import execute
+from .api import MOVING, execute
 from .store import OperationError
 
 log = logging.getLogger(__name__)
@@ -45,8 +45,11 @@ def host_key():
     """The secret a browser or command shows to use the host, so other people's programs on a shared computer can't.
 
     Kept across launches, so a tab left open keeps working when the host restarts on the same port (an update), and
-    readable only by this user: the program that reads it could read the courses anyway."""
-    path = state_dir() / 'host-key'
+    readable only by this user: the program that reads it could read the courses anyway. It never goes in an address
+    or a log; a browser signs in with a one-time code (`server.app.SignIn`). 0.52–0.54 kept it in `host-key` and printed
+    it in an address, so that key is replaced."""
+    (state_dir() / 'host-key').unlink(missing_ok=True)
+    path = state_dir() / 'host.key'
     try:
         key = path.read_text(encoding='ascii').strip()
         if re.fullmatch(r'[0-9a-f]{64}', key):
@@ -55,7 +58,7 @@ def host_key():
         pass
     path.parent.mkdir(parents=True, exist_ok=True)
     key = secrets.token_hex(32)
-    partial = path.with_name(f'host-key.{os.getpid()}.partial')
+    partial = path.with_name(f'host.key.{os.getpid()}.partial')
     descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(descriptor, 'w', encoding='ascii') as out:
         out.write(key)
@@ -264,15 +267,17 @@ def trash(root, name):
         raise OperationError('unknown_course', f'No course named {name} in {root}')
     title = _title(path)
     acquire_lease(path).close()  # released before the move, which Windows refuses for an open file
+    _mark_moving(path)
     entry = time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
     folder = trash_dir(root) / entry
-    folder.mkdir(parents=True)
-    record = {'name': name, 'title': title, 'deleted': time.time()}
-    (folder / 'deleted.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
     try:
+        folder.mkdir(parents=True)
+        record = {'name': name, 'title': title, 'deleted': time.time()}
+        (folder / 'deleted.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
         os.replace(path, folder / name)
     except OSError as exc:
         shutil.rmtree(folder, ignore_errors=True)
+        (path / MOVING).unlink(missing_ok=True)
         raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
     _summaries.pop(path.resolve(), None)
     if name in archived(root):  # a course restored later comes back to the main list
@@ -280,6 +285,21 @@ def trash(root, name):
         data['archived'] = sorted(archived(root) - {name})
         _save_settings(root, data)
     return {'id': entry, 'path': str(folder / name), **record}
+
+
+def _mark_moving(path):
+    """Leave `MOVING` in a course about to move, under its write lock. A write already running (Codex registering a
+    source from the command line, say) finishes first, files and all, and every later one sees the marker, or no
+    course at this path, and is refused (`api.execute`), so nothing is written to a course while it moves."""
+    db = sqlite3.connect(path / 'course.sqlite3', timeout=30)
+    try:
+        db.execute('BEGIN IMMEDIATE')
+        (path / MOVING).write_text('', encoding='utf-8')
+        db.rollback()
+    except sqlite3.Error as exc:
+        raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
+    finally:
+        db.close()
 
 
 def _entry(root, entry):
@@ -316,5 +336,6 @@ def restore(root, entry):
     folder, record = _entry(root, entry)
     target = Path(root).resolve() / free_name(root, record['name'])
     os.replace(folder / record['name'], target)
+    (target / MOVING).unlink(missing_ok=True)
     shutil.rmtree(folder, ignore_errors=True)
     return {**record, 'name': target.name, 'path': str(target), 'trash_path': record['path']}

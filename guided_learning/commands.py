@@ -226,17 +226,68 @@ def migrate(root):
             except OSError:
                 skipped.append(str(course))
                 left = True
+        archived = library.archived(old) & set(moved)
+        if archived:
+            for name in archived:
+                library.set_archived(root, name, True)
+        if not _move_trash(old, root):
+            left = True
         if left:
             continue  # the old library still has courses, and may have a host whose record setup must not forget
         agents = old / 'AGENTS.md'
         if agents.is_file() and agents.read_text(encoding='utf-8').startswith(LIBRARY_MARKER):
             agents.unlink()
-        shutil.rmtree(old / '.throughline', ignore_errors=True)
+        _tidy_own_dir(old)
         try:
             old.rmdir()
         except OSError:
             pass
     return moved, skipped
+
+
+# What an old library's own folder may hold that setup can delete once its courses and trash have moved: host
+# bookkeeping, logs, imports that never finished and the archive list. Anything else stays, and so does the folder.
+DISPOSABLE = ('host.json', 'host.log', 'host-output.log', 'library.json', 'imports', 'host-key', 'host.key')
+
+
+def _move_trash(old, root):
+    """Move the deleted courses waiting in an old library's trash into this library's; False if any stayed behind."""
+    source = library.trash_dir(old)
+    if not source.is_dir():
+        return True
+    target = library.trash_dir(root)
+    kept = True
+    for entry in sorted(source.iterdir()):
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            if (target / entry.name).exists():
+                kept = False
+                continue
+            shutil.move(str(entry), str(target / entry.name))
+        except OSError:
+            kept = False
+    if kept:
+        try:
+            source.rmdir()
+        except OSError:
+            pass
+    return kept
+
+
+def _tidy_own_dir(old):
+    own = library.own_dir(old)
+    if not own.is_dir():
+        return
+    for path in own.iterdir():
+        if path.name in DISPOSABLE or path.name.startswith('host.log.'):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+    try:
+        own.rmdir()  # only when nothing else is left in it
+    except OSError:
+        pass
 
 
 def _free(course, deadline):
@@ -322,8 +373,12 @@ def open_app():
 
 
 def app_url(port):
-    """The address that opens the library and signs the browser in."""
-    return f'http://127.0.0.1:{port}/?key={library.host_key()}'
+    """The address that opens the library and signs the browser in, with a one-time code from the host."""
+    try:
+        code = _call(port, 'POST', '/api/sign-in', {})['code']
+    except (OSError, ValueError, KeyError, TypeError):
+        code = None  # a host from before codes: the page says to open Throughline from its launcher
+    return f'http://127.0.0.1:{port}/' + (f'?code={code}' if code else '')
 
 
 def _call(port, method, path, body=None, timeout=2):
@@ -378,7 +433,10 @@ def _spawn(port):
     command = [windowless_python(), '-m', 'guided_learning.web', '--port', str(port), '--record']
     launch_id = str(uuid.uuid4())
     options = {**detached(), 'env': {**os.environ, 'GUIDED_LEARNING_LAUNCH_ID': launch_id}}
-    with log.open('wb') as output:
+    # Only this user reads it: it holds what the host printed, and paths of courses.
+    with os.fdopen(os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'wb') as output:
+        if os.name != 'nt':
+            os.chmod(log, 0o600)  # one an earlier version made
         process = subprocess.Popen(command, stdout=output, **options)
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:

@@ -160,6 +160,12 @@ test('an earlier section can be studied again, and its earlier lesson stays', as
   await expect(page.getByText('A long lesson saved as one reply.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Go back' })).toContainText('Wave superposition');
+  // A New lesson teaches it again in steps; the lesson saved as one reply folds above it (ADR 0023).
+  await page.getByRole('radiogroup', { name: 'What to ask for' }).getByText('New lesson').click();
+  await page.getByRole('button', { name: 'Start new lesson' }).click();
+  await expect(page.getByRole('region', { name: 'Step 1 of 4' })).toContainText('Each path carries a complex amplitude.');
+  await expect(page.locator('details.replaced summary')).toContainText('Earlier lesson');
+  await expect(page.getByText('A long lesson saved as one reply.'), 'the old lesson rests folded').toBeHidden();
   expect(errors).toEqual([]);
 });
 

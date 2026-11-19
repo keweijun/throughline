@@ -19,6 +19,10 @@
   const writing = $derived((hasLesson && !open) || focusing || prompt.trim() !== '');
   // Over a taught section: another pass adds one reply to the lesson there; a New lesson replaces it (ADR 0023).
   let chosen = $state<LessonKind>('pass');
+  $effect(() => {
+    void conceptId;
+    chosen = 'pass'; // each section starts from another pass
+  });
   const kind = $derived<LessonKind | undefined>(open ? 'new' : hasLesson ? chosen : undefined);
 
   function chooseFocus() {
@@ -39,7 +43,10 @@
     const result = await app.startLesson(sent, kind);
     busy = false;
     if (result && app.drafts.get(key) === sent) app.drafts.set(key, '');
-    if (result) focusing = false;
+    if (result) {
+      focusing = false;
+      chosen = 'pass';
+    }
   }
 </script>
 

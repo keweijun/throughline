@@ -359,18 +359,18 @@ class AppStore {
     );
   }
 
-  /** The section's current stepped lesson once a New lesson has replaced an earlier one; null while it has only one. */
-  newLesson(conceptId: string | null) {
-    const own = (this.state?.lessons ?? []).filter((l) => l.concept_id === conceptId);
-    return own.some((l) => l.replaced_by) ? (own.find((l) => !l.replaced_by) ?? null) : null;
+  /** The section's current stepped lesson: the latest, which no New lesson has replaced. */
+  currentLesson(conceptId: string | null) {
+    return (this.state?.lessons ?? []).filter((l) => l.concept_id === conceptId && !l.replaced_by).at(-1) ?? null;
   }
 
   /** Whether a section's lesson turn belongs to what a New lesson replaced: a step of a replaced lesson, or a reply
-   * written before the current lesson began. Such turns are kept to read, folded above the current lesson. */
+   * without steps written before the current lesson began (a lesson saved before steps, another pass over the old
+   * lesson). Such turns are kept to read, folded above the current lesson. */
   replaced(turn: Turn) {
     const step = this.stepOf(turn.id);
     if (step) return !!step.lesson.replaced_by;
-    const current = this.newLesson(turn.concept_id);
+    const current = this.currentLesson(turn.concept_id);
     return !!current && turn.started_at < current.created_at;
   }
 

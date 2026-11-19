@@ -3,7 +3,7 @@ import { test, expect } from './fixture';
 test('a long question list stays scannable: collapsed threads and search', async ({ page, course }) => {
   const { base, errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   for (let i = 1; i <= 6; i++) {
     const question = i === 2 ? 'Why does interference vanish?' : `Ordinary question ${i}`;
     await page.request.post(base + '/api/questions', { data: { id: `q${i}`, question } });

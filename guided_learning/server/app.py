@@ -75,6 +75,7 @@ class Body(BaseModel):
 class LessonRequest(Body):
     id: Optional[str] = None
     prompt: Optional[str] = None
+    kind: Optional[Literal['new', 'pass']] = None  # over a section with a lesson: a New lesson, or another pass (ADR 0023)
 
 
 class PreferencesRequest(Body):

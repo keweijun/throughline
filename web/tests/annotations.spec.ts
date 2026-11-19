@@ -3,7 +3,7 @@ import { test, expect, dragSelect, editorText, untilStill } from './fixture';
 test('highlight and note a lesson passage, bookmark the section, and find them in Notes', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
 
   expect((await dragSelect(page, paragraph)).trim().length).toBeGreaterThan(5);
@@ -73,7 +73,7 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
 test('a highlight of a couple of characters is painted', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
 
   expect((await dragSelect(page, paragraph, 14)).trim().length).toBeLessThan(3);
@@ -106,7 +106,7 @@ test('highlight text in the PDF reader and bookmark the page', async ({ page, co
 test('highlight and note a side-question answer', async ({ page, course }) => {
   const { base, errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   await page.request.post(base + '/api/questions', { data: { id: 'q1', question: 'Why?' } });
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();
@@ -162,7 +162,7 @@ test('highlight and note an exercise', async ({ page, course }) => {
 test('a highlight running into a formula is still painted', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const excerpt = await page.locator('.lesson-body').first().evaluate((body) => {
     const start = [...body.querySelectorAll('p')].find((p) => p.textContent?.includes('squared magnitude'))!;
     const range = document.createRange();
@@ -233,7 +233,7 @@ test('a formula on its own is highlighted whole, and Go to lands on it from anot
 test('highlights show before the host answers, preview on hover and can be noted or removed in place', async ({ page, course }) => {
   const { errors } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
   const painted = () => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0);
 

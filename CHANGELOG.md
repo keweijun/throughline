@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.55.0
+
+- A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.
+- A lesson you have not finished can be started over the same way, with "Start a new lesson instead" below it. You no longer have to finish a lesson you have moved past.
+- When Codex fixes a section you have already studied, it now asks you to take a new lesson on it, instead of adding extra sections to get the new material taught.
+- A shared course carries only each section's current lesson, not the ones a new lesson replaced.
+
 ## 0.54.6
 
 - On a Mac, opening Throughline from Finder, Spotlight or the Dock now finds a Codex you installed only for the terminal (the `codex` command), so lessons and Studio work there too. Before, Throughline could say Codex was not found unless the Codex app was installed. This also applies to app-menu launchers on Linux. Run setup again (or update) to pick up where your Codex is.

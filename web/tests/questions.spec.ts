@@ -80,7 +80,7 @@ test('a formula selection keeps its original TeX and the quote can be removed', 
   await expect(formula).toBeVisible();
   // The "Writing" chip above the lesson disappears on completion and shifts the text, later still on a busy machine;
   // measure once the formula has stopped moving.
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   let box = (await formula.boundingBox())!;
   await expect.poll(async () => {
     const previous = box;
@@ -103,7 +103,7 @@ test('a formula selection keeps its original TeX and the quote can be removed', 
 test('questions sort oldest first, like a conversation, and selected follow-ups stay in their thread', async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   await page.request.post(base + '/api/questions', { data: { id: 'z-old', question: 'Older question' } });
   await page.request.post(base + '/api/questions', { data: { id: 'a-new', question: 'Newer question' } });
   await page.reload();
@@ -141,7 +141,7 @@ test('questions sort oldest first, like a conversation, and selected follow-ups 
 test('mixed prose and math selections keep one TeX copy', async ({ page, course }) => {
   await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   await page.evaluate(() => {
     const body = document.querySelector('.lesson-body')!;
     const start = [...body.querySelectorAll('p')].find((p) => p.textContent?.startsWith('Add'))!;
@@ -178,7 +178,7 @@ test('a follow-up saved before its stream started can be retried after reopening
 test('threads start collapsed, one opens at a time, and the box switches between asking and following up', async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   for (const [id, question] of [['q1', 'First question'], ['q2', 'Second question']]) {
     await page.request.post(base + '/api/questions', { data: { id, question } });
   }
@@ -215,7 +215,7 @@ test('threads start collapsed, one opens at a time, and the box switches between
 test("an open thread's question scrolls away with its answers and leaves a strip that brings it back", async ({ page, course }) => {
   const { base } = await course('navigation_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   await page.request.post(base + '/api/questions', { data: { id: 'q1', question: 'What does the phase do?' } });
   await page.reload();
   await page.getByRole('button', { name: /^Questions(?: \d+)?$/ }).click();

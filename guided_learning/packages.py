@@ -80,6 +80,8 @@ def share(rows, level, notes=False):
     if level == 'lessons':
         from .server import prompts  # the server's package imports this module
         for lesson in lessons.values():
+            if lesson.get('replaced_by'):
+                continue  # a lesson a New lesson replaced is the sender's history, not the section's lesson (ADR 0023)
             steps, written = _steps(lesson, streams)
             if written:
                 # What the sender asked for is theirs: the lesson and its steps carry the request a plain Start or

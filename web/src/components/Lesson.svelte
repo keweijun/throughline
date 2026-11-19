@@ -23,7 +23,9 @@
   const planned = $derived(step ? step.lesson.steps.slice(step.number) : []);
   // A section's lesson goes on only at the learner's position; a section they are previewing shows it read-only. A
   // chapter recap is started from anywhere.
-  const here = $derived(!!turn.chapter_id || turn.concept_id === app.currentId);
+  // A lesson a New lesson replaced (ADR 0023) is kept only to read.
+  const replaced = $derived(app.replaced(turn));
+  const here = $derived(!replaced && (!!turn.chapter_id || turn.concept_id === app.currentId));
   // Continue is offered under the latest step once it is complete and the plan has steps left.
   const continues = $derived(
     here && !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),
@@ -32,7 +34,7 @@
   // A check stays answerable until the next step starts; continuing without answering leaves it unanswered.
   const entry = $derived(step ? step.lesson.steps[step.number - 1] : null);
   const check = $derived(
-    entry?.check && turn.status === 'completed' && (entry.answer || !planned.some((s) => s.turn_id)) ? entry.check : null,
+    entry?.check && turn.status === 'completed' && (entry.answer || (!replaced && !planned.some((s) => s.turn_id))) ? entry.check : null,
   );
 
   async function next() {

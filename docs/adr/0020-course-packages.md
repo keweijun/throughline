@@ -26,6 +26,8 @@ An export lists the course's files after taking its database snapshot, and refus
 
 A lesson in a Route and lessons package keeps each written step as a hidden turn, the way a step written ahead waits for Continue (ADR 0009). Every section starts unstudied. Start lesson reveals the first written step and Continue each next one, at once and with no teacher turn, and nothing is written ahead while the next step is already written. Steps of the plan that the sender never reached are written by the recipient's teacher as usual. A section with a written lesson that the recipient asks to be taught differently, with a request of their own, gets a new lesson.
 
+A lesson the sender replaced with a New lesson is left out, so each section carries only its current lesson (ADR 0023).
+
 A lesson step written after the sender missed a check question opens with a repair aimed at that miss (ADR 0009). Route and lessons keeps those steps as written; rewriting them is not worth a teacher turn.
 
 Before exporting Everything, the export lists what it shares (for example "12 notes, 40 questions, your progress"), since annotations are otherwise private (ADR 0005).

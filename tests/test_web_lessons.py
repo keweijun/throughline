@@ -591,5 +591,61 @@ class PreparedSteps(LessonHost):
         self.finish('three')
         self.assertGreaterEqual(time.monotonic() - start, DELAY)
 
+
+class NewLessons(LessonHost):
+    """A New lesson replaces a section's lesson (ADR 0023): planned afresh, knowing what the earlier one taught."""
+    def taught(self, remaining):
+        self.runner.replies = [step_reply('One.', remaining, title='Amplitudes', check=CHECK)]
+        self.post('/api/lessons', {'id': 'one'})
+        self.finish('one')
+        settle(self.host)
+
+    def test_a_new_lesson_replaces_a_finished_one_and_is_planned_from_what_it_taught(self):
+        self.taught([])
+        self.runner.replies = [step_reply('Again, more rigorously.', [{'title': 'Proof'}])]
+        self.post('/api/lessons', {'id': 'two', 'kind': 'new', 'prompt': 'With the proofs'})
+        self.finish('two')
+        old, new = self.lesson('one'), self.lesson('two')
+        self.assertEqual(old['replaced_by'], 'two')
+        self.assertEqual([s['title'] for s in old['steps']], ['Amplitudes'], 'the replaced lesson stays to read')
+        self.assertEqual([s['title'] for s in new['steps']], ['Wave', 'Proof'])
+        prompt = self.prompt(1)
+        self.assertIn('asked for a new lesson on this section', prompt)
+        self.assertIn('[["Amplitudes"]]', prompt, 'the teacher sees what the earlier lesson taught')
+        self.assertNotIn('first lesson for this section', prompt)
+        self.assertIn('With the proofs', prompt)
+        self.assertEqual(self.post('/api/lessons/one/steps/one/check', {'choice': 0}, 409)['code'], 'lesson_replaced')
+        self.assertEqual(self.post('/api/turns/one/resume', {'request_id': 'r'}, 409)['code'], 'lesson_replaced')
+
+    def test_without_new_a_taught_section_gets_another_pass(self):
+        self.taught([])
+        self.post('/api/lessons', {'id': 'pass', 'prompt': 'Another example', 'kind': 'pass'})
+        self.finish('pass')
+        self.assertEqual([l['id'] for l in self.state()['lessons']], ['one'])
+        self.assertNotIn('replaced_by', self.lesson('one'))
+
+    def test_a_new_lesson_restarts_one_left_unfinished(self):
+        self.taught([{'title': 'Adding amplitudes'}, {'title': 'Probability'}])
+        self.assertTrue(self.lesson('one').get('prepared'), 'the next step is being written ahead')
+        self.post('/api/lessons', {'id': 'two', 'kind': 'new'})
+        self.finish('two')
+        old = self.lesson('one')
+        self.assertEqual(old['replaced_by'], 'two')
+        self.assertNotIn('prepared', old, 'its step written ahead is dropped')
+        self.assertEqual([bool(s.get('turn_id')) for s in old['steps']], [True, False, False], 'what was read stays, the rest is dropped')
+        self.assertEqual(self.post('/api/lessons/one/steps', {'id': 'x'}, 409)['code'], 'lesson_replaced')
+        self.assertFalse(any(t['channel'] == 'prepared_step' and t['status'] == 'running' for t in self.host.brief_turns()))
+
+    def test_a_new_lesson_over_a_single_reply_lesson_is_taught_in_steps(self):
+        execute(self.root, {'op': 'mainline.enter', 'concept_id': 'wave', 'goal': 'g', 'next_step': 'n', 'request_id': 'p'})
+        execute(self.root, {'op': 'stream.start', 'id': 'old', 'concept_id': 'wave', 'prompt': 'Teach', 'channel': 'mainline'})
+        execute(self.root, {'op': 'stream.event', 'id': 'old', 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': 'A long single reply.'})
+        execute(self.root, {'op': 'stream.event', 'id': 'old', 'attempt': 1, 'sequence': 2, 'kind': 'complete'})
+        self.post('/api/lessons', {'id': 'two', 'kind': 'new'})
+        self.finish('two')
+        self.assertEqual([l['id'] for l in self.state()['lessons']], ['two'])
+        self.assertIn('1 earlier lesson replies without steps', self.prompt(1))
+
+
 if __name__ == '__main__':
     unittest.main()

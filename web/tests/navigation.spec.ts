@@ -24,7 +24,7 @@ test('lesson streams, renders math safely, survives reload and opens sources', a
   await expect(page.locator('.lesson-body p').first()).toBeVisible();
   await expect(page.locator('details.overview')).not.toHaveAttribute('open', '');
   await expect(page.getByRole('button', { name: 'Start lesson' })).toHaveCount(0);
-  await expect(page.getByText('Ask for another pass')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
 
   await page.getByRole('button', { name: 'View source line 2' }).first().click();
   await expect(page.locator('.source-view .line.cited')).toHaveText(/Normalization condition/);

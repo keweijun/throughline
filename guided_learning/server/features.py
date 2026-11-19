@@ -225,10 +225,18 @@ class Navigation(Feature):
         lesson, number, repair = self._step(turn)
         earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed' and not chapter_owned(t)]
+        before = [t for t in earlier if lesson and t['started_at'] < lesson['created_at']]
+        replaced = [l for l in self.operation({'op': 'lesson.list', 'concept_id': turn['concept_id']})['lessons']
+                    if lesson and l.get('replaced_by') and l['created_at'] < lesson['created_at']]
         if earlier and not lesson:
             text = prompts.LESSON_CONTINUES
         elif number and number > 1:
             text = ''
+        elif before or replaced:
+            # A New lesson over a section taught before (ADR 0023): planned afresh, knowing what the learner has read.
+            taught = [[s['title'] for s in l['steps'] if s.get('turn_id')] for l in replaced]
+            single = sum(1 for t in before if not self.step_of(t['id'])[0])
+            text = prompts.new_lesson([titles for titles in taught if titles], single) + '\n'
         else:
             # Every routed section is in a chapter: flat routes become one chapter (ADR 0006, migration 3).
             text = prompts.chapter_lesson(chapter, chapter['concept_ids'][0] == turn['concept_id'], language) + '\n'
@@ -265,21 +273,23 @@ class Navigation(Feature):
         return bool(lesson) and number < len(lesson['steps'])
 
     def start_lesson(self, concept_id, body):
-        """A section's first lesson is taught in steps planned from its overview (ADR 0009); a later request over a
-        section that already has a lesson, including one saved before steps, is a single reply."""
+        """A section's first lesson is taught in steps planned from its overview (ADR 0009). Over a section that already
+        has a lesson, including one saved before steps or one not finished, `kind` "new" starts a New lesson that
+        replaces it (ADR 0023); otherwise the request is another pass, a single reply added to the lesson there."""
         identifier = body.get('id') or str(uuid.uuid4())
         prompt = (body.get('prompt') or '').strip()
+        new = body.get('kind') == 'new'
         with self.host.lock:
             existing = self._existing(identifier)
             if existing:
                 return existing
             taught = any(t['channel'] == 'mainline' and t['concept_id'] == concept_id and not chapter_owned(t) for t in self.host.brief_turns())
             shared = next((l for l in self.operation({'op': 'lesson.list', 'concept_id': concept_id})['lessons']
-                           if l['steps'] and not l['steps'][0].get('turn_id') and l['steps'][0].get('written')), None)
+                           if l['steps'] and not l['steps'][0].get('turn_id') and l['steps'][0].get('written') and not l.get('replaced_by')), None)
             if shared and not taught and not prompt:
                 self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
                 return self._reveal(shared, identifier)
-            if taught:
+            if taught and not new:
                 return self.host.start_turn({'id': identifier, 'concept_id': concept_id, 'channel': 'mainline', 'prompt': prompt or prompts.DEFAULT_LESSON_REQUEST})
             self.host.ensure_single_mainline(identifier, 'Pause the current lesson before starting another')
             preview = self.preview(concept_id)
@@ -299,6 +309,8 @@ class Navigation(Feature):
             existing = self._existing(identifier)
             if existing:
                 return existing
+            if lesson.get('replaced_by'):
+                raise OperationError('lesson_replaced', 'A new lesson replaced this one; refresh the page')
             position = self.operation({'op': 'course.status'})['position'] or {}
             if position.get('concept_id') != lesson['concept_id']:
                 raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
@@ -357,7 +369,7 @@ class Navigation(Feature):
             turns = {t['id']: t for t in self.host.brief_turns()}
             position = self.operation({'op': 'course.status'})['position'] or {}
             if (self.host.closing or not taught or len(taught) == len(lesson['steps']) or position.get('concept_id') != lesson['concept_id']
-                    or self._next_written(lesson)
+                    or lesson.get('replaced_by') or self._next_written(lesson)
                     or turns.get(taught[-1]['turn_id'], {}).get('status') != 'completed'
                     or any(t['channel'] == 'mainline' and t['status'] == 'running' for t in turns.values())):
                 return None

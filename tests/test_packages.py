@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import json
 import os
 import shutil
@@ -6,6 +7,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import zipfile
 from unittest import mock
@@ -197,6 +199,93 @@ class CoursePackages(unittest.TestCase):
             packages.import_package(self.package, self.recipient)
         self.assertEqual(refused.exception.code, 'invalid_package')
         self.assertNothingImported()
+
+    def test_overlapping_exports_to_one_destination_keep_to_their_own_records(self):
+        # A Route export is about to pack its snapshot when an Everything export to the same file takes its own and
+        # starts packing; the Route export then finishes first.
+        real = zipfile.ZipFile
+        everything_packing, route_done = threading.Event(), threading.Event()
+        failures = []
+
+        def everything():
+            try:
+                packages.export(self.course, self.package, 'everything')
+            except Exception as exc:  # reported below; the Route package is what matters
+                failures.append(exc)
+
+        def opening(file, mode='r', *args, **kwargs):
+            if mode == 'w' and threading.current_thread() is threading.main_thread():
+                thread = threading.Thread(target=everything)
+                thread.start()
+                self.assertTrue(everything_packing.wait(10))
+                opening.thread = thread
+            elif mode == 'w':
+                everything_packing.set()
+                route_done.wait(10)
+            return real(file, mode, *args, **kwargs)
+        with mock.patch('guided_learning.packages.zipfile.ZipFile', opening):
+            route = packages.export(self.course, self.package, 'route')
+            with real(self.package) as archive:
+                shared = archive.read('course.sqlite3')
+            route_done.set()
+            opening.thread.join(10)
+        self.assertEqual(route['contents']['notes'], 0)
+        self.assertFalse(b'Rays, not vectors' in shared, "the Route package holds its own snapshot, not the Everything export's")
+        self.assertEqual(failures, [])
+        with real(self.package) as archive:
+            self.assertEqual(json.loads(archive.read('manifest.json'))['level'], 'everything', 'the later export replaced the file whole')
+        self.assertEqual([p.name for p in self.home.iterdir() if p.name.startswith('.')], [], 'no export leaves a file behind')
+
+    def test_a_long_compressible_source_makes_a_package_that_imports_at_every_level(self):
+        long = self.home / 'transcript.md'
+        long.write_text('# Transcript\n' + 'All work and no play makes Jack a dull boy. ' * 640_000, encoding='utf-8')  # 27 MiB
+        execute(self.course, {'op': 'source.register', 'path': str(long)})
+        for level in packages.LEVELS:
+            with self.subTest(level=level):
+                packages.export(self.course, self.package, level)
+                course = Path(packages.import_package(self.package, self.recipient, f'copy-{level}')['path'])
+                self.assertEqual(len(execute(course, {'op': 'course.status'})['sources']), 2)
+
+    def test_a_package_unpacking_far_beyond_its_size_is_still_refused(self):
+        packages.export(self.course, self.package)
+        zeros = b'\0' * (60 << 20)
+        with zipfile.ZipFile(self.package, 'a', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(f"sources/{self.source['id']}/{hashlib.sha256(zeros).hexdigest()}", zeros)
+        with mock.patch.object(packages, 'RATIO_FLOOR', 1 << 20, create=True):
+            with self.assertRaises(OperationError) as refused:
+                packages.import_package(self.package, self.recipient)
+        self.assertEqual(refused.exception.code, 'invalid_package')
+        self.assertNothingImported()
+
+    def test_a_course_its_package_could_not_be_imported_from_is_not_exported(self):
+        long = self.home / 'transcript.md'
+        long.write_text('# Transcript\n' + 'All work and no play. ' * 200_000, encoding='utf-8')
+        execute(self.course, {'op': 'source.register', 'path': str(long)})
+        with mock.patch.object(packages, 'RATIO_FLOOR', 1 << 20, create=True), mock.patch.object(packages, 'MAX_RATIO', 2):
+            with self.assertRaises(OperationError) as refused:
+                packages.export(self.course, self.package)
+        self.assertEqual(refused.exception.code, 'package_too_large')
+        self.assertEqual([p.name for p in self.home.iterdir() if p.name.startswith('.') or p.suffix == packages.SUFFIX], [])
+
+    def test_a_course_with_a_damaged_source_copy_is_not_exported(self):
+        (self.course / 'sources' / self.source['id'] / self.source['revision']).write_text('damaged on disk', encoding='utf-8')
+        for level in packages.LEVELS:
+            with self.subTest(level=level):
+                with self.assertRaises(OperationError) as refused:
+                    packages.export(self.course, self.package, level)
+                self.assertEqual(refused.exception.code, 'source_missing')
+                self.assertIn('notes.md', str(refused.exception))
+                self.assertFalse(self.package.exists())
+
+    def test_everything_carries_only_the_images_its_records_use(self):
+        loose = images.save(self.course, PNG + b'never attached')
+        packages.export(self.course, self.package)
+        with zipfile.ZipFile(self.package) as archive:
+            names = set(archive.namelist())
+        self.assertIn(f'answer_images/{self.image}', names)
+        self.assertNotIn(f'answer_images/{loose}', names)
+        course = Path(packages.import_package(self.package, self.recipient)['path'])
+        self.assertEqual(images.path(course, self.image).read_bytes(), PNG)
 
     def test_a_database_that_is_not_a_course_refuses_the_package(self):
         packages.export(self.course, self.package)

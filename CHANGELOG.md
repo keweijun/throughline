@@ -8,6 +8,14 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - Setup moving your courses from where an earlier version kept them now waits for anything Codex is saving in a course to finish, so nothing is left behind in the old folder. On Windows a course that is still open somewhere stays where it is, whole, instead of being half copied. And a course archived in one old location no longer archives a different course of the same name.
 - A copy of a course folder you made yourself is now its own course to Throughline: a tab still showing the original reloads instead of saving your notes into the copy or downloading the copy when you export.
 
+## 0.55.1
+
+- A course with a very long text source, such as a full transcript, can now be imported from its package. Before, the import could refuse a package Throughline had just exported, so a backup of such a course could not be restored.
+- Exporting a course whose saved copy of a source is damaged now says so and asks you to register that source again, instead of making a package that would not import.
+- Exporting the same course twice at once to the same file, say once to share and once as a backup, no longer mixes the two: a Route package can no longer pick up your notes or progress from the other export.
+- Importing a Route and lessons package made by Throughline 0.54.0 or earlier no longer carries the sender's own wording of their lesson requests, or the teacher's notes about them, into your course.
+- A whole-course package now holds only the images attached to your answers, questions and notes, not every image the course folder kept.
+
 ## 0.55.0
 
 - A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.

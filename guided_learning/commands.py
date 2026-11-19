@@ -247,7 +247,8 @@ def migrate(root):
 
 # What an old library's own folder may hold that setup can delete once its courses and trash have moved: host
 # bookkeeping, logs, imports that never finished and the archive list. Anything else stays, and so does the folder.
-DISPOSABLE = ('host.json', 'host.log', 'host-output.log', 'library.json', 'imports', 'host-key', 'host.key')
+DISPOSABLE = ('host.json', 'host.log', 'host-output.log', 'library.json', 'library.json.lock', 'imports', 'host-key',
+              'host.key')
 
 
 def _move_trash(old, root):

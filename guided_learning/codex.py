@@ -51,7 +51,7 @@ def remember_codex():
     found = os.path.abspath(found)
     if not _usable(found):
         return None
-    from .server.settings import write_json
+    from .userfiles import write_json
     try:
         write_json(_settings_path(), {'codex_path': found})
     except OSError:

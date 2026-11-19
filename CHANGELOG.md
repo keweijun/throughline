@@ -6,6 +6,10 @@ What changed for learners in each release of Throughline, newest first. Each rel
 
 - On a Mac, opening Throughline from Finder, Spotlight or the Dock now finds a Codex you installed only for the terminal (the `codex` command), so lessons and Studio work there too. Before, Throughline could say Codex was not found unless the Codex app was installed. This also applies to app-menu launchers on Linux. Run setup again (or update) to pick up where your Codex is.
 
+## 0.54.5
+
+- Running two versions of Throughline side by side, or a command while Throughline is open, no longer loses settings, Studio chats or archived courses. Before, when both saved at the same moment, one could overwrite what the other had just saved: a chat could drop out of a course's Studio list, or a course you archived could show up again.
+
 ## 0.54.4
 
 - If Codex stops responding in Studio, Stop now works: Throughline restarts Codex and says so, instead of leaving the chat working until you quit. Before, a stuck Codex also kept you from updating Throughline or deleting a course. Your chats are kept; send a message to carry on.

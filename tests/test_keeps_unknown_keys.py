@@ -24,7 +24,7 @@ class KeepsUnknownKeys(unittest.TestCase):
     def test_write_json_merges_and_leaves_no_temporary_file(self):
         path = self.newer('x.json', {'a': 1})
         self.assertEqual(write_json(path, {'a': 2}), {'a': 2, 'from_a_newer_version': {'kept': True}})
-        self.assertEqual([p.name for p in self.tmp.iterdir()], ['x.json'])
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ['x.json', 'x.json.lock'])  # the lock stays
         broken = self.tmp / 'broken.json'
         broken.write_text('[not an object', encoding='utf-8')
         self.assertEqual(write_json(broken, {'a': 1}), {'a': 1})

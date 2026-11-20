@@ -33,6 +33,13 @@ When the learner asks to review what they studied (before an exam, a topic that 
 - Each question names the sections it tests in `tests_concept_ids`, and usually connects more than one. An **apply** question (`"kind":"apply"`, the default) is answered in writing and assessed by part like an exercise: `{"kind":"apply","question":"…","parts"?:[…],"tests_concept_ids":["stack"]}`. A **recall** question is multiple choice with instant feedback: `{"kind":"recall","question":"…","idea":"…","options":[{"text":"…","explanation":"…"}],"correct":0,"tests_concept_ids":["stack"]}`, with 2 to 5 options, each explained. At most 8 questions; any invalid question rejects the whole set (`invalid_review_question`).
 - To practise sections not studied yet, add exercises to them instead.
 
+## Key points
+
+The app's teacher writes every studied section's key points: the results, rules and methods to hold from it, each with when it holds and a common mistake. The learner reads them at the end of the lesson, at the top of the section and on the chapter's sheet, but cannot edit them; they ask you instead ("say it without the matrix notation", "add the sign convention", "this one is wrong").
+
+- `{"op":"key_points.view","concept_id":"stack"}` returns the section's `key_points`: `points`, each `{statement, holds_when?, common_mistake?, turn_id?, source_refs}`, and `requests`, the changes the learner asked for before. Without `concept_id` it lists every section's points and the chapter sheets.
+- `{"op":"key_points.revise","concept_id":"stack","request":"Add the sign convention","points":[…]}` replaces the section's points. Give every point the section keeps, not only the changed one, and copy each kept point's `turn_id` and `source_refs` so it still links to the lesson step and pages that taught it; `source_refs` may only name pages the section links. `request` says what the learner asked for, in their words: when a later lesson rewrites the points, the teacher keeps that change unless the lesson contradicts it. Points are Markdown with LaTeX, at most 12 per section, and only a section with a completed lesson has them (`not_studied`).
+
 ## Plans for a deadline
 
 The learner studies any section from its preview in the app, earlier or later, and sections passed over show as not studied: nothing needs to be removed or marked to leave sections out. For a plan such as "300 minutes before the exam, leave out perturbation theory", tell the learner which sections the plan covers, in order, and record how they want to be taught meanwhile as a preference (`memory.save`, `memory.confirm`) that says when it ends ("until the exam on 15 Nov"), so they can delete it afterwards. Reordering the route still needs their agreement.

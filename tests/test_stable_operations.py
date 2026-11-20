@@ -14,7 +14,7 @@ STABLE = {
     'annotations.delete', 'annotations.list', 'annotations.save', 'course.init', 'course.profile.save', 'course.rename',
     'course.status',
     'curriculum.chapter.save', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage',
-    'curriculum.outline', 'curriculum.save', 'curriculum.view', 'mainline.enter', 'memory.confirm', 'memory.save',
+    'curriculum.outline', 'curriculum.save', 'curriculum.view', 'key_points.revise', 'key_points.view', 'mainline.enter', 'memory.confirm', 'memory.save',
     'position.save', 'practice.add', 'practice.list', 'practice.retire', 'practice.revise', 'preferences.save',
     'preferences.view', 'review.context', 'review.sets', 'review.write', 'session.resume', 'source.figure', 'source.read',
     'source.readings.save', 'source.register', 'source.render', 'source.search', 'stream.summaries', 'widgets.list',

@@ -184,10 +184,6 @@ class RecallAnswer(Body):
     choice: Union[int, Literal['unsure']]
 
 
-class RecapRequest(Body):
-    id: Optional[str] = None
-
-
 class StepRequest(Body):
     id: Optional[str] = None
 
@@ -786,11 +782,6 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/chapters/{chapter_id}/build')
     def build_chapter(chapter_id: str):
         return host.builds.request(chapter_id)
-
-    @app.post('/api/chapters/{chapter_id}/recap')
-    def recap(chapter_id: str, body: RecapRequest):
-        result = host.navigation.start_recap(chapter_id, body.id)
-        return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.post('/api/chapters/{chapter_id}/quiz')
     def chapter_quiz(chapter_id: str):

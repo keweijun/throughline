@@ -61,14 +61,6 @@ class SkipFlow(SkipCourse):
         self.assertEqual(result['task']['status'], 'skipped')
         self.assertNotIn('skip_reason', result['task'], 'skipping again without a reason drops the earlier one')
 
-    def test_a_skipped_exercise_is_not_reminded_in_the_chapter_recap(self):
-        task = self.exercise()
-        self.post(f'/api/practice/tasks/{task["id"]}/defer')
-        chapter = self.host.navigation.chapter('one')
-        self.assertEqual(len(self.host.navigation._recap_data(chapter)[1]), 1)
-        self.post(f'/api/practice/tasks/{task["id"]}/skip', {'reason': 'too_tedious'})
-        self.assertEqual(self.host.navigation._recap_data(chapter)[1], [])
-
     def test_an_unknown_reason_is_refused(self):
         task = self.exercise()
         self.post(f'/api/practice/tasks/{task["id"]}/skip', {'reason': 'boring'}, status=409)

@@ -110,7 +110,7 @@ test('the last section leads to the chapter quiz, which asks an earlier exercise
   await exercise.getByRole('button', { name: 'Check answer' }).click();
   await expect(exercise).toContainText('Solved independently');
 
-  await page.getByRole('button', { name: 'End of chapter: recap and quiz →' }).click();
+  await page.getByRole('button', { name: 'End of chapter: key points and quiz →' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await page.getByRole('button', { name: 'Take the chapter quiz' }).click();
   const quiz = page.getByRole('region', { name: 'Chapter quiz', exact: true });

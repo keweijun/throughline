@@ -1,5 +1,4 @@
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 from guided_learning.api import execute
@@ -63,40 +62,15 @@ class Chapters(unittest.TestCase):
         self.assertNotIn('## Chapter overview', prompt)
         self.assertIn('connecting it to the previous section', prompt)
 
-    def test_a_recap_belongs_to_the_chapter_and_starts_from_its_page_without_moving_the_position(self):
-        self.post('/api/chapters/one/recap', {}, status=409)  # no section of the chapter has a lesson yet
+    def test_a_recap_from_before_key_points_stays_on_its_chapter_but_is_not_written_again(self):
+        """Key points replaced the chapter recap (ADR 0023): nothing starts one, and an old one is kept to read."""
         self.lesson()
-        turn = self.post('/api/chapters/one/recap', {})['turn']
-        self.host.wait(turn['id'], 5)
-        self.assertEqual((turn['chapter_id'], turn['concept_id']), ('one', 'b'), 'anchored to the last section, owned by the chapter')
-        recap = next(p for p in self.runner.prompts if '## Chapter recap' in p)
-        self.assertIn('"not_studied_yet": ["Superposition"]', recap)
-        state = self.client.get('/api/state').json()
-        self.assertEqual(state['position']['concept_id'], 'a', 'a recap never moves the learner')
-        self.assertEqual([j for j in state['practice']['jobs'] if j['concept_id'] == 'b'], [], 'a recap asks for no questions')
-
-        # The recap anchored to b is not b's own lesson: b's first lesson still bridges from the previous section.
-        self.post('/api/sections/next', {'concept_id': 'a', 'request_id': 'next-1'})
-        self.runner.prompts.clear()
-        self.assertIn('connecting it to the previous section', self.lesson())
-        self.post('/api/sections/next', {'concept_id': 'b', 'request_id': 'next-2'})
-        self.assertEqual(self.client.get('/api/state').json()['position']['concept_id'], 'c')
-        again = self.post('/api/chapters/one/recap', {})['turn']
-        self.host.wait(again['id'], 5)
-        self.assertEqual(self.client.get('/api/state').json()['position']['concept_id'], 'c', 'recapping an earlier chapter stays in this one')
-        self.post('/api/chapters/two/recap', {}, status=409)
-        self.post('/api/chapters/nope/recap', {}, status=404)
-
-    def test_a_recap_waits_while_another_lesson_is_being_written(self):
-        self.lesson()
-        self.runner.gate = threading.Event()
-        running = self.post('/api/lessons', {})['turn']
-        try:
-            self.assertEqual(self.post('/api/chapters/one/recap', {}, status=409)['code'], 'active_turn')
-        finally:
-            self.runner.gate.set()
-        self.host.wait(running['id'], 5)
-        self.post('/api/chapters/one/recap', {})
+        self.post('/api/chapters/one/recap', {}, status=404)
+        execute(self.root, {'op': 'stream.start', 'id': 'recap:old', 'concept_id': 'b', 'chapter_id': 'one', 'prompt': 'Recap', 'record_user': False})
+        execute(self.root, {'op': 'stream.event', 'id': 'recap:old', 'attempt': 1, 'sequence': 1, 'kind': 'failed', 'error': 'stopped'})
+        turn = next(t for t in self.client.get('/api/state').json()['turns'] if t['id'] == 'recap:old')
+        self.assertEqual((turn['chapter_id'], turn['concept_id']), ('one', 'b'))
+        self.assertEqual(self.post('/api/turns/recap:old/resume', {'request_id': 'again'}, status=409)['code'], 'recap_retired')
 
     def position(self):
         return self.client.get('/api/state').json()['position']

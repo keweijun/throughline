@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import tempfile
 from guided_learning.api import execute
@@ -22,11 +23,27 @@ execute(root, {'op': 'curriculum.chapter.save', 'chapter_id': 'measurement', 'co
     {'id': 'outcomes', 'title': 'Possible outcomes', 'prerequisites': ['superposition'], 'links': [ref('line-4')]}]})
 
 
+# Each one-step lesson ends with its section's key points (ADR 0023); the first cites the page its section links to.
+POINTS = {
+    'What a state represents': [{'statement': 'A state assigns an amplitude $c_i$ to each outcome.', 'holds_when': 'The outcomes form a complete set.',
+                                 'common_mistake': 'Reading $c_i$ as a probability; the probability is $|c_i|^2$.', 'step': 1,
+                                 'sources': [{'source_id': s['id'], 'unit_id': 'line-2'}]}],
+    'Superposition': [{'statement': 'A sum of states is again a state, once normalised.', 'common_mistake': 'Forgetting to normalise the sum.', 'step': 1}],
+}
+
+
 class Runner:
     def run(self, prompt, cwd, emit, cancel):
-        text = '{"questions": []}' if 'Practice only' in prompt else ('## Chapter recap\n\nThe chapter in one line: states and their superpositions.' if 'Chapter recap' in prompt else '## Lesson\n\nA short lesson.')
+        if "Write how this chapter's key points connect." in prompt:
+            text = '<chapter-sheet>{"connection": "Amplitudes describe one state; superposition combines states into new ones."}</chapter-sheet>'
+        elif 'Practice only' in prompt:
+            text = '{"questions": []}'
+        else:
+            text = '## Lesson\n\nA short lesson.'
         if 'This reply teaches step' in prompt:
-            text += '\n<lesson-step>{"remaining": []}</lesson-step>'  # a one-step lesson
+            plan = prompt.split('Lesson plan (data):')[-1].split('\n')[0]  # its first step is named after the section
+            title = next(t for t in POINTS if t in plan)
+            text += '\n<lesson-step>' + json.dumps({'remaining': [], 'key_points': POINTS[title]}) + '</lesson-step>'  # a one-step lesson
         emit({'kind': 'final', 'text': text})
         emit({'kind': 'complete'})
 

@@ -12,6 +12,7 @@
   import NextSection from './NextSection.svelte';
   import CodexLink from './CodexLink.svelte';
   import ReviewSet from './ReviewSet.svelte';
+  import KeyPoints from './KeyPoints.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
 
@@ -34,6 +35,10 @@
     (app.state?.review.sets ?? []).find((s) => s.kind === 'warm_up' && s.concept_id === conceptId && !s.closed_at && (s.open || !s.task_ids.length)),
   );
   const position = $derived(app.state?.position);
+  // Key points (ADR 0023) end the lesson at the learner's position and open a finished section they come back to;
+  // while a lesson is being taught, the points it will rewrite wait.
+  const points = $derived(app.keyPoints(conceptId));
+  const teaching = $derived(!!app.openLesson(conceptId) || lessons.some((l) => l.status === 'running'));
   const explanations = $derived(app.explanationsFor(conceptId));
   const bookmarked = $derived(!!app.bookmark(conceptId));
   const chapter = $derived(app.chapterOf(conceptId));
@@ -188,6 +193,10 @@
       {/if}
     </header>
 
+    {#if points && !isCurrent && !teaching}
+      <div class="points top"><KeyPoints value={points} /></div>
+    {/if}
+
     {#if explanations.length}
       <section class="saved" aria-labelledby="saved-title">
         <h2 id="saved-title">{t("Saved for this section")}</h2>
@@ -257,6 +266,10 @@
           </div>
         {/if}
       </div>
+    {/if}
+
+    {#if points && isCurrent && !teaching}
+      <div class="points end"><KeyPoints value={points} /></div>
     {/if}
 
     <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
@@ -448,6 +461,14 @@
   .overview.loading {
     color: var(--pencil);
     font-size: var(--step-0);
+  }
+
+  .points.top {
+    margin-bottom: 2rem;
+  }
+
+  .points.end {
+    margin-top: 2.5rem;
   }
 
   .saved {

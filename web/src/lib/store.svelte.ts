@@ -321,6 +321,17 @@ class AppStore {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && t.concept_id === conceptId && !t.chapter_id);
   }
 
+  /** A section's key points (ADR 0023), once the teacher has written them. */
+  keyPoints(conceptId: string | null | undefined) {
+    return (this.state?.key_points ?? []).find((v) => v.concept_id === conceptId);
+  }
+
+  /** The paragraph opening a chapter's key points sheet, once two of its sections have points. */
+  chapterSheet(chapterId: string | null | undefined) {
+    return (this.state?.chapter_sheets ?? []).find((s) => s.chapter_id === chapterId);
+  }
+
+  /** Chapter recaps from before key points replaced them (ADR 0023); they stay readable on the chapter page. */
   recaps(chapterId: string | null | undefined): Turn[] {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && !!chapterId && t.chapter_id === chapterId);
   }
@@ -1165,11 +1176,15 @@ class AppStore {
     requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
-  /** A recap and the chapter quiz stay on the chapter page and never move the learner's position. */
-  recapChapter(chapterId: string) {
-    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+  /** Opens the section a lesson belongs to and scrolls to it, as a key point's link back to where it was taught. */
+  showLesson(turnId: string) {
+    const turn = this.turn(turnId);
+    if (!turn) return;
+    if (this.viewingChapter || this.reviewOpen || this.courseOpen || (this.viewing ?? this.currentId) !== turn.concept_id) this.view(turn.concept_id);
+    void this.#scrollToLesson(turnId, null);
   }
 
+  /** The chapter quiz stays on the chapter page and never moves the learner's position. */
   takeQuiz(chapterId: string) {
     return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/quiz`));
   }

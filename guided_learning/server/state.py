@@ -112,9 +112,10 @@ PARTS = {
                             'memory_requests': host.operation({'op': 'memory.requests'})['requests']},
     'course_changes': lambda host: host.operation({'op': 'course_change.list'}),
     'builds': lambda host: {'builds': host.builds.state()},
+    'key_points': lambda host: host.operation({'op': 'key_points.view'}),
 }
 # Parts a `changed` event may reload without the rest of the state.
-ALONE = ('preparation', 'settings', 'builds', 'memory')
+ALONE = ('preparation', 'settings', 'builds', 'memory', 'key_points')
 
 
 def build(host, parts=None):

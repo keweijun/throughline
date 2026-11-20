@@ -292,6 +292,35 @@ export type State = {
   changes: CourseChange[];
   builds: ChapterBuild[];
   review: ReviewState;
+  key_points: SectionKeyPoints[];
+  chapter_sheets: ChapterSheet[];
+};
+
+/** One key point of a section (ADR 0023): what to hold from it, when it holds, the mistake to avoid, and where it was taught. */
+export type KeyPoint = {
+  statement: string;
+  holds_when?: string;
+  common_mistake?: string;
+  /** The lesson turn (a step, or a single-reply lesson) that taught it. */
+  turn_id?: string;
+  source_refs: Ref[];
+};
+
+/** A studied section's key points, written by the teacher; the learner asks Codex to change them. */
+export type SectionKeyPoints = {
+  concept_id: string;
+  points: KeyPoint[];
+  origin: 'lesson' | 'backfill' | 'codex';
+  written_at: number;
+  requests: { text: string; at: number }[];
+};
+
+/** The paragraph that opens a chapter's key points sheet; `current` while it was written from the points shown. */
+export type ChapterSheet = {
+  chapter_id: string;
+  connection: string;
+  written_at: number;
+  current: boolean;
 };
 
 /** A change to the course itself that a lesson or side-question reply suggests making in Studio; `id` is its turn. */

@@ -64,8 +64,14 @@ _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number 
 **Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
 _Avoid_: An overview repeated at every section, unit overview (retired: a course without chapters is one chapter).
 
-**Chapter recap**: An optional lesson on the chapter page that connects the chapter's sections and lists set-aside exercises without new material. It sets no questions of its own; it offers the chapter quiz (ADR 0006).
-_Avoid_: Review test, chapter exam, a lesson of the chapter's last section.
+**Key point**: One result, rule, definition or method a learner should hold from a studied section, written by the teacher: its statement, when it holds and a common mistake, linked to the lesson step and source pages that taught it. The learner does not edit key points; they ask Codex to change them (ADR 0023).
+_Avoid_: Summary, flashcard, the learner's notes, a mastery target.
+
+**Chapter sheet**: A chapter's key points gathered on its chapter page, in route order, opened by a short paragraph on how its sections connect (ADR 0023).
+_Avoid_: Chapter recap, cheat sheet (something the learner asks Studio to make), chapter summary (the outline's one-line description).
+
+**Chapter recap**: Retired: a lesson on the chapter page, started on request, that connected the chapter's sections. Key points and the chapter sheet replace it; recaps written before stay readable (ADR 0006, ADR 0023).
+_Avoid_: Using it for the chapter sheet.
 
 **Chapter quiz**: A review set scoped to one chapter, taken from the chapter page, that asks a few earlier exercises from the chapter's sections again and adds new questions spanning the chapter. It never gates the route (ADR 0014).
 _Avoid_: Chapter exam, mastery test, gate, the section's exercises.

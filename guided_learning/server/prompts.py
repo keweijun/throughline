@@ -51,7 +51,8 @@ def instructions(turn):
 
 def base(turn):
     """The request part of a teaching prompt: the course state that changes between turns, recent interactions last."""
-    request_label = 'Internal task requirements (not a learner interaction):' if turn['channel'] == 'preparation' else 'Current learner request:'
+    internal = turn['channel'] in ('preparation', 'key_points', 'chapter_sheet')
+    request_label = 'Internal task requirements (not a learner interaction):' if internal else 'Current learner request:'
     state = {k: v for k, v in turn['prompt_snapshot'].items() if k not in STABLE + ('session', WIDGETS)}
     session = dict(turn['prompt_snapshot'].get('session', {}))
     state.update(session=session, recent_interactions=session.pop('recent_interactions', []))
@@ -131,21 +132,6 @@ def chapter_lesson(chapter, first, language):
         text = CHAPTER_FIRST.format(title=chapter['title'])
         return text.replace('## Chapter overview', '## 章节导览') if language == 'zh-CN' else text
     return CHAPTER_SECTION.format(title=chapter['title'])
-
-
-def recap_request(title, chinese):
-    return f'回顾本章：{title}' if chinese else f'Recap the chapter: {title}'
-
-
-def chapter_recap(chapter, sections, deferred, not_studied, language):
-    heading = '## 本章回顾' if language == 'zh-CN' else '## Chapter recap'
-    return (f'The learner asked for a recap of the chapter "{chapter["title"]}". Begin with "{heading}". Do not teach new material and do not set exercises in the lesson: '
-            'the app offers an optional chapter quiz separately, so do not announce, set or answer any questions. '
-            'Retrace the chain of reasoning through the chapter\'s sections in order, state the key results with the conditions under which they hold, '
-            'show how the sections depend on each other, and point out the confusions most worth checking. Base it on the route and sources; '
-            'the learner may not have studied every section closely. Sections listed as not studied yet have no lesson so far: recap what was studied '
-            'and only name what those sections will add. If deferred exercises are listed, mention briefly that they wait in their sections. '
-            'Chapter data: ' + json.dumps({'sections': sections, 'not_studied_yet': not_studied, 'deferred_exercises': deferred}, ensure_ascii=False))
 
 
 def due_explanations(items):
@@ -429,3 +415,71 @@ def memory_consolidation(section, entries):
             'suggested preferences or other entries that are stale: superseded by another entry or no longer about this course. '
             'Never prune a confirmed preference, never merge a suggested preference with a confirmed one, and never add, '
             'reword or invent entries. Name each entry at most once. When nothing needs to change, return {"merge":[],"prune":[]}.')
+
+
+# Key points (ADR 0023): what the learner should hold from a section, shown at the end of its lesson, at the top of the
+# section once finished and on the chapter's sheet. The learner reads them later, before an exam among other times.
+KEY_POINT = ('{"statement": the result, rule, definition or method in one or two sentences, with its formula when it has one, '
+             '"holds_when": the conditions under which it holds or applies, "common_mistake": the mistake most often made with it, '
+             'preferably one this learner made (course_memory difficulties, missed check questions), '
+             '"sources": [{"source_id": "...", "unit_id": "..."}] the source locations of this section that present it}')
+KEY_POINT_RULES = ('Give as many points as the section teaches, at most {limit}: one per result, rule or method the learner should '
+                   'be able to state and use without the lesson in front of them, not one per paragraph, and none for scene-setting. '
+                   'Points cover this section only; do not restate its prerequisites. Leave out holds_when or common_mistake only where '
+                   'a point has none worth stating. Write them in the teaching language, in Markdown with LaTeX as in the lesson, '
+                   'tersely: they are read as a sheet, not as a lesson.')
+KEY_POINTS_EARLIER = ('This section already has key points (data): {current}\n'
+                      'Rewrite the points from what has now been taught. For a point you keep as it is, give "kept": its index in that '
+                      'list (counting from 0) instead of restating it.')
+KEY_POINTS_ASKED = (' The learner asked Codex for these changes to the points (data): {asked}. Keep them in what you write, unless '
+                    'what was taught contradicts one; then follow what was taught.')
+
+
+def _earlier_points(current, asked):
+    if not current:
+        return ''
+    text = '\n' + KEY_POINTS_EARLIER.format(current=json.dumps(current, ensure_ascii=False))
+    return text + (KEY_POINTS_ASKED.format(asked=json.dumps(asked, ensure_ascii=False)) if asked else '')
+
+
+def key_points_step(limit, current=None, asked=None):
+    """What a lesson step adds to its <lesson-step> block when it ends the lesson."""
+    return ('When this step ends the lesson (remaining is empty), the <lesson-step> JSON also carries "key_points": the section\'s '
+            'key points, each ' + KEY_POINT[:-1] + ', "step": the number of the step of this lesson that taught it}. '
+            + KEY_POINT_RULES.format(limit=limit) + _earlier_points(current, asked))
+
+
+def key_points_reply(limit, current=None, asked=None):
+    """What a single-reply lesson adds: points only when the reply changes what the section's points should say."""
+    lead = ('If this reply teaches the section again, or teaches something its key points miss or get wrong, end it with one '
+            '<key-points>{"points": [...]}</key-points> block holding the section\'s key points; the host reads it and the learner '
+            'never sees it. Otherwise leave the block out.' if current else
+            'End the reply with one <key-points>{"points": [...]}</key-points> block holding the section\'s key points; the host '
+            'reads it and the learner never sees it.')
+    return (lead + ' Each point is ' + KEY_POINT[:-1] + ', "taught_here": true when this reply taught it}. '
+            + KEY_POINT_RULES.format(limit=limit) + _earlier_points(current, asked))
+
+
+KEY_POINTS_REQUEST = 'Write the key points of this section from its lessons.'
+
+
+def key_points_backfill(title, taught, limit, asked=None):
+    """The idle job's prompt for a section studied before key points were written."""
+    asked_text = KEY_POINTS_ASKED.format(asked=json.dumps(asked, ensure_ascii=False)).strip() if asked else ''
+    return (f'The learner has studied the section "{title}". Write its key points from the lessons taught (data, the learner has read '
+            'them) and the section\'s source pages. Return only one <key-points>{"points": [...]}</key-points> block, each point '
+            + KEY_POINT[:-1] + ', "lesson": the number of the lesson below that taught it}. ' + KEY_POINT_RULES.format(limit=limit)
+            + (' ' + asked_text if asked_text else '') + '\nLessons taught (data): ' + json.dumps(taught, ensure_ascii=False))
+
+
+CHAPTER_SHEET_REQUEST = "Write how this chapter's key points connect."
+
+
+def chapter_sheet(chapter, sections):
+    """The idle job's prompt for the paragraph that opens a chapter's key points sheet."""
+    return (f'The key points sheet of the chapter "{chapter["title"]}" opens with one short paragraph on how its sections connect: '
+            'which results build on which, what ties the chapter together, and where results are easily confused or misapplied. '
+            'Three to six sentences, in the teaching language, Markdown with LaTeX where needed. Do not restate the points '
+            'themselves, which the sheet lists below it, and do not mention sections without points. '
+            'Return only one <chapter-sheet>{"connection": "..."}</chapter-sheet> block.\n'
+            'Sections in order with their key points (data): ' + json.dumps(sections, ensure_ascii=False))

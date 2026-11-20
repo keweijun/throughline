@@ -21,11 +21,11 @@
   const units = $derived([...new Set(lessons.map((l) => app.stepOf(l.id)?.lesson.id ?? l.id))]);
   const number = $derived(units.indexOf(step?.lesson.id ?? turn.id) + 1);
   const planned = $derived(step ? step.lesson.steps.slice(step.number) : []);
-  // A section's lesson goes on only at the learner's position; a section they are previewing shows it read-only. A
-  // chapter recap is started from anywhere.
-  // A lesson a New lesson replaced (ADR 0023) is kept only to read.
+  // A section's lesson goes on only at the learner's position; a section they are previewing shows it read-only, and so
+  // does a chapter recap from before key points replaced them (ADR 0024). A lesson a New lesson replaced (ADR 0023) is
+  // kept only to read.
   const replaced = $derived(app.replaced(turn));
-  const here = $derived(!replaced && (!!turn.chapter_id || turn.concept_id === app.currentId));
+  const here = $derived(!replaced && !turn.chapter_id && turn.concept_id === app.currentId);
   // Continue is offered under the latest step once it is complete and the plan has steps left.
   const continues = $derived(
     here && !!step && turn.status === 'completed' && planned.length > 0 && !planned.some((s) => s.turn_id),

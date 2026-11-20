@@ -31,6 +31,8 @@ NAMESPACES = {
     'curriculum': 'route', 'sources': 'route', 'source_revisions': 'route', 'page_readings': 'route', 'figures': 'route',
     # What the sender's teacher wrote. Route and lessons carries the lessons and exercises among them (`share`).
     'lessons': 'lessons', 'streams': 'lessons', 'practice_tasks': 'lessons',
+    # Key points come with the lessons they sum up (`share`); the changes the sender asked for stay theirs.
+    'key_points': 'lessons', 'chapter_sheets': 'lessons',
     # Frozen prompts hold the sender's course memory, profile and session, so they never leave a course below Everything.
     'stream_snapshots': 'everything',
     # The sender's own learning, and the work queued for it.
@@ -102,6 +104,11 @@ def share(rows, level, notes=False):
         for task in shared['practice_tasks'].values():
             if task.get('variant_of') not in shared['practice_tasks']:
                 task.pop('variant_of', None)
+        for value in kept.get('key_points', {}).values():
+            value['requests'] = []
+            for point in value['points']:
+                if point.get('turn_id') not in shared['streams']:
+                    point.pop('turn_id', None)
     if notes:
         branches = {}
         for key, branch in kept.pop('web_branches', {}).items():

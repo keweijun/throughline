@@ -113,15 +113,18 @@
 
   .item {
     display: grid;
-    gap: 0.2rem;
-    padding: 0.45rem 0.7rem;
+    gap: 0.1rem;
+    padding: 0.45rem 0.6rem 0.25rem;
     border: 1px solid var(--rule);
     border-radius: var(--radius);
     background: var(--raised);
   }
 
+  /* In the aside's narrow column, at the size of the chats above it, so a long list stays a list to scan. */
   .text {
-    font-size: var(--step-0);
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    line-height: 1.45;
     overflow-wrap: anywhere;
   }
 

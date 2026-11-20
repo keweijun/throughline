@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.56.0
+
+- **The Overview on a wide window** puts the course's title, progress and tabs in a column on the left. Studio and an open document start at the top of the page and reach the bottom of the window, and Sources, Your notes and Share sit beside the column instead of at the far left of an empty page. On a narrower window the header stays above the tabs, as before.
+- **New course** gives Studio the page: it is wider, the chat sits in one centred column as on the Overview, and the box reaches the bottom of the window.
+- **A long list of how you're taught** scrolls beside Studio rather than running past the bottom of the window, and its entries take less room.
+- **Going back to Learn from the Overview** returns you to where you were reading. Before, after opening a document on the Sources tab, Learn could come back scrolled to another place in the lesson.
+
 ## 0.55.4
 
 - If you updated while an older Throughline (0.54.0 or earlier) was still running, the launcher and `guided-learning open` now stop it and start the new version, and `guided-learning stop` stops it. Before, the browser opened on the old version without signing in, and the old one could not be stopped.

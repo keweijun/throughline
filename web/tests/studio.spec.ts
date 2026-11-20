@@ -113,7 +113,7 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('Studio fills the window under the course header, and writing scrolls the header away without moving the box', async ({ page, course }) => {
+test('Studio fills the window: beside the course column on a wide window, and on a narrower one under the header, which writing scrolls away without moving the box', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const frame = page.locator('#course-studio .frame');
@@ -122,27 +122,63 @@ test('Studio fills the window under the course header, and writing scrolls the h
   const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('#course-studio .frame')!.getBoundingClientRect().bottom);
   await expect.poll(foot).toBeGreaterThan(8);
   expect(await foot()).toBeLessThan(32);
-  await page.setViewportSize({ width: 1280, height: 1000 });
+
+  // Wide, the course's header and its tabs are a column beside Studio, which starts level with the title; writing moves
+  // nothing, as there is no header above Studio to step aside.
+  const title = page.locator('#course-title');
+  await expect(page.getByRole('tablist', { name: 'This course' })).toHaveAttribute('aria-orientation', 'vertical');
+  expect(Math.abs((await frame.boundingBox())!.y - (await title.boundingBox())!.y)).toBeLessThan(16);
+  const box = page.locator('#studio-input');
+  let before = (await box.boundingBox())!;
+  let height = (await frame.boundingBox())!.height;
+  await box.click();
+  await expect(title).toBeInViewport();
+  expect((await frame.boundingBox())!.height).toBeCloseTo(height, 0);
+  expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
+
+  // Narrower, the header and tabs stack above Studio, and the frame still reaches the foot.
+  await page.locator('#course-tab-sources').click();
+  await page.setViewportSize({ width: 1000, height: 1000 });
+  await page.locator('#course-tab-studio').click();
+  await expect(page.getByRole('tablist', { name: 'This course' })).toHaveAttribute('aria-orientation', 'horizontal');
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
-  const box = page.locator('#studio-input');
-  const before = (await box.boundingBox())!;
-  const height = (await frame.boundingBox())!.height;
-  await expect(page.locator('#course-title')).toBeInViewport();
+  before = (await box.boundingBox())!;
+  height = (await frame.boundingBox())!.height;
+  await expect(title).toBeInViewport();
 
+  // Writing scrolls the header away under the pinned tabs, and the frame grows upward by as much.
   await box.click();
-  await expect(page.locator('#course-title')).not.toBeInViewport();
+  await expect(title).not.toBeInViewport();
   await expect(page.getByRole('tab', { name: 'Studio' })).toBeInViewport();
   expect((await frame.boundingBox())!.height).toBeGreaterThan(height + 50);
   expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
   expect(await foot()).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/studio-working.png` });
 
   // Another tab gives the header back its room.
   await page.getByRole('tab', { name: 'Sources' }).click();
   await page.getByRole('tab', { name: 'Studio' }).click();
   await expect.poll(async () => (await frame.boundingBox())!.height).toBeCloseTo(height, 0);
+});
+
+test('a long list of how the learner is taught scrolls beside Studio rather than past the window', async ({ page, course }) => {
+  const { base } = await course('studio_browser_fixture');
+  // Twenty confirmed preferences, as a long-studied course gathers.
+  const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
+  for (let i = 0; i < 20; i++) {
+    courseOperation(waves, { op: 'memory.save', id: `p${i}`, kind: 'preference', text: `Preference ${i}: explain each step of a derivation before the next.` });
+    courseOperation(waves, { op: 'memory.confirm', id: `p${i}` });
+  }
+  await page.reload();
+  await page.locator('#open-course').click();
+  const aside = page.locator('#course-studio .studio-aside');
+  await expect(aside.locator('#course-preferences li')).toHaveCount(20);
+  const frame = (await page.locator('#course-studio .frame').boundingBox())!;
+  const box = (await aside.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(frame.y + frame.height + 1);
+  expect(await aside.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  expect(await page.locator('#stage').evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThan(2);
 });
 
 test('a message while Codex works steers it, and Stop interrupts', async ({ page, course }) => {
@@ -377,6 +413,16 @@ test("the library page has its own Studio for new courses; a course card's actio
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'New course', level: 1 })).toBeVisible();
   await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  // Studio takes the page: wider than the list of courses, its frame reaching just above the window's foot.
+  const frame = page.locator('.studio-part .frame');
+  expect((await frame.boundingBox())!.width).toBeGreaterThan(1000);
+  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('.studio-part .frame')!.getBoundingClientRect().bottom);
+  expect(await foot()).toBeGreaterThan(8);
+  expect(await foot()).toBeLessThan(32);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await expect.poll(foot).toBeLessThan(32);
+  expect(await foot()).toBeGreaterThan(8);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(box).toBeFocused();
   await box.pressSequentially('hello');
   await page.keyboard.press('Control+Enter');
@@ -513,7 +559,7 @@ test('chats are listed beside Studio on a wide page, and pinned above the transc
   await expect(panel.locator('.user')).toHaveText('first');
 
   // Narrow, the chats are Studio's own bar: one row that stays at the frame's top as the transcript scrolls.
-  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.setViewportSize({ width: 860, height: 700 });
   await expect(chats).toBeHidden();
   const picker = panel.getByRole('combobox', { name: 'Studio chats' });
   const fresh = panel.getByRole('button', { name: 'New chat' });

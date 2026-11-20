@@ -166,13 +166,20 @@ test("a document opens in the Overview's Sources tab beside the list and fills t
   await tab.getByRole('button', { name: /lecture-2\.pdf/ }).click();
   await expect(tab.locator('.pdf-page.cited canvas')).toBeVisible();
 
-  // The list stays beside it, the document marked; the header steps aside and the reader ends at the window's foot.
+  // The list stays beside it, the document marked; beside the course's column, the reader ends at the window's foot.
   await expect(tab.locator('.source-list [aria-current="true"]')).toContainText('lecture-2.pdf');
+  await expect(page.locator('#course-title')).toBeInViewport();
+  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.getElementById('course-sources')!.getBoundingClientRect().bottom);
+  expect(await foot()).toBeGreaterThan(8);
+  expect(await foot()).toBeLessThan(32);
+
+  // Narrower, the header stacks above the tab and steps aside, so the reader still reaches the foot.
+  await page.setViewportSize({ width: 1000, height: 900 });
   await expect(page.locator('#course-title')).not.toBeInViewport();
   await expect(page.getByRole('tab', { name: 'Sources' })).toBeInViewport();
-  const foot = await page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.getElementById('course-sources')!.getBoundingClientRect().bottom);
-  expect(foot).toBeGreaterThan(8);
-  expect(foot).toBeLessThan(32);
+  await expect.poll(foot).toBeLessThan(32);
+  expect(await foot()).toBeGreaterThan(8);
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   // One line of header: the note on an unchecked location unfolds from its status; bookmark and original sit with the
   // PDF's controls.
@@ -460,4 +467,23 @@ test('appearance offers the theme as cards and applies the choice at once', asyn
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.getByRole('radio', { name: 'Match the system' }).check();
   await expect(page.locator('html')).not.toHaveAttribute('data-theme');
+});
+
+test('Learn keeps its place while the learner goes to the Overview and back, however far the Overview scrolled', async ({ page, course }) => {
+  await course('demo_course_fixture');
+  await page.setViewportSize({ width: 1000, height: 800 });
+  const stage = page.locator('#stage');
+  await stage.evaluate((node) => node.scrollTo({ top: 400, behavior: 'instant' }));
+  await expect.poll(() => stage.evaluate((node) => node.scrollTop)).toBe(400);
+
+  // Source opens the Overview's Sources tab; an open document there scrolls the course's header away.
+  await page.locator('#toggle-source').click();
+  await page.locator('#open-course').click();
+  await page.locator('#toggle-source').click();
+  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await page.locator('#course-sources').getByRole('button', { name: /lecture-2\.pdf/ }).click();
+  await expect(page.locator('#course-title')).not.toBeInViewport();
+
+  await page.locator('#open-study').click();
+  await expect.poll(() => stage.evaluate((node) => node.scrollTop)).toBe(400);
 });

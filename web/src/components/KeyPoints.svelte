@@ -6,7 +6,7 @@
   import CodexLink from './CodexLink.svelte';
 
   /**
-   * A section's key points (ADR 0023): each with when it holds, the mistake to avoid and links back to the lesson and
+   * A section's key points (ADR 0024): each with when it holds, the mistake to avoid and links back to the lesson and
    * pages that taught it. The learner cannot edit them; changing them is a request to Codex. With `section`, the list is
    * one section of a chapter sheet and names it instead of carrying a heading of its own.
    */
@@ -121,17 +121,17 @@
     line-height: 1.55;
   }
 
+  /* One label column for the point, as wide as its longest label. */
   dl {
     display: grid;
-    gap: 0.3rem;
+    grid-template-columns: max-content 1fr;
+    gap: 0.25rem 1rem;
+    align-items: baseline;
     margin: 0.4rem 0 0;
   }
 
   dl > div {
-    display: grid;
-    grid-template-columns: 8.5rem 1fr;
-    gap: 0.75rem;
-    align-items: baseline;
+    display: contents;
   }
 
   dt {

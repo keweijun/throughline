@@ -296,7 +296,7 @@ export type State = {
   chapter_sheets: ChapterSheet[];
 };
 
-/** One key point of a section (ADR 0023): what to hold from it, when it holds, the mistake to avoid, and where it was taught. */
+/** One key point of a section (ADR 0024): what to hold from it, when it holds, the mistake to avoid, and where it was taught. */
 export type KeyPoint = {
   statement: string;
   holds_when?: string;

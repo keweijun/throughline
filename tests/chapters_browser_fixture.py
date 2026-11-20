@@ -23,7 +23,7 @@ execute(root, {'op': 'curriculum.chapter.save', 'chapter_id': 'measurement', 'co
     {'id': 'outcomes', 'title': 'Possible outcomes', 'prerequisites': ['superposition'], 'links': [ref('line-4')]}]})
 
 
-# Each one-step lesson ends with its section's key points (ADR 0023); the first cites the page its section links to.
+# Each one-step lesson ends with its section's key points (ADR 0024); the first cites the page its section links to.
 POINTS = {
     'What a state represents': [{'statement': 'A state assigns an amplitude $c_i$ to each outcome.', 'holds_when': 'The outcomes form a complete set.',
                                  'common_mistake': 'Reading $c_i$ as a probability; the probability is $|c_i|^2$.', 'step': 1,

@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.57.0
+
+- **Key points.** Every section you study now ends with its key points: the results, rules and methods to hold from it. Each one says when it holds and gives a common mistake, often one you made, and links back to the lesson step and the page that taught it. They show at the end of the lesson and at the top of the section when you come back to it. Sections you studied before this update get their key points in the background while Throughline is idle.
+- **A chapter's key points on one sheet.** The chapter page gathers the key points of the sections you studied, opened by a short paragraph on how they connect. This replaces the chapter recap, which almost no one used. Recaps you already have stay on the chapter page, folded.
+- **To change a key point, ask Codex**, from **Ask Codex to change them** beside the points ("say it without the matrix notation", "add the sign convention"). When the section is taught again, its new key points keep the changes you asked for.
+
 ## 0.56.0
 
 - **The Overview on a wide window** puts the course's title, progress and tabs in a column on the left. Studio and an open document start at the top of the page and reach the bottom of the window, and Sources, Your notes and Share sit beside the column instead of at the far left of an empty page. On a narrower window the header stays above the tabs, as before.

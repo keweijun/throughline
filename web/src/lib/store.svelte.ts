@@ -321,7 +321,7 @@ class AppStore {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && t.concept_id === conceptId && !t.chapter_id);
   }
 
-  /** A section's key points (ADR 0023), once the teacher has written them. */
+  /** A section's key points (ADR 0024), once the teacher has written them. */
   keyPoints(conceptId: string | null | undefined) {
     return (this.state?.key_points ?? []).find((v) => v.concept_id === conceptId);
   }
@@ -331,7 +331,7 @@ class AppStore {
     return (this.state?.chapter_sheets ?? []).find((s) => s.chapter_id === chapterId);
   }
 
-  /** Chapter recaps from before key points replaced them (ADR 0023); they stay readable on the chapter page. */
+  /** Chapter recaps from before key points replaced them (ADR 0024); they stay readable on the chapter page. */
   recaps(chapterId: string | null | undefined): Turn[] {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && !!chapterId && t.chapter_id === chapterId);
   }

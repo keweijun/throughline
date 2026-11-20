@@ -63,7 +63,7 @@ class Chapters(unittest.TestCase):
         self.assertIn('connecting it to the previous section', prompt)
 
     def test_a_recap_from_before_key_points_stays_on_its_chapter_but_is_not_written_again(self):
-        """Key points replaced the chapter recap (ADR 0023): nothing starts one, and an old one is kept to read."""
+        """Key points replaced the chapter recap (ADR 0024): nothing starts one, and an old one is kept to read."""
         self.lesson()
         self.post('/api/chapters/one/recap', {}, status=404)
         execute(self.root, {'op': 'stream.start', 'id': 'recap:old', 'concept_id': 'b', 'chapter_id': 'one', 'prompt': 'Recap', 'record_user': False})

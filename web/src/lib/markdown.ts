@@ -10,7 +10,7 @@ const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
 // Structured blocks a teacher reply ends with; the host reads them and the learner never sees them.
 const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
-// The teacher's course memory note (ADR 0010), suggested course change and key points (ADR 0023), wherever they are and
+// The teacher's course memory note (ADR 0010), suggested course change and key points (ADR 0024), wherever they are and
 // while they are still streaming.
 const MEMORY = /\s*<(course-memory|course-change|key-points)>[\s\S]*?(<\/\1>|$)/g;
 // DOMPurify's own rule for link targets, which also lets through the file links Codex writes (`file:` URLs and Windows

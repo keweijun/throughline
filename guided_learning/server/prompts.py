@@ -417,7 +417,7 @@ def memory_consolidation(section, entries):
             'reword or invent entries. Name each entry at most once. When nothing needs to change, return {"merge":[],"prune":[]}.')
 
 
-# Key points (ADR 0023): what the learner should hold from a section, shown at the end of its lesson, at the top of the
+# Key points (ADR 0024): what the learner should hold from a section, shown at the end of its lesson, at the top of the
 # section once finished and on the chapter's sheet. The learner reads them later, before an exam among other times.
 KEY_POINT = ('{"statement": the result, rule, definition or method in one or two sentences, with its formula when it has one, '
              '"holds_when": the conditions under which it holds or applies, "common_mistake": the mistake most often made with it, '

@@ -1121,7 +1121,7 @@ class Preparation(Feature):
                 return
             try:
                 result = self.schedule()
-                # With nothing to prepare and nothing running, write missing key points (ADR 0023), then the Review for
+                # With nothing to prepare and nothing running, write missing key points (ADR 0024), then the Review for
                 # me set ahead (ADR 0014); each starts only when nothing else runs.
                 if result.get('reason') in ('no_next_section', 'ready', 'failed', 'existing'):
                     if self.host.key_points.ahead:

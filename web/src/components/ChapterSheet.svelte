@@ -7,7 +7,7 @@
   import Lesson from './Lesson.svelte';
 
   /**
-   * A chapter's key points sheet (ADR 0023): a paragraph on how its sections connect, then each studied section's
+   * A chapter's key points sheet (ADR 0024): a paragraph on how its sections connect, then each studied section's
    * points in route order. It replaces the chapter recap; recaps written before stay readable, folded, below it.
    */
   let { chapter }: { chapter: Chapter } = $props();

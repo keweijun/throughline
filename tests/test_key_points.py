@@ -1,4 +1,4 @@
-"""Key points (ADR 0023): the lesson's last step writes a section's points, a single-reply lesson may rewrite them, an
+"""Key points (ADR 0024): the lesson's last step writes a section's points, another pass may rewrite them, an
 idle job writes them for sections studied before, and Codex changes them when the learner asks."""
 import json
 import tempfile
@@ -137,6 +137,21 @@ class LessonPoints(LessonHost):
         shown = next(t for t in self.state()['turns'] if t['id'] == 'again')
         self.assertIn('<key-points>', shown['text'], 'the interface hides the block, as it hides memory notes')
 
+    def test_a_new_lesson_rewrites_the_points_from_its_last_step_keeping_what_was_asked(self):
+        self.runner.replies = [last_step('The first lesson.', [{**POINT, 'step': 1}])]
+        self.post('/api/lessons', {'id': 'one'})
+        self.finish('one')
+        execute(self.root, {'op': 'key_points.revise', 'concept_id': 'wave', 'request': 'Mention the phase',
+                            'points': [{**POINT, 'turn_id': self.turn_id('one')}]})
+        self.runner.replies = [last_step('Taught anew.', [{'kept': 0}, {'statement': 'The phase sets the interference.', 'step': 1}])]
+        self.post('/api/lessons', {'id': 'two', 'kind': 'new'})
+        self.finish('two')
+        self.assertIn('Mention the phase', self.prompt(1))
+        written = self.points()
+        self.assertEqual([(p['statement'], p.get('turn_id')) for p in written['points']],
+                         [(POINT['statement'], self.turn_id('one')), ('The phase sets the interference.', 'two')])
+        self.assertEqual(written['turn_id'], 'two')
+
     def test_a_single_reply_without_a_block_keeps_the_points(self):
         self.runner.replies = [last_step('The whole lesson.', [POINT]), 'More on the same.']
         self.post('/api/lessons', {'id': 'one'})
@@ -224,6 +239,23 @@ class IdlePoints(unittest.TestCase):
         settle(self.host)
         self.assertEqual([kind for kind, _ in self.runner.jobs], ['section', 'section'])
         self.assertEqual(self.client.get('/api/state').json()['key_points'], [])
+
+    def test_a_section_taught_anew_is_summed_up_from_its_current_lesson(self):
+        execute(self.root, {'op': 'lesson.begin', 'id': 'old', 'concept_id': 'wave', 'steps': ['Wave']})
+        execute(self.root, {'op': 'lesson.step', 'id': 'old', 'turn_id': 'old-wave'})
+        execute(self.root, {'op': 'stream.start', 'id': 'new-wave', 'concept_id': 'wave', 'prompt': 'Teach', 'record_user': False})
+        execute(self.root, {'op': 'lesson.begin', 'id': 'new', 'concept_id': 'wave', 'steps': ['Wave']})
+        execute(self.root, {'op': 'lesson.step', 'id': 'new', 'turn_id': 'new-wave'})
+        execute(self.root, {'op': 'stream.event', 'id': 'new-wave', 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': 'The new wave lesson.'})
+        execute(self.root, {'op': 'stream.event', 'id': 'new-wave', 'attempt': 1, 'sequence': 2, 'kind': 'complete'})
+        self.open()
+        self.wait_for(lambda: len(self.client.get('/api/state').json()['key_points']) == 2)
+        prompt = next(p for kind, p in self.runner.jobs if kind == 'section' and 'section "Wave"' in p)
+        taught = prompt.split('Lessons taught (data): ')[1]
+        self.assertIn('The new wave lesson.', taught)
+        self.assertNotIn('The old wave lesson.', taught, 'the lesson a New lesson replaced is history')
+        wave = next(v for v in self.client.get('/api/state').json()['key_points'] if v['concept_id'] == 'wave')
+        self.assertEqual(wave['points'][0]['turn_id'], 'new-wave')
 
     def test_off_in_tests_unless_asked(self):
         self.open(key_points=False)

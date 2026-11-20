@@ -35,7 +35,7 @@
     (app.state?.review.sets ?? []).find((s) => s.kind === 'warm_up' && s.concept_id === conceptId && !s.closed_at && (s.open || !s.task_ids.length)),
   );
   const position = $derived(app.state?.position);
-  // Key points (ADR 0023) end the lesson at the learner's position and open a finished section they come back to;
+  // Key points (ADR 0024) end the lesson at the learner's position and open a finished section they come back to;
   // while a lesson is being taught, the points it will rewrite wait.
   const points = $derived(app.keyPoints(conceptId));
   const teaching = $derived(!!app.openLesson(conceptId) || lessons.some((l) => l.status === 'running'));

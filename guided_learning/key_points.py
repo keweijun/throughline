@@ -1,4 +1,4 @@
-"""Key points (ADR 0023): what a learner should hold from each studied section, written by the teacher and never edited
+"""Key points (ADR 0024): what a learner should hold from each studied section, written by the teacher and never edited
 by the learner, who asks Codex to change them. The lesson's last step writes a section's points; an idle job writes them
 for sections studied before, and a short paragraph per chapter saying how its sections' points connect. They replace the
 chapter recap (ADR 0006)."""

@@ -1,4 +1,4 @@
-"""Key points in the app (ADR 0023). A lesson writes its section's points as it ends: the last step in its <lesson-step>
+"""Key points in the app (ADR 0024). A lesson writes its section's points as it ends: the last step in its <lesson-step>
 block, a single-reply lesson in a <key-points> block. While the host is idle, a background turn writes the points of a
 section studied before key points existed, and another the paragraph that opens a chapter's sheet."""
 import hashlib
@@ -133,12 +133,23 @@ class KeyPoints(Feature):
 
     # Idle work: sections studied before key points, then chapter sheets.
 
+    def _current_turns(self, concept_id, turns=None):
+        """The completed turns of the section's current lesson, oldest first: a lesson a New lesson replaced (ADR 0023), and
+        the replies before it, are history, not what the points sum up."""
+        lessons = self.operation({'op': 'lesson.list', 'concept_id': concept_id})['lessons']
+        replaced = {s.get('turn_id') for l in lessons if l.get('replaced_by') for s in l['steps']}
+        current = [l for l in lessons if not l.get('replaced_by')]
+        since = max((l['created_at'] for l in current), default=0) if any(l.get('replaced_by') for l in lessons) else 0
+        stepped = {s.get('turn_id') for l in current for s in l['steps']}
+        turns = turns if turns is not None else self.host.brief_turns()
+        found = [t for t in turns if t['channel'] == 'mainline' and t['status'] == 'completed' and t['concept_id'] == concept_id
+                 and not chapter_owned(t) and t['id'] not in replaced and (t['id'] in stepped or t['started_at'] >= since)]
+        return sorted(found, key=lambda t: t['started_at'])
+
     def _lessons_taught(self, concept_id):
-        """The section's completed lessons, oldest first, as (turn id, text without its notes or step block)."""
-        turns = [t for t in self.host.brief_turns() if t['channel'] == 'mainline' and t['status'] == 'completed'
-                 and t['concept_id'] == concept_id and not chapter_owned(t)]
+        """The section's current lesson, as (turn id, text without its notes or step block) for each of its turns."""
         taught = []
-        for brief in sorted(turns, key=lambda t: t['started_at']):
+        for brief in self._current_turns(concept_id):
             text = self.operation({'op': 'stream.read', 'id': brief['id']})['turn']['final_text'] or ''
             taught.append((brief['id'], NOTES.sub('', STEP_BLOCK.sub('', text)).strip()))
         return taught
@@ -169,8 +180,7 @@ class KeyPoints(Feature):
             exclude = [current] if current and self._teaching(current) else []
             pending = self.operation({'op': 'key_points.pending', 'exclude': exclude})
             for concept_id in pending['sections']:
-                taught = [t['id'] for t in turns if t['channel'] == 'mainline' and t['status'] == 'completed'
-                          and t['concept_id'] == concept_id and not chapter_owned(t)]
+                taught = [t['id'] for t in self._current_turns(concept_id, turns)]
                 started = self._start(self._job_id('key-points', concept_id, sorted(taught)), concept_id, 'key_points', prompts.KEY_POINTS_REQUEST)
                 if started is not False:
                     return started
@@ -186,9 +196,9 @@ class KeyPoints(Feature):
             return None
 
     def _teaching(self, concept_id):
-        """Whether a stepped lesson of the section still has steps to teach."""
+        """Whether the section's current stepped lesson still has steps to teach; a replaced one never goes on."""
         for lesson in self.operation({'op': 'lesson.list', 'concept_id': concept_id})['lessons']:
-            if any(not s.get('turn_id') for s in lesson['steps']):
+            if not lesson.get('replaced_by') and any(not s.get('turn_id') for s in lesson['steps']):
                 return True
         return False
 

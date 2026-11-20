@@ -166,10 +166,51 @@ class SavedCodex(unittest.TestCase):
         self.assertSamePath(self.codex.remember_codex(), self.cli)
         saved = json.loads(self.settings.read_text(encoding='utf-8'))
         self.assertSamePath(saved.pop('codex_path'), self.cli)
+        self.assertEqual(saved.pop('codex_path_dirs'), [], 'an empty file is no Node script')
         self.assertEqual(saved, {'model': 'gpt-6-luna', 'future_key': 1}, 'the settings and keys it does not know stay')
         self.launcher_environment()
         self.assertSamePath(self.codex.find_codex(), self.cli)
-        self.assertIn(str(self.cli.parent), self.codex.os.environ['PATH'].split(os.pathsep), 'so an npm codex finds its node')
+        env = self.codex.codex_env(self.codex.find_codex())
+        self.assertIn(str(self.cli.parent), env['PATH'].split(os.pathsep), 'so an npm codex finds its node')
+        self.assertEqual(self.codex.os.environ['PATH'], str(self.home / 'system'), "the host's own PATH stays as it was")
+
+    def test_a_running_host_finds_a_codex_setup_saved_after_it_started(self):
+        self.codex.remember_codex()
+        self.launcher_environment()
+        self.assertSamePath(self.codex.find_codex(), self.cli)
+        # Then setup, run again in another terminal, saves another codex.
+        moved = self.home / 'moved' / self.cli.name
+        moved.parent.mkdir()
+        moved.write_text('')
+        moved.chmod(0o755)
+        from guided_learning.userfiles import write_json
+        write_json(self.settings, {'codex_path': str(moved), 'codex_path_dirs': []})
+        self.assertSamePath(self.codex.find_codex(), moved)
+
+    @unittest.skipIf(os.name == 'nt', 'a POSIX script with a #!/usr/bin/env node line')
+    def test_an_npm_codex_whose_node_is_in_another_folder_runs_from_the_launcher(self):
+        # npm puts the codex script in its bin folder; nvm, Homebrew or Volta may keep node somewhere else.
+        node = self.home / 'node' / 'bin' / 'node'
+        node.parent.mkdir(parents=True)
+        server = self.home / 'server.py'
+        server.write_text(SAVED_SERVER % (str(self.home / 'calls'), 'ok'), encoding='utf-8')
+        node.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{server}" "$@"\n')
+        node.chmod(0o755)
+        self.cli.write_text('#!/usr/bin/env node\nconsole.log("codex")\n')
+        self.codex.os.environ['PATH'] = os.pathsep.join([str(self.cli.parent), str(node.parent)])  # setup's terminal
+        self.codex.remember_codex()
+        self.assertEqual(json.loads(self.settings.read_text(encoding='utf-8'))['codex_path_dirs'], [str(node.parent)])
+        self.launcher_environment()
+        events = []
+        with tempfile.TemporaryDirectory() as cwd:
+            self.codex.CodexRunner(model='m').run('Say hello', cwd, events.append, threading.Event())
+        self.assertEqual(events[-2:], [{'kind': 'final', 'text': 'Lesson.'}, {'kind': 'complete'}])
+        self.assertEqual(self.codex.os.environ['PATH'], str(self.home / 'system'))
+
+    def test_setup_saves_no_node_folder_for_a_codex_that_is_not_a_node_script(self):
+        self.cli.write_bytes(b'\x7fELF binary')
+        self.codex.remember_codex()
+        self.assertEqual(json.loads(self.settings.read_text(encoding='utf-8'))['codex_path_dirs'], [])
 
     def test_path_and_the_explicit_override_come_before_the_saved_codex(self):
         self.codex.remember_codex()

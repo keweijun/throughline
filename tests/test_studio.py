@@ -164,6 +164,29 @@ class StudioTest(unittest.TestCase):
         fresh = self.send('carry on')['thread']
         self.assertEqual(self.replies(self.history(fresh, lambda h: self.replies(h))), ['done'], 'Studio starts Codex again')
 
+    def test_stop_restarts_a_codex_that_answers_stop_but_never_ends_the_turn(self):
+        thread = self.send('ignore stop')['thread']
+        self.history(thread, lambda h: h['active_turn'])
+        stuck = self.client.app.state.courses.studio.server.process
+        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 0.5):
+            stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
+        self.assertEqual(stopped.json(), {'thread': thread, 'restarted': True})
+        self.assertEqual(len(self.received('turn/interrupt')), 1, 'Codex was asked to stop first')
+        self.assertIsNotNone(stuck.poll(), 'the App Server that kept the turn going was stopped')
+        self.assertEqual(self.client.get('/api/studio/activity').json()['running'], [], 'its turn no longer counts as running')
+        fresh = self.send('carry on')['thread']
+        self.assertEqual(self.replies(self.history(fresh, lambda h: self.replies(h))), ['done'], 'Studio starts Codex again')
+
+    def test_a_stop_codex_honours_keeps_the_app_server(self):
+        thread = self.send('wait for it')['thread']
+        self.history(thread, lambda h: h['active_turn'])
+        running = self.client.app.state.courses.studio.server.process
+        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 5):
+            stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
+        self.assertEqual(stopped.json(), {'thread': thread})
+        self.assertIsNone(running.poll(), 'a normal stop leaves Codex running')
+        self.assertEqual(self.client.get('/api/studio/activity').json()['running'], [])
+
     def named(self, thread):
         for _ in range(100):
             found = next((t for t in self.client.get('/api/studio').json()['threads'] if t['id'] == thread), None)

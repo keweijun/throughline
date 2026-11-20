@@ -13,7 +13,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from .codex import find_codex
+from .codex import codex_env, find_codex
 from .commands import detached, version
 from .store import OperationError
 
@@ -141,7 +141,7 @@ def install(folder, port, course=None, language='en', command=None):
                      prompt(found['version'], found['latest'], port, course, language)]
         try:
             with (folder / LOG).open('wb') as output:
-                _process['codex'] = subprocess.Popen(arguments, cwd=folder, stdout=output, **detached())
+                _process['codex'] = subprocess.Popen(arguments, cwd=folder, stdout=output, env=codex_env(codex), **detached())
         except OSError as exc:
             (folder / STATUS).unlink(missing_ok=True)
             raise OperationError('codex_missing', f'Codex could not be started ({exc})') from exc

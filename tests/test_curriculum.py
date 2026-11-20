@@ -196,6 +196,48 @@ class ChapterCLI(CurriculumCLI):
         self.chapter([state], [{**self.model()['coverage'][0], 'verification': 'verified', 'verification_note': 'Read it'}],
                      chapter_id='states', error='invalid_coverage')  # changing it still needs the current revision
 
+    def update_lecture(self):
+        path = self.base / 'lecture.md'
+        path.write_text('Revised states\nProjection', encoding='utf-8')
+        return self.call('source.register', path=str(path))['source']['revision']
+
+    def test_re_reviewing_a_chapter_after_its_source_is_updated_replaces_the_old_mapping(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        self.chapter([state], [self.model()['coverage'][0]], chapter_id='states')
+        self.chapter([projection], [self.model()['coverage'][2]], chapter_id='measure')
+        revision = self.update_lecture()
+        current = {**self.refs[0], 'revision': revision}
+        self.chapter([{**state, 'links': [{**current, 'detail': 'Definition'}]}],
+                     [{**current, 'disposition': 'mapped', 'concept_ids': ['state'], 'verification': 'verified', 'verification_note': 'Read it'}],
+                     chapter_id='states')
+        lecture = [e for e in self.call('curriculum.view')['coverage'] if e['source_id'] == current['source_id']]
+        self.assertEqual([(e['revision'], e['concept_ids']) for e in lecture], [(revision, ['state'])])
+        self.assertEqual(self.call('curriculum.coverage')['stale_mappings'], [])
+
+    def test_re_reviewing_a_chapter_keeps_another_chapters_concepts_on_the_old_mapping(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        shared = self.refs[0]
+        self.chapter([state], [{**shared, 'disposition': 'mapped', 'concept_ids': ['state']}], chapter_id='states')
+        projection = {**projection, 'links': projection['links'] + [shared]}
+        self.chapter([projection], [{**shared, 'disposition': 'mapped', 'concept_ids': ['projection']}], chapter_id='measure')
+        revision = self.update_lecture()
+        current = {**shared, 'revision': revision}
+        self.chapter([{**state, 'links': [current]}], [{**current, 'disposition': 'mapped', 'concept_ids': ['state']}], chapter_id='states')
+        lecture = {e['revision']: e['concept_ids'] for e in self.call('curriculum.view')['coverage']
+                   if (e['source_id'], e['unit_id']) == (shared['source_id'], shared['unit_id'])}
+        self.assertEqual(lecture, {shared['revision']: ['projection'], revision: ['state']})
+
+    def test_moving_a_concepts_link_to_the_new_revision_is_not_blocked_by_its_old_mapping(self):
+        self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
+        state, projection = self.model()['concepts']
+        self.chapter([state], [self.model()['coverage'][0]], chapter_id='states')
+        revision = self.update_lecture()
+        self.chapter([{**state, 'links': [{**self.refs[0], 'revision': revision}]}], chapter_id='states', title='Kets')
+        self.assertEqual(self.call('curriculum.view')['chapters'][0]['title'], 'Kets')
+        self.assertEqual(len(self.call('curriculum.coverage')['stale_mappings']), 1)  # still reported for review
+
     def test_a_source_unit_shared_by_two_chapters_keeps_both_mappings(self):
         self.call('curriculum.outline', chapters=[{'id': 'states', 'title': 'States'}, {'id': 'measure', 'title': 'Measurement'}])
         state, projection = self.model()['concepts']

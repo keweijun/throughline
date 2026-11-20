@@ -7,6 +7,7 @@ import re
 import secrets
 import shutil
 import sqlite3
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -49,12 +50,14 @@ def host_key():
     Kept across launches, so a tab left open keeps working when the host restarts on the same port (an update), and
     readable only by this user: the program that reads it could read the courses anyway. It never goes in an address
     or a log; a browser signs in with a one-time code (`server.app.SignIn`). 0.52–0.54 kept it in `host-key` and printed
-    it in an address, so that key is replaced."""
-    (state_dir() / 'host-key').unlink(missing_ok=True)
+    it in an address, so that key is replaced; it is kept only for stopping a host of theirs still running
+    (`legacy_host_key`)."""
     path = state_dir() / 'host.key'
     try:
         key = path.read_text(encoding='ascii').strip()
         if re.fullmatch(r'[0-9a-f]{64}', key):
+            if os.name == 'nt' and path not in _kept_private:
+                keep_private(path)  # one 0.54.1–0.55.0 made, which took the library folder's permissions
             return key
     except (OSError, UnicodeDecodeError):
         pass
@@ -62,10 +65,55 @@ def host_key():
     key = secrets.token_hex(32)
     partial = path.with_name(f'host.key.{os.getpid()}.partial')
     descriptor = os.open(partial, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    keep_private(partial)  # before the key is in it; the replace keeps its permissions
     with os.fdopen(descriptor, 'w', encoding='ascii') as out:
         out.write(key)
     os.replace(partial, path)
+    _kept_private.add(path)
     return key
+
+
+_kept_private = set()
+_sid = []
+
+
+def keep_private(path):
+    """Let only this user's account read or change a file. On Windows, POSIX modes set no permissions, so the file
+    would take the library folder's, which can let every account on the computer read it: its own entries are reset,
+    the inherited ones removed and this user alone granted full control (`icacls`, with the account's SID from
+    `whoami`). A failure is logged, never raised: the host still starts."""
+    if os.name != 'nt':
+        os.chmod(path, 0o600)
+        return
+    try:
+        if not _sid:
+            listed = subprocess.run(['whoami', '/user', '/fo', 'csv', '/nh'], capture_output=True, timeout=30, check=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW).stdout.decode('ascii', 'replace')
+            found = re.search(r'S-1-\d+(?:-\d+)+', listed)
+            if not found:
+                raise ValueError(f'no SID in {listed!r}')
+            _sid.append(found.group())
+        # /grant:r replaces only this user's entry, so first drop entries set on the file itself (SYSTEM, say).
+        for change in (['/reset'], ['/inheritance:r', '/grant:r', f'*{_sid[0]}:F']):
+            subprocess.run(['icacls', str(path), *change], capture_output=True, timeout=30, check=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        _kept_private.add(Path(path))
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        log.warning('Could not limit %s to this user: %s', path, getattr(exc, 'stderr', None) or exc)
+
+
+def legacy_host_key():
+    """The key 0.52–0.54.0 kept in `host-key`, which a host of theirs still running takes to stop; None without one."""
+    try:
+        key = (state_dir() / 'host-key').read_text(encoding='ascii').strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return key if re.fullmatch(r'[0-9a-f]{64}', key) else None
+
+
+def forget_legacy_host_key():
+    """Delete that key once no host of those versions runs: it was printed in addresses, so it may be in a browser's history."""
+    (state_dir() / 'host-key').unlink(missing_ok=True)
 
 
 def acquire_lease(workspace):

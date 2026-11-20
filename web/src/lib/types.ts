@@ -162,6 +162,9 @@ export type Task = {
   origin: 'source' | 'self_created' | 'review' | 'chapter_quiz';
   tests_concept_ids?: string[];
   set_id?: string;
+  /** A drill session's question: the session and the teacher turn that asked it (ADR 0025). */
+  session_id?: string;
+  drill_turn_id?: string;
   /** A review question is answered in writing (`apply`) or by choosing one of `options` (`recall`), recorded in `answer`. */
   kind?: 'apply' | 'recall';
   idea?: string;
@@ -295,6 +298,33 @@ export type State = {
   key_points: SectionKeyPoints[];
   chapter_sheets: ChapterSheet[];
   mistakes: Mistake[];
+  drills: DrillSession[];
+};
+
+/**
+ * A drill session (ADR 0025): a back-and-forth with the fast teacher over a scope, kept and reopened at will. Its
+ * questions are review tasks with `session_id`; nothing in it is ever finished or due.
+ */
+export type DrillSession = {
+  id: string;
+  kind: 'drill' | 'chapter' | 'warm_up';
+  scope?: { chapter_ids?: string[]; concept_ids?: string[] };
+  chapter_id?: string;
+  concept_id?: string;
+  created_at: number;
+  updated_at?: number;
+  turn_ids: string[];
+  messages?: Record<string, string>;
+  sections: string[];
+  task_ids: string[];
+};
+
+export type DrillStart = {
+  kind?: DrillSession['kind'];
+  scope?: { chapter_ids?: string[]; concept_ids?: string[] };
+  chapter_id?: string;
+  concept_id?: string;
+  message?: string;
 };
 
 /**

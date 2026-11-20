@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.60.0
+
+- **Drill sessions replace review sets.** In Review, **Drill me** starts a quick back-and-forth with a fast teacher on what you chose to review. It asks a few questions at a time, mostly on what you missed before and what you haven't practised for a while, and you answer them right there. Ask for **More questions**, ask about an answer, or say what to drill next. Nothing to finish and nothing due: a session is kept under **Earlier sessions**, and you can pick it up again whenever you like. Your answers count just as before, and misses go into your mistakes book.
+- **Drill this chapter** on the chapter page replaces the chapter quiz. It starts with one or two exercises from the chapter you've done before, then asks new ones. Your earlier quizzes stay on the chapter page.
+- **The warm-up** before a section is now a short drill on what the section builds on, right on the section page.
+- **Test me on this** under a key point, and **Try it again** under a mistake, start a drill on just that.
+- Review sets you already have stay in Review, under **Review sets from before**. Codex in Studio no longer writes review sets: when you ask it to help you review, it points you to Review.
+
 ## 0.59.0
 
 - **The Review page is now a place with several ways to review.** It opens on your key points, and the mistakes book is one tab away. Questions sit beside them on a wide window.

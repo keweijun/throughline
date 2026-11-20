@@ -10,9 +10,9 @@ const MATH = /(```[\s\S]*?```|`[^`\n]*`)|(\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|
 const CITATION = /\[(?:Source|来源)\s+([^\s/\]]+)\s*\/\s*([^\]\s]+)\]/g;
 // Structured blocks a teacher reply ends with; the host reads them and the learner never sees them.
 const DECISION = /<teaching-decision>[\s\S]*$|\s*<lesson-step>[\s\S]*$/;
-// The teacher's course memory note (ADR 0010), suggested course change and key points (ADR 0024), wherever they are and
-// while they are still streaming.
-const MEMORY = /\s*<(course-memory|course-change|key-points)>[\s\S]*?(<\/\1>|$)/g;
+// The teacher's course memory note (ADR 0010), suggested course change, key points (ADR 0024) and a drill's questions
+// (ADR 0025), wherever they are and while they are still streaming.
+const MEMORY = /\s*<(course-memory|course-change|key-points|drill-questions)>[\s\S]*?(<\/\1>|$)/g;
 // DOMPurify's own rule for link targets, which also lets through the file links Codex writes (`file:` URLs and Windows
 // drive paths); every link but a web link is taken apart after sanitizing, so none stays a link the browser follows.
 const URI = /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|file):|[a-z]:[\\/]|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i;

@@ -88,6 +88,7 @@ class Host:
         from .builds import ChapterBuilds
         from .review import Review
         from .key_points import KeyPoints
+        from .drills import Drills
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
@@ -119,9 +120,10 @@ class Host:
         self.course_changes = CourseChanges(self)
         self.memory = Memory(self)
         self.key_points = KeyPoints(self)
+        self.drills = Drills(self)
         # Order matters: prompt additions are appended, and completions handled, in this order; memory goes last, after
         # practice has recorded the interactions a note cites. Key points follow navigation, which records a step's plan.
-        self.features = (self.navigation, self.key_points, self.questions, self.practice, self.preparation, self.builds, self.course_changes, self.memory)
+        self.features = (self.navigation, self.key_points, self.questions, self.practice, self.drills, self.preparation, self.builds, self.course_changes, self.memory)
         self.questions.recover()
         self.navigation.recover()
         self.memory.recover()
@@ -134,8 +136,9 @@ class Host:
 
     def runner_for(self, turn):
         # Preparation and memory work are background work, so they run on the small model when one is chosen; a
-        # chapter build needs the teacher.
-        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
+        # chapter build needs the teacher. A drill is quick by design (ADR 0025): its turns and the assessment of its
+        # answers run on the small model too.
+        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL or self.drills.fast(turn))
 
     def operation(self, request):
         if self._pending:
@@ -253,6 +256,8 @@ class Host:
             return self.memory.consolidation_prompt(turn)
         if turn['channel'] == 'memory':
             return self.memory.request_prompt(turn)
+        if turn['channel'] == 'drill':
+            return self.drills.job_prompt(turn)  # its own rules and the scope's data, not a lesson's
         if turn['channel'] in ('key_points', 'chapter_sheet'):
             return self.key_points.job_prompt(turn)  # background work: the teaching additions do not apply
         prompt = prompts.base(turn)

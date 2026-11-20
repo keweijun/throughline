@@ -4,25 +4,21 @@
   import { markdown } from '../lib/markdown';
   import { locale } from '../lib/i18n.svelte';
   import { scopeSections, storeScope, storedScope, type ReviewScope as Scope } from '../lib/scope.svelte';
-  import type { KeyPoint, Mistake } from '../lib/types';
+  import type { DrillSession as Session, KeyPoint, Mistake } from '../lib/types';
   import Composer from './Composer.svelte';
+  import DrillSession from './DrillSession.svelte';
   import ReviewSet from './ReviewSet.svelte';
   import ReviewScope from './ReviewScope.svelte';
   import KeyPoints from './KeyPoints.svelte';
   import MistakesBook from './MistakesBook.svelte';
 
-  // The Review place (issue #219): ways of reviewing over one scope. Key points and the mistakes book are read at once,
-  // with no model turn; questions are asked for beside them. Nothing comes due (ADR 0014).
+  // The Review place (issue #219, ADR 0025): ways of reviewing over one scope. Key points and the mistakes book are read
+  // at once, with no model turn; a drill session with the fast teacher runs beside them. Nothing comes due.
   const review = $derived(app.state?.review);
-  const jobs = $derived(review?.jobs ?? []);
-  // A set with no questions is shown while they are written or after writing failed, until it is closed.
-  const shown = $derived(
-    (review?.sets ?? []).filter((s) => s.task_ids.length || (!s.closed_at && jobs.some((j) => j.set_id === s.id))),
-  );
-  // A set stays current, so its last feedback can be read, until it is closed or a day old once answered.
-  const now = Date.now() / 1000;
-  const current = $derived(shown.filter((s) => !s.closed_at && (s.open || !s.task_ids.length || now - s.created_at < 86400)));
-  const earlier = $derived(shown.filter((s) => !current.includes(s)));
+  // Review sets written before drill sessions stay to read.
+  const shown = $derived((review?.sets ?? []).filter((s) => s.task_ids.length));
+  const sessions = $derived(app.state?.drills ?? []);
+  const open = $derived(sessions.find((s) => s.id === app.drillOpen));
 
   // The scope the learner last chose in this course; everything studied until they choose.
   let scope = $state<Scope>(storedScope());
@@ -54,29 +50,39 @@
   const request = $derived(app.drafts.get(draftKey));
   let busy = $state(false);
 
-  async function ask(body: Parameters<typeof app.askReview>[0] = {}) {
+  async function drill(body: Parameters<typeof app.startDrill>[0] = {}) {
     if (busy) return;
     busy = true;
-    const result = await app.askReview(body);
+    const result = await app.startDrill(body);
     busy = false;
     return result;
   }
 
-  async function askFor() {
+  async function drillFor() {
     const sent = request;
-    if (!(await ask({ ...(sent.trim() ? { request: sent } : {}), ...(scoped ? { scope: scoped } : {}) }))) return;
+    if (!(await drill({ ...(sent.trim() ? { message: sent } : {}), ...(scoped ? { scope: scoped } : {}) }))) return;
     if (app.drafts.get(draftKey) === sent) app.drafts.set(draftKey, '');
   }
 
-  // A point or a mistake asks for questions on just that, in its section.
+  // A point or a mistake starts a session on just that, in its section.
   function test(point: KeyPoint, conceptId: string) {
-    void ask({ request: t("Test me on this key point, in a new situation: {point}", { point: point.statement }), scope: { concept_ids: [conceptId] } });
+    void drill({ message: t("Test me on this key point, in a new situation: {point}", { point: point.statement }), scope: { concept_ids: [conceptId] } });
   }
 
   function retry(entry: Mistake) {
     const what = entry.idea || entry.part || entry.question;
-    void ask({ request: t("I got this wrong before. Ask me about it again, in a new situation: {what}", { what }), scope: { concept_ids: entry.concept_ids } });
+    void drill({ message: t("I got this wrong before. Ask me about it again, in a new situation: {what}", { what }), scope: { concept_ids: entry.concept_ids } });
   }
+
+  const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
+  const chapterTitle = (id?: string) => app.chapters.find((c) => c.id === id)?.title ?? id ?? '';
+  function label(session: Session) {
+    if (session.kind === 'chapter') return t("Chapter drill · {chapter}", { chapter: chapterTitle(session.chapter_id) });
+    if (session.kind === 'warm_up') return t("Warm-up before {section}", { section: titles([session.concept_id!]) });
+    const scope = [...(session.scope?.chapter_ids ?? []).map(chapterTitle), titles(session.scope?.concept_ids)].filter(Boolean).join(', ');
+    return scope || t("Everything studied");
+  }
+  const when = (at: number) => new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(at * 1000));
 </script>
 
 {#if review}
@@ -87,7 +93,7 @@
       {#if review.reviewable || sections.length}<ReviewScope value={scope} onchange={setScope} />{/if}
     </header>
 
-    {#if !review.reviewable && !sections.length && !shown.length}
+    {#if !review.reviewable && !sections.length && !shown.length && !sessions.length}
       <section class="empty">
         <h2>{t("Nothing to review yet")}</h2>
         <p>{t("Once you have studied a section, you can review it here.")}</p>
@@ -126,40 +132,56 @@
           {/if}
         </div>
 
-        <aside class="session" aria-labelledby="ask-title">
-          <section class="ask">
-            <h2 id="ask-title">{t("Review questions")}</h2>
-            <button class="btn btn-primary" disabled={busy || !review.reviewable} onclick={() => ask(scoped ? { scope: scoped } : {})}>{t("Review for me")}</button>
-            {#snippet header()}{t("Or say what to review · the teacher writes questions on what you have studied")}{/snippet}
-            <Composer
-              id="review-request"
-              value={request}
-              onvalue={(value) => app.drafts.set(draftKey, value)}
-              label={t("What to review")}
-              placeholder={t("For example: the variational method, but not the derivations")}
-              submitLabel={t("Ask for questions")}
-              disabled={busy}
-              allowEmpty={!!scoped}
-              onsubmit={askFor}
-              {header}
-              preview={false}
-            />
-          </section>
-          {#if current.length}
-            <section class="sets" aria-labelledby="open-title">
-              <h2 id="open-title">{t("Current")}</h2>
-              {#each current as value (value.id)}
-                <ReviewSet {value} />
-              {/each}
+        <aside class="session" aria-labelledby="drill-title">
+          {#if open}
+            <header class="session-head">
+              <button class="link" onclick={() => (app.drillOpen = null)}>{t("← All sessions")}</button>
+              <h2 id="drill-title">{label(open)}</h2>
+              <p class="meta">{when(open.created_at)}</p>
+            </header>
+            <DrillSession session={open} />
+          {:else}
+            <section class="ask">
+              <h2 id="drill-title">{t("Drill")}</h2>
+              <p class="note">{t("A quick teacher asks you questions on what this covers: what you missed before, and what you have not practised for a while. Stop whenever you like.")}</p>
+              <button class="btn btn-primary" disabled={busy || !review.reviewable} onclick={() => drill(scoped ? { scope: scoped } : {})}>{t("Drill me")}</button>
+              {#snippet header()}{t("Or say what to drill")}{/snippet}
+              <Composer
+                id="review-request"
+                value={request}
+                onvalue={(value) => app.drafts.set(draftKey, value)}
+                label={t("What to review")}
+                placeholder={t("For example: the variational method, but not the derivations")}
+                submitLabel={t("Start")}
+                disabled={busy || !review.reviewable}
+                onsubmit={drillFor}
+                {header}
+                preview={false}
+              />
             </section>
-          {/if}
-          {#if earlier.length}
-            <section class="sets" aria-labelledby="earlier-title">
-              <h2 id="earlier-title">{t("Earlier")}</h2>
-              {#each earlier as value (value.id)}
-                <ReviewSet {value} collapsed />
-              {/each}
-            </section>
+            {#if sessions.length}
+              <section class="sessions" aria-labelledby="sessions-title">
+                <h2 id="sessions-title">{t("Earlier sessions")}</h2>
+                <ul>
+                  {#each sessions as session (session.id)}
+                    <li>
+                      <button class="open-session" onclick={() => (app.drillOpen = session.id)}>
+                        <span class="title">{label(session)}</span>
+                        <span class="meta">{when(session.updated_at ?? session.created_at)}{#if session.task_ids.length} · {session.task_ids.length === 1 ? t("1 question") : t("{count} questions", { count: session.task_ids.length })}{/if}</span>
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/if}
+            {#if shown.length}
+              <details class="sets">
+                <summary>{t("Review sets from before")}</summary>
+                {#each shown as value (value.id)}
+                  <ReviewSet {value} collapsed />
+                {/each}
+              </details>
+            {/if}
           {/if}
         </aside>
       </div>
@@ -170,7 +192,7 @@
 <style>
   /* A place of its own, like the Overview: wide enough for the reference and the questions side by side. */
   .place {
-    max-width: calc(var(--measure) + 28rem);
+    max-width: calc(var(--measure) + 34rem);
     margin-inline: auto;
     display: grid;
     gap: 2rem;
@@ -214,7 +236,7 @@
 
   @container (min-width: 62rem) {
     .columns {
-      grid-template-columns: minmax(0, var(--measure)) minmax(22rem, 1fr);
+      grid-template-columns: minmax(0, var(--measure)) minmax(24rem, 1fr);
       align-items: start;
     }
 
@@ -282,6 +304,66 @@
   .sets {
     display: grid;
     gap: 1.5rem;
+  }
+
+  .sets > summary {
+    font-size: var(--step--1);
+    color: var(--pencil);
+    cursor: pointer;
+  }
+
+  .session-head {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .session-head h2 {
+    color: var(--ink);
+  }
+
+  .meta {
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .link {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+
+  .sessions ul {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .open-session {
+    display: grid;
+    gap: 0.15rem;
+    width: 100%;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--raised);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .open-session:hover {
+    border-color: var(--accent);
+  }
+
+  .open-session .title {
+    font-weight: 600;
   }
 
   .note {

@@ -174,10 +174,19 @@ class ReviewScope(Body):
     concept_ids: list[str] = []
 
 
-class ReviewSetRequest(Body):
-    request: Optional[str] = None
+class DrillRequest(Body):
+    id: Optional[str] = None
+    kind: Optional[Literal['drill', 'chapter', 'warm_up']] = None
     scope: Optional[ReviewScope] = None
-    warm_up_for: Optional[str] = None
+    chapter_id: Optional[str] = None
+    concept_id: Optional[str] = None
+    message: Optional[str] = None
+    turn_id: Optional[str] = None
+
+
+class DrillMessage(Body):
+    message: Optional[str] = None
+    turn_id: Optional[str] = None
 
 
 class RecallAnswer(Body):
@@ -749,15 +758,16 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def review_state():
         return host.review.state()
 
-    @app.post('/api/review/sets')
-    def ask_for_review(body: ReviewSetRequest):
-        scope = {k: v for k, v in body.scope.model_dump().items() if v} if body.scope else None
-        result = host.review.ask(body.request, scope or None, body.warm_up_for)
-        return {**result, 'turn': turn_summary(result['turn'])} if 'turn' in result else result
+    @app.post('/api/drills')
+    def start_drill(body: DrillRequest):
+        request = body.model_dump(exclude_none=True)
+        if body.scope:
+            request['scope'] = {k: v for k, v in body.scope.model_dump().items() if v}
+        return host.drills.start(request)
 
-    @app.post('/api/review/sets/{set_id}/close')
-    def close_review_set(set_id: str):
-        return host.review.close(set_id)
+    @app.post('/api/drills/{session_id}/messages')
+    def drill_message(session_id: str, body: DrillMessage):
+        return host.drills.send(session_id, body.message, body.turn_id)
 
     @app.post('/api/review/tasks/{task_id}/answer')
     def answer_recall(task_id: str, body: RecallAnswer):
@@ -782,11 +792,6 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/chapters/{chapter_id}/build')
     def build_chapter(chapter_id: str):
         return host.builds.request(chapter_id)
-
-    @app.post('/api/chapters/{chapter_id}/quiz')
-    def chapter_quiz(chapter_id: str):
-        result = host.practice.quiz(chapter_id)
-        return {**result, 'turn': turn_summary(result['turn'])}
 
     @app.post('/api/preparation/retry')
     def retry_preparation():

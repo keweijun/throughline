@@ -50,7 +50,7 @@
 
 {#if endsChapter && chapter && studied}
   <p class="chapter-end">
-    <button class="link" onclick={() => app.viewChapter(chapter.id)}>{t("End of chapter: key points and quiz →")}</button>
+    <button class="link" onclick={() => app.viewChapter(chapter.id)}>{t("End of chapter: key points and drill →")}</button>
   </p>
 {/if}
 

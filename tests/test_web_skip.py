@@ -6,7 +6,7 @@ from pathlib import Path
 
 from guided_learning.api import execute
 from support import host_client, settle
-from test_web_review import Runner
+from test_web_drills import Runner
 
 
 class SkipCourse(unittest.TestCase):
@@ -65,23 +65,6 @@ class SkipFlow(SkipCourse):
         task = self.exercise()
         self.post(f'/api/practice/tasks/{task["id"]}/skip', {'reason': 'boring'}, status=409)
         self.assertEqual(self.task(task['id'])['status'], 'pending')
-
-    def test_review_and_quiz_questions_cannot_be_skipped(self):
-        self.runner.quiz_tests = [['a'], ['a']]  # only a is studied here
-        task = self.exercise()
-        self.runner.outcome = 'passed'
-        self.post(f'/api/practice/tasks/{task["id"]}/assess', {'answer': 'My reasoning.'})
-        self.settle()
-        self.host.review.ahead = False
-        self.post('/api/review/sets', {})
-        self.settle()
-        review = next(t for t in self.host.practice.state()['tasks'] if t['origin'] == 'review')
-        self.post(f'/api/practice/tasks/{review["id"]}/skip', {}, status=409)
-        self.post('/api/chapters/one/quiz')
-        self.settle()
-        quiz = next(t for t in self.host.practice.state()['tasks'] if t['origin'] == 'chapter_quiz')
-        self.post(f'/api/practice/tasks/{quiz["id"]}/skip', {}, status=409)
-        self.assertEqual(self.task(quiz['id'])['status'], 'pending')
 
 
 class TwoExercises(Runner):

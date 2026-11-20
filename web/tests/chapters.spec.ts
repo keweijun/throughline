@@ -37,7 +37,7 @@ test('a lesson ends with its key points, which the chapter page gathers into a s
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.getByRole('region', { name: 'Key points' })).toContainText('A sum of states is again a state');
   await expect(page.getByText('Next chapter: Measurement')).toBeVisible();
-  await page.getByRole('button', { name: 'End of chapter: key points and quiz →' }).click();
+  await page.getByRole('button', { name: 'End of chapter: key points and drill →' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
 
   const sheet = page.getByRole('region', { name: 'Key points' });

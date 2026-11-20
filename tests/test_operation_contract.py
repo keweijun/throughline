@@ -299,29 +299,6 @@ class Results(Contract):
         kept = self.op('practice.revise', id=exercise['id'], question='Reworded', parts=['(a) again', '(b) again'])['task']
         self.assertEqual((kept['history'], kept['status']), (exercise['history'], 'attempted'), 'answers and help stay')
 
-    def test_review(self):
-        sets = self.op('review.sets')['sets']
-        self.assertEqual({s['kind'] for s in sets}, {'for_me', 'chapter_quiz'})
-        for item in sets:
-            self.assertFields(item, ('id', 'kind', 'created_at', 'task_ids', 'answered', 'right', 'open'), 'a review set')
-        context = self.op('review.context')
-        self.assertFields(context, ('sections', 'earlier'))
-        self.assertEqual([s['id'] for s in context['sections']], ['paths', 'states'], 'the studied sections')
-        for section in context['sections']:
-            self.assertFields(section, ('id', 'title', 'days_since_practised', 'recent_misses', 'set_aside'), 'a section')
-        self.assertFields(context['earlier'][0], ('question', 'sections', 'outcome'))
-        written = self.op('review.write', id='exam-1', request='20 minutes before the test', scope={'chapter_ids': ['superposition']}, note='Leaves out measurement',
-                          questions=[{'kind': 'apply', 'question': 'Three paths: when is it dark?', 'parts': ['(a)', '(b)'], 'tests_concept_ids': ['paths', 'states']},
-                                     {'kind': 'recall', 'question': 'Does a global phase matter?', 'idea': 'global phase', 'tests_concept_ids': ['states'],
-                                      'options': [{'text': 'No', 'explanation': 'Squared magnitudes.'}, {'text': 'Yes', 'explanation': 'A slip.'}], 'correct': 0}])
-        self.assertFields(written, ('set', 'task_ids'))
-        self.assertEqual(written['task_ids'], ['exam-1:0', 'exam-1:1'])
-        self.assertEqual((written['set']['id'], written['set']['request']), ('exam-1', '20 minutes before the test'))
-        listed = next(s for s in self.op('review.sets')['sets'] if s['id'] == 'exam-1')
-        self.assertEqual(listed['task_ids'], ['exam-1:0', 'exam-1:1'], 'the app lists the set at once')
-        tasks = {t['id']: t for t in self.op('practice.list')['tasks']}
-        self.assertEqual((tasks['exam-1:0']['kind'], tasks['exam-1:1']['kind']), ('apply', 'recall'))
-
 
 class Errors(Contract):
     """Each error code the references name, triggered the way they describe."""
@@ -374,14 +351,6 @@ class Errors(Contract):
         answered = next(t for t in self.op('practice.list')['tasks'] if t['concept_id'] == 'paths' and t['origin'] == 'self_created')
         self.refused('exercise_answered', 'practice.revise', id=answered['id'], parts=['(a) only one part now'])
         self.refused('exercise_answered', 'practice.retire', id=answered['id'], reason='Duplicate')
-
-    def test_review_errors(self):
-        apply = {'kind': 'apply', 'question': 'Three paths: when is it dark?', 'tests_concept_ids': ['paths']}
-        self.refused('nothing_to_review', 'review.write', id='exam-1', request='Measurement only', scope={'chapter_ids': ['measurement']},
-                     questions=[{**apply, 'tests_concept_ids': ['outcomes']}])
-        self.refused('invalid_review_question', 'review.write', id='exam-2', request='r', questions=[
-            apply, {'kind': 'recall', 'question': 'One option?', 'tests_concept_ids': ['paths'], 'options': [{'text': 'Yes', 'explanation': 'Only one.'}], 'correct': 0}])
-        self.refused('invalid_review_question', 'review.write', id='exam-3', request='r', questions=[apply] * 9)
 
     def test_unknown_widget(self):
         self.refused('unknown_widget', 'widgets.save', ids=['plot', 'sparkles'])

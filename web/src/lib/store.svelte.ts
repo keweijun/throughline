@@ -5,7 +5,7 @@ import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DrillStart, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
@@ -182,6 +182,8 @@ class AppStore {
   viewingChapter = $state<string | null>(null);
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
+  /** The drill session open in the Review place, if any (ADR 0025). */
+  drillOpen = $state<string | null>(null);
   /** The Course page replaces the reading column: the course as a whole (ADR 0017). The side panel never shows there:
    * the Overview has its own Sources, and Studio and the reader need the width. It comes back as it was in Learn. */
   courseOpen = $state(false);
@@ -1151,15 +1153,22 @@ class AppStore {
   }
 
   /** Ask for a review set (ADR 0014): nothing for Review for me, or a request and scope, or the section a warm-up comes before. */
-  askReview(body: { request?: string; scope?: { chapter_ids?: string[]; concept_ids?: string[] }; warm_up_for?: string } = {}) {
-    return this.act(() => api.post('/api/review/sets', body));
+  /** Starts a drill session (ADR 0025) and opens it in the Review place, unless `inline` keeps it where it was asked for. */
+  async startDrill(body: DrillStart = {}, inline = false) {
+    const id = `drill-${newId()}`;
+    const result = await this.act(() => api.post('/api/drills', { id, turn_id: `drill-turn-${newId()}`, ...body }));
+    if (result && !inline) {
+      this.drillOpen = id;
+      this.showReview();
+    }
+    return result;
   }
 
-  closeReviewSet(setId: string) {
-    return this.act(() => api.post(`/api/review/sets/${encodeURIComponent(setId)}/close`, {}));
+  /** The learner's next message in a drill session, or More questions without one. */
+  sendDrill(sessionId: string, message = '') {
+    return this.act(() => api.post(`/api/drills/${encodeURIComponent(sessionId)}/messages`, { message, turn_id: `drill-turn-${newId()}` }));
   }
 
-  /** A recall question's choice; its feedback was written with it, so nothing waits for the teacher. */
   answerRecall(taskId: string, choice: CheckChoice) {
     return this.act(() => api.post(`/api/review/tasks/${encodeURIComponent(taskId)}/answer`, { choice }));
   }
@@ -1194,9 +1203,7 @@ class AppStore {
   }
 
   /** The chapter quiz stays on the chapter page and never moves the learner's position. */
-  takeQuiz(chapterId: string) {
-    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/quiz`));
-  }
+
 
   buildChapter(chapterId: string) {
     return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/build`));

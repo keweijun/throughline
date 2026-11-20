@@ -11,7 +11,7 @@ from .widgets import selected as selected_widgets
 
 
 # Turn channels, in one place for the host and its features; web/src/lib/types.ts mirrors CHANNELS.
-LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')  # the learner's own requests
+LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice', 'drill')  # the learner's own requests
 # A lesson step written ahead while the learner reads the current one: hidden, and no teaching interaction, until
 # lesson.step reveals it as a mainline turn (ADR 0009).
 PREPARED_STEP = 'prepared_step'

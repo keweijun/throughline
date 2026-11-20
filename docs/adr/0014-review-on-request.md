@@ -1,5 +1,7 @@
 # Review on request
 
+> Review sets, the prepared set and the chapter quiz described below are replaced by drill sessions (ADR 0025); the review context, recall and apply questions, warm-ups (now short sessions) and the Review place and mistakes book sections still hold.
+
 ADR 0008 brought earlier material back with a fixed schedule: each section that had a passed exercise came due after 1, 3, 7, 21 and 60 days, the review page listed due sections, and **Review** in the top bar counted them. In use it worked against itself:
 
 - The page listed sections, not questions. After a few days away it showed a column of sections, which read as a backlog to clear rather than a few minutes of practice.
@@ -63,13 +65,13 @@ The chapter quiz becomes a review set scoped to the chapter, whose id is the qui
 Added with the review rework (issue #219). Review is a place with several ways of reviewing over one **scope**, since learners prefer different ones and none of them is a preference to set:
 
 - **Scope.** Everything studied (the default), or chapters or sections chosen in a picker. It is remembered per course in the learner's browser. A section counts as studied for review when it has a lesson, key points or practice of its own (`review.warm_ups` lists them as `sections`).
-- **Key points**, which the Review place opens on, so it is never empty once something is studied. For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** asks for questions on that point in its section.
-- **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** asks for a question on that idea again, in a new situation.
-- **Questions**: Review for me and a request, both narrowed to the scope, beside the other two when the page is wide enough and below them otherwise.
+- **Key points**, which the Review place opens on, so it is never empty once something is studied. For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** starts a drill session on that point in its section.
+- **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** starts a drill session on that idea, asked again in a new situation.
+- **Drill**: drill sessions over the scope (ADR 0025), beside the other two when the page is wide enough and below them otherwise.
 
 Like the Overview, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
 
-Reading key points and mistakes needs no model turn. Questions are review sets as described above until drill sessions replace them.
+Reading key points and mistakes needs no model turn. Questions come from drill sessions with a fast teacher (ADR 0025).
 
 ## Mistakes book
 

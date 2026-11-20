@@ -6,7 +6,7 @@
   import CodexLink from './CodexLink.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
   import ChapterSheet from './ChapterSheet.svelte';
-  import ChapterQuiz from './ChapterQuiz.svelte';
+  import ChapterDrill from './ChapterDrill.svelte';
   import Exercise from './Exercise.svelte';
 
   let { chapterId }: { chapterId: string } = $props();
@@ -151,9 +151,9 @@
 
       {#if app.chapterStudied(chapterId)}
         <ChapterSheet {chapter} />
-        <ChapterQuiz {chapter} />
+        <ChapterDrill {chapter} />
       {:else}
-        <p class="note">{t("Key points and a quiz on this chapter open once you have studied one of its sections.")}</p>
+        <p class="note">{t("Key points and a drill on this chapter open once you have studied one of its sections.")}</p>
       {/if}
 
       {#if isCurrent && following && app.chapterOf(following.id)?.id !== chapterId}

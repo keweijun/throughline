@@ -11,7 +11,7 @@
   import Practice from './Practice.svelte';
   import NextSection from './NextSection.svelte';
   import CodexLink from './CodexLink.svelte';
-  import ReviewSet from './ReviewSet.svelte';
+  import DrillSession from './DrillSession.svelte';
   import KeyPoints from './KeyPoints.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
@@ -31,9 +31,8 @@
   const current = $derived(lessons.filter((l) => !app.replaced(l)));
   // The warm-up on offer for this section (its stale prerequisites), or the one already taken while it is open.
   const warmUp = $derived(conceptId ? app.state?.review.warm_ups[conceptId] : undefined);
-  const warmUpSet = $derived(
-    (app.state?.review.sets ?? []).find((s) => s.kind === 'warm_up' && s.concept_id === conceptId && !s.closed_at && (s.open || !s.task_ids.length)),
-  );
+  // A warm-up is a short drill session (ADR 0025), shown here until the lesson starts.
+  const warmUpSession = $derived((app.state?.drills ?? []).find((s) => s.kind === 'warm_up' && s.concept_id === conceptId));
   const position = $derived(app.state?.position);
   // Key points (ADR 0024) end the lesson at the learner's position and open a finished section they come back to;
   // while a lesson is being taught, the points it will rewrite wait.
@@ -275,13 +274,13 @@
     <!-- While a stepped lesson has steps left, Continue under its latest step is the way on. -->
     {#if isCurrent && !lessons.length}
       <!-- A warm-up on prerequisites studied a while ago, offered once and never in the way of the lesson (ADR 0014). -->
-      {#if warmUpSet}
-        <ReviewSet value={warmUpSet} />
+      {#if warmUpSession}
+        <aside class="warm-up" aria-label={t("Warm-up")}><DrillSession session={warmUpSession} /></aside>
       {:else if warmUp}
         <aside class="warm-up" aria-label={t("Warm-up")}>
           <p>{t("This section builds on {sections}, which you have not practised for a while.", { sections: warmUp.map((id) => app.concept(id)?.title ?? id).join(', ') })}</p>
           <div class="previewing-actions">
-            <button class="btn btn-small btn-primary" onclick={() => app.askReview({ warm_up_for: conceptId })}>{t("Warm up on what this builds on")}</button>
+            <button class="btn btn-small btn-primary" onclick={() => app.startDrill({ kind: 'warm_up', concept_id: conceptId! }, true)}>{t("Warm up on what this builds on")}</button>
             <button class="btn btn-small btn-quiet" onclick={() => app.dismissWarmUp(conceptId)}>{t("No thanks")}</button>
           </div>
         </aside>

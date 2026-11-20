@@ -1,13 +1,12 @@
-# Exercises and review sets
+# Exercises, key points and review
 
-Use the same JSON entrypoint as [course operations](course-operations.md). The app's teacher writes a section's exercises and the review sets the learner asks for in the app. Use these operations when the learner asks you, in Studio or a Codex chat, to change what they practise in a course they are studying: put a problem set's questions in front of them, reword exercises (full text instead of a link, formulas in LaTeX, references added), remove duplicates, or review studied sections before an exam.
+Use the same JSON entrypoint as [course operations](course-operations.md). The app's teacher writes a section's exercises, its key points and the questions of a review. Use these operations when the learner asks you, in Studio or a Codex chat, to change what they practise in a course they are studying: put a problem set's questions in front of them, reword exercises (full text instead of a link, formulas in LaTeX, references added), remove duplicates, or change a section's key points.
 
 Never write streams, practice jobs or `practice.complete` yourself, and never use `practice.skip` for the learner: those belong to the app and its teacher, and a skip records that the learner closed the exercise.
 
 ## Read
 
 - `{"op":"practice.list"}` returns `tasks` and `jobs`. A section exercise has `id`, `concept_id`, `question`, optional `parts`, `origin` (`source` for one of the course's exercises, which names it in `exercise`; `self_created` for one written for the section), `source_refs`, `status` and `history` (the learner's answers, asks and help, with the assessed part statuses). Statuses: `pending`, `attempted`, `deferred` (the learner chose Do later), `skipped` (the learner closed it), and two kept only for the record, never shown: `replaced` (the learner asked the teacher for different exercises) and `retired` (below). Review and chapter-quiz questions have `origin` `review` or `chapter_quiz`.
-- `{"op":"review.sets"}` lists review sets; `{"op":"review.context"}` lists the studied sections a review may test, when each was last practised, recent misses and earlier review questions.
 
 ## Add exercises to a section
 
@@ -25,13 +24,9 @@ Never write streams, practice jobs or `practice.complete` yourself, and never us
 
 `{"op":"practice.retire","id":"ps3-stack:2","reason":"Duplicate of problem 2"}` takes an exercise out of its section when the learner never touched it (a duplicate, one added by mistake). It is kept for the record and never shown, counted or asked again. An exercise the learner worked on cannot be retired (`exercise_answered`): revise it, or tell the learner they can skip it.
 
-## Write a review set
+## Review before an exam
 
-When the learner asks to review what they studied (before an exam, a topic that feels shaky), write a review set rather than a document or a chapter: its misses then count for the sections each question tests and reach later reviews. `{"op":"review.write","id":"exam-1","request":"20 minutes before the 15 Nov test","scope":{"chapter_ids":["ch2"]},"questions":[…],"note":"…"}` saves the set with its questions in one step, and the app lists it on the review page at once.
-
-- `request` says what the learner asked for; `scope` (`chapter_ids`, `concept_ids`) is optional. A set may test only studied sections (`nothing_to_review` when none matches); read `review.context` first. Reviewing unstudied material is teaching: say in `note` what you left out and why, which the page shows with the set.
-- Each question names the sections it tests in `tests_concept_ids`, and usually connects more than one. An **apply** question (`"kind":"apply"`, the default) is answered in writing and assessed by part like an exercise: `{"kind":"apply","question":"…","parts"?:[…],"tests_concept_ids":["stack"]}`. A **recall** question is multiple choice with instant feedback: `{"kind":"recall","question":"…","idea":"…","options":[{"text":"…","explanation":"…"}],"correct":0,"tests_concept_ids":["stack"]}`, with 2 to 5 options, each explained. At most 8 questions; any invalid question rejects the whole set (`invalid_review_question`).
-- To practise sections not studied yet, add exercises to them instead.
+Review happens in the app's **Review** place, not in a document or a chapter you write. There the learner reads the key points of what they studied, goes over their mistakes book, and drills with a fast teacher whose questions count for the sections they test. The learner can narrow it to chapters or sections first. When the learner asks you to review ("20 minutes before tomorrow's test"), open the course and tell them where: Review, choose the chapters, then Drill me, saying what to focus on. To add a problem set's questions for them to practise, add exercises to their sections (above). A cheat sheet or summary they asked for is a file you write for them; it is not course material.
 
 ## Key points
 

@@ -251,7 +251,8 @@ def warm_ups(store, request):
     allowed = set(ordered)
     practised = last_practised(store)
     started = {t['concept_id'] for t in store.digest('streams', streaming.brief) if t['channel'] == 'mainline' and not t.get('chapter_id')}
-    done = {w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+    done = ({w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+            | {s['concept_id'] for s in store.list('drill_sessions') if s.get('kind') == 'warm_up'})
     offers = {}
     for concept in model['concepts']:
         cid = concept['id']

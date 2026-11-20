@@ -10,7 +10,7 @@ from ..streaming import PREPARED_STEP
 from .. import practice as practice_ops
 
 # Channels whose text a view shows: lessons and side-question answers. Other turns only report their status.
-SHOWN = ('mainline', 'sidequestion')
+SHOWN = ('mainline', 'sidequestion', 'drill')
 REF = ('source_id', 'revision', 'unit_id')
 CONCEPT = ('id', 'title', 'prerequisites', 'objective', 'goal')
 COVERAGE = REF + ('concept_ids', 'disposition', 'verification')
@@ -114,6 +114,7 @@ PARTS = {
     'builds': lambda host: {'builds': host.builds.state()},
     'key_points': lambda host: host.operation({'op': 'key_points.view'}),
     # Worked out from exercises, review answers and check answers on every load; nothing of it is stored.
+    'drills': lambda host: {'drills': host.drills.state()},
     'mistakes': lambda host: {'mistakes': host.operation({'op': 'mistakes.list'})['entries']},
 }
 # Parts a `changed` event may reload without the rest of the state.

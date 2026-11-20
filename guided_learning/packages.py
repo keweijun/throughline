@@ -39,7 +39,7 @@ NAMESPACES = {
     'interactions': 'everything', 'evidence': 'everything', 'evidence_deferred': 'everything', 'evidence_resolutions': 'everything',
     'sidequestions': 'everything', 'web_branches': 'everything', 'teaching': 'everything', 'deferred_explanations': 'everything',
     'checkpoint_receipts': 'everything', 'memory': 'everything', 'memory_notes': 'everything', 'memory_requests': 'everything',
-    'memory_consolidations': 'everything', 'derived_notes': 'everything', 'annotations': 'everything', 'review_sets': 'everything',
+    'memory_consolidations': 'everything', 'derived_notes': 'everything', 'annotations': 'everything', 'review_sets': 'everything', 'drill_sessions': 'everything',
     'review_postponements': 'everything', 'review_warm_ups': 'everything', 'course_change': 'everything',
     'practice_jobs': 'everything', 'preparation_jobs': 'everything', 'preparation_payloads': 'everything',
     'chapter_builds': 'everything', 'background_jobs': 'everything', 'background_receipts': 'everything',

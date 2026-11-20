@@ -10,7 +10,7 @@
    * pages that taught it. The learner cannot edit them; changing them is a request to Codex. With `section`, the list is
    * one section of a chapter sheet and names it instead of carrying a heading of its own.
    */
-  let { value, section = false }: { value: SectionKeyPoints; section?: boolean } = $props();
+  let { value, section = false, ontest }: { value: SectionKeyPoints; section?: boolean; ontest?: (point: KeyPoint) => void } = $props();
 
   const concept = $derived(app.concept(value.concept_id));
   const course = $derived(app.libraryCourse);
@@ -55,10 +55,11 @@
             {/if}
           </dl>
         {/if}
-        {#if where || point.source_refs.length}
+        {#if where || point.source_refs.length || ontest}
           <p class="taught">
             {#if where}<button class="link" onclick={() => app.showLesson(point.turn_id!)}>{where}</button>{/if}
             {#if point.source_refs.length}<span class="cited" use:markdown={md(cited(point), point)}></span>{/if}
+            {#if ontest}<button class="link test" onclick={() => ontest(point)}>{t("Test me on this")}</button>{/if}
           </p>
         {/if}
       </li>
@@ -175,5 +176,9 @@
 
   .link:hover {
     text-decoration: underline;
+  }
+
+  .test {
+    margin-left: auto;
   }
 </style>

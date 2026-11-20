@@ -383,6 +383,8 @@ export type ReviewSet = {
 export type ReviewState = {
   sets: ReviewSet[];
   reviewable: number;
+  /** The studied sections a review may cover, in route order. */
+  sections: string[];
   warm_ups: Record<string, string[]>;
   tasks: Task[];
   jobs: PracticeJob[];

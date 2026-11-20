@@ -25,7 +25,7 @@ class Review:
         return {'sets': [s for s in listed if s['id'] not in hidden],
                 'tasks': [t for t in practice['tasks'] if t['origin'] == 'review' and t.get('set_id') not in hidden],
                 'jobs': [j for j in practice['jobs'] if j.get('purpose') == 'review' and j.get('set_id') not in hidden],
-                'reviewable': offers['reviewable'], 'warm_ups': offers['warm_ups']}
+                'reviewable': offers['reviewable'], 'sections': offers['sections'], 'warm_ups': offers['warm_ups']}
 
     def _prepared(self):
         """The prepared set and whether its questions are still usable: written, or being written."""

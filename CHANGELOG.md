@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.59.0
+
+- **The Review page is now a place with several ways to review.** It opens on your key points, and the mistakes book is one tab away. Questions sit beside them on a wide window.
+- **Choose what to review**: everything you have studied, or only some chapters or sections. The key points, the mistakes and the questions you ask for all follow your choice, and Throughline remembers it for the course.
+- **Test me on this** under a key point, and **Try it again** under a mistake, ask the teacher for questions on just that.
+
 ## 0.58.0
 
 - **A mistakes book on the Review page.** It collects what you missed: exercise parts, chapter quiz and review questions, and ideas whose check questions you got wrong more than once. Each entry shows what you answered and the feedback, and links back to the question or lesson step. When you later get one right, it stays, marked with the date, under **Since got right**.

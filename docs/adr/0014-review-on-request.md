@@ -58,6 +58,19 @@ A missed apply part or a wrong recall answer offers **Revisit**, a side question
 
 The chapter quiz becomes a review set scoped to the chapter, whose id is the quiz's; its questions keep `origin: "chapter_quiz"` and name the set in `set_id`. **Take the chapter quiz** on the chapter page creates it, with the composition ADR 0008 defined (earlier exercises asked again, then new questions spanning the chapter's studied sections) and the rule that a new quiz waits until the questions of the last one are answered. It is listed on the chapter page and on the review page.
 
+## The Review place
+
+Added with the review rework (issue #219). Review is a place with several ways of reviewing over one **scope**, since learners prefer different ones and none of them is a preference to set:
+
+- **Scope.** Everything studied (the default), or chapters or sections chosen in a picker. It is remembered per course in the learner's browser. A section counts as studied for review when it has a lesson, key points or practice of its own (`review.warm_ups` lists them as `sections`).
+- **Key points**, which the Review place opens on, so it is never empty once something is studied. For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** asks for questions on that point in its section.
+- **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** asks for a question on that idea again, in a new situation.
+- **Questions**: Review for me and a request, both narrowed to the scope, beside the other two when the page is wide enough and below them otherwise.
+
+Like the Overview, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
+
+Reading key points and mistakes needs no model turn. Questions are review sets as described above until drill sessions replace them.
+
 ## Mistakes book
 
 Added with the review rework (issue #219). The Review page keeps a **mistakes book**: what the learner missed, with what they answered and the feedback or explanation, newest first. It is worked out from the course's records each time it is read (`mistakes.list`), never stored, so it needs no migration and always agrees with the exercises:

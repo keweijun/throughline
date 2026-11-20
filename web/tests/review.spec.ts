@@ -55,6 +55,7 @@ test('a wrong recall answer offers Revisit, a side question quoting it', async (
   await expect(page.getByRole('region', { name: 'Earlier' })).toContainText('1 of 2 answered · 0 right');
 
   // The miss goes into the mistakes book, with what was chosen and why it is wrong.
+  await page.getByRole('tab', { name: 'Mistakes' }).click();
   const book = page.getByRole('region', { name: 'Mistakes' });
   const entry = book.getByRole('listitem').first();
   await expect(entry).toContainText('Review question');
@@ -155,5 +156,33 @@ test('before anything is studied the review page says so', async ({ page, course
   await page.getByRole('button', { name: /^Review/ }).click();
   await expect(page.getByRole('heading', { name: 'Nothing to review yet' })).toBeVisible();
   await expect(page.getByText('Once you have studied a section')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the Review place opens on the key points of what it covers, remembers its scope, and asks about one point', async ({ page, course }) => {
+  const { base, errors } = await course('review_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  await expect(page.getByRole('tab', { name: 'Key points' })).toHaveAttribute('aria-selected', 'true');
+  const points = page.getByRole('tabpanel');
+  await expect(points).toContainText('changes no probability');
+  await expect(page.getByRole('button', { name: 'Everything studied' })).toHaveAttribute('aria-pressed', 'true');
+
+  // Narrowed to a section without key points, and still narrowed after a reload.
+  await page.getByRole('button', { name: 'Choose sections' }).click();
+  await page.getByRole('checkbox', { name: 'Superposition' }).check();
+  await expect(points).toContainText("Key points appear here once you finish a section's lesson.");
+  await page.reload();
+  await page.getByRole('button', { name: /^Review/ }).click();
+  await expect(page.getByRole('button', { name: 'Everything studied' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('tabpanel')).not.toContainText('changes no probability');
+  await page.getByRole('button', { name: 'Everything studied' }).click();
+  await expect(page.getByRole('tabpanel')).toContainText('changes no probability');
+
+  // A point asks for questions on itself, in its section.
+  await page.getByRole('button', { name: 'Test me on this' }).click();
+  await expect(page.getByRole('region', { name: /Test me on this key point/ })).toBeVisible();
+  const state = await (await page.request.get(base + '/api/state')).json();
+  const asked = state.review.sets.at(-1);
+  expect([asked.kind, asked.scope]).toEqual(['request', { concept_ids: ['state'] }]);
   expect(errors).toEqual([]);
 });

@@ -8,7 +8,7 @@
    * The mistakes book (issue #219): what the learner missed, newest first, each with what they answered and the feedback.
    * Nothing is counted or cleared: an entry they later got right stays, folded below with when.
    */
-  let { entries }: { entries: Mistake[] } = $props();
+  let { entries, onretry }: { entries: Mistake[]; onretry?: (entry: Mistake) => void } = $props();
 
   const open = $derived(entries.filter((e) => !e.right_at));
   const right = $derived(entries.filter((e) => e.right_at));
@@ -53,8 +53,11 @@
         {#if entry.why}<dt>{t("Why")}</dt><dd class="prose" use:markdown={md(entry.why)}></dd>{/if}
       </dl>
     {/if}
-    {#if linked(entry)}
-      <button class="link" onclick={() => go(entry)}>{entry.kind === 'check' ? t("Go to the lesson step") : t("Go to the question")}</button>
+    {#if linked(entry) || onretry}
+      <p class="actions">
+        {#if linked(entry)}<button class="link" onclick={() => go(entry)}>{entry.kind === 'check' ? t("Go to the lesson step") : t("Go to the question")}</button>{/if}
+        {#if onretry}<button class="link" onclick={() => onretry(entry)}>{t("Try it again")}</button>{/if}
+      </p>
     {/if}
   </li>
 {/snippet}
@@ -186,6 +189,12 @@
   .note {
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1rem;
   }
 
   .link {

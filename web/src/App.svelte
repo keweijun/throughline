@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t, locale, diagnostic } from './lib/i18n.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { app } from './lib/store.svelte';
   import { studio } from './lib/studio.svelte';
   import { panelCoversLesson } from './lib/media';
@@ -45,6 +45,31 @@
     app.drafts.set('studio:new', studio.handoff(handed.prompt));
     app.showStudio({ focus: true });
   }
+
+  // Going to the Overview and back returns Learn or Review to where the learner was on it. The stage is one scroller for
+  // every place, so without this the page came back at whatever offset the Overview had last been scrolled to.
+  const place = $derived(
+    app.libraryOpen ? 'library' : app.courseOpen ? 'overview' : app.reviewOpen ? 'review' : `learn:${app.viewingChapter ?? app.viewing ?? app.currentId}`,
+  );
+  let scrolled = { place: '', top: 0 };
+  let left: { place: string; top: number } | null = null;
+  let shown = '';
+  $effect(() => {
+    if (!stage) return;
+    const node = stage;
+    const keep = () => (scrolled = { place: untrack(() => place), top: node.scrollTop });
+    node.addEventListener('scroll', keep, { passive: true });
+    return () => node.removeEventListener('scroll', keep);
+  });
+  $effect(() => {
+    const now = place;
+    untrack(() => {
+      const before = shown;
+      shown = now;
+      if (now === 'overview' && before) left = { place: before, top: scrolled.place === before ? scrolled.top : 0 };
+      else if (before === 'overview' && left?.place === now) stage?.scrollTo({ top: left.top, behavior: 'instant' });
+    });
+  });
 
   // The route folds when the reading column has no room beside it (an open side panel, a narrow window), and is a
   // drawer on a phone. The stage is measured rather than queried in CSS so the rail, its capsule and the grid agree.

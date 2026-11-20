@@ -11,6 +11,7 @@
   import CourseShare from './CourseShare.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
+  import { MediaQuery } from 'svelte/reactivity';
 
   // The course as a whole (ADR 0017): changing it, what the teacher remembers, its sources and the learner's notes.
   // Everything here is about the course rather than the section being read, which keeps it out of the side panel.
@@ -52,9 +53,12 @@
 
   // Studio and an open document fill the window below the tabs, measured rather than guessed, since the header above
   // them is as tall as the course's goal and notices make it.
+  // Where the tabs stand in a column beside the content; the same width as the stylesheet's.
+  const wide = new MediaQuery('min-width: 70rem');
+
   let fill = $state(0);
   let head = $state<HTMLElement>();
-  let barHeight = $state(0);
+  let bar = $state<HTMLElement>();
   const reading = $derived(!!app.source || app.sourceLoading);
   const filling = $derived(app.coursePart === 'studio' ? studio.available !== false : app.coursePart === 'sources' && reading);
   const shownPart = () => document.getElementById(`course-${app.coursePart}`);
@@ -91,7 +95,8 @@
     const part = shownPart();
     if (grown !== null || !stage || !part || !filling) return;
     const gap = parseFloat(getComputedStyle(part.closest('.page')!).rowGap) || 0;
-    grown = Math.max(0, contentTop(part, stage) - barHeight - gap);
+    // Measured now: a bound height would still be the other layout's just after the window changes.
+    grown = Math.max(0, contentTop(part, stage) - (bar?.offsetHeight ?? 0) - gap);
     await tick();
     stage.scrollTo({ top: grown, behavior: 'instant' });
   }
@@ -99,7 +104,8 @@
   // A turn that starts by any other way than the box, such as a hand-off from a lesson, counts as working too.
   let grownFor: string | null = null;
   $effect(() => {
-    const at = app.courseOpen ? `${app.coursePart}:${filling}` : null;
+    // The layout counts too: the header steps aside only above the tab, so a window that changes layout starts again.
+    const at = app.courseOpen ? `${app.coursePart}:${filling}:${wide.current}` : null;
     const working = filling && (app.coursePart === 'sources' || studio.running);
     untrack(() => {
       if (at !== grownFor) grown = null;
@@ -110,7 +116,7 @@
 
   // One tab at a time at full height, so Studio has the room and nothing scrolls inside something else that scrolls.
   function onTabKey(event: KeyboardEvent) {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    const step = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : ['ArrowLeft', 'ArrowUp'].includes(event.key) ? -1 : 0;
     if (!step) return;
     event.preventDefault();
     const at = parts.findIndex((p) => p.id === app.coursePart);
@@ -121,6 +127,9 @@
 </script>
 
 <article class="page still" class:filling aria-labelledby="course-title" style:--fill="{fill}px" style:--grown={grown === null ? null : `${grown}px`}>
+  <!-- On a wide window the header and tabs are a column of their own beside the tab's content, so Studio and the reader
+       take the window's whole height; on a narrower one they stack above it and the header steps aside as they work. -->
+  <div class="side">
   <header class="head" bind:this={head}>
     <h1 id="course-title">{app.state?.course.title}</h1>
     {#if course?.goal}<p class="intro" title={course.goal}>{course.goal}</p>{/if}
@@ -145,7 +154,7 @@
           <li style:flex-grow={Math.max(segment.total, 1)}>
             <button
               class="segment"
-              class:current={current?.id === segment.id && !!segment.id}
+              class:current={current?.id === segment.id && !!segment.id && strip.length > 1}
               disabled={!segment.id}
               title={t('{title}: {studied} of {total} sections studied', { title: segment.title, studied: segment.done, total: segment.total })}
               aria-label={t('{title}: {studied} of {total} sections studied', { title: segment.title, studied: segment.done, total: segment.total })}
@@ -158,7 +167,13 @@
       </ol>
       <!-- Overall progress is in the top bar; here, where in the route you are and how much there is. -->
       <p class="facts">
-        {#if current}
+        {#if current && wide.current}
+          <!-- In the narrow column, which chapter and how far in it are a line each. -->
+          <span class="now">
+            {t('Chapter {number}', { number: currentNumber })} · {current.title}
+            <span class="count">{t('{studied} of {total} sections studied', { studied: currentDone, total: current.concept_ids.length })}</span>
+          </span>
+        {:else if current}
           <span class="now">
             {t('{title}: {studied} of {total} sections studied', {
               title: `${t('Chapter {number}', { number: currentNumber })} · ${current.title}`,
@@ -174,8 +189,8 @@
   </header>
 
   <!-- Outside the header, so the tabs stay pinned while the header scrolls away. -->
-  <div class="bar" bind:offsetHeight={barHeight}>
-    <div class="tabs" role="tablist" aria-label={t('This course')} tabindex="-1" onkeydown={onTabKey}>
+  <div class="bar" bind:this={bar}>
+    <div class="tabs" role="tablist" aria-label={t('This course')} aria-orientation={wide.current ? 'vertical' : 'horizontal'} tabindex="-1" onkeydown={onTabKey}>
       {#each parts as part (part.id)}
         <button
           id="course-tab-{part.id}"
@@ -190,6 +205,7 @@
         </button>
       {/each}
     </div>
+  </div>
   </div>
 
   <!-- Studio is course-level (ADR 0017): the first tab. Where Codex cannot run it, the hand-offs open a Codex chat
@@ -466,9 +482,19 @@
     container-type: inline-size;
   }
 
-  @container (min-width: 60rem) {
+  @container (min-width: 54rem) {
     .studio-row {
       grid-template-columns: minmax(0, 1fr) 17rem;
+    }
+
+    /* Beside Studio, the chats and how the learner is taught keep to the frame's height and scroll on their own, so a
+       long list never runs past the window's foot and drags the page with it. */
+    .studio-aside {
+      max-height: calc(var(--fill) + var(--grown, 0px));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 0.25rem;
+      scrollbar-width: thin;
     }
   }
 
@@ -480,13 +506,13 @@
   }
 
   /* Where the aside drops below Studio, the chats are Studio's own pinned bar instead; beside it, the bar steps aside. */
-  @container (max-width: 59.99rem) {
+  @container (max-width: 53.99rem) {
     .studio-aside :global(.chats) {
       display: none;
     }
   }
 
-  @container (min-width: 60rem) {
+  @container (min-width: 54rem) {
     .studio-main :global(.studio > .panel-head) {
       display: none;
     }
@@ -570,5 +596,95 @@
   /* A tab that comes into view fades in, as the side panel's views do. */
   .part:not([hidden]) {
     animation: enter-fade var(--quick) ease;
+  }
+
+  /* Stacked, the side column is no box of its own: the header scrolls away and the tabs stay pinned to the stage. */
+  .side {
+    display: contents;
+  }
+
+  /* A wide window: the course's header and its tabs as a column on the left, the open tab beside it from the top of the
+     page to the window's foot. Lists and forms stand at a reading width against the column rather than adrift in the
+     middle, and Studio and the reader have the height the header took. */
+  @media (min-width: 70rem) {
+    .page {
+      grid-template-columns: 14rem minmax(0, 1fr);
+      column-gap: 2.75rem;
+      align-items: start;
+    }
+
+    .side {
+      position: sticky;
+      top: 0;
+      display: grid;
+      gap: 1.5rem;
+      align-content: start;
+    }
+
+    .part {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    h1 {
+      font-size: var(--step-2);
+      line-height: 1.25;
+    }
+
+    .intro {
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      font-size: var(--step--1);
+    }
+
+    .glance {
+      gap: 0.6rem;
+    }
+
+    .facts .now {
+      display: grid;
+      flex-basis: 100%;
+      gap: 0.1rem;
+    }
+
+    .facts .count {
+      color: var(--pencil);
+      font-weight: 400;
+    }
+
+    .bar {
+      position: static;
+      margin-top: 0;
+      border-bottom: 0;
+      background: none;
+    }
+
+    .tabs {
+      flex-direction: column;
+      gap: 0.15rem;
+      width: 100%;
+    }
+
+    .tab {
+      justify-content: space-between;
+      margin: 0;
+      padding: 0.5rem 0.75rem;
+      border: 0;
+      border-radius: var(--radius);
+    }
+
+    .tab:hover {
+      background: var(--accent-wash);
+    }
+
+    .tab[aria-selected='true'] {
+      background: var(--accent-wash);
+      color: var(--accent);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .part.reading {
+      grid-template-columns: 15rem minmax(0, 1fr);
+    }
   }
 </style>

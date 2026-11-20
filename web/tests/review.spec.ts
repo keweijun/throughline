@@ -53,6 +53,14 @@ test('a wrong recall answer offers Revisit, a side question quoting it', async (
   // A set can be left with questions unanswered.
   await page.getByRole('button', { name: 'Done for now' }).click();
   await expect(page.getByRole('region', { name: 'Earlier' })).toContainText('1 of 2 answered · 0 right');
+
+  // The miss goes into the mistakes book, with what was chosen and why it is wrong.
+  const book = page.getByRole('region', { name: 'Mistakes' });
+  const entry = book.getByRole('listitem').first();
+  await expect(entry).toContainText('Review question');
+  await expect(entry).toContainText('multiplied by');
+  await expect(entry).toContainText('Yes, they all flip sign');
+  await expect(book.getByText('Since got right')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -113,6 +113,8 @@ PARTS = {
     'course_changes': lambda host: host.operation({'op': 'course_change.list'}),
     'builds': lambda host: {'builds': host.builds.state()},
     'key_points': lambda host: host.operation({'op': 'key_points.view'}),
+    # Worked out from exercises, review answers and check answers on every load; nothing of it is stored.
+    'mistakes': lambda host: {'mistakes': host.operation({'op': 'mistakes.list'})['entries']},
 }
 # Parts a `changed` event may reload without the rest of the state.
 ALONE = ('preparation', 'settings', 'builds', 'memory', 'key_points')

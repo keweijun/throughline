@@ -1176,6 +1176,15 @@ class AppStore {
     requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
+  /** Opens the page an exercise or quiz question is on and scrolls to it, as a mistake's link back to it. */
+  showTask(taskId: string) {
+    const task = this.state?.practice.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.chapter_id) this.viewChapter(task.chapter_id);
+    else this.view(task.concept_id);
+    void this.#scrollToTask(task.id, null);
+  }
+
   /** Opens the section a lesson belongs to and scrolls to it, as a key point's link back to where it was taught. */
   showLesson(turnId: string) {
     const turn = this.turn(turnId);

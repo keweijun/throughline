@@ -3,6 +3,7 @@
   import { app } from '../lib/store.svelte';
   import Composer from './Composer.svelte';
   import ReviewSet from './ReviewSet.svelte';
+  import MistakesBook from './MistakesBook.svelte';
 
   // Review on request (ADR 0014): nothing comes due; the learner asks for a set of questions whenever they like.
   const review = $derived(app.state?.review);
@@ -93,6 +94,7 @@
         </section>
       {/if}
 
+      <MistakesBook entries={app.state?.mistakes ?? []} />
       {#if earlier.length}
         <section class="sets" aria-labelledby="earlier-title">
           <h2 id="earlier-title">{t("Earlier")}</h2>

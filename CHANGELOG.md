@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.58.0
+
+- **A mistakes book on the Review page.** It collects what you missed: exercise parts, chapter quiz and review questions, and ideas whose check questions you got wrong more than once. Each entry shows what you answered and the feedback, and links back to the question or lesson step. When you later get one right, it stays, marked with the date, under **Since got right**.
+
 ## 0.57.0
 
 - **Key points.** Every section you study now ends with its key points: the results, rules and methods to hold from it. Each one says when it holds and gives a common mistake, often one you made, and links back to the lesson step and the page that taught it. They show at the end of the lesson and at the top of the section when you come back to it. Sections you studied before this update get their key points in the background while Throughline is idle.

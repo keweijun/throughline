@@ -79,6 +79,9 @@ _Avoid_: Chapter exam, mastery test, gate, the section's exercises.
 **Review**: Answering questions from memory about sections already studied, when the learner asks for it. There is no schedule and nothing comes due; the learner asks for a review set, and the teacher chooses what to test from the review context unless the learner says what (ADR 0014).
 _Avoid_: Revision of the course plan, reviewing source locations in Codex, a test that must be passed, a due list.
 
+**Mistakes book**: The learner's misses, collected on the Review page from what the course records: missed exercise, chapter-quiz and review parts, wrong recall answers, and ideas whose check questions were missed more than once. An entry the learner later gets right stays, marked with when; nothing is counted or cleared (ADR 0014).
+_Avoid_: Error log, to-do list, a single missed check question (a slip, not yet a mistake).
+
 **Review set**: The questions written for one review request ("Review for me", a learner's request, a warm-up or a chapter quiz). Its questions usually connect ideas from several studied sections and name the sections each part tests.
 _Avoid_: A list of sections to review, a quiz that must be finished.
 

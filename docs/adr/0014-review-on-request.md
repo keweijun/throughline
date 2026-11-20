@@ -58,6 +58,16 @@ A missed apply part or a wrong recall answer offers **Revisit**, a side question
 
 The chapter quiz becomes a review set scoped to the chapter, whose id is the quiz's; its questions keep `origin: "chapter_quiz"` and name the set in `set_id`. **Take the chapter quiz** on the chapter page creates it, with the composition ADR 0008 defined (earlier exercises asked again, then new questions spanning the chapter's studied sections) and the rule that a new quiz waits until the questions of the last one are answered. It is listed on the chapter page and on the review page.
 
+## Mistakes book
+
+Added with the review rework (issue #219). The Review page keeps a **mistakes book**: what the learner missed, with what they answered and the feedback or explanation, newest first. It is worked out from the course's records each time it is read (`mistakes.list`), never stored, so it needs no migration and always agrees with the exercises:
+
+- every exercise part assessed `partly_correct` or `not_yet`: a section's exercise, a chapter quiz question or a written review answer, with the answer and feedback of its latest miss;
+- every wrong or unsure recall answer;
+- an idea whose check questions were missed twice or more, the point at which course memory also records a difficulty (ADR 0010). A single missed check is a slip and stays out.
+
+An entry the learner later gets right stays, marked **Got right** with the date: a later assessment of the same part, or a later right recall or check answer on the same idea. A retry counts. Those entries fold under **Since got right**. Nothing is counted, cleared or due. An exercise, quiz question or check links back to where it was asked.
+
 ## What goes
 
 The schedule (`review.schedule` intervals, due sections, the daily cap), "Not now" (`review.postpone` and `review_postponements`), the count on **Review** in the top bar, and the `daily_reviews` preference with its Settings row. **Review** stays in the top bar as a plain entry (hidden on phone-width screens, where it used to show only when something was due). **Do later** remains a deferral: set-aside exercises are listed on their section and chapter pages, enter the review context, and are asked again by chapter quizzes.

@@ -294,6 +294,33 @@ export type State = {
   review: ReviewState;
   key_points: SectionKeyPoints[];
   chapter_sheets: ChapterSheet[];
+  mistakes: Mistake[];
+};
+
+/**
+ * An entry of the mistakes book, worked out from what the course records: a missed exercise, quiz or review part, a
+ * wrong recall answer, or an idea whose check questions were missed more than once. `right_at` is when the learner
+ * later got it right; the entry stays.
+ */
+export type Mistake = {
+  id: string;
+  kind: 'exercise' | 'quiz' | 'review' | 'check';
+  concept_id: string;
+  concept_ids: string[];
+  task_id?: string;
+  chapter_id?: string;
+  turn_id?: string;
+  question: string;
+  part?: string;
+  answer?: string;
+  feedback?: string;
+  idea?: string;
+  chosen?: string | null;
+  correct_answer?: string;
+  why?: string;
+  missed_at: number | null;
+  last_missed_at: number | null;
+  right_at: number | null;
 };
 
 /** One key point of a section (ADR 0024): what to hold from it, when it holds, the mistake to avoid, and where it was taught. */

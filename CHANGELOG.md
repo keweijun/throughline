@@ -5,6 +5,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 ## 0.56.0
 
 - **The Overview on a wide window** puts the course's title, progress and tabs in a column on the left. Studio and an open document start at the top of the page and reach the bottom of the window, and Sources, Your notes and Share sit beside the column instead of at the far left of an empty page. On a narrower window the header stays above the tabs, as before.
+- **New course** gives Studio the page: it is wider, the chat sits in one centred column as on the Overview, and the box reaches the bottom of the window.
 - **A long list of how you're taught** scrolls beside Studio rather than running past the bottom of the window, and its entries take less room.
 - **Going back to Learn from the Overview** returns you to where you were reading. Before, after opening a document on the Sources tab, Learn could come back scrolled to another place in the lesson.
 

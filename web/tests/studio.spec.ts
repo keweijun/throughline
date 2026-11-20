@@ -413,6 +413,16 @@ test("the library page has its own Studio for new courses; a course card's actio
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'New course', level: 1 })).toBeVisible();
   await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  // Studio takes the page: wider than the list of courses, its frame reaching just above the window's foot.
+  const frame = page.locator('.studio-part .frame');
+  expect((await frame.boundingBox())!.width).toBeGreaterThan(1000);
+  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('.studio-part .frame')!.getBoundingClientRect().bottom);
+  expect(await foot()).toBeGreaterThan(8);
+  expect(await foot()).toBeLessThan(32);
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await expect.poll(foot).toBeLessThan(32);
+  expect(await foot()).toBeGreaterThan(8);
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(box).toBeFocused();
   await box.pressSequentially('hello');
   await page.keyboard.press('Control+Enter');

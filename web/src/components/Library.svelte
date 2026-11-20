@@ -586,6 +586,38 @@
     background: var(--sheet);
   }
 
+  /* New course is a page for Studio: wider than the list of courses, and one window high, so the frame reaches the
+     window's foot with its writing box at the bottom whatever the window's height. */
+  .library.making {
+    display: flex;
+    flex-direction: column;
+    max-width: 76rem;
+    height: calc(100dvh - var(--topbar));
+    padding-bottom: 1.25rem;
+  }
+
+  .making .studio-part {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 22rem;
+  }
+
+  .making .studio-part .frame {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+
+  /* As on a course's Overview and in Codex: the chat in one centred column at a readable width, its box under it. */
+  .studio-part :global(.studio > .panel-head),
+  .studio-part :global(.studio > .transcript > *),
+  .studio-part :global(.studio > .panel-foot) {
+    width: 100%;
+    max-width: 50rem;
+    margin-inline: auto;
+  }
+
   /* The page's title already names it. */
   .studio-part :global(.studio > .panel-head > .panel-bar),
   .studio-part :global(.studio > .panel-head > .panel-intro) {

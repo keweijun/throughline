@@ -164,7 +164,7 @@
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen && !app.libraryOpen}>
+<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen || app.libraryOpen}>
   {#if app.signedOut}
     <main id="main" class="loading" role="alert">
       <h1 class="signed-out">{t('Open Throughline from its launcher')}</h1>
@@ -255,7 +255,7 @@
   }
 
   /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
-  /* The Overview sets its own widths: wide for Studio and the reader, a reading width for its lists. */
+  /* The Overview and the library set their own widths: wide for Studio and the reader, a reading width for lists. */
   .layout.overview {
     grid-template-columns: minmax(0, 1fr);
     max-width: none;

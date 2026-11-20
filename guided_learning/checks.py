@@ -18,7 +18,7 @@ PROBE = 'Reply with the single word OK.'
 
 def run(command, timeout=15):
     return subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout,
-                          stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                          env=codex.codex_env(command[0]), stdin=subprocess.DEVNULL, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
 
 
 def result(check, ok, detail='', **extra):

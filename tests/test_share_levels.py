@@ -3,6 +3,7 @@ exercises the sender's teacher wrote, revealed as they study, without the sender
 import json
 import sqlite3
 import tempfile
+import zipfile
 from pathlib import Path
 
 from guided_learning import packages
@@ -139,6 +140,45 @@ class SharedLessons(LessonHost):
         self.assertEqual(said['text'], 'Teach this section step by step, starting with the first step.',
                          "the recipient's reveal records the Start they pressed")
         self.assertEqual([k for (n, k) in records(course) if n in ('memory', 'memory_notes')], [], 'nothing of the sender reaches their memory')
+
+    def test_a_route_and_lessons_package_from_before_sharing_left_out_the_sender_is_made_safe_on_import(self):
+        # Throughline 0.54.0 and earlier kept the sender's lesson request and the teacher's notes about them.
+        package = Path(self.tmp.name) / 'old.throughline'
+        packages.export(self.root, package, 'lessons')
+        unpacked = Path(tempfile.mkdtemp(dir=self.tmp.name))
+        with zipfile.ZipFile(package) as archive:
+            archive.extractall(unpacked)
+        db = sqlite3.connect(unpacked / 'course.sqlite3')
+        request = 'Explain it for my resit on Friday, I failed it in June'
+        note = '\n<course-memory>{"kind": "difficulty", "text": "Failed this exam in June"}</course-memory>'
+        (lesson,), = db.execute("SELECT value FROM documents WHERE namespace='lessons' AND key='one'")
+        db.execute("UPDATE documents SET value=? WHERE namespace='lessons' AND key='one'", (json.dumps({**json.loads(lesson), 'request': request}),))
+        for key in (self.turn_id('one'), self.turn_id('two')):
+            (turn,), = db.execute("SELECT value FROM documents WHERE namespace='streams' AND key=?", (key,))
+            turn = json.loads(turn)
+            turn.update(prompt=request, text=turn['text'] + note, final_text=turn['final_text'] + note)
+            db.execute("UPDATE documents SET value=? WHERE namespace='streams' AND key=?", (json.dumps(turn), key))
+        db.commit()
+        db.close()
+        with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(unpacked.rglob('*')):
+                if path.is_file():
+                    archive.write(path, path.relative_to(unpacked).as_posix())
+
+        course = Path(packages.import_package(package, self.library)['path'])
+        kept = records(course)
+        everything = json.dumps(list(kept.values()), ensure_ascii=False)
+        for private in ('resit on Friday', 'Failed this exam', 'course-memory'):
+            self.assertNotIn(private, everything)
+        self.assertIn('Step one text.', everything, 'what the teacher wrote travels')
+        self.assertEqual([s.get('written') for s in kept[('lessons', 'one')]['steps']], [self.turn_id('one'), self.turn_id('two'), None])
+        self.client.__exit__(None, None, None)
+        self.client, self.host = host_client(course, runner=Runner(), port=8771)
+        self.client.__enter__()
+        self.post('/api/lessons', {'id': 'r1'})
+        said = records(course)[('interactions', 'stream-user:' + self.turn_id('one'))]
+        self.assertEqual(said['text'], 'Teach this section step by step, starting with the first step.',
+                         "the recipient's reveal records the Start they pressed, not the sender's request")
 
     def test_a_shared_course_shared_again_keeps_its_lessons(self):
         course = self.share('lessons')

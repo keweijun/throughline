@@ -12,7 +12,8 @@ import time
 import uuid
 from pathlib import Path
 
-from .api import MOVING, execute
+from .api import execute
+from .moving import MOVING, move_course, try_lock
 from .store import OperationError
 from .userfiles import locked, write_json
 
@@ -117,20 +118,8 @@ def forget_legacy_host_key():
 
 def acquire_lease(workspace):
     """Hold a course for one host, or for setup while it moves the course; refused while another holds it."""
-    lease = (workspace / '.learning-host.lock').open('a+b')
-    lease.seek(0)
-    lease.write(b'0')
-    lease.flush()
-    lease.seek(0)
-    try:
-        if os.name == 'nt':
-            import msvcrt
-            msvcrt.locking(lease.fileno(), msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        lease.close()
+    lease = try_lock(Path(workspace) / '.learning-host.lock')
+    if lease is None:
         raise OperationError('host_running', 'Another learning host already owns this course')
     return lease
 
@@ -313,37 +302,22 @@ def trash(root, name):
         raise OperationError('unknown_course', f'No course named {name} in {root}')
     title = _title(path)
     acquire_lease(path).close()  # released before the move, which Windows refuses for an open file
-    _mark_moving(path)
     entry = time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:6]
     folder = trash_dir(root) / entry
+    record = {'name': name, 'title': title, 'deleted': time.time()}
     try:
         folder.mkdir(parents=True)
-        record = {'name': name, 'title': title, 'deleted': time.time()}
         (folder / 'deleted.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
-        os.replace(path, folder / name)
-    except OSError as exc:
+        move_course(path, folder / name, 'The course could not be moved to the trash')
+    except (OSError, OperationError) as exc:
         shutil.rmtree(folder, ignore_errors=True)
-        (path / MOVING).unlink(missing_ok=True)
+        if isinstance(exc, OperationError):
+            raise
         raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
     _summaries.pop(path.resolve(), None)
     if name in archived(root):  # a course restored later comes back to the main list
         _change_archived(root, lambda names: names - {name})
     return {'id': entry, 'path': str(folder / name), **record}
-
-
-def _mark_moving(path):
-    """Leave `MOVING` in a course about to move, under its write lock. A write already running (Codex registering a
-    source from the command line, say) finishes first, files and all, and every later one sees the marker, or no
-    course at this path, and is refused (`api.execute`), so nothing is written to a course while it moves."""
-    db = sqlite3.connect(path / 'course.sqlite3', timeout=30)
-    try:
-        db.execute('BEGIN IMMEDIATE')
-        (path / MOVING).write_text('', encoding='utf-8')
-        db.rollback()
-    except sqlite3.Error as exc:
-        raise OperationError('course_in_use', f'The course could not be moved to the trash: {exc}') from None
-    finally:
-        db.close()
 
 
 def _entry(root, entry):

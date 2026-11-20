@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .. import library
-from ..codex import NOT_FOUND, find_codex
+from ..codex import NOT_FOUND, app_server, codex_env
 from ..logs import Tail
 from ..store import OperationError
 from ..userfiles import locked, write_json
@@ -69,7 +69,7 @@ TITLE_PROMPT = LINE.join([
 TITLE_SCHEMA = {'type': 'object', 'properties': {'title': {'type': 'string', 'minLength': 1, 'maxLength': 60}},
                 'required': ['title'], 'additionalProperties': False}
 TITLE_TIMEOUT = 30
-STOP_TIMEOUT = 10  # how long Stop waits for Codex to answer before restarting its App Server
+STOP_TIMEOUT = 10  # how long Stop waits for Codex to answer, and then to end the turn, before restarting its App Server
 
 
 def config_path():
@@ -91,7 +91,7 @@ class AppServer:
     def __init__(self, command, cwd, on_message, on_exit):
         self.process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace',
-                                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                                        env=codex_env(command[0]), creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         self.stderr = Tail(self.process.stderr)
         self.closing = False
         self.restarted = False  # stopped by Throughline because it stopped answering
@@ -217,6 +217,7 @@ class Studio:
         self.server = None
         self.owned = set()  # threads the running App Server has loaded for Studio
         self.active = {}  # thread -> its running turn
+        self.turns = threading.Condition()  # notified when a turn ends or the App Server stops, for Stop to wait on
         self.ended = {}  # thread -> its last finished turn, which a slow turn/start reply must not mark running again
         self.pending = {}  # request id -> what Codex asked, until the learner answers
         self.titling = {}  # side thread writing a chat's title -> where its events go
@@ -279,7 +280,7 @@ class Studio:
                 return self.server
             if self.missing:
                 raise StudioError('studio_unavailable', self.missing)
-            command = self.command or [find_codex() or 'codex', 'app-server', '--stdio']
+            command = self.command or app_server()
             try:
                 server = AppServer(command, self.root or Path.home(), self._message, self._exit)
             except OSError as exc:
@@ -347,6 +348,8 @@ class Studio:
             self.active.clear()
             self.ended.clear()
             self.pending.clear()
+        with self.turns:
+            self.turns.notify_all()
         self.events.publish({'type': 'studio', 'method': 'studio/closed', 'params': {'restarted': restarted}})
 
     def _message(self, message):
@@ -376,8 +379,10 @@ class Studio:
         if method == 'turn/started':
             self.active[thread] = params['turn']['id']
         elif method == 'turn/completed':
-            self.active.pop(thread, None)
-            self.ended[thread] = params['turn']['id']
+            with self.turns:
+                self.active.pop(thread, None)
+                self.ended[thread] = params['turn']['id']
+                self.turns.notify_all()
         if method == 'account/rateLimits/updated' or (FORWARDED.match(method) and method not in IGNORED and thread in self.owned):
             self.events.publish({'type': 'studio', 'method': method, 'params': params})
 
@@ -638,9 +643,9 @@ class Studio:
                     pass
 
     def interrupt(self, course, thread):
-        """Stop a thread's turn. An App Server that does not answer is hung: it is stopped, and with it every turn it
-        was running, so Studio, updates and deleting a course are not held up by a turn nothing will finish. Its
-        chats are saved by Codex and carry on in the next App Server."""
+        """Stop a thread's turn. An App Server that does not answer, or answers but never ends the turn, is hung: it
+        is stopped, and with it every turn it was running, so Studio, updates and deleting a course are not held up by
+        a turn nothing will finish. Its chats are saved by Codex and carry on in the next App Server."""
         server = self._load(course, thread)
         turn = self.active.get(thread)
         if turn:
@@ -648,12 +653,22 @@ class Studio:
                 server.call('turn/interrupt', {'threadId': thread, 'turnId': turn}, timeout=STOP_TIMEOUT)
             except Unanswered:
                 log.warning("Studio's Codex App Server did not answer Stop; restarting it")
-                self._exit(server, restarted=True)
-                server.restarted = True
-                server.process.kill()  # a hung App Server would not close when asked
-                server.close()
-                return {'thread': thread, 'restarted': True}
+                return self._restart(server, thread)
+            # The turn ends with its turn/completed, which the App Server's reader hands to `_message`.
+            with self.turns:
+                ended = self.turns.wait_for(lambda: self.active.get(thread) != turn or self.server is not server,
+                                            timeout=STOP_TIMEOUT)
+            if not ended:
+                log.warning("Studio's Codex App Server did not end the turn it was told to stop; restarting it")
+                return self._restart(server, thread)
         return {'thread': thread}
+
+    def _restart(self, server, thread):
+        self._exit(server, restarted=True)
+        server.restarted = True
+        server.process.kill()  # a hung App Server would not close when asked
+        server.close()
+        return {'thread': thread, 'restarted': True}
 
     def intake(self):
         """Where files attached on the library page wait for the course a Studio chat makes: hidden, so the library

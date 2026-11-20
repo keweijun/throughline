@@ -9,6 +9,26 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - After a document of a course is updated, Codex can save a chapter again with its links moved to the new version of the document. Before, that save was refused.
 - "Back to the passage" on a side question now unfolds an earlier lesson that a new lesson replaced, and shows the passage in it.
 
+## 0.55.3
+
+- Stop in Studio no longer leaves Studio busy when Codex agrees to stop but keeps working. If the turn has not ended a few seconds after Stop, Throughline restarts Codex, so you can update Throughline, delete a course and start a new chat again. Your chats are kept.
+- Throughline now finds a Codex you installed with npm when it is opened from Finder, Spotlight or an app menu even if `node` lives in a different folder from `codex` (as with nvm, Homebrew or Volta). Run setup again (or update) to pick this up.
+- After you run setup again and it finds Codex somewhere new, an open Throughline uses the new Codex right away instead of the old one until it is restarted.
+
+## 0.55.2
+
+- A course whose deletion was cut short, because Throughline was closed or the computer shut down at that moment, works again the next time you open it or change it. Before, it stayed in the library but refused every change, telling you to restore it from a trash that did not hold it.
+- Setup moving your courses from where an earlier version kept them now waits for anything Codex is saving in a course to finish, so nothing is left behind in the old folder. On Windows a course that is still open somewhere stays where it is, whole, instead of being half copied. And a course archived in one old location no longer archives a different course of the same name.
+- A copy of a course folder you made yourself is now its own course to Throughline: a tab still showing the original reloads instead of saving your notes into the copy or downloading the copy when you export.
+
+## 0.55.1
+
+- A course with a very long text source, such as a full transcript, can now be imported from its package. Before, the import could refuse a package Throughline had just exported, so a backup of such a course could not be restored.
+- Exporting a course whose saved copy of a source is damaged now says so and asks you to register that source again, instead of making a package that would not import.
+- Exporting the same course twice at once to the same file, say once to share and once as a backup, no longer mixes the two: a Route package can no longer pick up your notes or progress from the other export.
+- Importing a Route and lessons package made by Throughline 0.54.0 or earlier no longer carries the sender's own wording of their lesson requests, or the teacher's notes about them, into your course.
+- A whole-course package now holds only the images attached to your answers, questions and notes, not every image the course folder kept.
+
 ## 0.55.0
 
 - A section you have studied can be taught again as a **new lesson**. Below the lesson, choose New lesson instead of Another pass: the teacher plans the section afresh in steps, from what it covers now, and knows what your earlier lesson taught. Ask for only what the last lesson skipped, more rigour or the proofs, or leave it empty for the whole section. The earlier lesson stays folded above the new one, with your answers and notes, and the section stays studied.

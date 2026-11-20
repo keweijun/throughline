@@ -430,7 +430,7 @@ class AppStore {
       const state = await api.get<State>('/api/state');
       const missed = this.#inflight;
       // The page belongs to this course from now on; the host refuses its requests once another one is open.
-      course.id = state.course.id;
+      course.key = state.course.key;
       this.drafts.open(state.course.id);
       this.state = state;
       for (const delta of missed) this.#delta(delta);
@@ -669,7 +669,7 @@ class AppStore {
 
   #apply(event: HostEvent) {
     // What another course's host published, before this page learned the course switched, is not for this page.
-    if ('course' in event && event.course && course.id && event.course !== course.id) return;
+    if ('course' in event && event.course && course.key && event.course !== course.key) return;
     if (event.type === 'studio') {
       studio.apply(event);
       return;

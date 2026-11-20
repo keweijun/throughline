@@ -3,7 +3,8 @@
 It logs every message it receives to <log> as JSON lines. A turn's text picks its script: "approve" asks to run a
 command and replies with the learner's decision, "ask" asks a question and replies with the answer, "wait" keeps
 running until it is steered or interrupted, "busy" works through a long turn with lots of output until the test
-ends it, "go silent" starts a turn and then stops answering anything, "interview" asks two questions in its answer as newer Codex does, and a reply to them is read back; "links" answers with links to files
+ends it, "go silent" starts a turn and then stops answering anything, "ignore stop" keeps running and answers
+`turn/interrupt` without ever ending the turn, "interview" asks two questions in its answer as newer Codex does, and a reply to them is read back; "links" answers with links to files
 in the library folder, the Studio fixture's course, the web and the page; anything else replies "done". A
 turn with an output schema writes a chat's title from the first words of its prompt. With `old` it lacks
 `turn/steer`, as an older Codex would."""
@@ -17,6 +18,7 @@ old = len(sys.argv) > 2 and sys.argv[2] == 'old'
 # 'unsandboxed': Windows without Codex's sandbox until a setup; 'unsandboxed-fail': a setup that never works.
 sandbox = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2].startswith('unsandboxed') else 'ready'
 threads, turns = {}, {}
+stubborn = set()  # turns that ignore turn/interrupt
 waiting = {}  # server request id -> (thread, turn, kind)
 asked = iter(range(900, 10000))
 LINE = chr(10)
@@ -180,6 +182,8 @@ for line in sys.stdin:
             busy(tid, turn, 16)
         elif 'go silent' in text:
             time.sleep(3600)
+        elif 'ignore stop' in text:
+            stubborn.add(turn)
         elif 'wait' not in text:
             message(tid, turn, 'done')
             finish(tid, turn)
@@ -193,6 +197,8 @@ for line in sys.stdin:
         continue
     elif method == 'turn/interrupt':
         send({'id': rid, 'result': {}})
+        if params['turnId'] in stubborn:
+            continue
         finish(params['threadId'], params['turnId'], 'interrupted')
         continue
     elif method == 'skills/list':

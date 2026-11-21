@@ -10,7 +10,7 @@ A **drill session** is a conversation with a **fast teacher** over the Review pl
 
 ### The fast teacher
 
-- **Model.** Each turn runs on the small model the learner chose in Settings, and so does the assessment of a written answer to a drill question. A drill is a quick back-and-forth, and a full teacher turn for every reply would be too slow. Under the trust-the-model stance, the small model's assessment counts as evidence.
+- **Model.** Each turn runs on the small model, and so does the assessment of a written answer to a drill question. The small model is GPT-6.1 Terra unless the learner chose another in Settings: real runs found it two to three times faster than Sol at comparable quality (PR #231). Without a small-model effort set, the fast teacher runs at low effort. A drill is a quick back-and-forth, and a full teacher turn for every reply would be too slow. Under the trust-the-model stance, the small model's assessment counts as evidence.
 - **Prompt.** It is lean and its own (`prompts.drill_instructions`): the teacher's rules, the drill rules, and the key points of every section in scope lead it as the thread's instructions, which stay the same through the session. After them comes the review state:
   - each section's review context (ADR 0014);
   - the open mistakes in scope;

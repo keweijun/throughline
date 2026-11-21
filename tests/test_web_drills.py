@@ -67,8 +67,9 @@ class DrillCourse(unittest.TestCase):
         self.host._runner = None
         self.host.settings.runner = self._runner_for
 
-    def _runner_for(self, small=False):
+    def _runner_for(self, small=False, fast=False):
         self.small.append(small)
+        self.fast = getattr(self, 'fast', []) + [fast]
         return self.runner
 
     def post(self, path, body=None, status=200):

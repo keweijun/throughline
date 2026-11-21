@@ -9,6 +9,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
   - **Sheets:** cheat sheets, formula sheets and "my mistakes on one page" appear under **Sheets** in Review, linked from the chapter page. You can print or remove them.
 - **Done, and one click to open it.** When Studio finishes something you sent it, the card that sent it says **Done: <what it made>**. **Open it** takes you there: the session, the sheet, or the section it added exercises to.
 - **Studio builds from your mistakes.** Codex can now read your mistakes book and your review history, so a mock exam or a summary can focus on what you actually get wrong.
+- **GPT-6.1 Terra is the default small model.** Unless you chose another, it now runs the quick drill teacher and background work such as preparing the next section, because it's two to three times faster. To keep using the teacher's model there, choose **Same as the teacher model** in Settings.
 
 ## 0.61.0
 

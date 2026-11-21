@@ -138,7 +138,8 @@ class Host:
         # Preparation and memory work are background work, so they run on the small model when one is chosen; a
         # chapter build needs the teacher. A drill is quick by design (ADR 0025): its turns and the assessment of its
         # answers run on the small model too.
-        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL or self.drills.fast(turn))
+        fast = self.drills.fast(turn)
+        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL or fast, fast=fast)
 
     def operation(self, request):
         if self._pending:

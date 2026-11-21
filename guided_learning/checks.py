@@ -11,6 +11,7 @@ import threading
 import time
 
 from . import codex
+from .background import DEFAULT_SMALL_MODEL, small_model
 from .store import OperationError
 
 PROBE = 'Reply with the single word OK.'
@@ -39,17 +40,20 @@ def codex_found(context):
 
 
 def probe_model(settings=None, models=codex.list_models):
-    """The learner's small model if set; else a small "luna" model this account offers; else the teacher's or Codex's default."""
+    """The small model the settings name (the learner's, the teacher's on request, or Throughline's default) when this
+    account offers it; else a small "luna" model it offers; else the teacher's or Codex's default."""
     try:
         current = settings.current() if settings else {}
     except OperationError:
         current = {}  # unreadable settings: still probe, with a model Codex offers
     if current.get('small_model'):
-        return current['small_model']
+        return small_model(current)
     try:
         offered = [m['id'] for m in models()]
     except (OSError, RuntimeError):
         offered = []
+    if DEFAULT_SMALL_MODEL in offered:
+        return DEFAULT_SMALL_MODEL
     return next((m for m in offered if 'luna' in m), None) or current.get('model') or None
 
 

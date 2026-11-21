@@ -85,7 +85,7 @@
     <p class="what"><span class="badge">{t("Studio")}</span> {label}</p>
   {/if}
   {#if sent || sending}
-    <p class="row">{@render state()}</p>
+    <p class="row actions">{@render state()}</p>
   {:else if confirming}
     <InlineConfirm
       message={t("Studio will work on your course with Codex, in its own chat: it may add files, exercises or sheets. Go ahead?")}
@@ -95,7 +95,7 @@
       oncancel={() => (confirming = false)}
     />
   {:else if variant === 'offer'}
-    <p class="row"><button class="btn btn-small" onclick={start}>{t("Do this in Studio")}</button></p>
+    <button class="btn btn-small btn-primary actions" onclick={start}>{t("Do this in Studio")}</button>
   {:else}
     <button class="link studio-link" onclick={start}>{label}</button>
   {/if}
@@ -103,10 +103,15 @@
 </div>
 
 <style>
+  /* One row: what Studio will do on the left, the action or how it is going on the right; the confirmation and any
+     problem take a row of their own below. */
   .handoff.offer {
-    display: grid;
-    gap: 0.5rem;
-    padding: 0.7rem 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.6rem 0.6rem 0.6rem 0.9rem;
     border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--rule));
     border-radius: var(--radius);
     background: var(--accent-wash);
@@ -118,8 +123,19 @@
   }
 
   .what {
+    flex: 1 1 14rem;
     margin: 0;
     font-size: var(--step-0);
+  }
+
+  .offer .actions {
+    flex: none;
+    margin-left: auto;
+  }
+
+  .offer :global(.inline-confirm),
+  .offer .problem {
+    flex-basis: 100%;
   }
 
   .badge {

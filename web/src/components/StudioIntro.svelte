@@ -41,7 +41,10 @@
 
 {#if shown}
   <aside class="intro" aria-labelledby="studio-intro-title">
-    <h2 id="studio-intro-title">{t("Codex works on this course with you")}</h2>
+    <header>
+      <h2 id="studio-intro-title">{t("Codex works on this course with you")}</h2>
+      <button class="btn btn-quiet btn-small" onclick={() => app.markSeen(KEY)}>{t("Got it")}</button>
+    </header>
     <p>{t("Lessons, questions and reviews here are quick. Anything bigger goes to Studio, where Codex works on the course itself: it reads your files, writes sheets and mock exams, adds problem sets as exercises and rebuilds sections. Try one:")}</p>
     <ul>
       {#each examples as item (item.key)}
@@ -49,12 +52,11 @@
       {/each}
     </ul>
     {#if studio.access && !studio.access.full_access}
-      <p class="access">
-        {t("Studio asks before each request. With full access it simply starts, and Codex can change files in this course's folder without asking.")}
+      <div class="access">
+        <p>{t("Studio asks before each request. With full access it simply starts, and Codex can change files in this course's folder without asking.")}</p>
         <button class="btn btn-small" disabled={switching} onclick={fullAccess}>{t("Use full access")}</button>
-      </p>
+      </div>
     {/if}
-    <button class="btn btn-quiet btn-small dismiss" onclick={() => app.markSeen(KEY)}>{t("Got it")}</button>
   </aside>
 {/if}
 
@@ -67,6 +69,13 @@
     border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--rule));
     border-radius: var(--radius);
     background: var(--accent-wash);
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
   }
 
   h2 {
@@ -88,16 +97,20 @@
     list-style: none;
   }
 
+  /* The note and its button on one line, set off from the examples above. */
   .access {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.9rem;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
+    justify-content: space-between;
+    gap: 0.5rem 1.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in srgb, var(--accent) 25%, var(--rule));
   }
 
-  .dismiss {
-    justify-self: start;
+  .access p {
+    flex: 1 1 20rem;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
   }
 </style>

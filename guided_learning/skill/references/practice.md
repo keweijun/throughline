@@ -48,6 +48,7 @@ Build on these when the learner asks for review: a mock exam weighted to what th
 - **Questions.** Each one names the sections it tests in `tests_concept_ids`, all of them studied and inside `scope` (all studied sections without a scope; `nothing_to_review` when none is studied).
   - **Apply** (`"kind":"apply"`, the default) is written and assessed by part: `{"question":"…","parts"?:[…],"tests_concept_ids":["stack"],"marks"?:6}`.
   - **Recall** is multiple choice: `{"kind":"recall","question":"…","idea":"…","options":[{"text":"…","explanation":"…"}],"correct":0,"tests_concept_ids":["stack"]}`, with 2 to 5 options, each explained.
+- **Wording.** Write each question as the learner reads it, starting with the question itself. Don't number it or give it a heading: the app numbers questions and shows their marks. Don't say where it was adapted from either; put that in `note`.
 - **Limits.** At most 30 questions. Any invalid question rejects the whole session (`invalid_review_question`).
 - **Exam papers.** `exam: true` shows the session as a paper, in order, with each question's `marks`.
 - **`note`** says what the session covers or leaves out, and the app shows it above the questions.
@@ -58,13 +59,14 @@ Build on these when the learner asks for review: a mock exam weighted to what th
 `{"op":"sheet.save","id":"formulas-ch2","title":"Formula sheet: chapter 2","scope":{"chapter_ids":["ch2"]},"markdown":"…"}` saves a page the learner reads in Review and on the chapter page, and can print: a cheat sheet, a formula sheet, their mistakes on one page, a comparison table.
 
 - **Content.** Write it in Markdown with LaTeX, as lessons are, and make it fit for printing on one or two pages.
+- **Voice.** Write it to the learner about the subject. A page of their mistakes says what they got wrong and the right idea, in their terms. It never mentions records, ids, timestamps or which operation found them.
 - **Scope** names the chapters or sections it covers; leave it out for the whole course.
 - **Changes.** Saving again with the same `id` replaces the sheet; use that when the learner asks you to change it.
 - **Listing.** `{"op":"sheet.list"}` lists the sheets.
 
 ### Requests from the app
 
-A request handed off from the app has a context naming where it was asked, ending `· hand-off <id>`. Pass that id as `handoff_id` to `drill.write`, `sheet.save` or `practice.add` when you save what you made: the card the learner pressed then links to it.
+A request handed off from the app has a context naming where it was asked, ending `· hand-off <id>`. Pass that id as `handoff_id` to `drill.write`, `sheet.save` or `practice.add` when you save what you made: the card the learner pressed then links to it. The learner is already in the app, so there is no need to open the course; end by saying in a sentence or two what you made, which goes beside the card.
 
 When the learner asks you to review ("20 minutes before tomorrow's test"), you can offer what fits:
 - a mock exam (`drill.write`);

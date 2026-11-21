@@ -7,6 +7,9 @@ import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio } from './studio.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
+/** A passage waiting in the Notes box: saving the box highlights it with the note written there. */
+export type NoteQuote = Pick<Annotation, 'passage' | 'concept_id'> & Partial<Pick<Annotation, 'occurrence' | 'turn_id' | 'task_id' | 'source'>>;
+
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
 export type CoursePart = 'studio' | 'sources' | 'notes' | 'share';
@@ -196,6 +199,7 @@ class AppStore {
   /** The Source tab shows every course document instead of the open one. */
   sourceList = $state(false);
   quote = $state<Quote | null>(null);
+  noteQuote = $state<NoteQuote | null>(null);
   settingsOpen = $state(false);
   /** The Settings category to show when the dialog next opens, such as About from the update notice. */
   settingsPane = $state<string | null>(null);
@@ -215,8 +219,9 @@ class AppStore {
   hint = $state.raw<{ key: string; owner: object } | null>(null);
   /** Question thread to scroll to and flash in the side panel. */
   focusThread = $state<string | null>(null);
-  /** Annotation to scroll to and flash in the Notes tab. */
+  /** Annotation to scroll to and flash in the Notes tab, or with `editAnnotation` to open for editing there. */
   focusAnnotation = $state<string | null>(null);
+  editAnnotation = $state(false);
   panelWidth = $state(storedWidth());
   #widthChosen = storedWidth() !== DEFAULT_PANEL;
   #sources = new Map<string, Promise<SourceView>>();
@@ -934,8 +939,15 @@ class AppStore {
     return this.annotate({ kind: 'bookmark', concept_id: conceptId, ...(source ? { source } : {}) });
   }
 
-  showAnnotation(id: string) {
+  showAnnotation(id: string, { edit = false } = {}) {
     this.focusAnnotation = id;
+    this.editAnnotation = edit;
+    this.openPanel('notes');
+  }
+
+  /** Puts a selected passage in the Notes box, to be saved as a highlight with the note written there. */
+  notePassage(quote: NoteQuote) {
+    this.noteQuote = quote;
     this.openPanel('notes');
   }
 

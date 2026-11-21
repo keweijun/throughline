@@ -1,11 +1,10 @@
 <script lang="ts">
-  import { modEnterToSend } from '../lib/keys';
   import { selectionMarkdown } from '../lib/selection';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { stageScroll } from '../lib/stage';
-  import { autogrow } from '../lib/autogrow';
   import { highlightAt, occurrenceOf } from '../lib/highlight';
+  import type { NoteQuote } from '../lib/store.svelte';
   import type { Annotation, AnnotationSource } from '../lib/types';
 
   type Pending = {
@@ -23,8 +22,6 @@
   };
 
   let visible = $state(false);
-  let writing = $state(false);
-  let note = $state('');
   let left = $state(0);
   let top = $state(0);
   /** The passage the toolbar points at, and which side of it the toolbar sits on. */
@@ -47,18 +44,17 @@
     anchor = rect;
   }
 
-  // Once shown, centre on the passage at its real size: the toolbar above it, so the next lines stay readable, and
-  // the note form below it, so the passage stays in view while writing. Either flips when the window edge is too close.
+  // Once shown, centre on the passage at its real size, above it so the next lines stay readable, or below it when the
+  // window edge is too close.
   $effect(() => {
     if (!pop || !anchor) return;
-    void writing;
     const { width, height } = pop.getBoundingClientRect();
     const gap = 10;
     // The top bar covers the top of the window, so the reading area's top is the edge to keep clear of.
     const edge = (document.getElementById('stage')?.getBoundingClientRect().top ?? 0) + 8;
     const fitsAbove = anchor.top - gap - height >= edge;
     const fitsBelow = anchor.bottom + gap + height <= window.innerHeight - 8;
-    side = writing ? (fitsBelow || !fitsAbove ? 'below' : 'above') : fitsAbove || !fitsBelow ? 'above' : 'below';
+    side = fitsAbove || !fitsBelow ? 'above' : 'below';
     top = side === 'above' ? Math.max(edge, anchor.top - gap - height) : Math.min(anchor.bottom + gap, window.innerHeight - height - 8);
     const centre = anchor.left + anchor.width / 2;
     left = Math.max(8, Math.min(centre - width / 2, window.innerWidth - width - 8));
@@ -73,7 +69,6 @@
   }
 
   function capture(point?: { x: number; y: number; on: EventTarget | null }) {
-    if (writing) return;
     visible = false;
     target = null;
     const selection = window.getSelection();
@@ -129,27 +124,21 @@
 
   function close() {
     visible = false;
-    writing = false;
-    note = '';
     target = null;
     confirmRemove = false;
   }
 
-  function startNote() {
-    note = target?.note ?? '';
-    writing = true;
+  /** A clicked highlight's note is written or changed in the Notes tab, in the same box as every note. */
+  function editNote() {
+    if (!target) return;
+    const { id } = target;
+    close();
+    app.showAnnotation(id, { edit: true });
   }
 
-  async function save(withNote: boolean) {
-    app.markSeen('hint-select-passage');
-    if (target) {
-      const { id } = target;
-      const text = note.trim();
-      close();
-      await app.editNote(id, text);
-      return;
-    }
-    if (!pending) return;
+  /** The passage as a highlight would keep it: where it is, and which section it belongs to. */
+  function passage(): NoteQuote | null {
+    if (!pending) return null;
     const source: AnnotationSource | undefined =
       pending.unit && app.source
         ? {
@@ -162,18 +151,33 @@
         : undefined;
     // The host takes the section from the lesson, answer or exercise; a source passage belongs to the section being read.
     const conceptId = (pending.turnId && app.turn(pending.turnId)?.concept_id) || app.viewingId;
-    if (!conceptId) return;
-    const text = withNote ? note.trim() : '';
-    close();
-    window.getSelection()?.removeAllRanges();
-    await app.annotate({
-      kind: 'highlight',
+    if (!conceptId) return null;
+    return {
       concept_id: conceptId,
       passage: pending.text,
       ...(pending.occurrence ? { occurrence: pending.occurrence } : {}),
-      ...(text ? { note: text } : {}),
       ...(source ? { source } : pending.taskId ? { task_id: pending.taskId } : { turn_id: pending.turnId }),
-    });
+    };
+  }
+
+  function highlight() {
+    app.markSeen('hint-select-passage');
+    const quote = passage();
+    if (!quote) return;
+    close();
+    window.getSelection()?.removeAllRanges();
+    void app.annotate({ kind: 'highlight', ...quote });
+  }
+
+  // Like Ask: the passage goes into the Notes box, where the note is written with formulas and images like any other.
+  function note() {
+    app.markSeen('hint-select-passage');
+    const quote = passage();
+    if (!quote) return;
+    close();
+    window.getSelection()?.removeAllRanges();
+    app.notePassage(quote);
+    requestAnimationFrame(() => document.getElementById('section-note')?.focus());
   }
 
   // Removing a highlight that carries a note asks first, in the toolbar itself.
@@ -190,14 +194,10 @@
     void app.removeAnnotation(id);
   }
 
-  function onNoteKey(event: KeyboardEvent) {
-    if (event.key === 'Escape') close();
-  }
-
   let settle: ReturnType<typeof setTimeout> | undefined;
 
   function onSelectionChange() {
-    if (writing || target) return;
+    if (target) return;
     if (!window.getSelection()?.toString().trim()) {
       visible = false;
       return;
@@ -221,23 +221,13 @@
   onmouseup={onMouseUp}
   ontouchend={() => setTimeout(capture, 50)}
   onkeyup={(e) => (e.key === 'Shift' || e.key.startsWith('Arrow')) && capture()}
-  onkeydown={(e) => e.key === 'Escape' && visible && !writing && close()}
+  onkeydown={(e) => e.key === 'Escape' && visible && close()}
   onselectionchange={onSelectionChange}
 />
 <!-- Scrolling moves the passage away from the toolbar, but a writing box scrolling its own text does not. -->
-<svelte:window onscrollcapture={(e) => !writing && !(e.target instanceof Element && e.target.closest('.cm-editor')) && (visible = false)} />
+<svelte:window onscrollcapture={(e) => !(e.target instanceof Element && e.target.closest('.cm-editor')) && (visible = false)} />
 
-{#if visible && writing}
-  <form bind:this={pop} class="pop writing" data-side={side} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px" onsubmit={(e) => (e.preventDefault(), save(true))}>
-    <label for="quick-note">{target?.note ? t("Edit your note") : t("Note on this passage")}</label>
-    <!-- svelte-ignore a11y_autofocus -->
-    <textarea id="quick-note" rows="3" bind:value={note} use:autogrow={note} use:modEnterToSend={() => (target || note.trim()) && save(true)} onkeydown={onNoteKey} autofocus placeholder={t("Only you see your notes.")}></textarea>
-    <div class="actions">
-      <button type="button" class="btn btn-quiet btn-small" onclick={close}>{t("Cancel")}</button>
-      <button type="submit" class="btn btn-small" disabled={!target && !note.trim()}>{t("Save note")}</button>
-    </div>
-  </form>
-{:else if visible && target}
+{#if visible && target}
   <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Your highlight")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
     {#if confirmRemove}
       <span class="asking">{t("Delete this note?")}</span>
@@ -247,7 +237,7 @@
       </button>
       <button onpointerdown={(e) => e.preventDefault()} onclick={() => (confirmRemove = false)}>{t("Cancel")}</button>
     {:else}
-      <button onpointerdown={(e) => e.preventDefault()} onclick={startNote}>
+      <button onpointerdown={(e) => e.preventDefault()} onclick={editNote}>
         <span class="icon note" aria-hidden="true">✎</span>{target.note ? t("Edit note") : t("Add note")}
       </button>
       <button class="danger" onpointerdown={(e) => e.preventDefault()} onclick={remove}>
@@ -258,10 +248,10 @@
 {:else if visible}
   <div bind:this={pop} class="pop bar" data-side={side} role="toolbar" aria-label={t("Selected passage")} style:left="{left}px" style:top="{top}px" style:--caret="{caret}px">
     {#if annotatable}
-      <button onpointerdown={(e) => e.preventDefault()} onclick={() => save(false)}>
+      <button onpointerdown={(e) => e.preventDefault()} onclick={highlight}>
         <span class="icon swatch" aria-hidden="true"></span>{t("Highlight")}
       </button>
-      <button onpointerdown={(e) => e.preventDefault()} onclick={() => (writing = true)}>
+      <button onpointerdown={(e) => e.preventDefault()} onclick={note}>
         <span class="icon note" aria-hidden="true">✎</span>{t("Note")}
       </button>
     {/if}
@@ -397,33 +387,4 @@
     font-weight: 400;
   }
 
-  .writing {
-    flex-direction: column;
-    gap: 0.4rem;
-    width: min(340px, calc(100vw - 16px));
-    padding: 0.6rem;
-  }
-
-  .writing > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  .writing label {
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--ink-soft);
-  }
-
-  .writing textarea {
-    width: 100%;
-    resize: vertical;
-    font-size: var(--step-0);
-  }
-
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.3rem;
-  }
 </style>

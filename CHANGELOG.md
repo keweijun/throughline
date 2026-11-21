@@ -2,6 +2,11 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.57.0
+
+- **A note on a passage is written in Notes.** Select text and choose **Note**: the passage waits in the box at the foot of the Notes panel, as **Ask** puts it in Questions. That box offers LaTeX as you type `\`, shows a preview of your formulas, and takes images you attach, paste or drop, such as a photo of your working. Before, the note on a passage was written in a small box on the page, with none of these. **Remove quote** turns it back into a note on the section.
+- **Add note** and **Edit note** on a highlight open its note for editing in Notes too.
+
 ## 0.56.0
 
 - **The Overview on a wide window** puts the course's title, progress and tabs in a column on the left. Studio and an open document start at the top of the page and reach the bottom of the window, and Sources, Your notes and Share sit beside the column instead of at the far left of an empty page. On a narrower window the header stays above the tabs, as before.

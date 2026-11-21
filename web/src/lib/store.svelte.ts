@@ -184,6 +184,9 @@ class AppStore {
   reviewOpen = $state(false);
   /** The drill session open in the Review place, if any (ADR 0025). */
   drillOpen = $state<string | null>(null);
+  /** The Review place's tab, and the sheet open in Sheets. */
+  reviewTab = $state<'points' | 'mistakes' | 'sheets'>('points');
+  sheetOpen = $state<string | null>(null);
   /** The Course page replaces the reading column: the course as a whole (ADR 0017). The side panel never shows there:
    * the Overview has its own Sources, and Studio and the reader need the width. It comes back as it was in Learn. */
   courseOpen = $state(false);
@@ -1135,6 +1138,9 @@ class AppStore {
   }
 
   showReview() {
+    // Review opens on its key points; what Studio made for the learner opens on its own tab (showResult).
+    this.reviewTab = 'points';
+    this.sheetOpen = null;
     this.reviewOpen = true;
     this.courseOpen = false;
     this.libraryOpen = false;
@@ -1164,6 +1170,24 @@ class AppStore {
     return result;
   }
 
+  /** Opens what Studio made for a hand-off (issue #229): a session or sheet in Review, or the section it added exercises to. */
+  showResult(result: NonNullable<Handoff['result']>) {
+    if (result.kind === 'session' && result.id) {
+      this.drillOpen = result.id;
+      this.showReview();
+    } else if (result.kind === 'sheet' && result.id) {
+      this.showReview();
+      this.reviewTab = 'sheets';
+      this.sheetOpen = result.id;
+    } else if (result.kind === 'exercises' && result.concept_id) {
+      this.view(result.concept_id);
+    }
+  }
+
+  deleteSheet(id: string) {
+    return this.act(() => api.delete(`/api/sheets/${encodeURIComponent(id)}`));
+  }
+
   /** A hand-off sent to Studio from this place (issue #229), once it has been. */
   handoff(id: string) {
     return (this.state?.handoffs ?? []).find((h) => h.id === id);
@@ -1186,7 +1210,9 @@ class AppStore {
     }
     if (!studio.skills.length) await studio.loadSkills();
     const previous = { thread: studio.threadId, origin: studio.origin };
-    studio.handoff('', context);
+    // Codex names the hand-off when it saves what it made (`handoff_id`, as the skill says), so the card that asked can
+    // link to it. The learner sees this note under their message, so it stays short.
+    studio.handoff('', { ...context, text: `${context.text} · hand-off ${value.id}` });
     try {
       const sent = await studio.send(studio.messageFor(`$throughline ${value.request}`));
       await this.act(() => api.post('/api/handoffs', { ...value, thread_id: sent.thread }));

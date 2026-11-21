@@ -778,6 +778,12 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def drill_message(session_id: str, body: DrillMessage):
         return host.drills.send(session_id, body.message, body.turn_id)
 
+    @app.delete('/api/sheets/{sheet_id}')
+    def delete_sheet(sheet_id: str):
+        result = host.operation({'op': 'sheet.delete', 'id': sheet_id})
+        host.changed()
+        return result
+
     @app.post('/api/handoffs')
     def save_handoff(body: Handoff):
         result = host.operation({'op': 'handoff.save', **body.model_dump()})

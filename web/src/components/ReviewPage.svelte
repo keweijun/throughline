@@ -10,6 +10,7 @@
   import ReviewSet from './ReviewSet.svelte';
   import ReviewScope from './ReviewScope.svelte';
   import StudioHandoff from './StudioHandoff.svelte';
+  import SheetView from './SheetView.svelte';
   import KeyPoints from './KeyPoints.svelte';
   import MistakesBook from './MistakesBook.svelte';
 
@@ -36,7 +37,17 @@
   const scoped = $derived(everything ? undefined : { chapter_ids: scope.chapter_ids, concept_ids: scope.concept_ids });
 
   // The Review place opens on the key points, so it is never empty once something is studied.
-  let tab = $state<'points' | 'mistakes'>('points');
+  // The tab lives in the store, so what Studio made can be opened straight on it (a sheet).
+  const tab = $derived(app.reviewTab);
+  // Sheets that touch the scope (a sheet for the whole course always does), newest first.
+  const sheets = $derived(
+    (app.state?.sheets ?? []).filter((sheet) => {
+      if (everything) return true;
+      const covered = [...(sheet.scope.concept_ids ?? []), ...app.chapters.filter((c) => sheet.scope.chapter_ids?.includes(c.id)).flatMap((c) => c.concept_ids)];
+      return !covered.length || covered.some((id) => sections.includes(id));
+    }),
+  );
+  const shownSheet = $derived(sheets.find((s) => s.id === app.sheetOpen) ?? sheets[0]);
   const chapters = $derived(
     app.chapters
       .map((chapter) => ({ chapter, ids: chapter.concept_ids.filter((id) => sections.includes(id) && !!app.keyPoints(id)) }))
@@ -100,6 +111,7 @@
   });
   const chapterTitle = (id?: string) => app.chapters.find((c) => c.id === id)?.title ?? id ?? '';
   function label(session: Session) {
+    if (session.title) return session.title;
     if (session.kind === 'chapter') return t("Chapter drill · {chapter}", { chapter: chapterTitle(session.chapter_id) });
     if (session.kind === 'warm_up') return t("Warm-up before {section}", { section: titles([session.concept_id!]) });
     const way = ways.find((w) => w.way === session.way);
@@ -127,8 +139,11 @@
       <div class="columns">
         <div class="reference">
           <div class="tabs" role="tablist" aria-label={t("Ways to review")}>
-            <button role="tab" id="tab-points" aria-selected={tab === 'points'} aria-controls="panel-points" onclick={() => (tab = 'points')}>{t("Key points")}</button>
-            <button role="tab" id="tab-mistakes" aria-selected={tab === 'mistakes'} aria-controls="panel-mistakes" onclick={() => (tab = 'mistakes')}>{t("Mistakes")}</button>
+            <button role="tab" id="tab-points" aria-selected={tab === 'points'} aria-controls="panel-points" onclick={() => (app.reviewTab = 'points')}>{t("Key points")}</button>
+            <button role="tab" id="tab-mistakes" aria-selected={tab === 'mistakes'} aria-controls="panel-mistakes" onclick={() => (app.reviewTab = 'mistakes')}>{t("Mistakes")}</button>
+            {#if sheets.length}
+              <button role="tab" id="tab-sheets" aria-selected={tab === 'sheets'} aria-controls="panel-sheets" onclick={() => (app.reviewTab = 'sheets')}>{t("Sheets")} <span class="count">{sheets.length}</span></button>
+            {/if}
           </div>
           {#if tab === 'points'}
             <div class="panel" role="tabpanel" id="panel-points" aria-labelledby="tab-points">
@@ -150,9 +165,20 @@
                 </p>
               {/if}
             </div>
-          {:else}
+          {:else if tab === 'mistakes' || !shownSheet}
             <div class="panel" role="tabpanel" id="panel-mistakes" aria-labelledby="tab-mistakes">
               <MistakesBook entries={mistakes} onretry={retry} />
+            </div>
+          {:else if tab === 'sheets' && shownSheet}
+            <div class="panel" role="tabpanel" id="panel-sheets" aria-labelledby="tab-sheets">
+              {#if sheets.length > 1}
+                <div class="sheet-list" role="group" aria-label={t("Sheets")}>
+                  {#each sheets as sheet (sheet.id)}
+                    <button class="chip-way" aria-pressed={sheet.id === shownSheet.id} onclick={() => (app.sheetOpen = sheet.id)}>{sheet.title}</button>
+                  {/each}
+                </div>
+              {/if}
+              <SheetView sheet={shownSheet} />
             </div>
           {/if}
         </div>
@@ -362,6 +388,24 @@
     color: var(--ink-soft);
     font-size: var(--step--1);
     cursor: pointer;
+  }
+
+  .chip-way[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+
+  .sheet-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .count {
+    margin-left: 0.2rem;
+    font-weight: 400;
+    color: var(--pencil);
   }
 
   .chip-way:hover:not(:disabled) {

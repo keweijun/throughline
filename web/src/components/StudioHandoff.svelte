@@ -69,7 +69,12 @@
 </script>
 
 {#snippet state()}
-  {#if sent}
+  {#if sent?.result && status === 'done'}
+    <!-- What Studio made, where it lives: a session or sheet in Review, or the section it added exercises to. -->
+    <span class="status" role="status">{t("Done: {what}", { what: sent.result.title ?? (sent.result.kind === 'exercises' ? t("exercises added") : label) })}</span>
+    <button class="link" onclick={() => app.showResult(sent.result!)}>{t("Open it")}</button>
+    <button class="link quiet" onclick={() => app.showStudio({ thread: sent.thread_id })}>{t("The chat")}</button>
+  {:else if sent}
     <span class="status" role="status">
       {#if status === 'working'}<span class="live-dot"></span>{t("Studio is working on it")}
       {:else if status === 'waiting'}{t("Studio needs your answer")}
@@ -200,6 +205,10 @@
 
   .link:hover {
     text-decoration: underline;
+  }
+
+  .link.quiet {
+    color: var(--pencil);
   }
 
   .studio-link::before {

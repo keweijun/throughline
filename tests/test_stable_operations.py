@@ -1,5 +1,5 @@
 """The operations docs/stability.md promises through 1.x: named in the skill for Codex to call, or frozen chat-teaching
-ones. Removing or renaming one is a 2.0 change from 1.0 (review.write, review.sets and review.context left before it, ADR 0025); a new one the skill names is added to STABLE here."""
+ones. Removing or renaming one is a 2.0 change from 1.0 (review.write and review.sets left before it, ADR 0025); a new one the skill names is added to STABLE here."""
 import glob
 import re
 import unittest
@@ -14,9 +14,9 @@ STABLE = {
     'annotations.delete', 'annotations.list', 'annotations.save', 'course.init', 'course.profile.save', 'course.rename',
     'course.status',
     'curriculum.chapter.save', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage',
-    'curriculum.outline', 'curriculum.save', 'curriculum.view', 'key_points.revise', 'key_points.view', 'mainline.enter', 'memory.confirm', 'memory.save',
+    'curriculum.outline', 'curriculum.save', 'curriculum.view', 'drill.list', 'drill.write', 'key_points.revise', 'key_points.view', 'mainline.enter', 'mistakes.list', 'memory.confirm', 'memory.save',
     'position.save', 'practice.add', 'practice.list', 'practice.retire', 'practice.revise', 'preferences.save',
-    'preferences.view', 'session.resume', 'source.figure', 'source.read',
+    'preferences.view', 'review.context', 'session.resume', 'sheet.list', 'sheet.save', 'source.figure', 'source.read',
     'source.readings.save', 'source.register', 'source.render', 'source.search', 'stream.summaries', 'widgets.list',
     'widgets.save',
 }

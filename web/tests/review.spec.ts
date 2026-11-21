@@ -195,3 +195,37 @@ test('other ways to review start their own sessions, and Studio ways are one cli
   await expect(page.getByRole('region', { name: 'Earlier sessions' })).toContainText('Explain it back · Everything studied');
   expect(errors).toEqual([]);
 });
+
+test('what Studio made for a hand-off opens from its card: a mock exam to answer, and a sheet to read and print', async ({ page, course }) => {
+  // No real Codex: Studio reports nothing running, so the hand-off reads as done.
+  await page.route(/\/api\/studio\/activity/, (route) => route.fulfill({ json: { running: [], waiting: [] } }));
+  const { base, errors } = await course('studio_review_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  await page.getByRole('region', { name: 'Earlier sessions' }).getByRole('button', { name: /Everything studied/ }).click();
+  const card = page.getByRole('group', { name: 'Studio: A mock exam on States' });
+  await expect(card).toContainText('Done: Mock exam: States');
+  await card.getByRole('button', { name: 'Open it' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Mock exam: States' })).toBeVisible();
+  const session = page.getByRole('region', { name: 'Drill session' });
+  await expect(session).toContainText('An exam paper Studio wrote · 8 marks in all');
+  await expect(session).toContainText('Two questions; about twenty minutes.');
+  await expect(session.getByRole('article', { name: 'Question 1' })).toContainText('6 marks');
+  await expect(session.getByRole('group', { name: /Question 2 · 2 marks/ })).toBeVisible();
+
+  // The sheet is a tab of its own in Review, and the chapter page links to it.
+  await page.getByRole('tab', { name: /Sheets/ }).click();
+  const sheet = page.getByRole('article', { name: 'Formula sheet: States' });
+  await expect(sheet).toContainText('Probabilities');
+  await expect(sheet).toContainText('States ·');
+  await page.locator('#open-study').click();
+  await page.locator('#route').getByRole('button', { name: /Chapter 1 · States|^States/ }).first().click();
+  await page.getByRole('button', { name: 'Formula sheet: States' }).click();
+  await expect(page.getByRole('tab', { name: /Sheets/ })).toHaveAttribute('aria-selected', 'true');
+  await sheet.getByRole('button', { name: 'Remove' }).click();
+  await sheet.getByRole('group').getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByRole('tab', { name: /Sheets/ })).toHaveCount(0);
+  const state = await (await page.request.get(base + '/api/state')).json();
+  expect(state.sheets).toEqual([]);
+  expect(errors).toEqual([]);
+});

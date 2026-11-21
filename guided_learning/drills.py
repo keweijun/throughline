@@ -14,6 +14,9 @@ KINDS = ('drill', 'chapter', 'warm_up')
 WAYS = ('questions', 'explain', 'oral', 'confusable')
 MAX_MESSAGE = 4000
 MAX_LABEL = 120
+MAX_TITLE = 200
+MAX_NOTE = 1000
+MAX_WRITTEN = 30  # a mock exam's sanity cap; Codex decides the paper's length
 
 
 def _scope(value):
@@ -130,6 +133,51 @@ def offer(store, request):
     return {'handoff': offers[turn_id]}
 
 
+def write(store, request):
+    """A session Codex writes in Studio (issue #229): a mock exam from past papers, a problem set to answer from memory,
+    "drill me on this file". Its questions are review questions under the same rules as a drill's, over the sections it
+    covers (`scope`, else everything studied), with optional `marks`; `exam` shows it as a paper. The learner answers
+    them in Review, where the fast teacher can carry the session on. `handoff_id` links it to the hand-off that asked."""
+    from .practice import FormatError, _review_questions
+    from . import handoffs
+    identifier = require_text(request, 'id')
+    previous = store.get(SESSIONS, identifier)
+    if previous:
+        return {'session': previous, 'task_ids': [t['id'] for t in store.list('practice_tasks') if t.get('session_id') == identifier]}
+    title = request.get('title')
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > MAX_TITLE:
+        raise OperationError('invalid_request', f'title is text of at most {MAX_TITLE} characters')
+    note = request.get('note')
+    if note is not None and (not isinstance(note, str) or len(note) > MAX_NOTE):
+        raise OperationError('invalid_request', f'note is text of at most {MAX_NOTE} characters')
+    exam = request.get('exam', False)
+    if not isinstance(exam, bool):
+        raise OperationError('invalid_request', 'exam is true or false')
+    value = {'id': identifier, 'kind': 'drill', 'origin': 'studio', 'title': title.strip(), 'created_at': time.time(), 'turn_ids': [],
+             **({'exam': True} if exam else {}), **({'note': note.strip()} if note and note.strip() else {})}
+    scope = _scope(request.get('scope'))
+    if scope:
+        value['scope'] = scope
+    covered = sections(store, value)
+    if not covered:
+        raise OperationError('nothing_to_review', 'Nothing studied matches this session yet')
+    written = identifier + ':written'
+    try:
+        questions = _review_questions(store, {'id': written}, {'questions': request.get('questions')}, strict=True, allowed=covered, cap=MAX_WRITTEN)
+    except FormatError as exc:
+        raise OperationError('invalid_review_question', str(exc)) from exc
+    store.put(SESSIONS, identifier, value)
+    ids = []
+    for index, question in enumerate(questions):
+        task_id = f'{written}:{index:02d}'
+        store.put('practice_tasks', task_id, {'id': task_id, 'concept_id': question['tests_concept_ids'][0], 'origin': 'review', 'session_id': identifier,
+                                              'drill_turn_id': written, 'status': 'pending', 'history': [], 'source_refs': [],
+                                              'created_at': time.time(), **question})
+        ids.append(task_id)
+    handoffs.record_result(store, request.get('handoff_id'), {'kind': 'session', 'id': identifier, 'title': value['title']})
+    return {'session': value, 'task_ids': ids}
+
+
 def listing(store, _request):
     """Every session, newest first, with its turns and questions in order and the sections it covers."""
     tasks = {}
@@ -138,10 +186,11 @@ def listing(store, _request):
             tasks.setdefault(task['session_id'], []).append(task)
     found = []
     for value in sorted(store.list(SESSIONS), key=lambda s: -s.get('updated_at', s['created_at'])):
-        mine = sorted(tasks.get(value['id'], []), key=lambda t: (value['turn_ids'].index(t['drill_turn_id']) if t['drill_turn_id'] in value['turn_ids'] else 0, t['id']))
+        # What Codex wrote comes first, then each teacher turn's questions in turn order.
+        mine = sorted(tasks.get(value['id'], []), key=lambda t: (value['turn_ids'].index(t['drill_turn_id']) if t['drill_turn_id'] in value['turn_ids'] else -1, t['id']))
         found.append({**value, 'sections': sections(store, value), 'task_ids': [t['id'] for t in mine]})
     return {'sessions': found}
 
 
 OPERATIONS = {'drill.create': create, 'drill.add_turn': add_turn, 'drill.questions': add_questions, 'drill.offer': offer,
-              'drill.list': listing}
+              'drill.write': write, 'drill.list': listing}

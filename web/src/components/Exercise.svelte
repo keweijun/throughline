@@ -151,6 +151,7 @@
       {#if task.origin === 'review'}
         <!-- A drill's questions are numbered through its session, recall and written alike (ADR 0025). -->
         {task.session_id ? t('Question {number}', { number: number ?? 0 }) : number ? t('Review question {number}', { number }) : t("Review question")}
+        {#if task.marks}<span class="origin">· {task.marks === 1 ? t("1 mark") : t("{count} marks", { count: task.marks })}</span>{/if}
         {#if task.tests_concept_ids?.length}<span class="origin">· {t("tests {sections}", { sections: titles(task.tests_concept_ids) })}</span>{/if}
       {:else if task.origin === 'chapter_quiz'}
         {number ? t('Quiz question {number}', { number }) : t("Quiz question")}

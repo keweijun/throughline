@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.62.0
+
+- **What Studio makes for review lands in Review.**
+  - **Mock exams and drills:** a mock exam from your past papers, or "drill me on this PDF", becomes a session you answer right in Review, with marks when it's a paper. Your answers count, and misses go into your mistakes book. You can carry on with the quick teacher afterwards.
+  - **Sheets:** cheat sheets, formula sheets and "my mistakes on one page" appear under **Sheets** in Review, linked from the chapter page. You can print or remove them.
+- **Done, and one click to open it.** When Studio finishes something you sent it, the card that sent it says **Done: <what it made>**. **Open it** takes you there: the session, the sheet, or the section it added exercises to.
+- **Studio builds from your mistakes.** Codex can now read your mistakes book and your review history, so a mock exam or a summary can focus on what you actually get wrong.
+
 ## 0.61.0
 
 - **Hand things to Studio without leaving what you're doing.** When a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio right under its reply. One click sends it, with what you were reviewing, and the card shows Studio working, then **Done** with **Open**. A suggested course change now works the same way, as does **One-page summary in Studio** beside a chapter's key points.

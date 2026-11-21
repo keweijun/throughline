@@ -37,6 +37,11 @@
       + `Questions so far: ${tasks.map((x) => `${x.question.slice(0, 120)} [${x.answer ? (x.answer.correct ? 'right' : 'missed') : x.history.some((h) => h.action === 'assess') ? 'answered' : 'unanswered'}]`).join('; ') || 'none'}`,
   });
 
+  // What Codex wrote in Studio for this session (`drill.write`) comes first; a paper says its marks.
+  const written = $derived(tasks.filter((task) => task.drill_turn_id === `${session.id}:written`));
+  const total = $derived(written.reduce((sum, task) => sum + (task.marks ?? 0), 0));
+  const marks = (count: number) => (count === 1 ? t("1 mark") : t("{count} marks", { count }));
+
   async function send(message = '') {
     if (busy || replying) return;
     busy = true;
@@ -53,7 +58,7 @@
       check={{ idea: task.idea ?? '', question: task.question, options: task.options, correct: task.correct ?? 0 }}
       answer={task.answer}
       more={false}
-      label={t('Question {number}', { number: numbers.get(task.id) ?? 0 }) + ' · ' + t("tests {sections}", { sections: titles(task.tests_concept_ids) })}
+      label={t('Question {number}', { number: numbers.get(task.id) ?? 0 }) + (task.marks ? ' · ' + marks(task.marks) : '') + ' · ' + t("tests {sections}", { sections: titles(task.tests_concept_ids) })}
       onanswer={(choice) => app.answerRecall(task.id, choice)}
       taskId={task.id}
       section={task.concept_id}
@@ -68,6 +73,16 @@
 {/snippet}
 
 <section class="drill" aria-label={t("Drill session")}>
+  {#if session.origin === 'studio'}
+    <p class="written">
+      <span class="badge">{t("Studio")}</span>
+      {session.exam ? t("An exam paper Studio wrote") : t("Questions Studio wrote")}{#if total}&nbsp;· {t("{count} marks in all", { count: total })}{/if}
+    </p>
+    {#if session.note}<p class="note">{session.note}</p>{/if}
+    {#each written as task (task.id)}
+      {@render question(task)}
+    {/each}
+  {/if}
   {#each turns as turn (turn.id)}
     {@const said = session.messages?.[turn.id]}
     {@const offer = session.handoffs?.[turn.id]}
@@ -128,6 +143,29 @@
   .reply {
     font-size: var(--step-0);
     line-height: 1.6;
+  }
+
+  .written {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+
+  .badge {
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink, white);
+    font-weight: 600;
+  }
+
+  .note {
+    margin: -0.5rem 0 0;
+    font-size: var(--step-0);
+    color: var(--ink-soft);
   }
 
   .status {

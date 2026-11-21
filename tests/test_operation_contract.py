@@ -300,6 +300,27 @@ class Results(Contract):
         self.assertEqual((kept['history'], kept['status']), (exercise['history'], 'attempted'), 'answers and help stay')
 
 
+    def test_review_data_and_what_studio_writes(self):
+        """What Studio reads of the learner's review and writes into the Review place (issue #229)."""
+        mistakes = self.op('mistakes.list')
+        self.assertFields(mistakes, ('entries',))
+        for entry in mistakes['entries']:
+            self.assertFields(entry, ('id', 'kind', 'concept_ids', 'question', 'missed_at', 'right_at'), 'a mistake')
+        context = self.op('review.context', sections=['paths'])
+        self.assertFields(context, ('sections', 'earlier'))
+        self.assertFields(context['sections'][0], ('id', 'title', 'days_since_practised', 'recent_misses', 'set_aside'), 'a section')
+        apply = {'kind': 'apply', 'question': 'Three paths: when is it dark?', 'parts': ['(a)', '(b)'], 'tests_concept_ids': ['paths'], 'marks': 4}
+        written = self.op('drill.write', id='mock-1', title='Mock exam', exam=True, note='Twenty minutes.', questions=[apply], handoff_id='review:1')
+        self.assertFields(written, ('session', 'task_ids'))
+        self.assertFields(written['session'], ('id', 'title', 'created_at'), 'a written session')
+        sessions = self.op('drill.list')['sessions']
+        self.assertFields(next(s for s in sessions if s['id'] == 'mock-1'), ('id', 'kind', 'title', 'sections', 'task_ids', 'created_at'), 'a session')
+        task = next(t for t in self.op('practice.list')['tasks'] if t['id'] == written['task_ids'][0])
+        self.assertEqual((task['origin'], task['session_id'], task['marks']), ('review', 'mock-1', 4))
+        sheet = self.op('sheet.save', id='formulas', title='Formula sheet', markdown='$P = |a + b|^2$', scope={'concept_ids': ['paths']})
+        self.assertFields(sheet['sheet'], ('id', 'title', 'markdown', 'scope', 'created_at', 'updated_at'), 'a sheet')
+        self.assertFields(self.op('sheet.list'), ('sheets',))
+
 class Errors(Contract):
     """Each error code the references name, triggered the way they describe."""
 
@@ -351,6 +372,14 @@ class Errors(Contract):
         answered = next(t for t in self.op('practice.list')['tasks'] if t['concept_id'] == 'paths' and t['origin'] == 'self_created')
         self.refused('exercise_answered', 'practice.revise', id=answered['id'], parts=['(a) only one part now'])
         self.refused('exercise_answered', 'practice.retire', id=answered['id'], reason='Duplicate')
+
+    def test_review_errors(self):
+        apply = {'kind': 'apply', 'question': 'Three paths: when is it dark?', 'tests_concept_ids': ['paths']}
+        self.refused('nothing_to_review', 'drill.write', id='m', title='Measurement', scope={'chapter_ids': ['measurement']}, questions=[{**apply, 'tests_concept_ids': ['outcomes']}])
+        self.refused('invalid_review_question', 'drill.write', id='m', title='T', questions=[apply] * 31)
+        self.refused('invalid_review_question', 'drill.write', id='m', title='T', questions=[
+            apply, {'kind': 'recall', 'question': 'One option?', 'tests_concept_ids': ['paths'], 'options': [{'text': 'Yes', 'explanation': 'Only one.'}], 'correct': 0}])
+        self.refused('unknown_concept', 'sheet.save', id='s', title='T', markdown='x', scope={'chapter_ids': ['nowhere']})
 
     def test_unknown_widget(self):
         self.refused('unknown_widget', 'widgets.save', ids=['plot', 'sparkles'])

@@ -165,6 +165,8 @@ export type Task = {
   /** A drill session's question: the session and the teacher turn that asked it (ADR 0025). */
   session_id?: string;
   drill_turn_id?: string;
+  /** A paper's marks for this question (`drill.write`). */
+  marks?: number;
   /** A review question is answered in writing (`apply`) or by choosing one of `options` (`recall`), recorded in `answer`. */
   kind?: 'apply' | 'recall';
   idea?: string;
@@ -300,6 +302,18 @@ export type State = {
   mistakes: Mistake[];
   drills: DrillSession[];
   handoffs: Handoff[];
+  sheets: Sheet[];
+};
+
+/** A page Codex wrote in Studio for review (issue #229): a cheat sheet, formula sheet, mistakes on one page. */
+export type Sheet = {
+  id: string;
+  title: string;
+  markdown: string;
+  /** The chapters and sections it covers; empty for the whole course. */
+  scope: { chapter_ids?: string[]; concept_ids?: string[] };
+  created_at: number;
+  updated_at: number;
 };
 
 /** A request handed to Studio from a fast view (issue #229), and the Studio chat it started. */
@@ -310,6 +324,8 @@ export type Handoff = {
   request: string;
   thread_id: string;
   created_at: number;
+  /** What Studio made for it, once it says so. */
+  result?: { kind: 'session' | 'sheet' | 'exercises'; id?: string; title?: string; concept_id?: string; task_ids?: string[]; at: number };
 };
 
 /**
@@ -327,6 +343,11 @@ export type DrillSession = {
   turn_ids: string[];
   messages?: Record<string, string>;
   way?: DrillWay;
+  /** Written by Codex in Studio (`drill.write`): its title, a note on what it covers, and whether it is an exam paper. */
+  origin?: 'studio';
+  title?: string;
+  note?: string;
+  exam?: boolean;
   /** What a reply offered to hand to Studio, by turn: once sent, the chat it started. */
   handoffs?: Record<string, { label: string; request: string }>;
   sections: string[];

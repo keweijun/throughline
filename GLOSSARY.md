@@ -94,6 +94,9 @@ _Avoid_: Escalation (internal), redirect, a link that only opens Studio.
 **Way to review**: How a drill session asks, chosen in the Review place: quick questions, explain it back, oral quiz or telling confusable ideas apart; Studio ways (a mock exam, a sheet) are hand-offs (ADR 0026).
 _Avoid_: Mode, game, a separate page.
 
+**Sheet**: A page Codex wrote in Studio for review, such as a cheat sheet, a formula sheet or the learner's mistakes on one page. It covers chapters or sections, is read and printed in Review's Sheets, and is linked from the chapter page (ADR 0026).
+_Avoid_: Chapter sheet (the chapter's key points), key points, a source.
+
 **Drill session**: A conversation with the fast teacher over a review scope, in the Review place: it asks a few review questions at a time, the learner answers them in place, asks for more or says what to drill next. It is kept and reopened at will and never finished or due; a chapter's drill and a warm-up are sessions with a fixed scope (ADR 0025).
 _Avoid_: Quiz, test, review set, a session that must be completed.
 

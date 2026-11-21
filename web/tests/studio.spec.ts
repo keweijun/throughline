@@ -279,7 +279,7 @@ test('a course change the teacher suggests is sent to Studio in one go, and its 
   await suggestion.getByRole('button', { name: 'Open', exact: true }).click();
   const panel = page.locator('#course-studio');
   await expect(panel.locator('.user').first()).toContainText('Add a section on interference after Wave superposition');
-  await expect(panel.locator('.user .origin').first()).toHaveText('section "Wave superposition" (wave)');
+  await expect(panel.locator('.user .origin').first()).toHaveText(/^section "Wave superposition" \(wave\) · hand-off change:/);
   await page.locator('#open-study').click();
   await page.reload();
   await expect(page.locator('.lesson-body')).toHaveText('A wave.');

@@ -43,9 +43,20 @@ The fast teacher runs more ways than quick questions. Each is a guide in its pro
 - **Oral quiz:** one short question at a time in the conversation.
 - **Tell confusable ideas apart:** from course memory's difficulties, which the drill's review state now carries, and from open mistakes.
 
-## Next
+### What Studio makes comes back to Review
 
-Studio writes what it makes back into Review (issue #229, step 2): `drill.write` for sessions and mock exams, and `sheet.save` for sheets. Studio also gets read access to review data, and the operations take a `handoff_id`, so a card's **Done** links to what was made.
+Studio works best from what the learner actually got wrong, and what it makes for review belongs where review happens. New skill operations make both possible, and they are part of the 1.0 promise (docs/stability.md):
+
+- **Reading review data.** `mistakes.list`, `drill.list` and `review.context` (with an optional `sections`) join the skill. This lets Codex build a mock exam weighted to what the learner misses, or a page of their mistakes.
+- **`drill.write`: a session Codex writes**, such as a mock exam from past papers, a problem set to answer from memory, or "drill me on this file".
+  - **Questions:** review questions under the drill's rules, over a `scope` of studied sections. At most 30, with optional `marks`. `exam: true` shows them as a paper, with the total marks, and a `note` above them.
+  - **Placement:** they lead the session in Review (`<id>:written:NN`, `origin: "studio"`). Answers count and misses reach the mistakes book, as in any drill, and the learner can carry the session on with the fast teacher.
+  - **Errors:** an invalid question refuses the whole session, since Codex can correct it.
+- **`sheet.save`: a sheet**, such as a cheat sheet, a formula sheet or the learner's mistakes on one page.
+  - **Format:** Markdown with LaTeX, with a `scope` of chapters or sections.
+  - **Where it shows:** under **Sheets**, a third tab in Review that appears when a sheet touches the scope, and as links on the chapter page of a chapter it covers. It can be printed alone (`body[data-print]`).
+  - **Changes:** saving under the same id replaces it, which is how Codex changes it when asked. The learner can remove a sheet; Codex can write it again.
+- **`handoff_id` on `drill.write`, `sheet.save` and `practice.add`.** A hand-off's context gives Codex its id, and Codex passes it when it saves what it made. The hand-off then records the result (`handoffs.record_result`), and the card that sent it reads **Done: <title> · Open it**: open the session, open the sheet, or go to the section given the exercises. A result saved before the app recorded its hand-off waits for it.
 
 ## Not chosen
 

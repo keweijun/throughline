@@ -116,6 +116,7 @@ PARTS = {
     # Worked out from exercises, review answers and check answers on every load; nothing of it is stored.
     'drills': lambda host: {'drills': host.drills.state()},
     'handoffs': lambda host: host.operation({'op': 'handoff.list'}),
+    'sheets': lambda host: host.operation({'op': 'sheet.list'}),
     'mistakes': lambda host: {'mistakes': host.operation({'op': 'mistakes.list'})['entries']},
 }
 # Parts a `changed` event may reload without the rest of the state.

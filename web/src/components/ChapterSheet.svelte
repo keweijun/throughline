@@ -17,6 +17,10 @@
   // Sections studied before key points get theirs in the background, a section at a time.
   const waiting = $derived(chapter.concept_ids.filter((id) => !app.keyPoints(id) && app.studied(id)).length);
   const sheet = $derived(app.chapterSheet(chapter.id));
+  // Sheets Studio wrote for this chapter or its sections; they open in Review, where they are read and printed.
+  const pages = $derived(
+    (app.state?.sheets ?? []).filter((s) => s.scope.chapter_ids?.includes(chapter.id) || s.scope.concept_ids?.some((id) => chapter.concept_ids.includes(id))),
+  );
   const recaps = $derived(app.recaps(chapter.id).filter((r) => r.status === 'completed'));
 </script>
 
@@ -34,6 +38,14 @@
       />
     {/if}
   </header>
+  {#if pages.length}
+    <p class="pages">
+      <span>{t("Sheets")}</span>
+      {#each pages as page (page.id)}
+        <button class="link" onclick={() => app.showResult({ kind: 'sheet', id: page.id, at: page.updated_at })}>{page.title}</button>
+      {/each}
+    </p>
+  {/if}
   {#if sheet}
     <div class="prose connection" use:markdown={{ language: locale.language, text: sheet.connection }}></div>
   {/if}
@@ -61,6 +73,29 @@
   .sheet {
     display: grid;
     gap: 1.4rem;
+  }
+
+  .pages {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.9rem;
+    margin-top: -0.8rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    text-decoration: underline;
   }
 
   header {

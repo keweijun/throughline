@@ -13,6 +13,7 @@
   import CodexLink from './CodexLink.svelte';
   import DrillSession from './DrillSession.svelte';
   import KeyPoints from './KeyPoints.svelte';
+  import StudioIntro from './StudioIntro.svelte';
 
   let { conceptId }: { conceptId: string | null } = $props();
 
@@ -120,6 +121,7 @@
   </section>
 {:else}
   <article class="page" aria-labelledby="concept-title">
+    <StudioIntro />
     {#if !isCurrent}
       <div class="previewing" role="note">
         <p>

@@ -6,6 +6,7 @@
   import CheckQuestion from './CheckQuestion.svelte';
   import Composer from './Composer.svelte';
   import Exercise from './Exercise.svelte';
+  import StudioHandoff from './StudioHandoff.svelte';
 
   /**
    * One drill session (ADR 0025): what the learner said, the fast teacher's replies and the questions each one set,
@@ -28,6 +29,13 @@
   let busy = $state(false);
   // Questions are numbered through the session, so a reply can refer to one.
   const numbers = $derived(new Map(tasks.map((task, i) => [task.id, i + 1])));
+
+  // What Studio is told about where a hand-off came from: the session, what it covers and how its questions went.
+  const context = $derived({
+    label: t('Review: {scope}', { scope: titles(session.sections) }),
+    text: `drill session ${session.id} in the Review place, covering ${session.sections.map((id) => `"${app.concept(id)?.title ?? id}" (${id})`).join(', ')}. `
+      + `Questions so far: ${tasks.map((x) => `${x.question.slice(0, 120)} [${x.answer ? (x.answer.correct ? 'right' : 'missed') : x.history.some((h) => h.action === 'assess') ? 'answered' : 'unanswered'}]`).join('; ') || 'none'}`,
+  });
 
   async function send(message = '') {
     if (busy || replying) return;
@@ -62,11 +70,16 @@
 <section class="drill" aria-label={t("Drill session")}>
   {#each turns as turn (turn.id)}
     {@const said = session.messages?.[turn.id]}
+    {@const offer = session.handoffs?.[turn.id]}
     {#if said}<p class="said">{said}</p>{/if}
     {#if turn.text}
       <div class="prose reply" use:markdown={{ language: locale.language, text: turn.text, streaming: turn.status === 'running' }}></div>
     {:else if turn.status === 'running'}
       <p class="status"><span class="chip"><span class="live-dot"></span>{t("The teacher is choosing questions")}</span></p>
+    {/if}
+    <!-- Under the reply that offers it, before the questions the reply also asks. -->
+    {#if offer && turn.status === 'completed'}
+      <StudioHandoff id="drill:{turn.id}" place={{ kind: 'drill', session: session.id, turn: turn.id }} label={offer.label} request={offer.request} {context} />
     {/if}
     {#each tasks.filter((task) => task.drill_turn_id === turn.id) as task (task.id)}
       {@render question(task)}

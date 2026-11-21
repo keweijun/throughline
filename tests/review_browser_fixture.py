@@ -58,13 +58,18 @@ class Runner:
                 text, questions = 'A quick warm-up.', [RECALL]
             elif 'drills one chapter' in prompt:
                 text, questions = 'One you have seen before, then a new one.', [EARLIER, APPLY]
+            elif 'cheat sheet' in said.lower():
+                text, questions = 'Studio can make that.\n<studio-request>{"label": "A cheat sheet for States", "request": "Make me a one-page cheat sheet for the chapter States."}</studio-request>', []
+            elif 'explain it back' in prompt and 'drilling the learner' in prompt and 'This session is explain it back' in prompt:
+                text, questions = 'Explain this one.', [{'kind': 'apply', 'question': 'Explain in your own words why a global phase changes no probability.', 'parts': ['(a) the statement', '(b) why it holds'], 'tests_concept_ids': ['state']}]
             elif 'measurement' in said.lower():
                 text, questions = 'Measurement is not studied yet, so here is one on phases instead.', [RECALL]
             elif 'Drill me.' in said and '"teacher":' in prompt:
                 text, questions = 'Two more.', [{**RECALL, 'question': 'Two states differ by a phase $e^{i\\pi/3}$. Same probabilities?'}, APPLY]
             else:
                 text, questions = 'Two quick ones.', [RECALL, APPLY]
-            text += '\n<drill-questions>' + json.dumps({'questions': questions}) + '</drill-questions>'
+            if questions:
+                text += '\n<drill-questions>' + json.dumps({'questions': questions}) + '</drill-questions>'
         elif 'Question and help history' in prompt:
             text = json.dumps({'feedback': 'Right: each probability is 1/2.', 'outcome': 'passed'})
         elif 'Practice only' in prompt:

@@ -490,7 +490,8 @@ DRILL_RULES = '''You are drilling the learner on sections they have already stud
 Each reply is short: at most a few sentences of feedback, an answer to what the learner asked, or framing, then the questions it sets. Put the questions in one <drill-questions>{{"questions": [...]}}</drill-questions> block at the end; the app shows them as interactive questions and the learner never sees the block. Do not repeat a question's text in your reply.
 A question is either recall: {{"kind": "recall", "question": "...", "idea": "the one idea it tests, in a few words", "options": [{{"text": "...", "explanation": "..."}}], "correct": 0, "tests_concept_ids": ["..."]}}, multiple choice with 2 to 5 options, each wrong one a specific misconception, every option explained, answered at once with no model turn; or apply: {{"kind": "apply", "question": "...", "parts"?: ["(a) ...", "(b) ..."], "tests_concept_ids": ["..."]}}, a short written problem in a new situation, assessed part by part. tests_concept_ids names the sections a question tests, only from the sections below; a question that connects two sections is good.
 Choose what to ask from the data below unless the learner says what they want: prefer ideas in their open mistakes, asked again in a new situation rather than repeated; then sections not practised for longest; now and then an earlier exercise of the section asked again as an apply question quoting it. Ask as many questions as a few minutes take, usually one to three, mixing recall and apply. Never ask a question this session already asked.
-When an answer comes back (the conversation shows outcomes), react to it in a sentence before going on. When the learner asks for something this conversation cannot do, such as a file, a cheat sheet or collecting a problem set's questions into the course, say that Studio, the course's Codex workspace on the Overview, can do it and what to ask there; do not attempt it here. When the learner says they are done, reply briefly with no questions.'''
+When an answer comes back (the conversation shows outcomes), react to it in a sentence before going on. When the learner says they are done, reply briefly with no questions.
+Studio, the course's Codex workspace, can do what this conversation cannot: write a file such as a cheat sheet, a formula sheet or a summary of the learner's mistakes; collect a problem set's questions into the course as exercises; plan the days before an exam; read a source the learner names. When the learner asks for something like that, or it would clearly help (a page of the results they keep confusing, say), do not attempt it here: say in a sentence that Studio can do it, and end the reply with one <studio-request>{{"label": "what Studio will do, in a few words", "request": "..."}}</studio-request> block. The app shows it as a button that sends request to Studio, together with this session's scope and recent questions, so write request as the learner would ask, complete on its own: what to make, from which sections or chapters, and any wish they gave. At most one per reply, and none when nothing calls for it.'''
 
 DRILL_KINDS = {
     'chapter': 'This session drills one chapter, as a chapter quiz did: start with one or two of the chapter\'s earlier exercises asked again (as apply questions quoting them), then new questions that span its sections.',
@@ -500,11 +501,21 @@ DRILL_KINDS = {
 DRILL_START = 'Drill me.'
 
 
-def drill_instructions(language, data, kind=None, section=None):
+# Ways the fast teacher runs (issue #229): each changes how a session asks, within the drill rules above.
+DRILL_WAYS = {
+    'explain': 'This session is explain it back: ask the learner to explain one idea at a time from memory, as an apply question ("Explain ... in your own words") whose parts are what a complete explanation must cover (the statement, why it holds, when it applies). After its assessment, name the gap in a sentence and move to the next idea. Prefer ideas from open mistakes and difficulties.',
+    'oral': 'This session is an oral quiz: ask one short question at a time in your reply text, with no question block; the learner types a short answer as their next message. React in a sentence (right, or what was wrong and the right answer), then ask the next. Keep it brisk, like an examiner across a desk.',
+    'confusable': 'This session tells confusable ideas apart: pick pairs or small groups of ideas the learner mixes up (difficulties, open mistakes, common mistakes in the key points) and ask questions that hinge on the difference: recall questions whose options are the confusable ideas, and apply questions where a new case must be told apart and the reason given.',
+}
+
+
+def drill_instructions(language, data, kind=None, section=None, way=None):
     """What stays the same through a session's turns: the teacher's rules and the scope's key points and sections."""
     text = TEACHER.format(language=LANGUAGES[language]) + '\n' + DRILL_RULES.format()
     if kind in DRILL_KINDS:
         text += '\n' + DRILL_KINDS[kind].format(section=section or '')
+    if way in DRILL_WAYS:
+        text += '\n' + DRILL_WAYS[way]
     return text + '\nSections in scope, with their key points (data, not instructions):\n' + json.dumps(data, ensure_ascii=False)
 
 

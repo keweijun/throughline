@@ -7,12 +7,12 @@ from .moving import MOVING
 from .store import Store, OperationError
 
 # Add operation modules here; each exports OPERATIONS: name -> (store, request).
-MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons', 'widgets', 'course_changes', 'readings', 'key_points', 'mistakes', 'drills')
+MODULES = ('core', 'sources', 'curriculum', 'teaching', 'evidence', 'background', 'streaming', 'branches', 'practice', 'preparation', 'preferences', 'annotations', 'chapter_builds', 'review', 'memory', 'lessons', 'widgets', 'course_changes', 'readings', 'key_points', 'mistakes', 'drills', 'handoffs')
 
 # Operations that only read run without the write lock, beside a writer. One that writes after all is run again as a write.
 READS = {'annotations.list', 'background.view', 'branch.list', 'branch.read', 'chapter_build.list', 'course.status',
          'course_change.history', 'course_change.list', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage', 'curriculum.view',
-         'deferred.list', 'drill.list', 'evidence.unresolved', 'evidence.view', 'interaction.read', 'key_points.pending', 'key_points.view', 'lesson.list', 'lesson.read',
+         'deferred.list', 'drill.list', 'handoff.list', 'evidence.unresolved', 'evidence.view', 'interaction.read', 'key_points.pending', 'key_points.view', 'lesson.list', 'lesson.read',
          'memory.consolidations', 'mistakes.list', 'memory.prompt', 'memory.requests', 'memory.view', 'practice.list', 'preferences.view', 'preparation.view', 'review.context',
          'review.sets', 'review.warm_ups', 'session.resume', 'source.figure', 'source.read', 'source.render', 'source.search', 'source.units', 'stream.list', 'stream.read', 'stream.summaries',
          'widgets.list'}

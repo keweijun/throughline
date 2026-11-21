@@ -12,7 +12,8 @@ from .features import Feature, tagged_json
 log = logging.getLogger(__name__)
 
 QUESTIONS = re.compile(r'<drill-questions>\s*(\{.*?\})\s*</drill-questions>', re.S)
-BLOCK = re.compile(r'\s*<drill-questions>.*?(</drill-questions>|$)', re.S)
+BLOCK = re.compile(r'\s*<(drill-questions|studio-request)>.*?(</\1>|$)', re.S)
+OFFER = re.compile(r'<studio-request>\s*(\{.*?\})\s*</studio-request>', re.S)
 CONVERSATION = 12  # earlier turns a prompt carries; a session can go on without its prompt growing for ever
 OPEN_MISTAKES = 12
 
@@ -31,7 +32,7 @@ class Drills(Feature):
         """A new session, and its first turn: the learner's message, else "Drill me"."""
         with self.host.lock:
             request = {'id': body.get('id') or 'drill-' + str(uuid.uuid4()), 'kind': body.get('kind') or 'drill'}
-            for key in ('scope', 'chapter_id', 'concept_id'):
+            for key in ('scope', 'chapter_id', 'concept_id', 'way'):
                 if body.get(key):
                     request[key] = body[key]
             session = self.operation({'op': 'drill.create', **request})['session']
@@ -72,19 +73,26 @@ class Drills(Feature):
         context = self.operation({'op': 'review.context', 'sections': session['sections']})
         mistakes = [{k: m[k] for k in ('kind', 'concept_ids', 'question', 'part', 'idea', 'answer', 'feedback', 'chosen') if m.get(k)}
                     for m in self.operation({'op': 'mistakes.list'})['entries'] if not m['right_at'] and covered & set(m['concept_ids'])]
-        return {'sections': context['sections'], 'open_mistakes': mistakes[:OPEN_MISTAKES], 'earlier_review_questions': context['earlier']}
+        # Ideas the learner keeps getting wrong, which telling confusable ideas apart starts from (course memory, ADR 0010).
+        difficulties = [e['text'] for e in self.operation({'op': 'memory.view'})['entries']
+                        if e['kind'] == 'difficulty' and e['status'] == 'active' and (not e.get('concept_id') or e['concept_id'] in covered)]
+        return {'sections': context['sections'], 'open_mistakes': mistakes[:OPEN_MISTAKES], 'difficulties': difficulties,
+                'earlier_review_questions': context['earlier']}
 
     def _conversation(self, session, current):
         """The session's earlier turns: what the learner said, what the teacher replied, and how each question went."""
         tasks = {t['id']: t for t in self.host.review.state()['tasks']}
+        sent = {h['id'] for h in self.operation({'op': 'handoff.list'})['handoffs']}
         found = []
         for turn_id in session['turn_ids']:
             if turn_id == current:
                 break
             turn = self.operation({'op': 'stream.read', 'id': turn_id})['turn']
             asked = [tasks[i] for i in session['task_ids'] if i.startswith(turn_id + ':') and i in tasks]
+            offered = session.get('handoffs', {}).get(turn_id)
             found.append({'learner': '' if turn['prompt'] == prompts.DRILL_START else turn['prompt'],
                           'teacher': BLOCK.sub('', turn.get('final_text') or '').strip(),
+                          **({'offered_to_studio': offered['label'], 'sent_to_studio': 'drill:' + turn_id in sent} if offered else {}),
                           'questions': [{'question': t['question'], 'kind': t.get('kind', 'apply'), 'outcome': self._outcome(t)} for t in asked]})
         return found[-CONVERSATION:]
 
@@ -106,7 +114,7 @@ class Drills(Feature):
         title = None
         if session['kind'] == 'warm_up':
             title = next((c['title'] for c in self.operation({'op': 'curriculum.view'})['concepts'] if c['id'] == session.get('concept_id')), None)
-        instructions = prompts.drill_instructions(language, self._scope_data(session), session['kind'], title)
+        instructions = prompts.drill_instructions(language, self._scope_data(session), session['kind'], title, session.get('way'))
         message = turn['prompt']
         return prompts.Prompt(instructions, prompts.drill_request(self._review_state(session), self._conversation(session, turn['id']), message))
 
@@ -114,13 +122,20 @@ class Drills(Feature):
         if turn['channel'] != 'drill':
             return
         session = self.owner(turn['id'])
-        reply = tagged_json(QUESTIONS, turn['final_text'])
-        if not session or not isinstance(reply, dict) or not reply.get('questions'):
+        if not session:
             return
-        try:
-            self.operation({'op': 'drill.questions', 'id': session['id'], 'turn_id': turn['id'], 'questions': reply['questions']})
-        except OperationError as exc:
-            log.info('Drill turn %s wrote no usable questions: %s', turn['id'], exc)
+        reply = tagged_json(QUESTIONS, turn['final_text'])
+        if isinstance(reply, dict) and reply.get('questions'):
+            try:
+                self.operation({'op': 'drill.questions', 'id': session['id'], 'turn_id': turn['id'], 'questions': reply['questions']})
+            except OperationError as exc:
+                log.info('Drill turn %s wrote no usable questions: %s', turn['id'], exc)
+        offer = tagged_json(OFFER, turn['final_text'])
+        if isinstance(offer, dict):
+            try:
+                self.operation({'op': 'drill.offer', 'id': session['id'], 'turn_id': turn['id'], **{k: offer.get(k) for k in ('label', 'request')}})
+            except OperationError as exc:
+                log.info('Drill turn %s offered nothing usable for Studio: %s', turn['id'], exc)
 
     def fast(self, turn):
         """Whether a turn belongs to a drill: its own, or the assessment of an answer to one of its questions."""

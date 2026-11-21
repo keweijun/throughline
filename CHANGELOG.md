@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.61.0
+
+- **Hand things to Studio without leaving what you're doing.** When a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio right under its reply. One click sends it, with what you were reviewing, and the card shows Studio working, then **Done** with **Open**. A suggested course change now works the same way, as does **Make a one-page summary of this chapter in Studio** on the chapter page.
+- **More ways to review.** Next to Drill me: **Explain it back**, **Oral quiz** and **Tell confusable ideas apart**. With Studio: a **Mock exam**, a **Formula sheet** and **My mistakes on one page** for what you chose to review.
+- **Meet Studio.** The first course you open now says what Studio is, with three things it could do for that course, each one click away. With full access Studio starts straight away; without it, Throughline asks once before each request.
+
 ## 0.60.0
 
 - **Drill sessions replace review sets.** In Review, **Drill me** starts a quick back-and-forth with a fast teacher on what you chose to review. It asks a few questions at a time, mostly on what you missed before and what you haven't practised for a while, and you answer them right there. Ask for **More questions**, ask about an answer, or say what to drill next. Nothing to finish and nothing due: a session is kept under **Earlier sessions**, and you can pick it up again whenever you like. Your answers count just as before, and misses go into your mistakes book.

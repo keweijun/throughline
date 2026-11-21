@@ -36,6 +36,8 @@ class Runner:
         self.prompts.append(prompt)
         if 'drilling the learner' in prompt:
             text = self.reply + ('\n<drill-questions>' + json.dumps(self.drill) + '</drill-questions>' if self.drill else '')
+            if 'cheat sheet' in prompt.rsplit('The learner now says:', 1)[-1]:
+                text = 'Studio can make that for you.\n<studio-request>{"label": "A cheat sheet for States", "request": "Make me a one-page cheat sheet for the chapter States."}</studio-request>'
         elif 'Question and help history' in prompt:
             text = json.dumps({'feedback': 'Checked.', 'outcome': self.outcome})
         elif 'Practice only' in prompt:
@@ -201,6 +203,39 @@ class Drills(DrillCourse):
         self.study('a')
         self.post('/api/review/sets', {}, 404)
         self.post('/api/chapters/one/quiz', {}, 404)
+
+    def test_a_reply_offers_studio_what_it_cannot_do_and_the_hand_off_is_kept(self):
+        self.study('a')
+        self.drill({'id': 's1'})
+        self.post('/api/drills/s1/messages', {'message': 'Can you make me a cheat sheet?'})
+        settle(self.host)
+        session = self.session('s1')
+        turn = session['turn_ids'][-1]
+        self.assertEqual(session['handoffs'][turn], {'label': 'A cheat sheet for States', 'request': 'Make me a one-page cheat sheet for the chapter States.'})
+        self.assertIn('<studio-request>', self.drill_prompt(), 'the teacher is told how to offer Studio')
+        shown = next(t for t in self.state()['turns'] if t['id'] == turn)
+        self.assertIn('Studio can make that for you.', shown['text'])
+        sent = self.post('/api/handoffs', {'id': 'drill:' + turn, 'place': {'kind': 'drill', 'session': 's1', 'turn': turn},
+                                           'label': 'A cheat sheet for States', 'request': 'Make me a one-page cheat sheet.', 'thread_id': 'thread-1'})['handoff']
+        self.assertEqual(sent['thread_id'], 'thread-1')
+        again = self.post('/api/handoffs', {'id': 'drill:' + turn, 'place': {'kind': 'drill'}, 'label': 'x', 'request': 'y', 'thread_id': 'thread-2'})['handoff']
+        self.assertEqual(again['thread_id'], 'thread-1', 'a hand-off is recorded once')
+        self.assertEqual([h['id'] for h in self.state()['handoffs']], ['drill:' + turn])
+        self.post('/api/drills/s1/messages', {'message': 'Thanks'})
+        settle(self.host)
+        self.assertIn('"offered_to_studio": "A cheat sheet for States", "sent_to_studio": true', self.drill_prompt())
+        self.post('/api/handoffs', {'id': 'x', 'place': {'kind': 'elsewhere'}, 'label': 'x', 'request': 'y', 'thread_id': 't'}, 409)
+
+    def test_a_way_to_review_shapes_the_session(self):
+        self.study('a')
+        execute(self.root, {'op': 'memory.save', 'id': 'd1', 'kind': 'difficulty', 'text': 'Global and relative phase', 'concept_id': 'a'})
+        for way, said in (('explain', 'explain it back'), ('oral', 'an oral quiz'), ('confusable', 'tells confusable ideas apart')):
+            session = self.drill({'way': way})['session']
+            self.assertEqual(session['way'], way)
+            self.assertIn(said, self.drill_prompt())
+        self.assertIn('Global and relative phase', self.drill_prompt(), 'difficulties reach the teacher')
+        self.assertNotIn('way', self.drill({})['session'], 'quick questions is the default')
+        self.post('/api/drills', {'way': 'sing'}, 400)
 
     def test_drill_questions_cannot_be_skipped(self):
         self.study('a')

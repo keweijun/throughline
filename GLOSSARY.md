@@ -88,6 +88,12 @@ _Avoid_: Error log, to-do list, a single missed check question (a slip, not yet 
 **Review set**: Retired: the questions written for one review request before drill sessions. Sets written before stay to read and answer (ADR 0025).
 _Avoid_: Using it for a drill session.
 
+**Hand-off**: A request a fast view (a lesson, a drill, the Review place) cannot serve, sent to Studio as a new chat with where it came from; the learner stays put and the card that sent it follows the chat (ADR 0026).
+_Avoid_: Escalation (internal), redirect, a link that only opens Studio.
+
+**Way to review**: How a drill session asks, chosen in the Review place: quick questions, explain it back, oral quiz or telling confusable ideas apart; Studio ways (a mock exam, a sheet) are hand-offs (ADR 0026).
+_Avoid_: Mode, game, a separate page.
+
 **Drill session**: A conversation with the fast teacher over a review scope, in the Review place: it asks a few review questions at a time, the learner answers them in place, asks for more or says what to drill next. It is kept and reopened at will and never finished or due; a chapter's drill and a warm-up are sessions with a fixed scope (ADR 0025).
 _Avoid_: Quiz, test, review set, a session that must be completed.
 
@@ -124,7 +130,7 @@ _Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never r
 **Share level**: How much of a course a package holds: Route (the route and sources), Route and lessons (adds lessons and exercises without the sender's answers) or Everything. The recipient takes at most that much when importing.
 _Avoid_: Privacy setting, export format.
 
-**Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
+**Studio**: The place in the app where Codex works on the course with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught, and making what the fast views cannot, such as sheets, mock exams or a problem set's exercises. It is the main line; content questions go to the teacher in Questions (ADR 0016, ADR 0026).
 _Avoid_: Chat, workshop, side question, teaching.
 
 **Suggested course change**: A change to the course itself that the teacher proposes under a lesson reply or side-question answer, which the learner opens in Studio with the request filled in or dismisses. One is open at a time (ADR 0016).

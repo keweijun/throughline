@@ -158,3 +158,40 @@ test('the Review place opens on the key points of what it covers, remembers its 
   expect([state.drills[0].kind, state.drills[0].scope]).toEqual(['drill', { concept_ids: ['state'] }]);
   expect(errors).toEqual([]);
 });
+
+test('a reply offers Studio what a drill cannot do, asks once without full access, and says when Studio cannot run here', async ({ page, course }) => {
+  // No real Codex in a test: Studio answers that it cannot run here.
+  await page.route(/\/api\/studio(\?|$)/, (route) =>
+    route.fulfill({ json: { available: false, error: 'Codex cannot run Studio here.', access: { full_access: false, saved: true, sandbox_missing: false, setting_up: false, setup_error: null }, choice: { model: '', effort: '' }, threads: [] } }),
+  );
+  await page.route(/\/api\/studio\/access/, (route) => route.fulfill({ json: { full_access: false, saved: true, sandbox_missing: false, setting_up: false, setup_error: null } }));
+  const { errors } = await course('review_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  await page.getByRole('button', { name: 'Drill me' }).click();
+  const session = page.getByRole('region', { name: 'Drill session' });
+  await expect(session.getByRole('group', { name: /Question 1/ })).toBeVisible();
+  await session.getByRole('textbox', { name: 'Message to the teacher' }).fill('Can you make me a cheat sheet?');
+  await session.getByRole('button', { name: 'Send' }).click();
+  const offer = session.getByRole('group', { name: 'Studio: A cheat sheet for States' });
+  await expect(offer).toBeVisible();
+  await expect(session).not.toContainText('studio-request');
+  await offer.getByRole('button', { name: 'Do this in Studio' }).click();
+  await offer.getByRole('button', { name: 'Go ahead' }).click();
+  // This test course runs no Studio: the request is copied for a Codex chat instead, said beside it.
+  await expect(offer).toContainText('Codex cannot run Studio here. The request is copied');
+  expect(errors).toEqual([]);
+});
+
+test('other ways to review start their own sessions, and Studio ways are one click away', async ({ page, course }) => {
+  const { errors } = await course('review_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  const ways = page.getByRole('group', { name: 'Other ways to review' });
+  await expect(ways.getByRole('button')).toHaveText(['Explain it back', 'Oral quiz', 'Tell confusable ideas apart']);
+  await expect(page.getByRole('group', { name: 'With Studio' }).getByRole('button')).toHaveText(['Mock exam', 'Formula sheet', 'My mistakes on one page']);
+  await ways.getByRole('button', { name: 'Explain it back' }).click();
+  const session = page.getByRole('region', { name: 'Drill session' });
+  await expect(session.getByRole('article', { name: 'Question 1' })).toContainText('Explain in your own words');
+  await page.getByRole('button', { name: '← All sessions' }).click();
+  await expect(page.getByRole('region', { name: 'Earlier sessions' })).toContainText('Explain it back · Everything studied');
+  expect(errors).toEqual([]);
+});

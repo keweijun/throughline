@@ -5,6 +5,7 @@
   import type { Chapter } from '../lib/types';
   import KeyPoints from './KeyPoints.svelte';
   import Lesson from './Lesson.svelte';
+  import StudioHandoff from './StudioHandoff.svelte';
 
   /**
    * A chapter's key points sheet (ADR 0024): a paragraph on how its sections connect, then each studied section's
@@ -27,6 +28,16 @@
   {#each sections as value (value.concept_id)}
     <KeyPoints {value} section />
   {/each}
+  {#if sections.length}
+    <!-- What Studio can make from the chapter, where the learner has just read its points (issue #229). -->
+    <StudioHandoff
+      variant="link"
+      place={{ kind: 'chapter', chapter: chapter.id }}
+      label={t("Make a one-page summary of this chapter in Studio")}
+      request={t('Make me a one-page summary of the chapter "{chapter}": its key results with when they hold, how they connect, and the mistakes to avoid.', { chapter: chapter.title })}
+      context={{ label: t('Chapter: {chapter}', { chapter: chapter.title }), text: `chapter "${chapter.title}" (${chapter.id})` }}
+    />
+  {/if}
   {#if waiting}
     <p class="note">
       {waiting === 1 ? t("The key points of 1 studied section are still being written.") : t("The key points of {count} studied sections are still being written.", { count: waiting })}

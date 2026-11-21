@@ -4,8 +4,8 @@ import { api, ApiError, course, newId, signIn } from './api';
 import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
-import { studio } from './studio.svelte';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DrillStart, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
+import { studio, type StudioOrigin } from './studio.svelte';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DrillStart, Handoff, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
@@ -1162,6 +1162,42 @@ class AppStore {
       this.showReview();
     }
     return result;
+  }
+
+  /** A hand-off sent to Studio from this place (issue #229), once it has been. */
+  handoff(id: string) {
+    return (this.state?.handoffs ?? []).find((h) => h.id === id);
+  }
+
+  /**
+   * Hands a request to Studio (issue #229): a new Studio chat is sent `$throughline <request>` with `context` saying where
+   * it came from, and the course records it, so the card that sent it can follow the chat. The learner stays where they
+   * are. Returns an error message when Studio cannot run here, after copying the request so it can be pasted into Codex.
+   */
+  async handOff(value: Omit<Handoff, 'thread_id' | 'created_at'>, context: StudioOrigin): Promise<string | null> {
+    await studio.load();
+    if (!studio.available) {
+      try {
+        await navigator.clipboard.writeText(`$throughline ${value.request}`);
+      } catch {
+        // The message says where the request is either way.
+      }
+      return studio.error || t('Studio cannot run here.');
+    }
+    if (!studio.skills.length) await studio.loadSkills();
+    const previous = { thread: studio.threadId, origin: studio.origin };
+    studio.handoff('', context);
+    try {
+      const sent = await studio.send(studio.messageFor(`$throughline ${value.request}`));
+      await this.act(() => api.post('/api/handoffs', { ...value, thread_id: sent.thread }));
+      void studio.loadActivity();
+      return null;
+    } catch (e) {
+      // Studio stays on the chat the learner had open.
+      studio.origin = previous.origin;
+      if (previous.thread) void studio.open(previous.thread);
+      return e instanceof Error ? e.message : String(e);
+    }
   }
 
   /** The learner's next message in a drill session, or More questions without one. */

@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { t } from '../lib/i18n.svelte';
+  import { t, type MessageKey } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { markdown } from '../lib/markdown';
   import { locale } from '../lib/i18n.svelte';
   import { scopeSections, storeScope, storedScope, type ReviewScope as Scope } from '../lib/scope.svelte';
-  import type { DrillSession as Session, KeyPoint, Mistake } from '../lib/types';
+  import type { DrillSession as Session, DrillWay, KeyPoint, Mistake } from '../lib/types';
   import Composer from './Composer.svelte';
   import DrillSession from './DrillSession.svelte';
   import ReviewSet from './ReviewSet.svelte';
   import ReviewScope from './ReviewScope.svelte';
+  import StudioHandoff from './StudioHandoff.svelte';
   import KeyPoints from './KeyPoints.svelte';
   import MistakesBook from './MistakesBook.svelte';
 
@@ -75,12 +76,36 @@
   }
 
   const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
+
+  // Ways to review besides quick questions (issue #229): the fast teacher runs some in a session, Studio does the rest.
+  const ways: { way: DrillWay; label: MessageKey }[] = [
+    { way: 'explain', label: "Explain it back" },
+    { way: 'oral', label: "Oral quiz" },
+    { way: 'confusable', label: "Tell confusable ideas apart" },
+  ];
+  const covers = $derived(
+    everything
+      ? t('everything I have studied in this course')
+      : [...scope.chapter_ids.map((id) => t('the chapter "{chapter}"', { chapter: app.chapters.find((c) => c.id === id)?.title ?? id })),
+         ...scope.concept_ids.map((id) => t('the section "{section}"', { section: app.concept(id)?.title ?? id }))].join(', '),
+  );
+  const studioWays = $derived([
+    { key: 'mock', label: t("Mock exam"), request: t("Write me a mock exam on {scope}, built from the course's own exercises and any past papers among its sources, in the style of the real exam.", { scope: covers }) },
+    { key: 'sheet', label: t("Formula sheet"), request: t("Make me a one-page formula sheet for {scope}: each result with when it holds.", { scope: covers }) },
+    { key: 'mistakes', label: t("My mistakes on one page"), request: t("Make me one page on the mistakes I keep making in {scope}, each with the right idea and a quick check.", { scope: covers }) },
+  ]);
+  const reviewContext = $derived({
+    label: t('Review: {scope}', { scope: everything ? t("Everything studied") : titles(sections) }),
+    text: `the Review place, covering ${sections.map((id) => `"${app.concept(id)?.title ?? id}" (${id})`).join(', ')}`,
+  });
   const chapterTitle = (id?: string) => app.chapters.find((c) => c.id === id)?.title ?? id ?? '';
   function label(session: Session) {
     if (session.kind === 'chapter') return t("Chapter drill · {chapter}", { chapter: chapterTitle(session.chapter_id) });
     if (session.kind === 'warm_up') return t("Warm-up before {section}", { section: titles([session.concept_id!]) });
+    const way = ways.find((w) => w.way === session.way);
     const scope = [...(session.scope?.chapter_ids ?? []).map(chapterTitle), titles(session.scope?.concept_ids)].filter(Boolean).join(', ');
-    return scope || t("Everything studied");
+    const covered = scope || t("Everything studied");
+    return way ? `${t(way.label)} · ${covered}` : covered;
   }
   const when = (at: number) => new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(at * 1000));
 </script>
@@ -158,6 +183,18 @@
                 {header}
                 preview={false}
               />
+              <div class="ways" role="group" aria-label={t("Other ways to review")}>
+                <span class="ways-label">{t("Other ways")}</span>
+                {#each ways as item (item.way)}
+                  <button class="chip-way" disabled={busy || !review.reviewable} onclick={() => drill({ way: item.way, ...(scoped ? { scope: scoped } : {}) })}>{t(item.label)}</button>
+                {/each}
+              </div>
+              <div class="ways studio" role="group" aria-label={t("With Studio")}>
+                <span class="ways-label">{t("With Studio")}</span>
+                {#each studioWays as item (item.key)}
+                  <StudioHandoff variant="link" place={{ kind: 'review', way: item.key }} label={item.label} request={item.request} context={reviewContext} />
+                {/each}
+              </div>
             </section>
             {#if sessions.length}
               <section class="sessions" aria-labelledby="sessions-title">
@@ -301,6 +338,33 @@
   .sets {
     display: grid;
     gap: 1.5rem;
+  }
+
+  .ways {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .ways-label {
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .chip-way {
+    padding: 0.2rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+
+  .chip-way:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .sets > summary {

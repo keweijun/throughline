@@ -10,7 +10,10 @@ from .teaching import require_text
 
 SESSIONS = 'drill_sessions'
 KINDS = ('drill', 'chapter', 'warm_up')
+# Ways the fast teacher runs (issue #229); each is a guide in its prompt (prompts.DRILL_WAYS), not a page of its own.
+WAYS = ('questions', 'explain', 'oral', 'confusable')
 MAX_MESSAGE = 4000
+MAX_LABEL = 120
 
 
 def _scope(value):
@@ -38,6 +41,11 @@ def create(store, request):
     if kind not in KINDS:
         raise OperationError('invalid_request', 'kind must be drill, chapter or warm_up')
     value = {'id': identifier, 'kind': kind, 'created_at': time.time(), 'turn_ids': []}
+    way = request.get('way') or 'questions'
+    if way not in WAYS:
+        raise OperationError('invalid_request', 'way is one of ' + ', '.join(WAYS))
+    if way != 'questions':
+        value['way'] = way
     if kind == 'chapter':
         chapter = require_text(request, 'chapter_id')
         if chapter not in {c['id'] for c in curriculum.model(store)['chapters']}:
@@ -103,6 +111,25 @@ def add_questions(store, request):
     return {'task_ids': ids}
 
 
+def offer(store, request):
+    """What a turn offers to hand to Studio (ADR 0025): `request`, the message Studio is sent, and `label`, what Studio will
+    do, in a few words. One offer per turn; a turn's offer is kept as it was first written."""
+    value = _read(store, require_text(request, 'id'))
+    turn_id = require_text(request, 'turn_id')
+    if turn_id not in value['turn_ids']:
+        raise OperationError('invalid_request', 'The turn is not part of this session')
+    offers = value.setdefault('handoffs', {})
+    if turn_id not in offers:
+        label, text = request.get('label'), request.get('request')
+        if not isinstance(label, str) or not label.strip() or len(label.strip()) > MAX_LABEL:
+            raise OperationError('invalid_request', f'label is text of at most {MAX_LABEL} characters')
+        if not isinstance(text, str) or not text.strip() or len(text.strip()) > MAX_MESSAGE:
+            raise OperationError('invalid_request', f'request is text of at most {MAX_MESSAGE} characters')
+        offers[turn_id] = {'label': label.strip(), 'request': text.strip()}
+        store.put(SESSIONS, value['id'], value)
+    return {'handoff': offers[turn_id]}
+
+
 def listing(store, _request):
     """Every session, newest first, with its turns and questions in order and the sections it covers."""
     tasks = {}
@@ -116,4 +143,5 @@ def listing(store, _request):
     return {'sessions': found}
 
 
-OPERATIONS = {'drill.create': create, 'drill.add_turn': add_turn, 'drill.questions': add_questions, 'drill.list': listing}
+OPERATIONS = {'drill.create': create, 'drill.add_turn': add_turn, 'drill.questions': add_questions, 'drill.offer': offer,
+              'drill.list': listing}

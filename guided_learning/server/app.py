@@ -177,6 +177,7 @@ class ReviewScope(Body):
 class DrillRequest(Body):
     id: Optional[str] = None
     kind: Optional[Literal['drill', 'chapter', 'warm_up']] = None
+    way: Optional[Literal['questions', 'explain', 'oral', 'confusable']] = None
     scope: Optional[ReviewScope] = None
     chapter_id: Optional[str] = None
     concept_id: Optional[str] = None
@@ -187,6 +188,14 @@ class DrillRequest(Body):
 class DrillMessage(Body):
     message: Optional[str] = None
     turn_id: Optional[str] = None
+
+
+class Handoff(Body):
+    id: str
+    place: dict[str, str]
+    label: str
+    request: str
+    thread_id: str
 
 
 class RecallAnswer(Body):
@@ -768,6 +777,12 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/drills/{session_id}/messages')
     def drill_message(session_id: str, body: DrillMessage):
         return host.drills.send(session_id, body.message, body.turn_id)
+
+    @app.post('/api/handoffs')
+    def save_handoff(body: Handoff):
+        result = host.operation({'op': 'handoff.save', **body.model_dump()})
+        host.changed()
+        return result
 
     @app.post('/api/review/tasks/{task_id}/answer')
     def answer_recall(task_id: str, body: RecallAnswer):

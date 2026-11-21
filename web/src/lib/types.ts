@@ -299,6 +299,17 @@ export type State = {
   chapter_sheets: ChapterSheet[];
   mistakes: Mistake[];
   drills: DrillSession[];
+  handoffs: Handoff[];
+};
+
+/** A request handed to Studio from a fast view (issue #229), and the Studio chat it started. */
+export type Handoff = {
+  id: string;
+  place: { kind: 'drill' | 'review' | 'chapter' | 'source' | 'section' | 'intro'; [key: string]: string };
+  label: string;
+  request: string;
+  thread_id: string;
+  created_at: number;
 };
 
 /**
@@ -315,12 +326,18 @@ export type DrillSession = {
   updated_at?: number;
   turn_ids: string[];
   messages?: Record<string, string>;
+  way?: DrillWay;
+  /** What a reply offered to hand to Studio, by turn: once sent, the chat it started. */
+  handoffs?: Record<string, { label: string; request: string }>;
   sections: string[];
   task_ids: string[];
 };
 
+export type DrillWay = 'questions' | 'explain' | 'oral' | 'confusable';
+
 export type DrillStart = {
   kind?: DrillSession['kind'];
+  way?: DrillWay;
   scope?: { chapter_ids?: string[]; concept_ids?: string[] };
   chapter_id?: string;
   concept_id?: string;

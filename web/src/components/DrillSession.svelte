@@ -74,15 +74,16 @@
   {/each}
   {#if stopped}<p class="problem">{t("The teacher's reply stopped before it finished. Ask again.")}</p>{/if}
 
+  <!-- Sent empty, the box asks for more questions; with words, it asks about an answer or says what to drill next. -->
   <div class="next">
-    <button class="btn btn-primary" disabled={busy || replying} onclick={() => send()}>{t("More questions")}</button>
     <Composer
       id="drill-message-{session.id}"
       value={draft}
       onvalue={(value) => app.drafts.set(draftKey, value)}
       label={t("Message to the teacher")}
       placeholder={t("Ask about an answer, or say what to drill next")}
-      submitLabel={t("Send")}
+      submitLabel={draft.trim() ? t("Send") : t("More questions")}
+      allowEmpty
       disabled={busy || replying}
       onsubmit={() => send(draft)}
       preview={false}
@@ -121,13 +122,7 @@
   }
 
   .next {
-    display: grid;
-    gap: 0.75rem;
-    padding-top: 0.5rem;
+    padding-top: 0.75rem;
     border-top: 1px solid var(--rule);
-  }
-
-  .next > .btn {
-    justify-self: start;
   }
 </style>

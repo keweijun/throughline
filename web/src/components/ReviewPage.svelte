@@ -141,18 +141,18 @@
             </header>
             <DrillSession session={open} />
           {:else}
+            <!-- One box: sent empty, the teacher picks what to ask; with words, the learner says what to drill. -->
             <section class="ask">
               <h2 id="drill-title">{t("Drill")}</h2>
-              <p class="note">{t("A quick teacher asks you questions on what this covers: what you missed before, and what you have not practised for a while. Stop whenever you like.")}</p>
-              <button class="btn btn-primary" disabled={busy || !review.reviewable} onclick={() => drill(scoped ? { scope: scoped } : {})}>{t("Drill me")}</button>
-              {#snippet header()}{t("Or say what to drill")}{/snippet}
+              {#snippet header()}{t("Leave it empty and the teacher picks what to ask")}{/snippet}
               <Composer
                 id="review-request"
                 value={request}
                 onvalue={(value) => app.drafts.set(draftKey, value)}
                 label={t("What to review")}
                 placeholder={t("For example: the variational method, but not the derivations")}
-                submitLabel={t("Start")}
+                submitLabel={request.trim() ? t("Start") : t("Drill me")}
+                allowEmpty
                 disabled={busy || !review.reviewable}
                 onsubmit={drillFor}
                 {header}
@@ -167,7 +167,7 @@
                     <li>
                       <button class="open-session" onclick={() => (app.drillOpen = session.id)}>
                         <span class="title">{label(session)}</span>
-                        <span class="meta">{when(session.updated_at ?? session.created_at)}{#if session.task_ids.length} · {session.task_ids.length === 1 ? t("1 question") : t("{count} questions", { count: session.task_ids.length })}{/if}</span>
+                        <span class="meta">{when(session.updated_at ?? session.created_at)}{#if session.task_ids.length}&nbsp;· {session.task_ids.length === 1 ? t("1 question") : t("{count} questions", { count: session.task_ids.length })}{/if}</span>
                       </button>
                     </li>
                   {/each}
@@ -297,9 +297,6 @@
     gap: 0.9rem;
   }
 
-  .ask > .btn {
-    justify-self: start;
-  }
 
   .sets {
     display: grid;

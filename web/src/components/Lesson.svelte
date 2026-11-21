@@ -368,10 +368,14 @@
     color: var(--ink-soft);
   }
 
+  /* The steps still to come on the left, Continue at the bottom right, where the eye ends up after reading them. */
   .next {
     animation: enter-rise var(--settle) var(--ease-out);
-    display: grid;
-    gap: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
     margin-top: 1.75rem;
     padding: 1rem 1.1rem;
     border: 1px solid var(--rule);
@@ -381,6 +385,7 @@
   }
 
   .plan {
+    flex: 1 1 18rem;
     margin: 0;
     padding-left: 1.4rem;
     color: var(--ink-soft);
@@ -396,6 +401,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
+    margin-left: auto;
   }
 
   .next .hint {

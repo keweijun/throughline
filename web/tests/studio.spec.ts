@@ -292,7 +292,7 @@ test('the first course opened introduces Studio once, with examples from the cou
   await expect(intro).toBeVisible();
   await expect(intro.getByRole('button', { name: /Make a formula sheet for/ })).toBeVisible();
   await expect(intro).toContainText('Studio asks before each request');
-  await intro.getByRole('button', { name: 'Got it' }).click();
+  await intro.getByRole('button', { name: 'Close' }).click();
   await expect(intro).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.lesson-body, #lesson-request, .request').first()).toBeVisible();

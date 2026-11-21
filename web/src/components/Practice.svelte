@@ -142,7 +142,7 @@
           preview={false}
         />
       {:else}
-        <button class="btn btn-quiet btn-small different" disabled={busy} onclick={() => (differing = true)}>{t("Ask for different exercises")}</button>
+        <button class="btn btn-quiet btn-small btn-flush different" disabled={busy} onclick={() => (differing = true)}>{t("Ask for different exercises")}</button>
       {/if}
     {/if}
 

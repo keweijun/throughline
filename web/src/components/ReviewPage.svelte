@@ -161,8 +161,10 @@
           {#if open}
             <header class="session-head">
               <button class="link" onclick={() => (app.drillOpen = null)}>{t("← All sessions")}</button>
-              <h2 id="drill-title">{label(open)}</h2>
-              <p class="meta">{when(open.created_at)}</p>
+              <div class="session-title">
+                <h2 id="drill-title">{label(open)}</h2>
+                <p class="meta">{when(open.created_at)}</p>
+              </div>
             </header>
             <DrillSession session={open} />
           {:else}
@@ -192,7 +194,7 @@
               <div class="ways studio" role="group" aria-label={t("With Studio")}>
                 <span class="ways-label">{t("With Studio")}</span>
                 {#each studioWays as item (item.key)}
-                  <StudioHandoff variant="link" place={{ kind: 'review', way: item.key }} label={item.label} request={item.request} context={reviewContext} />
+                  <StudioHandoff variant="chip" place={{ kind: 'review', way: item.key }} label={item.label} request={item.request} context={reviewContext} />
                 {/each}
               </div>
             </section>
@@ -380,6 +382,14 @@
 
   .session-head h2 {
     color: var(--ink);
+  }
+
+  .session-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.2rem 1rem;
   }
 
   .meta {

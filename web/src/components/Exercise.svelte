@@ -531,6 +531,11 @@
     color: var(--pencil);
   }
 
+  /* Wrapped under the help, setting the exercise aside stays on the right, as it is on one line. */
+  .aside {
+    margin-left: auto;
+  }
+
   .solved-row {
     gap: 0.5rem;
   }

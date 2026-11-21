@@ -43,7 +43,9 @@
   <aside class="intro" aria-labelledby="studio-intro-title">
     <header>
       <h2 id="studio-intro-title">{t("Codex works on this course with you")}</h2>
-      <button class="btn btn-quiet btn-small" onclick={() => app.markSeen(KEY)}>{t("Got it")}</button>
+      <button class="btn btn-quiet btn-small close" onclick={() => app.markSeen(KEY)} aria-label={t("Close")} title={t("Close")}>
+        <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
+      </button>
     </header>
     <p>{t("Lessons, questions and reviews here are quick. Anything bigger goes to Studio, where Codex works on the course itself: it reads your files, writes sheets and mock exams, adds problem sets as exercises and rebuilds sections. Try one:")}</p>
     <ul>
@@ -76,6 +78,12 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
+  }
+
+  .close {
+    margin: -0.3rem -0.4rem -0.3rem 0;
+    padding: 0.25rem;
+    color: var(--pencil);
   }
 
   h2 {

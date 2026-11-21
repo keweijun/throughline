@@ -27,7 +27,7 @@ Hand-offs today:
 
 - **A drill's offer.** When the learner asks for something a drill cannot do, or it would clearly help, the fast teacher says so and ends its reply with `<studio-request>{"label", "request"}</studio-request>` (at most one per reply). The app shows it as a card under the reply (`drill.offer`). The teacher is told which offers were sent.
 - **Studio ways in Review.** Beside the box: **Mock exam**, **Formula sheet** and **My mistakes on one page**, written for the scope.
-- **The chapter page.** **Make a one-page summary of this chapter in Studio**, under its key points.
+- **The chapter page.** **One-page summary in Studio**, beside the heading of its key points.
 - **A suggested course change** (ADR 0016) is now sent as a hand-off, not prefilled in Studio. It is answered once sent, and its card stays to follow the chat.
 
 ### Showing what Studio can do

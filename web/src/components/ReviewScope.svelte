@@ -27,7 +27,7 @@
   {#each chapters as item (item.id)}
     <button class="chip-toggle" aria-pressed={value.chapter_ids.includes(item.id)} onclick={() => chapter(item.id)}>{item.title}</button>
   {/each}
-  <button class="btn btn-quiet btn-small" aria-expanded={choosing} onclick={() => (choosing = !choosing)}>{t("Choose sections")}</button>
+  <button class="chip-toggle choose" aria-expanded={choosing} onclick={() => (choosing = !choosing)}>{t("Choose sections")} <span aria-hidden="true">{choosing ? '▴' : '▾'}</span></button>
 </div>
 {#if choosing}
   <div class="sections">
@@ -63,7 +63,12 @@
     cursor: pointer;
   }
 
-  .chip-toggle[aria-pressed='true'] {
+  .choose {
+    border-style: dashed;
+  }
+
+  .chip-toggle[aria-pressed='true'],
+  .choose[aria-expanded='true'] {
     border-color: var(--accent);
     background: var(--accent-wash);
     color: var(--accent);

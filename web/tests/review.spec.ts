@@ -113,7 +113,7 @@ test('the chapter page drills the chapter in the Review place, starting from an 
   await page.getByRole('button', { name: 'End of chapter: key points and drill →' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
   await expect(page.getByRole('button', { name: 'Take the chapter quiz' }), 'the quiz became a drill').toHaveCount(0);
-  await page.getByRole('button', { name: 'Drill this chapter' }).click();
+  await page.getByRole('button', { name: 'Start a drill' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Review');
   await expect(page.getByRole('heading', { name: 'Chapter drill · States' })).toBeVisible();
   const session = page.getByRole('region', { name: 'Drill session' });
@@ -187,7 +187,7 @@ test('other ways to review start their own sessions, and Studio ways are one cli
   await page.getByRole('button', { name: /^Review/ }).click();
   const ways = page.getByRole('group', { name: 'Other ways to review' });
   await expect(ways.getByRole('button')).toHaveText(['Explain it back', 'Oral quiz', 'Tell confusable ideas apart']);
-  await expect(page.getByRole('group', { name: 'With Studio' }).getByRole('button')).toHaveText(['Mock exam', 'Formula sheet', 'My mistakes on one page']);
+  await expect(page.getByRole('group', { name: 'With Studio' }).getByRole('button')).toHaveText(['↗ Mock exam', '↗ Formula sheet', '↗ My mistakes on one page']);
   await ways.getByRole('button', { name: 'Explain it back' }).click();
   const session = page.getByRole('region', { name: 'Drill session' });
   await expect(session.getByRole('article', { name: 'Question 1' })).toContainText('Explain in your own words');

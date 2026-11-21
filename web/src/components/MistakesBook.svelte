@@ -63,7 +63,8 @@
 {/snippet}
 
 <section class="book" aria-labelledby="mistakes-title">
-  <h2 id="mistakes-title">{t("Mistakes")}</h2>
+  <!-- The Review place's tab already says Mistakes; the heading names the region for assistive technology only. -->
+  <h2 id="mistakes-title" class="visually-hidden">{t("Mistakes")}</h2>
   {#if !entries.length}
     <p class="note">{t("Exercise parts you miss, wrong review answers and check questions you miss more than once collect here.")}</p>
   {:else}
@@ -191,9 +192,11 @@
     color: var(--pencil);
   }
 
+  /* On the right, as a key point's Test me on this is. */
   .actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.2rem 1rem;
   }
 

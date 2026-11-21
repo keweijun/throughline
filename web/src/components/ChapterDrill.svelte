@@ -32,10 +32,13 @@
 </script>
 
 <section class="quiz" aria-labelledby="drill-title">
-  <h2 id="drill-title">{t("Drill this chapter")}</h2>
-  <p class="note">{t("A few of this chapter's earlier exercises asked again, with new questions that span it. Answer from memory: each answer counts for the sections it tests. It opens in Review.")}</p>
-  <div>
-    <button class="btn" disabled={busy} onclick={drill}>{t("Drill this chapter")}</button>
+  <!-- What it is on the left, starting it on the right. -->
+  <div class="start">
+    <div>
+      <h2 id="drill-title">{t("Drill this chapter")}</h2>
+      <p class="note">{t("A few of this chapter's earlier exercises asked again, with new questions that span it. Answer from memory: each answer counts for the sections it tests. It opens in Review.")}</p>
+    </div>
+    <button class="btn" disabled={busy} onclick={drill}>{t("Start a drill")}</button>
   </div>
 
   {#if quizzes.length}
@@ -64,8 +67,20 @@
     font-weight: 600;
   }
 
+  .start {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+  }
+
+  .start > div {
+    flex: 1 1 20rem;
+  }
+
   .note {
-    margin-top: -0.7rem;
+    margin-top: 0.25rem;
     font-size: var(--step--1);
     color: var(--pencil);
   }

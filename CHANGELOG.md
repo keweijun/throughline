@@ -4,9 +4,15 @@ What changed for learners in each release of Throughline, newest first. Each rel
 
 ## 0.61.0
 
-- **Hand things to Studio without leaving what you're doing.** When a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio right under its reply. One click sends it, with what you were reviewing, and the card shows Studio working, then **Done** with **Open**. A suggested course change now works the same way, as does **Make a one-page summary of this chapter in Studio** on the chapter page.
+- **Hand things to Studio without leaving what you're doing.** When a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio right under its reply. One click sends it, with what you were reviewing, and the card shows Studio working, then **Done** with **Open**. A suggested course change now works the same way, as does **One-page summary in Studio** beside a chapter's key points.
 - **More ways to review.** Next to Drill me: **Explain it back**, **Oral quiz** and **Tell confusable ideas apart**. With Studio: a **Mock exam**, a **Formula sheet** and **My mistakes on one page** for what you chose to review.
 - **Meet Studio.** The first course you open now says what Studio is, with three things it could do for that course, each one click away. With full access Studio starts straight away; without it, Throughline asks once before each request.
+- **Tidier cards.** Several cards are now balanced, with what they say on the left and the action on the right:
+  - **Next step** under a lesson, with Continue at its bottom right;
+  - the warm-up, now with a close button;
+  - skipping a chapter, and the chapter drill.
+
+  **Back to current section** sits beside the chapter's name, and an exercise's **Another like this / Do later / Skip** stay on the right when they wrap.
 
 ## 0.60.0
 

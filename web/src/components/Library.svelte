@@ -487,7 +487,7 @@
       <p class="done" role="status">
         <span>{done.kind === 'deleted' ? t('“{course}” is in the trash.', { course: done.title }) : t('“{course}” is archived.', { course: done.title })}</span>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => void undo()}>{t('Undo')}</button>
-        <button class="btn btn-quiet btn-small" aria-label={t('Dismiss')} onclick={() => (done = null)}>×</button>
+        <button class="btn btn-quiet btn-small" aria-label={t('Dismiss')} title={t('Dismiss')} onclick={() => (done = null)}><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg></button>
       </p>
     {/if}
     <ul class="courses">

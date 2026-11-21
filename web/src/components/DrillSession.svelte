@@ -110,6 +110,11 @@
     gap: 1.25rem;
   }
 
+  /* A check question brings its own top margin for a lesson; here the session's gap spaces every question alike. */
+  .drill :global(.check) {
+    margin-top: 0;
+  }
+
   .said {
     justify-self: end;
     max-width: 85%;

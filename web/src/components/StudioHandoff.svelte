@@ -27,7 +27,8 @@
     label: string;
     request: string;
     context: StudioOrigin;
-    variant?: 'offer' | 'link';
+    /** offer: a card; link: reads as a link; button: a small bordered button; chip: a pill among other choices. */
+    variant?: 'offer' | 'link' | 'button' | 'chip';
     onsent?: () => void;
   } = $props();
 
@@ -96,6 +97,10 @@
     />
   {:else if variant === 'offer'}
     <button class="btn btn-small btn-primary actions" onclick={start}>{t("Do this in Studio")}</button>
+  {:else if variant === 'button'}
+    <button class="btn btn-small" onclick={start}>{label}</button>
+  {:else if variant === 'chip'}
+    <button class="chip-way" onclick={start}>↗ {label}</button>
   {:else}
     <button class="link studio-link" onclick={start}>{label}</button>
   {/if}
@@ -117,9 +122,27 @@
     background: var(--accent-wash);
   }
 
-  .handoff.link {
+  .handoff.link,
+  .handoff.button,
+  .handoff.chip {
     display: grid;
+    justify-items: start;
     gap: 0.3rem;
+  }
+
+  .chip-way {
+    padding: 0.2rem 0.7rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+
+  .chip-way:hover {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .what {

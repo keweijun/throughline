@@ -139,7 +139,7 @@
             </button>
             <button class="btn btn-small" onclick={() => app.enter(conceptId)}>{t("Study from here")}</button>
           {/if}
-          <button class="btn btn-small btn-quiet" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
+          <button class="btn btn-small btn-quiet away" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
         </div>
       </div>
     {/if}
@@ -277,13 +277,22 @@
     {#if isCurrent && !lessons.length}
       <!-- A warm-up on prerequisites studied a while ago, offered once and never in the way of the lesson (ADR 0014). -->
       {#if warmUpSession}
-        <aside class="warm-up" aria-label={t("Warm-up")}><DrillSession session={warmUpSession} /></aside>
+        <aside class="warm-up session" aria-label={t("Warm-up")}>
+          <h2 class="warm-title">{t("Warm-up")}</h2>
+          <DrillSession session={warmUpSession} />
+        </aside>
       {:else if warmUp}
+        <!-- Title and dismissal on top, what it is and the choice to take it on one row below. -->
         <aside class="warm-up" aria-label={t("Warm-up")}>
-          <p>{t("This section builds on {sections}, which you have not practised for a while.", { sections: warmUp.map((id) => app.concept(id)?.title ?? id).join(', ') })}</p>
-          <div class="previewing-actions">
+          <header class="warm-head">
+            <h2 class="warm-title">{t("Warm-up")}</h2>
+            <button class="btn btn-quiet btn-small dismiss" onclick={() => app.dismissWarmUp(conceptId)} aria-label={t("No thanks")} title={t("No thanks")}>
+              <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
+            </button>
+          </header>
+          <div class="warm-offer">
+            <p>{t("This section builds on {sections}, which you have not practised for a while.", { sections: warmUp.map((id) => app.concept(id)?.title ?? id).join(', ') })}</p>
             <button class="btn btn-small btn-primary" onclick={() => app.startDrill({ kind: 'warm_up', concept_id: conceptId! }, true)}>{t("Warm up on what this builds on")}</button>
-            <button class="btn btn-small btn-quiet" onclick={() => app.dismissWarmUp(conceptId)}>{t("No thanks")}</button>
           </div>
         </aside>
       {/if}
@@ -366,6 +375,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+  }
+
+  /* Leaving the preview is not one of the choices about this section: it keeps to the right. */
+  .away {
+    margin-left: auto;
   }
 
   .bookmark[aria-pressed='true'] {
@@ -551,14 +565,51 @@
   .warm-up {
     display: grid;
     gap: 0.6rem;
-    margin-top: 1.5rem;
-    padding: 0.9rem 1.1rem;
+    margin: 1.5rem 0 1rem;
+    padding: 1rem 1rem 1.1rem 1.35rem;
     border: 1px solid var(--rule);
     border-left: 3px solid var(--marker);
     border-radius: var(--radius);
     background: var(--raised);
     font-size: var(--step-0);
     color: var(--ink-soft);
+  }
+
+  /* A warm-up under way holds question cards with accent borders of their own: no second one around them. */
+  .warm-up.session {
+    border-left-width: 1px;
+  }
+
+  .warm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .warm-title {
+    font-size: var(--step-0);
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .dismiss {
+    margin: -0.3rem -0.3rem -0.3rem 0;
+    padding: 0.25rem;
+    color: var(--pencil);
+  }
+
+  .warm-offer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem 1.25rem;
+  }
+
+  .warm-offer p {
+    flex: 1 1 18rem;
+    margin: 0;
   }
 
   @media (max-width: 40rem) {

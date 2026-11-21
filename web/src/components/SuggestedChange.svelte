@@ -22,7 +22,7 @@
       {#if change && !sent}<button class="btn btn-quiet btn-small" onclick={() => app.resolveChange(change.id, 'dismissed')}>{t('Not now')}</button>{/if}
       <StudioHandoff
         id="change:{turnId}"
-        variant="link"
+        variant="button"
         place={{ kind: 'section', concept: section?.id ?? '', turn: turnId }}
         label={t('Change it in Studio')}
         {request}

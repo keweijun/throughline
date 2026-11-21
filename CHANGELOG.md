@@ -2,50 +2,35 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
-## 0.62.0
-
-- **What Studio makes for review lands in Review.**
-  - **Mock exams and drills:** a mock exam from your past papers, or "drill me on this PDF", becomes a session you answer right in Review, with marks when it's a paper. Your answers count, and misses go into your mistakes book. You can carry on with the quick teacher afterwards.
-  - **Sheets:** cheat sheets, formula sheets and "my mistakes on one page" appear under **Sheets** in Review, linked from the chapter page. You can print or remove them.
-- **Done, and one click to open it.** When Studio finishes something you sent it, the card that sent it says **Done: <what it made>**. **Open it** takes you there: the session, the sheet, or the section it added exercises to.
-- **Studio builds from your mistakes.** Codex can now read your mistakes book and your review history, so a mock exam or a summary can focus on what you actually get wrong.
-- **GPT-6.1 Terra is the default small model.** Unless you chose another, it now runs the quick drill teacher and background work such as preparing the next section, because it's two to three times faster. To keep using the teacher's model there, choose **Same as the teacher model** in Settings.
-
-## 0.61.0
-
-- **Hand things to Studio without leaving what you're doing.** When a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio right under its reply. One click sends it, with what you were reviewing, and the card shows Studio working, then **Done** with **Open**. A suggested course change now works the same way, as does **One-page summary in Studio** beside a chapter's key points.
-- **More ways to review.** Next to Drill me: **Explain it back**, **Oral quiz** and **Tell confusable ideas apart**. With Studio: a **Mock exam**, a **Formula sheet** and **My mistakes on one page** for what you chose to review.
-- **Meet Studio.** The first course you open now says what Studio is, with three things it could do for that course, each one click away. With full access Studio starts straight away; without it, Throughline asks once before each request.
-- **Tidier cards.** Several cards are now balanced, with what they say on the left and the action on the right:
-  - **Next step** under a lesson, with Continue at its bottom right;
-  - the warm-up, now with a close button;
-  - skipping a chapter, and the chapter drill.
-
-  **Back to current section** sits beside the chapter's name, and an exercise's **Another like this / Do later / Skip** stay on the right when they wrap.
-
-## 0.60.0
-
-- **Drill sessions replace review sets.** In Review, **Drill me** starts a quick back-and-forth with a fast teacher on what you chose to review. It asks a few questions at a time, mostly on what you missed before and what you haven't practised for a while, and you answer them right there. Ask for **More questions**, ask about an answer, or say what to drill next. Nothing to finish and nothing due: a session is kept under **Earlier sessions**, and you can pick it up again whenever you like. Your answers count just as before, and misses go into your mistakes book.
-- **Drill this chapter** on the chapter page replaces the chapter quiz. It starts with one or two exercises from the chapter you've done before, then asks new ones. Your earlier quizzes stay on the chapter page.
-- **The warm-up** before a section is now a short drill on what the section builds on, right on the section page.
-- **Test me on this** under a key point, and **Try it again** under a mistake, start a drill on just that.
-- Review sets you already have stay in Review, under **Review sets from before**. Codex in Studio no longer writes review sets: when you ask it to help you review, it points you to Review.
-
-## 0.59.0
-
-- **The Review page is now a place with several ways to review.** It opens on your key points, and the mistakes book is one tab away. Questions sit beside them on a wide window.
-- **Choose what to review**: everything you have studied, or only some chapters or sections. The key points, the mistakes and the questions you ask for all follow your choice, and Throughline remembers it for the course.
-- **Test me on this** under a key point, and **Try it again** under a mistake, ask the teacher for questions on just that.
-
-## 0.58.0
-
-- **A mistakes book on the Review page.** It collects what you missed: exercise parts, chapter quiz and review questions, and ideas whose check questions you got wrong more than once. Each entry shows what you answered and the feedback, and links back to the question or lesson step. When you later get one right, it stays, marked with the date, under **Since got right**.
-
 ## 0.57.0
 
-- **Key points.** Every section you study now ends with its key points: the results, rules and methods to hold from it. Each one says when it holds and gives a common mistake, often one you made, and links back to the lesson step and the page that taught it. They show at the end of the lesson and at the top of the section when you come back to it. Sections you studied before this update get their key points in the background while Throughline is idle.
-- **A chapter's key points on one sheet.** The chapter page gathers the key points of the sections you studied, opened by a short paragraph on how they connect. This replaces the chapter recap, which almost no one used. Recaps you already have stay on the chapter page, folded.
-- **To change a key point, ask Codex**, from **Ask Codex to change them** beside the points ("say it without the matrix notation", "add the sign convention"). When the section is taught again, its new key points keep the changes you asked for.
+- **Key points.**
+  - **Every section you study ends with its key points:** the results, rules and methods to hold from it. Each says when it holds and gives a common mistake, often one you made, and links back to the lesson step and page that taught it.
+  - **Where they show:** at the end of the lesson, at the top of the section when you come back, and gathered on the chapter page with a short paragraph on how they connect. This replaces the chapter recap; recaps you already have stay, folded.
+  - **Sections you studied before** get their key points in the background.
+  - **To change a point, ask Codex** with **Ask Codex to change them**. When the section is taught again, the changes you asked for are kept.
+- **Review is now a place with several ways to review.**
+  - It opens on the key points of what you choose to review: everything you studied, or some chapters or sections. Throughline remembers the choice for the course.
+  - **Mistakes** collects what you missed, with what you answered and the feedback. Entries you later get right stay, marked with the date, under **Since got right**.
+  - **Sheets** holds what Studio wrote for you.
+- **Drills replace review sets.**
+  - **Drill me** starts a quick back-and-forth with a fast teacher. It asks a few questions at a time, mostly on what you missed and what you haven't practised for a while, and you answer them right there.
+  - Ask for **More questions**, ask about an answer, or say what to drill next.
+  - Nothing is due and nothing needs finishing: sessions stay under **Earlier sessions**.
+  - **Other ways:** **Explain it back**, **Oral quiz** and **Tell confusable ideas apart**.
+  - **Drill this chapter** on the chapter page replaces the chapter quiz.
+  - The warm-up before a section is a short drill.
+  - **Test me on this** under a key point, and **Try it again** under a mistake, drill just that.
+  - Your answers count as before, and review sets and quizzes you already have stay readable.
+- **Hand things to Studio without leaving what you're doing.**
+  - **Offers:** when a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio under its reply. Review also offers a **Mock exam**, a **Formula sheet** and **My mistakes on one page**, and a chapter offers a **One-page summary in Studio**.
+  - **Sending:** one click sends the request, with what you were reviewing. A suggested course change is now sent the same way. With full access Studio starts straight away; without it, Throughline asks once.
+  - **Results:** the card shows Studio working, then **Done** with **Open it**, which opens what Studio made. Mock exams become sessions you answer in Review, with marks, and sheets appear under **Sheets**, ready to print. Studio can read your mistakes book, so what it makes focuses on what you get wrong.
+- **Meet Studio.** The first course you open says what Studio is, with three things it could do for that course, each one click away.
+- **GPT-6.1 Terra is the default small model.** Unless you chose another, it runs the drill teacher and background work, because it's two to three times faster. Choose **Same as the teacher model** in Settings to keep the old behaviour.
+- **Tidier cards.**
+  - The cards below put what they say on the left and the action on the right: **Next step** under a lesson, the warm-up (now with a close button), skipping a chapter, and the chapter drill.
+  - **Back to current section** sits beside the chapter's name.
 
 ## 0.56.0
 

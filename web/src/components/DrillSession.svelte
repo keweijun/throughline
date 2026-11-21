@@ -1,0 +1,184 @@
+<script lang="ts">
+  import { locale, t } from '../lib/i18n.svelte';
+  import { app } from '../lib/store.svelte';
+  import { markdown } from '../lib/markdown';
+  import type { DrillSession, Task } from '../lib/types';
+  import CheckQuestion from './CheckQuestion.svelte';
+  import Composer from './Composer.svelte';
+  import Exercise from './Exercise.svelte';
+  import StudioHandoff from './StudioHandoff.svelte';
+
+  /**
+   * One drill session (ADR 0025): what the learner said, the fast teacher's replies and the questions each one set,
+   * answered in place. It goes on for as long as the learner likes and is never finished: More questions, or say what to
+   * drill next.
+   */
+  let { session }: { session: DrillSession } = $props();
+
+  // In the session's order, turn by turn: task ids start with their turn's id, which says nothing of when it came.
+  const tasks = $derived.by(() => {
+    const mine = new Map((app.state?.review.tasks ?? []).filter((x) => x.session_id === session.id).map((x) => [x.id, x]));
+    return session.task_ids.map((id) => mine.get(id)).filter((x) => !!x);
+  });
+  const turns = $derived(session.turn_ids.map((id) => app.turn(id)).filter((turn) => !!turn));
+  const replying = $derived(turns.some((turn) => turn.status === 'running'));
+  const stopped = $derived(turns.at(-1) && !['running', 'completed'].includes(turns.at(-1)!.status));
+  const titles = (ids: string[] = []) => ids.map((id) => app.concept(id)?.title ?? id).join(', ');
+  const draftKey = $derived(`drill:${session.id}`);
+  const draft = $derived(app.drafts.get(draftKey));
+  let busy = $state(false);
+  // Questions are numbered through the session, so a reply can refer to one.
+  const numbers = $derived(new Map(tasks.map((task, i) => [task.id, i + 1])));
+
+  // What Studio is told about where a hand-off came from: the session, what it covers and how its questions went.
+  const context = $derived({
+    label: t('Review: {scope}', { scope: titles(session.sections) }),
+    text: `drill session ${session.id} in the Review place, covering ${session.sections.map((id) => `"${app.concept(id)?.title ?? id}" (${id})`).join(', ')}. `
+      + `Questions so far: ${tasks.map((x) => `${x.question.slice(0, 120)} [${x.answer ? (x.answer.correct ? 'right' : 'missed') : x.history.some((h) => h.action === 'assess') ? 'answered' : 'unanswered'}]`).join('; ') || 'none'}`,
+  });
+
+  // What Codex wrote in Studio for this session (`drill.write`) comes first; a paper says its marks.
+  const written = $derived(tasks.filter((task) => task.drill_turn_id === `${session.id}:written`));
+  const total = $derived(written.reduce((sum, task) => sum + (task.marks ?? 0), 0));
+  const marks = (count: number) => (count === 1 ? t("1 mark") : t("{count} marks", { count }));
+
+  async function send(message = '') {
+    if (busy || replying) return;
+    busy = true;
+    const sent = draft;
+    const result = await app.sendDrill(session.id, message);
+    busy = false;
+    if (result && message && app.drafts.get(draftKey) === sent) app.drafts.set(draftKey, '');
+  }
+</script>
+
+{#snippet question(task: Task)}
+  {#if task.kind === 'recall' && task.options}
+    <CheckQuestion
+      check={{ idea: task.idea ?? '', question: task.question, options: task.options, correct: task.correct ?? 0 }}
+      answer={task.answer}
+      more={false}
+      label={t('Question {number}', { number: numbers.get(task.id) ?? 0 }) + (task.marks ? ' · ' + marks(task.marks) : '') + ' · ' + t("tests {sections}", { sections: titles(task.tests_concept_ids) })}
+      onanswer={(choice) => app.answerRecall(task.id, choice)}
+      taskId={task.id}
+      section={task.concept_id}
+    >
+      {#snippet after(right: boolean)}
+        {#if !right}<button class="btn btn-quiet btn-small" onclick={() => app.revisit(task)}>{t("Revisit")}</button>{/if}
+      {/snippet}
+    </CheckQuestion>
+  {:else}
+    <Exercise {task} number={numbers.get(task.id)} />
+  {/if}
+{/snippet}
+
+<section class="drill" aria-label={t("Drill session")}>
+  {#if session.origin === 'studio'}
+    <p class="written">
+      <span class="badge">{t("Studio")}</span>
+      {session.exam ? t("An exam paper Studio wrote") : t("Questions Studio wrote")}{#if total}&nbsp;· {t("{count} marks in all", { count: total })}{/if}
+    </p>
+    {#if session.note}<p class="note">{session.note}</p>{/if}
+    {#each written as task (task.id)}
+      {@render question(task)}
+    {/each}
+  {/if}
+  {#each turns as turn (turn.id)}
+    {@const said = session.messages?.[turn.id]}
+    {@const offer = session.handoffs?.[turn.id]}
+    {#if said}<p class="said">{said}</p>{/if}
+    {#if turn.text}
+      <div class="prose reply" use:markdown={{ language: locale.language, text: turn.text, streaming: turn.status === 'running' }}></div>
+    {:else if turn.status === 'running'}
+      <p class="status"><span class="chip"><span class="live-dot"></span>{t("The teacher is choosing questions")}</span></p>
+    {/if}
+    <!-- Under the reply that offers it, before the questions the reply also asks. -->
+    {#if offer && turn.status === 'completed'}
+      <StudioHandoff id="drill:{turn.id}" place={{ kind: 'drill', session: session.id, turn: turn.id }} label={offer.label} request={offer.request} {context} />
+    {/if}
+    {#each tasks.filter((task) => task.drill_turn_id === turn.id) as task (task.id)}
+      {@render question(task)}
+    {/each}
+  {/each}
+  {#if stopped}<p class="problem">{t("The teacher's reply stopped before it finished. Ask again.")}</p>{/if}
+
+  <!-- Sent empty, the box asks for more questions; with words, it asks about an answer or says what to drill next. -->
+  <div class="next">
+    <Composer
+      id="drill-message-{session.id}"
+      value={draft}
+      onvalue={(value) => app.drafts.set(draftKey, value)}
+      label={t("Message to the teacher")}
+      placeholder={t("Ask about an answer, or say what to drill next")}
+      submitLabel={draft.trim() ? t("Send") : t("More questions")}
+      allowEmpty
+      disabled={busy || replying}
+      onsubmit={() => send(draft)}
+      preview={false}
+    />
+  </div>
+</section>
+
+<style>
+  .drill {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  /* A check question brings its own top margin for a lesson; here the session's gap spaces every question alike. */
+  .drill :global(.check) {
+    margin-top: 0;
+  }
+
+  .said {
+    justify-self: end;
+    max-width: 85%;
+    padding: 0.55rem 0.85rem;
+    border-radius: var(--radius);
+    background: var(--accent-wash);
+    font-size: var(--step-0);
+    white-space: pre-wrap;
+  }
+
+  .reply {
+    font-size: var(--step-0);
+    line-height: 1.6;
+  }
+
+  .written {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+
+  .badge {
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink, white);
+    font-weight: 600;
+  }
+
+  .note {
+    margin: -0.5rem 0 0;
+    font-size: var(--step-0);
+    color: var(--ink-soft);
+  }
+
+  .status {
+    font-size: var(--step--1);
+  }
+
+  .problem {
+    font-size: var(--step--1);
+    color: var(--danger, var(--accent));
+  }
+
+  .next {
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+</style>

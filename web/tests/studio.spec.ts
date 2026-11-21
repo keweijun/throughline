@@ -261,25 +261,42 @@ test('an empty chat suggests a range of course work that fills the box without s
   await expect(panel.locator('.user')).toHaveCount(0);
 });
 
-test('a course change the teacher suggests opens in Studio with the request, and closes once answered', async ({ page, course }) => {
+test('a course change the teacher suggests is sent to Studio in one go, and its card follows the chat', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toHaveText('A wave.');
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
   await expect(suggestion).toContainText('Change the course? Add a section on interference after Wave superposition');
 
-  await suggestion.getByRole('link', { name: 'Open in Studio' }).click();
-  const box = page.locator('#studio-input');
-  await expect(box).toBeVisible();
-  expect(await editorText(box)).toContain('$throughline Add a section on interference after Wave superposition');
-  await expect(page.locator('#course-studio form .origin')).toContainText('Section: Wave superposition');
-  // Opened, it is answered: going back to the lesson, it is gone, and a reload does not bring it back.
-  await page.locator('#open-study').click();
+  // Without full access, the hand-off asks once, beside it (issue #229).
+  await suggestion.getByRole('button', { name: 'Change it in Studio' }).click();
+  await suggestion.getByRole('button', { name: 'Go ahead' }).click();
+  await expect(suggestion.getByRole('status')).toContainText(/Studio is working on it|Done in Studio/);
+  await expect(suggestion.getByRole('button', { name: 'Not now' }), 'sent, it is answered').toHaveCount(0);
+
+  // The learner stays in the lesson; Open shows the chat, sent with where it came from.
   await expect(page.locator('.lesson-body')).toHaveText('A wave.');
-  await expect(suggestion).toHaveCount(0);
+  await suggestion.getByRole('button', { name: 'Open', exact: true }).click();
+  const panel = page.locator('#course-studio');
+  await expect(panel.locator('.user').first()).toContainText('Add a section on interference after Wave superposition');
+  await expect(panel.locator('.user .origin').first()).toHaveText(/^section "Wave superposition" \(wave\) · hand-off change:/);
+  await page.locator('#open-study').click();
   await page.reload();
   await expect(page.locator('.lesson-body')).toHaveText('A wave.');
-  await expect(page.getByRole('group', { name: 'Suggested course change' })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Suggested course change' }).getByRole('status'), 'the card still follows the chat after a reload').toBeVisible();
+});
+
+test('the first course opened introduces Studio once, with examples from the course that are one click away', async ({ page, course }) => {
+  await course('studio_browser_fixture', { intro: true });
+  const intro = page.getByRole('complementary', { name: 'Codex works on this course with you' });
+  await expect(intro).toBeVisible();
+  await expect(intro.getByRole('button', { name: /Make a formula sheet for/ })).toBeVisible();
+  await expect(intro).toContainText('Studio asks before each request');
+  await intro.getByRole('button', { name: 'Close' }).click();
+  await expect(intro).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.lesson-body, #lesson-request, .request').first()).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Codex works on this course with you' }), 'once per learner').toHaveCount(0);
 });
 
 test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {

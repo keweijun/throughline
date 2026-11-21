@@ -4,6 +4,7 @@ import os
 import threading
 from pathlib import Path
 
+from ..background import small_model
 from ..codex import CodexRunner, list_models
 from ..store import OperationError
 from ..userfiles import locked, write_json
@@ -35,7 +36,8 @@ class TeacherSettings:
 
     The service tier (for example Codex's "priority" tier, shown as Fast) applies to teacher turns only.
     Command-line values apply to one run without being saved. An empty model or service tier means the
-    Codex default; an empty small model or small effort means the teacher's.
+    Codex default; an empty small model means Throughline's default small model (`background.small_model`), and
+    `teacher` the teacher's; an empty small effort means the teacher's, or low for Review's fast teacher.
     """
 
     def __init__(self, path=None, override=None):
@@ -70,10 +72,12 @@ class TeacherSettings:
             self.override = {}
         return self.public()
 
-    def runner(self, small=False):
+    def runner(self, small=False, fast=False):
+        """A runner for a teacher turn, or with `small` for background work; `fast` is Review's fast teacher, which
+        runs at low effort unless the learner set the small model's effort."""
         settings = self.current()
-        model = (small and settings['small_model']) or settings['model']
-        effort = (small and settings['small_effort']) or settings['effort']
+        model = small_model(settings) if small else settings['model']
+        effort = (small and settings['small_effort']) or ('low' if fast else settings['effort'])
         tier = None if small else settings['service_tier'] or None
         return CodexRunner(model=model or None, effort=effort, service_tier=tier)
 

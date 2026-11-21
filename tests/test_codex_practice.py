@@ -81,27 +81,6 @@ class CodexPractice(unittest.TestCase):
         # A retired course exercise no longer blocks adding it again.
         self.op('practice.add', id='ps1-fixed', concept_id='stack', exercises=[{'question': 'A new one', 'origin': 'self_created'}])
 
-    def test_codex_writes_a_review_set_for_studied_sections(self):
-        question = {'kind': 'apply', 'question': 'Push 1, 2, 3 and pop twice: what is left?', 'tests_concept_ids': ['stack']}
-        self.refused('nothing_to_review', 'review.write', id='exam', request='Before my exam', questions=[question])
-        self.op('stream.start', id='lesson', concept_id='stack', prompt='Teach', channel='mainline')
-        self.op('stream.event', id='lesson', attempt=1, sequence=1, kind='final', text='Stacks')
-        self.op('stream.event', id='lesson', attempt=1, sequence=2, kind='complete')
-        recall = {'kind': 'recall', 'question': 'Which end does pop use?', 'idea': 'LIFO', 'correct': 0, 'tests_concept_ids': ['stack'],
-                  'options': [{'text': 'The top', 'explanation': 'Last in, first out.'}, {'text': 'The bottom', 'explanation': 'That is a queue.'}]}
-        self.refused('empty_request', 'review.write', id='exam', questions=[question])
-        self.refused('invalid_review_question', 'review.write', id='exam', request='Before my exam', questions=[{**question, 'tests_concept_ids': ['queue']}])
-        self.refused('invalid_review_question', 'review.write', id='exam', request='Before my exam', questions=[{**recall, 'correct': 5}])
-        self.assertEqual(self.op('review.sets')['sets'], [], 'a refused set is not saved')
-        written = self.op('review.write', id='exam', request='20 minutes before my exam', questions=[question, recall], note='Queues are not studied yet')
-        self.assertEqual(written['task_ids'], ['exam:0', 'exam:1'])
-        self.assertEqual(self.op('review.write', id='exam', request='again', questions=[])['task_ids'], ['exam:0', 'exam:1'], 'a replay')
-        listed = self.op('review.sets')['sets'][0]
-        self.assertEqual((listed['kind'], listed['request'], listed['note'], listed['open']), ('request', '20 minutes before my exam', 'Queues are not studied yet', True))
-        tasks = {t['id']: t for t in self.op('practice.list')['tasks']}
-        self.assertEqual((tasks['exam:0']['origin'], tasks['exam:0']['concept_id']), ('review', 'stack'))
-        self.assertEqual(tasks['exam:1']['options'][tasks['exam:1']['correct']]['text'], 'The top')
-
 
 class Answer:
     def run(self, prompt, cwd, emit, cancel):

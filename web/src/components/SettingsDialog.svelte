@@ -311,18 +311,20 @@
           <p class="lead">{t("Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.")}</p>
 
           <h4>{t("Background work")}</h4>
-          <p class="lead">{t("The small model prepares upcoming sections and consolidates notes in the background.")}</p>
+          <p class="lead">{t("The small model prepares upcoming sections, consolidates notes in the background, and runs the quick teacher of drills in Review.")}</p>
           <div class="setting">
             <div class="text"><label class="title" for="small-model">{t("Small model")}</label></div>
             {#if models}
               <select id="small-model" bind:value={smallModel} onchange={saveTeacher}>
-                <option value="">{t("Same as the teacher model")}</option>
-                {#each choices(smallModel) as option (option.id)}
+                <!-- Empty is Throughline's default small model; `teacher` the teacher's (background.small_model). -->
+                <option value="">{t("Default (GPT-6.1 Terra)")}</option>
+                <option value="teacher">{t("Same as the teacher model")}</option>
+                {#each choices(smallModel === "teacher" ? "" : smallModel) as option (option.id)}
                   <option value={option.id} title={option.description}>{option.name}</option>
                 {/each}
               </select>
             {:else}
-              <input id="small-model" type="text" bind:value={smallModel} onchange={saveTeacher} placeholder={t("Same as the teacher model")} autocomplete="off" />
+              <input id="small-model" type="text" bind:value={smallModel} onchange={saveTeacher} placeholder={t("Default: gpt-6.1-terra")} autocomplete="off" />
             {/if}
           </div>
           <div class="setting">

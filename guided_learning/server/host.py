@@ -71,7 +71,7 @@ def _offer(queue, event):
 
 turn_summary = summarize
 # What a finished background turn changes besides itself: the interface reloads only that part of the state.
-FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': 'memory'}
+FINISHED = {'preparation': 'preparation', 'consolidation': 'memory', 'memory': 'memory', 'key_points': 'key_points', 'chapter_sheet': 'key_points'}
 
 
 def course_key(course_id, workspace):
@@ -87,6 +87,8 @@ class Host:
         from .features import CourseChanges, Memory, Navigation, Practice, Preparation, Questions
         from .builds import ChapterBuilds
         from .review import Review
+        from .key_points import KeyPoints
+        from .drills import Drills
         self.workspace = Path(workspace).resolve()
         self.settings = settings or TeacherSettings()
         self._runner = runner
@@ -117,9 +119,11 @@ class Host:
         self.review = Review(self)
         self.course_changes = CourseChanges(self)
         self.memory = Memory(self)
+        self.key_points = KeyPoints(self)
+        self.drills = Drills(self)
         # Order matters: prompt additions are appended, and completions handled, in this order; memory goes last, after
-        # practice has recorded the interactions a note cites.
-        self.features = (self.navigation, self.questions, self.practice, self.preparation, self.builds, self.course_changes, self.memory)
+        # practice has recorded the interactions a note cites. Key points follow navigation, which records a step's plan.
+        self.features = (self.navigation, self.key_points, self.questions, self.practice, self.drills, self.preparation, self.builds, self.course_changes, self.memory)
         self.questions.recover()
         self.navigation.recover()
         self.memory.recover()
@@ -132,8 +136,10 @@ class Host:
 
     def runner_for(self, turn):
         # Preparation and memory work are background work, so they run on the small model when one is chosen; a
-        # chapter build needs the teacher.
-        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL)
+        # chapter build needs the teacher. A drill is quick by design (ADR 0025): its turns and the assessment of its
+        # answers run on the small model too.
+        fast = self.drills.fast(turn)
+        return self._runner or self.settings.runner(small=turn['channel'] in SMALL_MODEL or fast, fast=fast)
 
     def operation(self, request):
         if self._pending:
@@ -251,6 +257,10 @@ class Host:
             return self.memory.consolidation_prompt(turn)
         if turn['channel'] == 'memory':
             return self.memory.request_prompt(turn)
+        if turn['channel'] == 'drill':
+            return self.drills.job_prompt(turn)  # its own rules and the scope's data, not a lesson's
+        if turn['channel'] in ('key_points', 'chapter_sheet'):
+            return self.key_points.job_prompt(turn)  # background work: the teaching additions do not apply
         prompt = prompts.base(turn)
         context = turn['prompt_snapshot']['context']
         for feature in self.features:
@@ -402,8 +412,10 @@ class Host:
             previous = self.operation({'op': 'stream.read', 'id': identifier})['turn']
             if previous['channel'] == PREPARED_STEP:
                 raise OperationError('invalid_transition', 'A prepared step that stopped is discarded, not regenerated')
+            if previous['channel'] == 'mainline' and previous.get('chapter_id'):
+                raise OperationError('recap_retired', 'Chapter recaps are kept to read; the chapter page shows its key points instead')
             if previous['channel'] == 'mainline':
-                # A section's lesson is taught at the position, like Continue; a chapter recap is started from anywhere.
+                # A section's lesson is taught at the position, like Continue.
                 position = self.operation({'op': 'course.status'})['position'] or {}
                 if not previous.get('chapter_id') and previous['concept_id'] != position.get('concept_id'):
                     raise OperationError('stale_position', 'This lesson belongs to another section; refresh the page')
@@ -422,10 +434,10 @@ class Host:
 
     def writing(self):
         """Whether the learner is waiting on something this host writes: a lesson, an answer, feedback or a chapter.
-        Background work (preparation, memory and a step written ahead) can be stopped at any time."""
+        Background work (preparation, memory, key points and a step written ahead) can be stopped at any time."""
         with self._streams:
             channels = set(self._live.values())
-        return bool(channels - {PREPARED_STEP, *SMALL_MODEL})
+        return bool(channels - {PREPARED_STEP, 'key_points', *SMALL_MODEL})
 
     def worker_alive(self, turn):
         worker = self.workers.get((turn['id'], turn['attempt']))

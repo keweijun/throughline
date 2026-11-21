@@ -1,4 +1,4 @@
-import { test, expect, dragSelect } from './fixture';
+import { test, expect } from './fixture';
 
 test('route groups sections by chapter and the chapter page shows progress and coverage', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
@@ -20,51 +20,41 @@ test('route groups sections by chapter and the chapter page shows progress and c
   expect(errors).toEqual([]);
 });
 
-test('the last section links to the chapter page, whose recap is a lesson that never moves the learner', async ({ page, course }) => {
+test('a lesson ends with its key points, which the chapter page gathers into a sheet', async ({ page, course }) => {
   const { base, errors } = await course('chapters_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('A short lesson');
+  const points = page.getByRole('region', { name: 'Key points' });
+  await expect(points, 'the lesson ends with its key points').toContainText('A state assigns an amplitude');
+  await expect(points).toContainText('Holds when');
+  await expect(points).toContainText('Reading');
+  await expect(points.getByRole('button', { name: 'Step 1' })).toBeVisible();
+  await expect(points.locator('.citation'), 'a point links the page that presents it').toHaveCount(1);
+  await expect(page.locator('.lesson-body')).not.toContainText('key_points');
+
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
   await page.getByRole('button', { name: 'Start lesson' }).click();
+  await expect(page.getByRole('region', { name: 'Key points' })).toContainText('A sum of states is again a state');
   await expect(page.getByText('Next chapter: Measurement')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Recap this chapter' }), 'the recap is on the chapter page').toHaveCount(0);
-  await page.getByRole('button', { name: 'End of chapter: recap and quiz →' }).click();
+  await page.getByRole('button', { name: 'End of chapter: key points and drill →' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('States');
-  await page.getByRole('button', { name: 'Recap this chapter' }).click();
-  await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' })).toBeVisible();
-  const recap = page.locator('.lesson-body').last();
-  await expect(recap).toContainText('The chapter in one line');
-  await expect(page.getByRole('button', { name: 'Recap again' })).toBeVisible();
 
-  // Passages in the recap can be highlighted like any lesson's. The finished recap is rendered once more as it lands,
-  // which can replace the paragraph mid-drag, so the selection is retried until it holds.
-  await expect(async () => {
-    expect((await dragSelect(page, recap.locator('p').first())).trim().length).toBeGreaterThan(5);
-  }).toPass({ timeout: 5000 });
-  await page.getByRole('button', { name: 'Highlight', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size)).toBe(1);
+  const sheet = page.getByRole('region', { name: 'Key points' });
+  await expect(sheet.getByRole('region', { name: 'What a state represents' })).toContainText('A state assigns an amplitude');
+  await expect(sheet.getByRole('region', { name: 'Superposition' })).toContainText('once normalised');
+  // The paragraph connecting the sections is written in the background once two sections have points.
+  await expect(sheet).toContainText('superposition combines states into new ones', { timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Recap this chapter' }), 'key points replace the recap').toHaveCount(0);
 
-  await page.locator('#route').getByRole('button', { name: /Superposition/ }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Superposition');
-  await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' }), 'the recap is not one of the section lessons').toHaveCount(0);
-  await page.getByRole('button', { name: 'Enter next section' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Possible outcomes');
-
-  // An earlier chapter can be recapped from anywhere.
-  await page.locator('#route').getByRole('button', { name: /Chapter 1 · States/ }).click();
-  await page.getByRole('button', { name: 'Recap again' }).click();
-  await expect(page.locator('.lesson .number', { hasText: 'Chapter recap' })).toHaveCount(2);
-  await page.locator('#route').getByRole('button', { name: /Chapter 2 · Measurement/ }).click();
-  await expect(page.getByRole('button', { name: 'Skip to the next chapter' }), 'no later chapter is built').toHaveCount(0);
+  // A point links back to the step that taught it, in its section.
+  await sheet.getByRole('region', { name: 'What a state represents' }).getByRole('button', { name: 'Step 1' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What a state represents');
+  await expect(page.getByRole('region', { name: 'Key points' }), 'a finished section opens with its points').toBeVisible();
 
   const state = await (await page.request.get(base + '/api/state')).json();
-  expect(state.position.concept_id).toBe('outcomes');
-  const recaps = state.turns.filter((turn: { id: string }) => turn.id.startsWith('recap:'));
-  expect(recaps.map((turn: { chapter_id: string; concept_id: string }) => [turn.chapter_id, turn.concept_id])).toEqual([['states', 'superposition'], ['states', 'superposition']]);
-  // The section's own lesson asked for exercises once; a recap asks for nothing (the quiz is taken on purpose).
-  const jobs = state.practice.jobs.filter((job: { concept_id: string }) => job.concept_id === 'superposition');
-  expect(jobs.map((job: { purpose?: string }) => job.purpose ?? 'exercises')).toEqual(['exercises']);
+  expect(state.position.concept_id).toBe('superposition');
+  expect(state.key_points.map((v: { concept_id: string; origin: string }) => [v.concept_id, v.origin])).toEqual([['state', 'lesson'], ['superposition', 'lesson']]);
   expect(errors).toEqual([]);
 });
 

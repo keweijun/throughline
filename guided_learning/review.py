@@ -243,13 +243,16 @@ def answer(store, request):
 
 def warm_ups(store, request):
     """Sections whose lesson has not started and that build on a studied prerequisite not practised for a while, with
-    those prerequisites; offered once each (ADR 0014). `reviewable` counts the sections a review may test."""
+    those prerequisites; offered once each (ADR 0014). `sections` are those a review may test, in route order, and
+    `reviewable` counts them."""
     now = request.get('now', time.time())
     model = curriculum.model(store)
-    allowed = set(reviewable(store))
+    ordered = reviewable(store)
+    allowed = set(ordered)
     practised = last_practised(store)
     started = {t['concept_id'] for t in store.digest('streams', streaming.brief) if t['channel'] == 'mainline' and not t.get('chapter_id')}
-    done = {w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+    done = ({w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+            | {s['concept_id'] for s in store.list('drill_sessions') if s.get('kind') == 'warm_up'})
     offers = {}
     for concept in model['concepts']:
         cid = concept['id']
@@ -258,7 +261,7 @@ def warm_ups(store, request):
         stale = [p for p in concept.get('prerequisites', []) if p in allowed and now - practised.get(p, 0) >= WARM_UP_AFTER]
         if stale:
             offers[cid] = stale
-    return {'warm_ups': offers, 'reviewable': len(allowed)}
+    return {'warm_ups': offers, 'reviewable': len(ordered), 'sections': ordered}
 
 
 def dismiss_warm_up(store, request):

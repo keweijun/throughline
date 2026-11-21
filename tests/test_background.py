@@ -38,7 +38,7 @@ class BackgroundCLI(unittest.TestCase):
         self.call('background.retry', id='job', request_id='retry')
         claim = self.call('background.claim', id='job', request_id='claim', attempt_id='attempt-1')
         self.assertEqual(claim, self.call('background.claim', id='job', request_id='claim', attempt_id='attempt-1'))
-        self.assertEqual(claim['handoff']['model'], 'gpt-6-luna')
+        self.assertEqual(claim['handoff']['model'], 'gpt-6.1-terra')
         self.assertEqual(claim['handoff']['interactions'][0]['text'], 'A wavefunction represents a state.')
         self.assertFalse(claim['model_call_performed'])
         self.assertEqual(self.call('session.resume')['position']['next_step'], 'Normalize')

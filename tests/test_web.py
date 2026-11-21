@@ -165,7 +165,12 @@ class WebLearning(unittest.TestCase):
                 self.assertEqual((small.model, small.effort, small.service_tier), ('gpt-6-luna', 'low', None))
                 client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'effort': 'high'})
                 small = host.settings.runner(small=True)
-                self.assertEqual((small.model, small.effort), ('gpt-6.1-sol', 'high'))
+                self.assertEqual((small.model, small.effort), ('gpt-6.1-terra', 'high'), 'no small model chosen: Throughline\'s default')
+                client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'small_model': 'teacher', 'effort': 'high'})
+                small = host.runner_for({'id': 'prep', 'channel': 'preparation'})
+                self.assertEqual(small.model, 'gpt-6.1-sol', 'the teacher model, when chosen for background work')
+                fast = host.settings.runner(small=True, fast=True)
+                self.assertEqual((fast.model, fast.effort), ('gpt-6.1-sol', 'low'), "Review's fast teacher runs at low effort unless the learner set one")
                 self.assertEqual(client.put('/api/settings', json={'effort': 'extreme'}).status_code, 409)
                 for effort in ('xhigh', 'max'):
                     saved = client.put('/api/settings', json={'model': 'gpt-6.1-sol', 'effort': effort, 'small_effort': effort})

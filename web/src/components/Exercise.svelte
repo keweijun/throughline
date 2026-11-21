@@ -145,11 +145,13 @@
   }
 </script>
 
-<article class="exercise" id="exercise-{task.id}" bind:this={article} class:solved aria-label={task.origin === 'review' ? (number ? t('Review question {number}', { number }) : t("Review question")) : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
+<article class="exercise" id="exercise-{task.id}" bind:this={article} class:solved aria-label={task.session_id ? t('Question {number}', { number: number ?? 0 }) : task.origin === 'review' ? (number ? t('Review question {number}', { number }) : t("Review question")) : task.origin === 'chapter_quiz' ? (number ? t('Quiz question {number}', { number }) : t("Quiz question")) : number ? t('Exercise {number}', { number }) : t("Exercise")}>
   <header>
     <span class="label">
       {#if task.origin === 'review'}
-        {number ? t('Review question {number}', { number }) : t("Review question")}
+        <!-- A drill's questions are numbered through its session, recall and written alike (ADR 0025). -->
+        {task.session_id ? t('Question {number}', { number: number ?? 0 }) : number ? t('Review question {number}', { number }) : t("Review question")}
+        {#if task.marks}<span class="origin">· {task.marks === 1 ? t("1 mark") : t("{count} marks", { count: task.marks })}</span>{/if}
         {#if task.tests_concept_ids?.length}<span class="origin">· {t("tests {sections}", { sections: titles(task.tests_concept_ids) })}</span>{/if}
       {:else if task.origin === 'chapter_quiz'}
         {number ? t('Quiz question {number}', { number }) : t("Quiz question")}
@@ -528,6 +530,11 @@
 
   .aside .btn {
     color: var(--pencil);
+  }
+
+  /* Wrapped under the help, setting the exercise aside stays on the right, as it is on one line. */
+  .aside {
+    margin-left: auto;
   }
 
   .solved-row {

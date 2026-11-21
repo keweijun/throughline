@@ -1,5 +1,7 @@
 # Review on request
 
+> Review sets, the prepared set and the chapter quiz described below are replaced by drill sessions (ADR 0025); the review context, recall and apply questions, warm-ups (now short sessions) and the Review place and mistakes book sections still hold.
+
 ADR 0008 brought earlier material back with a fixed schedule: each section that had a passed exercise came due after 1, 3, 7, 21 and 60 days, the review page listed due sections, and **Review** in the top bar counted them. In use it worked against itself:
 
 - The page listed sections, not questions. After a few days away it showed a column of sections, which read as a backlog to clear rather than a few minutes of practice.
@@ -57,6 +59,29 @@ A missed apply part or a wrong recall answer offers **Revisit**, a side question
 ## Chapter quiz
 
 The chapter quiz becomes a review set scoped to the chapter, whose id is the quiz's; its questions keep `origin: "chapter_quiz"` and name the set in `set_id`. **Take the chapter quiz** on the chapter page creates it, with the composition ADR 0008 defined (earlier exercises asked again, then new questions spanning the chapter's studied sections) and the rule that a new quiz waits until the questions of the last one are answered. It is listed on the chapter page and on the review page.
+
+## The Review place
+
+Added with the review rework (issue #219). Review is a place with several ways of reviewing over one **scope**, since learners prefer different ones and none of them is a preference to set:
+
+- **Scope.** Everything studied (the default), or chapters or sections chosen in a picker. It is remembered per course in the learner's browser. A section counts as studied for review when it has a lesson, key points or practice of its own (`review.warm_ups` lists them as `sections`).
+- **Key points**, which the Review place opens on, so it is never empty once something is studied. For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** starts a drill session on that point in its section.
+- **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** starts a drill session on that idea, asked again in a new situation.
+- **Drill**: drill sessions over the scope (ADR 0025), beside the other two when the page is wide enough and below them otherwise.
+
+Like the Overview, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
+
+Reading key points and mistakes needs no model turn. Questions come from drill sessions with a fast teacher (ADR 0025).
+
+## Mistakes book
+
+Added with the review rework (issue #219). The Review page keeps a **mistakes book**: what the learner missed, with what they answered and the feedback or explanation, newest first. It is worked out from the course's records each time it is read (`mistakes.list`), never stored, so it needs no migration and always agrees with the exercises:
+
+- every exercise part assessed `partly_correct` or `not_yet`: a section's exercise, a chapter quiz question or a written review answer, with the answer and feedback of its latest miss;
+- every wrong or unsure recall answer;
+- an idea whose check questions were missed twice or more, the point at which course memory also records a difficulty (ADR 0010). A single missed check is a slip and stays out.
+
+An entry the learner later gets right stays, marked **Got right** with the date: a later assessment of the same part, or a later right recall or check answer on the same idea. A retry counts. Those entries fold under **Since got right**. Nothing is counted, cleared or due. An exercise, quiz question or check links back to where it was asked.
 
 ## What goes
 

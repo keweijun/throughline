@@ -10,7 +10,7 @@ from ..streaming import PREPARED_STEP
 from .. import practice as practice_ops
 
 # Channels whose text a view shows: lessons and side-question answers. Other turns only report their status.
-SHOWN = ('mainline', 'sidequestion')
+SHOWN = ('mainline', 'sidequestion', 'drill')
 REF = ('source_id', 'revision', 'unit_id')
 CONCEPT = ('id', 'title', 'prerequisites', 'objective', 'goal')
 COVERAGE = REF + ('concept_ids', 'disposition', 'verification')
@@ -112,9 +112,15 @@ PARTS = {
                             'memory_requests': host.operation({'op': 'memory.requests'})['requests']},
     'course_changes': lambda host: host.operation({'op': 'course_change.list'}),
     'builds': lambda host: {'builds': host.builds.state()},
+    'key_points': lambda host: host.operation({'op': 'key_points.view'}),
+    # Worked out from exercises, review answers and check answers on every load; nothing of it is stored.
+    'drills': lambda host: {'drills': host.drills.state()},
+    'handoffs': lambda host: host.operation({'op': 'handoff.list'}),
+    'sheets': lambda host: host.operation({'op': 'sheet.list'}),
+    'mistakes': lambda host: {'mistakes': host.operation({'op': 'mistakes.list'})['entries']},
 }
 # Parts a `changed` event may reload without the rest of the state.
-ALONE = ('preparation', 'settings', 'builds', 'memory')
+ALONE = ('preparation', 'settings', 'builds', 'memory', 'key_points')
 
 
 def build(host, parts=None):

@@ -33,13 +33,15 @@ def taught(workspace, concept_id):
     execute(workspace, {'op': 'stream.event', 'id': identifier, 'attempt': 1, 'sequence': 2, 'kind': 'complete'})
 
 
-def host_client(workspace, runner=None, settings=None, port=8765):
-    """A loopback-addressed client for the HTTP host; close it to release the course lease."""
+def host_client(workspace, runner=None, settings=None, port=8765, key_points=False):
+    """A loopback-addressed client for the HTTP host; close it to release the course lease. The idle job writing missing
+    key points stays off unless a test asks for it (`key_points`), so it never takes a reply another test expects."""
     from fastapi.testclient import TestClient
     from guided_learning.server.settings import TeacherSettings
     from guided_learning.server import create_app
     settings = settings or TeacherSettings(Path(tempfile.mkdtemp()) / 'settings.json')
     app = create_app(workspace, port=port, runner=runner, settings=settings)
+    app.state.host.key_points.ahead = key_points
     return TestClient(app, base_url=f'http://127.0.0.1:{port}'), app.state.host
 
 

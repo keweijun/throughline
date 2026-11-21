@@ -220,8 +220,6 @@ class Navigation(Feature):
             return ''
         language = turn.get('language', 'en')
         chapter = context.get('chapter')
-        if is_recap(turn):
-            return prompts.chapter_recap(chapter, *self._recap_data(chapter), language)
         lesson, number, repair = self._step(turn)
         earlier = [t for t in self.host.brief_turns() if t['id'] != turn['id'] and t['channel'] == 'mainline'
                    and t['concept_id'] == turn['concept_id'] and t['status'] == 'completed' and not chapter_owned(t)]
@@ -449,16 +447,6 @@ class Navigation(Feature):
                     if turn and turn['status'] == 'completed':
                         self._record_step(lesson, self.operation({'op': 'stream.read', 'id': turn['id']})['turn'])
 
-    def _recap_data(self, chapter):
-        model = self.operation({'op': 'curriculum.view'})
-        titles = {c['id']: c['title'] for c in model['concepts']}
-        deferred = [{'section': titles[t['concept_id']], 'question': t['question']}
-                    for t in self.operation({'op': 'practice.list'})['tasks']
-                    if t['status'] == 'deferred' and t['concept_id'] in chapter['concept_ids'] and not chapter_owned(t) and t['origin'] not in RETRIEVAL_ORIGINS]
-        studied = set(self.studied(chapter))
-        return ([titles[cid] for cid in chapter['concept_ids']], deferred,
-                [titles[cid] for cid in chapter['concept_ids'] if cid not in studied])
-
     def chapter(self, chapter_id):
         chapter = next((c for c in self.operation({'op': 'curriculum.view'})['chapters'] if c['id'] == chapter_id), None)
         if chapter is None:
@@ -473,20 +461,11 @@ class Navigation(Feature):
         return [cid for cid in chapter['concept_ids'] if cid in done]
 
     def studied_chapter(self, chapter_id):
-        """A chapter recap or quiz is offered once any section of the chapter has a completed lesson, wherever the learner is."""
+        """A chapter quiz is offered once any section of the chapter has a completed lesson, wherever the learner is."""
         chapter = self.chapter(chapter_id)
         if not self.studied(chapter):
             raise OperationError('not_studied', 'Study a section of this chapter first')
         return chapter
-
-    def start_recap(self, chapter_id, identifier=None):
-        """A recap is a mainline turn owned by the chapter and shown on its page; it explains nothing new. Starting one
-        never moves the learner's position, and like any lesson it waits while another lesson is being written."""
-        with self.host.lock:
-            chapter = self.studied_chapter(chapter_id)
-            chinese = self.operation({'op': 'preferences.view'})['preferences']['language'] == 'zh-CN'
-            return self.host.start_turn({'id': 'recap:' + (identifier or str(uuid.uuid4())).removeprefix('recap:'), 'concept_id': chapter['concept_ids'][-1],
-                                         'chapter_id': chapter['id'], 'channel': 'mainline', 'prompt': prompts.recap_request(chapter['title'], chinese)})
 
     def on_complete(self, turn):
         if turn['channel'] != 'mainline' or is_recap(turn):
@@ -858,17 +837,6 @@ class Practice(Feature):
         sections = [{'id': cid, 'title': titles.get(cid, cid)} for cid in self.operation({'op': 'practice.quiz_sections', 'chapter_id': chapter['id']})['sections']]
         return prompts.chapter_quiz(chapter, sections, seen, again)
 
-    def quiz(self, chapter_id):
-        """A chapter quiz: a few earlier exercises from the chapter asked again plus two or three new questions spanning
-        it (ADR 0008). Offered once any section has a lesson, wherever the learner is, and it never moves the position. A
-        new quiz waits until every question of the chapter's earlier quizzes has been answered."""
-        with self.host.lock:
-            chapter = self.host.navigation.studied_chapter(chapter_id)
-            if any(t.get('chapter_id') == chapter_id and t['origin'] == 'chapter_quiz' and not any(h.get('action') == 'assess' for h in t['history'])
-                   for t in self.state()['tasks']):
-                raise OperationError('quiz_open', 'Answer the questions of the current quiz before taking it again')
-            return self._launch(chapter['concept_ids'][-1], 'generate', purpose='chapter_quiz', chapter_id=chapter_id)
-
     def on_complete(self, turn):
         self.operation({'op': 'practice.complete', 'id': turn['id']})
         # A chapter recap asks for nothing: the chapter quiz is taken on purpose from the chapter page.
@@ -1142,9 +1110,9 @@ class Preparation(Feature):
                 return
             try:
                 result = self.schedule()
-                # With nothing to prepare and nothing running, write the Review for me set ahead (ADR 0014).
-                if result.get('reason') in ('no_next_section', 'ready', 'failed', 'existing') and self.host.review.ahead:
-                    self.host.review.prepare()
+                # With nothing to prepare and nothing running, write missing key points (ADR 0024).
+                if result.get('reason') in ('no_next_section', 'ready', 'failed', 'existing') and self.host.key_points.ahead:
+                    self.host.key_points.idle()
                 summary = [(j['id'], j['status']) for j in self.state(brief=True)['jobs']]
                 if summary != self._last:
                     self._last = summary

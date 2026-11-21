@@ -240,7 +240,7 @@ class Answering(TeacherSettings):
         super().__init__(Path(tempfile.mkdtemp()) / 'settings.json')
         self.reply, self.calls = reply, []
 
-    def runner(self, small=False):
+    def runner(self, small=False, fast=False):
         settings = self
 
         class Run:
@@ -257,7 +257,7 @@ class Consolidating:
     def __init__(self, reply):
         self.reply, self.calls = reply, []
 
-    def runner(self, small=False):
+    def runner(self, small=False, fast=False):
         settings = self
 
         class Run:

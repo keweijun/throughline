@@ -296,6 +296,21 @@ class StudioStore {
     }
   }
 
+  /** A message as the composer would send it, for one sent from elsewhere: a `$name` names that skill, as typed. */
+  messageFor(text: string): StudioMessage {
+    const points = (index: number) => [...text.slice(0, index)].length;
+    const found = [...text.matchAll(/(^|\s)\$([\w:.-]+)/g)]
+      .map((match) => ({ from: (match.index ?? 0) + match[1].length, skill: this.skills.find((s) => s.name === match[2]) }))
+      .filter((m) => !!m.skill);
+    return {
+      text,
+      elements: found.map((m) => ({ start: points(m.from), end: points(m.from + m.skill!.name.length + 1) })),
+      skills: found.map((m) => ({ name: m.skill!.name, path: m.skill!.path })).filter((s, i, all) => all.findIndex((x) => x.path === s.path) === i),
+      mentions: [],
+      images: [],
+    };
+  }
+
   /** A hand-off: a new chat with the request filled in and, when it points somewhere, a chip saying where. */
   handoff(prompt: string, origin: StudioOrigin | null = null) {
     this.newThread();

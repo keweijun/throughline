@@ -3,7 +3,7 @@ import json
 import re
 import time
 from collections import Counter
-from . import curriculum, images as attached, evidence, lessons, memory, review, teaching
+from . import curriculum, handoffs, images as attached, evidence, lessons, memory, review, teaching
 from .store import OperationError
 
 def listing(store, request):
@@ -230,16 +230,17 @@ def _section_question(store, context, q):
 def _same_unit(ref, other):
     return all(ref.get(k)==other.get(k) for k in ('source_id','revision','unit_id'))
 
-def _review_questions(store, value, result, strict=False):
-    """A review set's questions (ADR 0014): each tests sections the set may test and is an apply question, answered in
-    writing and assessed by part, or a recall question with its options. A recall question that is malformed is dropped,
-    so one bad question does not lose the set; with `strict` (Codex writing a set) it is an error instead."""
+def _review_questions(store, value, result, strict=False, allowed=None, cap=None):
+    """Review questions (ADR 0014): each tests sections the set or drill session may test (`allowed`, else the set's)
+    and is an apply question, answered in writing and assessed by part, or a recall question with its options. A recall
+    question that is malformed is dropped, so one bad question does not lose the rest; with `strict` it is an error."""
     questions=result.get('questions')
     if not isinstance(questions,list) or not questions: raise FormatError('Expected a list of questions')
-    if strict and len(questions)>review.MAX_QUESTIONS: raise FormatError(f'A review set has at most {review.MAX_QUESTIONS} questions')
-    allowed=review.scope_sections(store,store.get('review_sets',value['set_id']) or {})
+    cap=cap or review.MAX_QUESTIONS
+    if strict and len(questions)>cap: raise FormatError(f'At most {cap} questions')
+    if allowed is None: allowed=review.scope_sections(store,store.get('review_sets',value['set_id']) or {})
     kept=[]
-    for index,q in enumerate(questions[:review.MAX_QUESTIONS]):
+    for index,q in enumerate(questions[:cap]):
         if not isinstance(q,dict) or not isinstance(q.get('question'),str) or not q['question'].strip(): raise FormatError('question must be nonempty text')
         tested=q.get('tests_concept_ids')
         if not isinstance(tested,list) or not tested or any(c not in allowed for c in tested):
@@ -258,6 +259,13 @@ def _review_questions(store, value, result, strict=False):
         if parts and any(isinstance(p,dict) and any(c not in tested for c in p.get('concept_ids',[])) for p in parts):
             raise FormatError('A part may test only sections its question tests')
         kept.append({'kind':'apply','question':q['question'],'tests_concept_ids':tested,**({'parts':parts} if parts else {})})
+    if strict:
+        # A paper's marks, as Codex gives them: kept with the question, shown beside it.
+        for q,k in zip([q for q in questions[:cap]],kept):
+            marks=q.get('marks')
+            if marks is not None:
+                if not isinstance(marks,int) or isinstance(marks,bool) or not 1<=marks<=100: raise FormatError('marks is a whole number from 1 to 100')
+                k['marks']=marks
     if not kept: raise FormatError('No usable question')
     return kept
 
@@ -467,6 +475,7 @@ def add(store, request):
         tasks.append({'id':f'{identifier}:{index}','concept_id':cid,'question':q['question'],'origin':q['origin'],'source_refs':q.get('source_refs',[]),
                       'status':'pending','history':[],'created_at':time.time(),**{k:q[k] for k in ('parts','exercise') if k in q}})
     for task in tasks: store.put('practice_tasks',task['id'],task)
+    handoffs.record_result(store,request.get('handoff_id'),{'kind':'exercises','concept_id':cid,'task_ids':[t['id'] for t in tasks]})
     return {'tasks':tasks}
 
 def _codex_task(store, request):
@@ -507,21 +516,4 @@ def retire(store, request):
     task={**task,'status':'retired','retired_at':time.time(),**({'retire_reason':reason.strip()} if reason and reason.strip() else {})}
     return {'task':store.put('practice_tasks',task['id'],task)}
 
-def write_review(store, request):
-    """A review set Codex writes with its questions, for a learner who asks in Studio to review what they studied (issue
-    #173): a request as **Review for me** with a request would make, under the same rules, written in one step."""
-    identifier=teaching.require_text(request,'id')
-    found=store.get('review_sets',identifier)
-    if found:
-        return {'set':found,'task_ids':[t['id'] for t in store.list('practice_tasks') if t.get('set_id')==identifier]}
-    review.create(store,{'id':identifier,'kind':'request',**{k:request[k] for k in ('request','scope') if k in request}})
-    note=request.get('note')
-    if note is not None and (not isinstance(note,str) or len(note)>review.MAX_NOTE):
-        raise OperationError('invalid_request',f'note must be text of at most {review.MAX_NOTE} characters')
-    value={'id':identifier,'set_id':identifier}
-    try: questions=_review_questions(store,value,{'questions':request.get('questions')},strict=True)
-    except FormatError as exc: raise OperationError('invalid_review_question',str(exc)) from exc
-    review_tasks(store,value,{'questions':questions,'note':note})
-    return {'set':store.get('review_sets',identifier),'task_ids':[f'{identifier}:{i}' for i in range(len(questions))]}
-
-OPERATIONS={'practice.add':add,'practice.revise':revise,'practice.retire':retire,'review.write':write_review,'practice.list':listing,'practice.quiz_sections':sections_for_quiz,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}
+OPERATIONS={'practice.add':add,'practice.revise':revise,'practice.retire':retire,'practice.list':listing,'practice.quiz_sections':sections_for_quiz,'practice.job':job,'practice.complete':complete,'practice.defer':defer,'practice.skip':skip}

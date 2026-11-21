@@ -11,13 +11,13 @@ from .widgets import selected as selected_widgets
 
 
 # Turn channels, in one place for the host and its features; web/src/lib/types.ts mirrors CHANNELS.
-LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice')  # the learner's own requests
+LEARNER_CHANNELS = ('mainline', 'sidequestion', 'practice', 'drill')  # the learner's own requests
 # A lesson step written ahead while the learner reads the current one: hidden, and no teaching interaction, until
 # lesson.step reveals it as a mainline turn (ADR 0009).
 PREPARED_STEP = 'prepared_step'
 # A `memory` turn answers what the learner asked to be remembered; their message is recorded by memory.request.
-BACKGROUND = ('preparation', 'build', 'consolidation', 'memory')  # channels whose turns are not teaching interactions
-SMALL_MODEL = ('preparation', 'consolidation', 'memory')  # channels the small model serves
+BACKGROUND = ('preparation', 'build', 'consolidation', 'memory', 'key_points', 'chapter_sheet')  # channels whose turns are not teaching interactions
+SMALL_MODEL = ('preparation', 'consolidation', 'memory', 'chapter_sheet')  # channels the small model serves
 # What a prompt carries of a prerequisite section: enough to bridge or refer back to it. Its pages, exercises and any
 # build notes Codex stored with it would be most of a prompt (issue #175).
 PREREQUISITE_FIELDS = ('id', 'title', 'core_question', 'objective', 'goal', 'overview')

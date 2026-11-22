@@ -723,8 +723,10 @@ summary:focus-visible {
 .prose blockquote.callout {
   --callout: var(--accent);
   padding: 0.6em 0.9em;
-  border-left-color: var(--callout);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  /* A faint border on every side lets the coloured bar follow the rounded corners. */
+  border: 1px solid color-mix(in srgb, var(--callout) 22%, transparent);
+  border-left: 3px solid var(--callout);
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--callout) 7%, transparent);
   color: var(--ink);
   font-style: normal;

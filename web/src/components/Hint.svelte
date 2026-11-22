@@ -39,8 +39,9 @@
     gap: 0.6rem;
     margin: 0.9rem 0;
     padding: 0.55rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--marker) 30%, transparent);
     border-left: 3px solid var(--marker);
-    border-radius: 0 var(--radius) var(--radius) 0;
+    border-radius: var(--radius);
     background: var(--marker-wash);
     font-size: var(--step--1);
     animation: enter-drop var(--settle) var(--ease-out);

@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.59.1
+
+- **Note, tip and important boxes in lessons, and first-visit tips, have rounded corners on every side**, like the other cards in the app.
+
 ## 0.59.0
 
 - **A short welcome the first time Throughline opens.** Choose your language (it starts in the one you installed in), see how Throughline works in three steps (make a course from your files, learn, review), find out what Studio can do and how much it may do without asking (Full access unless you choose Library access), and learn how to open Throughline next time. Every step can be skipped, and Help → **How Throughline works** shows it again.

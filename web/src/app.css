@@ -1281,3 +1281,27 @@ dialog[open]::backdrop {
     animation: none;
   }
 }
+
+/* Printing one sheet (SheetView): only it is on the page. */
+@media print {
+  body[data-print] * {
+    visibility: hidden;
+  }
+
+  body[data-print] [data-sheet],
+  body[data-print] [data-sheet] * {
+    visibility: visible;
+  }
+
+  body[data-print] [data-sheet] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: 0;
+    background: none;
+  }
+
+  body[data-print] [data-sheet] header .actions {
+    display: none;
+  }
+}

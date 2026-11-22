@@ -70,7 +70,8 @@
       {:else}{t("What the lesson focuses on · optional")}{/if}
     {/snippet}
     {#if open && !writing}
-      <div class="row">
+      <!-- Under a lesson still going on, the other choice sits right, below its Continue. -->
+      <div class="row instead">
         <button class="btn btn-quiet btn-small" disabled={busy || !!running} onclick={chooseFocus}>{t("Start a new lesson instead")}</button>
       </div>
     {:else if !writing}
@@ -137,6 +138,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .row.instead {
+    justify-content: flex-end;
   }
 
   .hint {

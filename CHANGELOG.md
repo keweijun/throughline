@@ -2,6 +2,36 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.58.0
+
+- **Key points.**
+  - **Every section you study ends with its key points:** the results, rules and methods to hold from it. Each says when it holds and gives a common mistake, often one you made, and links back to the lesson step and page that taught it.
+  - **Where they show:** at the end of the lesson, at the top of the section when you come back, and gathered on the chapter page with a short paragraph on how they connect. This replaces the chapter recap; recaps you already have stay, folded.
+  - **Sections you studied before** get their key points in the background.
+  - **To change a point, ask Codex** with **Ask Codex to change them**. When the section is taught again, the changes you asked for are kept.
+- **Review is now a place with several ways to review.**
+  - It opens on the key points of what you choose to review: everything you studied, or some chapters or sections. Throughline remembers the choice for the course.
+  - **Mistakes** collects what you missed, with what you answered and the feedback. Entries you later get right stay, marked with the date, under **Since got right**.
+  - **Sheets** holds what Studio wrote for you.
+- **Drills replace review sets.**
+  - **Drill me** starts a quick back-and-forth with a fast teacher. It asks a few questions at a time, mostly on what you missed and what you haven't practised for a while, and you answer them right there.
+  - Ask for **More questions**, ask about an answer, or say what to drill next.
+  - Nothing is due and nothing needs finishing: sessions stay under **Earlier sessions**.
+  - **Other ways:** **Explain it back**, **Oral quiz** and **Tell confusable ideas apart**.
+  - **Drill this chapter** on the chapter page replaces the chapter quiz.
+  - The warm-up before a section is a short drill.
+  - **Test me on this** under a key point, and **Try it again** under a mistake, drill just that.
+  - Your answers count as before, and review sets and quizzes you already have stay readable.
+- **Hand things to Studio without leaving what you're doing.**
+  - **Offers:** when a drill can't do what you ask, such as a cheat sheet or collecting a problem set, the teacher offers it to Studio under its reply. Review also offers a **Mock exam**, a **Formula sheet** and **My mistakes on one page**, and a chapter offers a **One-page summary in Studio**.
+  - **Sending:** one click sends the request, with what you were reviewing. A suggested course change is now sent the same way. With full access Studio starts straight away; without it, Throughline asks once.
+  - **Results:** the card shows Studio working, then **Done** with **Open it**, which opens what Studio made. Mock exams become sessions you answer in Review, with marks, and sheets appear under **Sheets**, ready to print. Studio can read your mistakes book, so what it makes focuses on what you get wrong.
+- **Meet Studio.** The first course you open says what Studio is, with three things it could do for that course, each one click away.
+- **GPT-6.1 Terra is the default small model.** Unless you chose another, it runs the drill teacher and background work, because it's two to three times faster. Choose **Same as the teacher model** in Settings to keep the old behaviour.
+- **Tidier cards.**
+  - The cards below put what they say on the left and the action on the right: **Next step** under a lesson, the warm-up (now with a close button), skipping a chapter, and the chapter drill.
+  - **Back to current section** sits beside the chapter's name.
+
 ## 0.57.0
 
 - **A note on a passage is written in Notes.** Select text and choose **Note**: the passage waits in the box at the foot of the Notes panel, as **Ask** puts it in Questions. That box offers LaTeX as you type `\`, shows a preview of your formulas, and takes images you attach, paste or drop, such as a photo of your working. Before, the note on a passage was written in a small box on the page, with none of these. **Remove quote** turns it back into a note on the section.

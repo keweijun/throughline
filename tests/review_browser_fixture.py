@@ -22,11 +22,20 @@ for cid in ('state', 'superposition'):
     execute(root, {'op': 'interaction.record', 'id': f'feedback-{cid}', 'role': 'assistant', 'text': 'Correct.', 'concept_id': cid})
     execute(root, {'op': 'evidence.assess', 'id': f'pass-{cid}', 'concept_id': cid, 'session_id': 'earlier', 'exercise_id': f'exercise-{cid}',
                    'answer_id': f'answer-{cid}', 'assessment_id': f'feedback-{cid}', 'outcome': 'passed'})
+# The first section was taught in a lesson too, which ended with its key points (ADR 0024).
+execute(root, {'op': 'stream.start', 'id': 'lesson-state', 'concept_id': 'state', 'prompt': 'Teach', 'record_user': False})
+execute(root, {'op': 'stream.event', 'id': 'lesson-state', 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': '## States\n\nA state is a unit vector.'})
+execute(root, {'op': 'stream.event', 'id': 'lesson-state', 'attempt': 1, 'sequence': 2, 'kind': 'complete'})
+execute(root, {'op': 'key_points.save', 'concept_id': 'state', 'turn_id': 'lesson-state', 'origin': 'lesson', 'points': [
+    {'statement': 'A state is a unit vector; multiplying it by a phase changes no probability.', 'holds_when': 'The phase is global.',
+     'common_mistake': 'Treating a relative phase as global.', 'turn_id': 'lesson-state'}]})
 store = Store(root)
 with store.db:
     for cid in ('state', 'superposition'):
         item = store.get('evidence', f'pass-{cid}')
         store.put('evidence', item['id'], {**item, 'assessed_at': time.time() - 10 * 86400})
+    turn = store.get('streams', 'lesson-state')
+    store.put('streams', 'lesson-state', {**turn, 'started_at': time.time() - 10 * 86400})
 store.db.close()
 
 RECALL = {'kind': 'recall', 'idea': 'global phase', 'question': 'A state is multiplied by $-1$. Does any probability change?',
@@ -36,17 +45,31 @@ RECALL = {'kind': 'recall', 'idea': 'global phase', 'question': 'A state is mult
 APPLY = {'kind': 'apply', 'question': 'Normalize $(1, i)$ and say what each probability is.', 'tests_concept_ids': ['state', 'superposition']}
 
 
+EARLIER = {'kind': 'apply', 'question': 'Asked again from Superposition: normalize (1, 1).', 'tests_concept_ids': ['superposition']}
+
+
 class Runner:
     def run(self, prompt, cwd, emit, cancel):
-        if 'Practice only (review set)' in prompt:
-            # A warm-up tests only the prerequisites of the section it comes before.
-            reply = {'questions': [RECALL] if 'warm-up' in prompt else [RECALL, APPLY]}
-            if 'Request (data)' in prompt:
-                reply['note'] = 'Left out measurement: you have not studied it yet.'
-            text = json.dumps(reply)
-        elif 'Practice only (chapter quiz)' in prompt:
-            text = json.dumps({'questions': [{'question': 'Why must the amplitudes of a superposition be normalized together?', 'tests_concept_ids': ['state', 'superposition']},
-                                             {'question': 'Write a new superposition with equal probabilities.', 'tests_concept_ids': ['superposition']}]})
+        if 'drilling the learner' in prompt:
+            said = prompt.rsplit('The learner now says:\n', 1)[-1]
+            # A warm-up tests only the prerequisites of the section it comes before; a chapter drill asks an earlier
+            # exercise again first.
+            if 'warm-up before the learner starts' in prompt:
+                text, questions = 'A quick warm-up.', [RECALL]
+            elif 'drills one chapter' in prompt:
+                text, questions = 'One you have seen before, then a new one.', [EARLIER, APPLY]
+            elif 'cheat sheet' in said.lower():
+                text, questions = 'Studio can make that.\n<studio-request>{"label": "A cheat sheet for States", "request": "Make me a one-page cheat sheet for the chapter States."}</studio-request>', []
+            elif 'explain it back' in prompt and 'drilling the learner' in prompt and 'This session is explain it back' in prompt:
+                text, questions = 'Explain this one.', [{'kind': 'apply', 'question': 'Explain in your own words why a global phase changes no probability.', 'parts': ['(a) the statement', '(b) why it holds'], 'tests_concept_ids': ['state']}]
+            elif 'measurement' in said.lower():
+                text, questions = 'Measurement is not studied yet, so here is one on phases instead.', [RECALL]
+            elif 'Drill me.' in said and '"teacher":' in prompt:
+                text, questions = 'Two more.', [{**RECALL, 'question': 'Two states differ by a phase $e^{i\\pi/3}$. Same probabilities?'}, APPLY]
+            else:
+                text, questions = 'Two quick ones.', [RECALL, APPLY]
+            if questions:
+                text += '\n<drill-questions>' + json.dumps({'questions': questions}) + '</drill-questions>'
         elif 'Question and help history' in prompt:
             text = json.dumps({'feedback': 'Right: each probability is 1/2.', 'outcome': 'passed'})
         elif 'Practice only' in prompt:

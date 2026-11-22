@@ -164,7 +164,7 @@
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen || app.libraryOpen}>
+<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen || app.libraryOpen || app.reviewOpen}>
   {#if app.signedOut}
     <main id="main" class="loading" role="alert">
       <h1 class="signed-out">{t('Open Throughline from its launcher')}</h1>
@@ -174,8 +174,9 @@
     <Library />
   {:else if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
-    <!-- The course's Overview shows the whole route in its chapter strip, so the rail steps aside for the page. -->
-    {#if !app.courseOpen}<RouteRail />{/if}
+    <!-- The course's Overview shows the whole route in its chapter strip, and Review has its own scope picker, so the
+         rail steps aside for those places. -->
+    {#if !app.courseOpen && !app.reviewOpen}<RouteRail />{/if}
     <main id="main">
       {#if app.courseOpen}
         <CoursePage />

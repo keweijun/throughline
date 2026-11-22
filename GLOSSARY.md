@@ -64,22 +64,49 @@ _Avoid_: Unit (clashes with a source `unit_id`), a long lecture, a fixed number 
 **Chapter overview**: The opening of a chapter's first lesson: the chapter's core problem, its sections and how they connect, links to earlier chapters, and what the learner can do at the end.
 _Avoid_: An overview repeated at every section, unit overview (retired: a course without chapters is one chapter).
 
-**Chapter recap**: An optional lesson on the chapter page that connects the chapter's sections and lists set-aside exercises without new material. It sets no questions of its own; it offers the chapter quiz (ADR 0006).
-_Avoid_: Review test, chapter exam, a lesson of the chapter's last section.
+**Key point**: One result, rule, definition or method a learner should hold from a studied section, written by the teacher: its statement, when it holds and a common mistake, linked to the lesson step and source pages that taught it. The learner does not edit key points; they ask Codex to change them (ADR 0024).
+_Avoid_: Summary, flashcard, the learner's notes, a mastery target.
 
-**Chapter quiz**: A review set scoped to one chapter, taken from the chapter page, that asks a few earlier exercises from the chapter's sections again and adds new questions spanning the chapter. It never gates the route (ADR 0014).
+**Chapter sheet**: A chapter's key points gathered on its chapter page, in route order, opened by a short paragraph on how its sections connect (ADR 0024).
+_Avoid_: Chapter recap, cheat sheet (something the learner asks Studio to make), chapter summary (the outline's one-line description).
+
+**Chapter recap**: Retired: a lesson on the chapter page, started on request, that connected the chapter's sections. Key points and the chapter sheet replace it; recaps written before stay readable (ADR 0006, ADR 0024).
+_Avoid_: Using it for the chapter sheet.
+
+**Chapter quiz**: Retired: a review set scoped to one chapter, taken from the chapter page, that asked earlier exercises again with new questions spanning the chapter. **Drill this chapter**, a drill session scoped to the chapter, replaces it; quizzes taken before stay on the chapter page (ADR 0025).
 _Avoid_: Chapter exam, mastery test, gate, the section's exercises.
 
-**Review**: Answering questions from memory about sections already studied, when the learner asks for it. There is no schedule and nothing comes due; the learner asks for a review set, and the teacher chooses what to test from the review context unless the learner says what (ADR 0014).
+**Review**: Going over sections already studied, in the Review place, when the learner chooses: reading key points, the mistakes book, or a drill session over a review scope. There is no schedule and nothing comes due (ADR 0014, ADR 0025).
 _Avoid_: Revision of the course plan, reviewing source locations in Codex, a test that must be passed, a due list.
 
-**Review set**: The questions written for one review request ("Review for me", a learner's request, a warm-up or a chapter quiz). Its questions usually connect ideas from several studied sections and name the sections each part tests.
-_Avoid_: A list of sections to review, a quiz that must be finished.
+**Review scope**: What the Review place covers: everything studied, or the chapters and sections the learner chose. Key points, the mistakes book and the questions asked there all follow it, and the course remembers the last choice in the learner's browser (ADR 0014).
+_Avoid_: A review set's own scope (what one request asked about), a filter on the route.
 
-**Review context**: What the teacher is given to choose review questions: for each studied section when it was last practised, recent misses and exercises set aside, plus course memory and earlier review questions with their outcomes. It informs, it never schedules.
+**Mistakes book**: The learner's misses, collected on the Review page from what the course records: missed exercise, chapter-quiz and review parts, wrong recall answers, and ideas whose check questions were missed more than once. An entry the learner later gets right stays, marked with when; nothing is counted or cleared (ADR 0014).
+_Avoid_: Error log, to-do list, a single missed check question (a slip, not yet a mistake).
+
+**Review set**: Retired: the questions written for one review request before drill sessions. Sets written before stay to read and answer (ADR 0025).
+_Avoid_: Using it for a drill session.
+
+**Hand-off**: A request a fast view (a lesson, a drill, the Review place) cannot serve, sent to Studio as a new chat with where it came from; the learner stays put and the card that sent it follows the chat (ADR 0026).
+_Avoid_: Escalation (internal), redirect, a link that only opens Studio.
+
+**Way to review**: How a drill session asks, chosen in the Review place: quick questions, explain it back, oral quiz or telling confusable ideas apart; Studio ways (a mock exam, a sheet) are hand-offs (ADR 0026).
+_Avoid_: Mode, game, a separate page.
+
+**Sheet**: A page Codex wrote in Studio for review, such as a cheat sheet, a formula sheet or the learner's mistakes on one page. It covers chapters or sections, is read and printed in Review's Sheets, and is linked from the chapter page (ADR 0026).
+_Avoid_: Chapter sheet (the chapter's key points), key points, a source.
+
+**Drill session**: A conversation with the fast teacher over a review scope, in the Review place: it asks a few review questions at a time, the learner answers them in place, asks for more or says what to drill next. It is kept and reopened at will and never finished or due; a chapter's drill and a warm-up are sessions with a fixed scope (ADR 0025).
+_Avoid_: Quiz, test, review set, a session that must be completed.
+
+**Fast teacher**: The teacher of a drill session, running on the small model so a reply comes quickly; its assessments count as evidence like any teacher's (ADR 0025).
+_Avoid_: A second teacher with its own memory, Studio.
+
+**Review context**: What the teacher is given to choose review questions: for each studied section when it was last practised, recent misses and exercises set aside, plus course memory and earlier review questions with their outcomes; a drill session adds its scope's key points and open mistakes. It informs, it never schedules.
 _Avoid_: Review schedule, due dates, mastery score.
 
-**Warm-up**: A small review set offered when the learner opens a section whose prerequisites were studied but not practised for a while, scoped to those prerequisites. Offered once per section and never required.
+**Warm-up**: A short drill session offered when the learner opens a section whose prerequisites were studied but not practised for a while, scoped to those prerequisites and shown on the section. Offered once per section and never required (ADR 0025).
 _Avoid_: Pre-test, gate, the chapter overview.
 
 **Retrieval question**: A review question answered from memory, without new material or hints in the question: a recall question (multiple choice or a short answer, with instant feedback, not evidence) or an apply question (a written answer to a new situation, assessed by part like an exercise).
@@ -106,7 +133,7 @@ _Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never r
 **Share level**: How much of a course a package holds: Route (the route and sources), Route and lessons (adds lessons and exercises without the sender's answers) or Everything. The recipient takes at most that much when importing.
 _Avoid_: Privacy setting, export format.
 
-**Studio**: The place in the app where the learner creates and reshapes courses by talking to Codex with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught. It is for course work, not questions about a course's content, which go to the teacher in Questions (ADR 0016).
+**Studio**: The place in the app where Codex works on the course with the `$throughline` skill: making a course from files, adding files, rebuilding the route, checking pages, changing how a course is taught, and making what the fast views cannot, such as sheets, mock exams or a problem set's exercises. It is the main line; content questions go to the teacher in Questions (ADR 0016, ADR 0026).
 _Avoid_: Chat, workshop, side question, teaching.
 
 **Suggested course change**: A change to the course itself that the teacher proposes under a lesson reply or side-question answer, which the learner opens in Studio with the request filled in or dismisses. One is open at a time (ADR 0016).

@@ -7,6 +7,18 @@ from .teaching import require_text
 
 STATE_NAMESPACES = ('course', 'curriculum', 'sources', 'interactions', 'evidence', 'evidence_deferred', 'evidence_resolutions', 'sidequestions', 'teaching', 'deferred_explanations')
 FALLBACK_MODEL = 'gpt-6-luna'  # the documented default auxiliary model when the learner chose none
+# The small model when the learner has not chosen one: background work and Review's fast teacher run on it. Real runs
+# found Terra two to three times faster than Sol at comparable quality (PR #231). `SAME_AS_TEACHER` picks the teacher's.
+DEFAULT_SMALL_MODEL = 'gpt-6.1-terra'
+SAME_AS_TEACHER = 'teacher'
+
+
+def small_model(settings):
+    """The small model the settings name: the learner's choice, the teacher's model on request, else the default."""
+    chosen = (settings or {}).get('small_model') or ''
+    if chosen == SAME_AS_TEACHER:
+        return (settings or {}).get('model') or None
+    return chosen or DEFAULT_SMALL_MODEL
 
 
 def no_saved_models():
@@ -23,7 +35,7 @@ def fingerprint(store):
 def handoff_model():
     """The learner's small model, else their teacher model, else the default auxiliary model."""
     settings = teacher_models() or {}
-    return settings.get('small_model') or settings.get('model') or FALLBACK_MODEL
+    return small_model(settings) or FALLBACK_MODEL
 
 def capture(store, spec):
     messages = [store.get('interactions', identifier) for identifier in spec['interaction_ids']]

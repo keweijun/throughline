@@ -4,8 +4,8 @@ import { api, ApiError, course, newId, signIn } from './api';
 import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
-import { studio } from './studio.svelte';
-import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
+import { studio, type StudioOrigin } from './studio.svelte';
+import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DrillStart, Handoff, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 /** A passage waiting in the Notes box: saving the box highlights it with the note written there. */
 export type NoteQuote = Pick<Annotation, 'passage' | 'concept_id'> & Partial<Pick<Annotation, 'occurrence' | 'turn_id' | 'task_id' | 'source'>>;
@@ -185,6 +185,11 @@ class AppStore {
   viewingChapter = $state<string | null>(null);
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
+  /** The drill session open in the Review place, if any (ADR 0025). */
+  drillOpen = $state<string | null>(null);
+  /** The Review place's tab, and the sheet open in Sheets. */
+  reviewTab = $state<'points' | 'mistakes' | 'sheets'>('points');
+  sheetOpen = $state<string | null>(null);
   /** The Course page replaces the reading column: the course as a whole (ADR 0017). The side panel never shows there:
    * the Overview has its own Sources, and Studio and the reader need the width. It comes back as it was in Learn. */
   courseOpen = $state(false);
@@ -326,6 +331,17 @@ class AppStore {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && t.concept_id === conceptId && !t.chapter_id);
   }
 
+  /** A section's key points (ADR 0024), once the teacher has written them. */
+  keyPoints(conceptId: string | null | undefined) {
+    return (this.state?.key_points ?? []).find((v) => v.concept_id === conceptId);
+  }
+
+  /** The paragraph opening a chapter's key points sheet, once two of its sections have points. */
+  chapterSheet(chapterId: string | null | undefined) {
+    return (this.state?.chapter_sheets ?? []).find((s) => s.chapter_id === chapterId);
+  }
+
+  /** Chapter recaps from before key points replaced them (ADR 0024); they stay readable on the chapter page. */
   recaps(chapterId: string | null | undefined): Turn[] {
     return (this.state?.turns ?? []).filter((t) => t.channel === 'mainline' && !!chapterId && t.chapter_id === chapterId);
   }
@@ -1134,6 +1150,9 @@ class AppStore {
   }
 
   showReview() {
+    // Review opens on its key points; what Studio made for the learner opens on its own tab (showResult).
+    this.reviewTab = 'points';
+    this.sheetOpen = null;
     this.reviewOpen = true;
     this.courseOpen = false;
     this.libraryOpen = false;
@@ -1152,15 +1171,99 @@ class AppStore {
   }
 
   /** Ask for a review set (ADR 0014): nothing for Review for me, or a request and scope, or the section a warm-up comes before. */
-  askReview(body: { request?: string; scope?: { chapter_ids?: string[]; concept_ids?: string[] }; warm_up_for?: string } = {}) {
-    return this.act(() => api.post('/api/review/sets', body));
+  /** Starts a drill session (ADR 0025) and opens it in the Review place, unless `inline` keeps it where it was asked for. */
+  async startDrill(body: DrillStart = {}, inline = false) {
+    const id = `drill-${newId()}`;
+    const result = await this.act(() => api.post('/api/drills', { id, turn_id: `drill-turn-${newId()}`, ...body }));
+    if (result && !inline) {
+      this.drillOpen = id;
+      this.showReview();
+    }
+    return result;
   }
 
-  closeReviewSet(setId: string) {
-    return this.act(() => api.post(`/api/review/sets/${encodeURIComponent(setId)}/close`, {}));
+  /** Opens what Studio made for a hand-off (issue #229): a session or sheet in Review, or the section it added exercises to. */
+  showResult(result: NonNullable<Handoff['result']>) {
+    if (result.kind === 'session' && result.id) {
+      this.drillOpen = result.id;
+      this.showReview();
+    } else if (result.kind === 'sheet' && result.id) {
+      this.showReview();
+      this.reviewTab = 'sheets';
+      this.sheetOpen = result.id;
+    } else if (result.kind === 'exercises' && result.concept_id) {
+      this.view(result.concept_id);
+    }
   }
 
-  /** A recall question's choice; its feedback was written with it, so nothing waits for the teacher. */
+  deleteSheet(id: string) {
+    return this.act(() => api.delete(`/api/sheets/${encodeURIComponent(id)}`));
+  }
+
+  /** A hand-off sent to Studio from this place (issue #229), once it has been. */
+  handoff(id: string) {
+    return (this.state?.handoffs ?? []).find((h) => h.id === id);
+  }
+
+  /** The latest hand-off of this request from this place: a card without a fixed id finds what it sent after a reload. */
+  handoffFor(place: Handoff['place'], request: string) {
+    const key = JSON.stringify(place);
+    return (this.state?.handoffs ?? [])
+      .filter((h) => h.request === request && JSON.stringify(h.place) === key)
+      .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))[0];
+  }
+
+  /**
+   * Hands a request to Studio (issue #229): a new Studio chat is sent `$throughline <request>` with `context` saying where
+   * it came from, and the course records it, so the card that sent it can follow the chat. The learner stays where they
+   * are. Returns an error message when Studio cannot run here, after copying the request so it can be pasted into Codex,
+   * and `thread` once Studio took the request, even when the course could not record it for the card to follow.
+   */
+  async handOff(value: Omit<Handoff, 'thread_id' | 'created_at'>, context: StudioOrigin): Promise<{ problem: string | null; thread?: string }> {
+    // A hand-off is course work: after the library's Studio, Studio may still be on the library's scope.
+    studio.setScope('course');
+    await studio.load();
+    if (!studio.available) {
+      try {
+        await navigator.clipboard.writeText(`$throughline ${value.request}`);
+      } catch {
+        // The message says where the request is either way.
+      }
+      return { problem: studio.error || t('Studio cannot run here.') };
+    }
+    if (!studio.skills.length) await studio.loadSkills();
+    const previous = { thread: studio.threadId, origin: studio.origin };
+    // Codex names the hand-off when it saves what it made (`handoff_id`, as the skill says), so the card that asked can
+    // link to it. The learner sees this note under their message, so it stays short.
+    studio.handoff('', { ...context, text: `${context.text} · hand-off ${value.id}` });
+    let sent: { thread: string };
+    try {
+      sent = await studio.send(studio.messageFor(`$throughline ${value.request}`));
+    } catch (e) {
+      // Studio stays on the chat the learner had open.
+      studio.origin = previous.origin;
+      if (previous.thread) void studio.open(previous.thread);
+      return { problem: e instanceof Error ? e.message : String(e) };
+    }
+    void studio.loadActivity();
+    // Studio has the request now; record it for the card, trying once more before saying it could not.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await api.post('/api/handoffs', { ...value, thread_id: sent.thread });
+        await this.sync();
+        return { problem: null, thread: sent.thread };
+      } catch {
+        // tried again below
+      }
+    }
+    return { problem: t('Studio is working on it, but this card could not keep track of it. Open the chat in Studio.'), thread: sent.thread };
+  }
+
+  /** The learner's next message in a drill session, or More questions without one. */
+  sendDrill(sessionId: string, message = '') {
+    return this.act(() => api.post(`/api/drills/${encodeURIComponent(sessionId)}/messages`, { message, turn_id: `drill-turn-${newId()}` }));
+  }
+
   answerRecall(taskId: string, choice: CheckChoice) {
     return this.act(() => api.post(`/api/review/tasks/${encodeURIComponent(taskId)}/answer`, { choice }));
   }
@@ -1177,14 +1280,25 @@ class AppStore {
     requestAnimationFrame(() => document.getElementById('question-input')?.focus());
   }
 
-  /** A recap and the chapter quiz stay on the chapter page and never move the learner's position. */
-  recapChapter(chapterId: string) {
-    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/recap`, { id: `recap:${newId()}` }));
+  /** Opens the page an exercise or quiz question is on and scrolls to it, as a mistake's link back to it. */
+  showTask(taskId: string) {
+    const task = this.state?.practice.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.chapter_id) this.viewChapter(task.chapter_id);
+    else this.view(task.concept_id);
+    void this.#scrollToTask(task.id, null);
   }
 
-  takeQuiz(chapterId: string) {
-    return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/quiz`));
+  /** Opens the section a lesson belongs to and scrolls to it, as a key point's link back to where it was taught. */
+  showLesson(turnId: string) {
+    const turn = this.turn(turnId);
+    if (!turn) return;
+    if (this.viewingChapter || this.reviewOpen || this.courseOpen || (this.viewing ?? this.currentId) !== turn.concept_id) this.view(turn.concept_id);
+    void this.#scrollToLesson(turnId, null);
   }
+
+  /** The chapter quiz stays on the chapter page and never moves the learner's position. */
+
 
   buildChapter(chapterId: string) {
     return this.act(() => api.post(`/api/chapters/${encodeURIComponent(chapterId)}/build`));

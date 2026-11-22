@@ -97,17 +97,24 @@ def last_practised(store):
     return times
 
 
-def scope_sections(store, value):
-    """The sections a set may test: reviewable ones, narrowed by its scope or, for a warm-up, to the section's prerequisites."""
-    allowed = reviewable(store)
+def scope_basis(store):
+    """What scope_sections works from: the reviewable sections, the sections by id and each chapter's sections."""
+    return (reviewable(store), {c['id']: c for c in curriculum.model(store)['concepts']},
+            {c['id']: c['concept_ids'] for c in curriculum.view(store, {})['chapters']})
+
+
+def scope_sections(store, value, known=None):
+    """The sections a set may test: reviewable ones, narrowed by its scope or, for a warm-up, to the section's prerequisites.
+    `known` is what scope_basis returned, for working out many scopes at once."""
+    allowed, concepts, chapters = known or scope_basis(store)
     if value.get('kind') == 'warm_up':
-        concept = next((c for c in curriculum.model(store)['concepts'] if c['id'] == value.get('concept_id')), None)
-        wanted = set(concept.get('prerequisites', [])) if concept else set()
+        concept = concepts.get(value.get('concept_id'))
+        # A drill's warm-up keeps the stale prerequisites it was offered for; a set's covered them all.
+        wanted = set(value['prerequisite_ids'] if 'prerequisite_ids' in value else concept.get('prerequisites', []) if concept else [])
         return [c for c in allowed if c in wanted]
     scope = value.get('scope') or {}
     if not scope:
         return allowed
-    chapters = {c['id']: c['concept_ids'] for c in curriculum.view(store, {})['chapters']}
     wanted = set(scope.get('concept_ids', [])) | {cid for ch in scope.get('chapter_ids', []) for cid in chapters.get(ch, [])}
     return [c for c in allowed if c in wanted]
 
@@ -243,13 +250,16 @@ def answer(store, request):
 
 def warm_ups(store, request):
     """Sections whose lesson has not started and that build on a studied prerequisite not practised for a while, with
-    those prerequisites; offered once each (ADR 0014). `reviewable` counts the sections a review may test."""
+    those prerequisites; offered once each (ADR 0014). `sections` are those a review may test, in route order, and
+    `reviewable` counts them."""
     now = request.get('now', time.time())
     model = curriculum.model(store)
-    allowed = set(reviewable(store))
+    ordered = reviewable(store)
+    allowed = set(ordered)
     practised = last_practised(store)
     started = {t['concept_id'] for t in store.digest('streams', streaming.brief) if t['channel'] == 'mainline' and not t.get('chapter_id')}
-    done = {w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+    done = ({w['concept_id'] for w in store.list('review_warm_ups')} | {s['concept_id'] for s in store.list('review_sets') if s.get('kind') == 'warm_up'}
+            | {s['concept_id'] for s in store.list('drill_sessions') if s.get('kind') == 'warm_up'})
     offers = {}
     for concept in model['concepts']:
         cid = concept['id']
@@ -258,7 +268,7 @@ def warm_ups(store, request):
         stale = [p for p in concept.get('prerequisites', []) if p in allowed and now - practised.get(p, 0) >= WARM_UP_AFTER]
         if stale:
             offers[cid] = stale
-    return {'warm_ups': offers, 'reviewable': len(allowed)}
+    return {'warm_ups': offers, 'reviewable': len(ordered), 'sections': ordered}
 
 
 def dismiss_warm_up(store, request):

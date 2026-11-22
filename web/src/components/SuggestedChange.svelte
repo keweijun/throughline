@@ -1,28 +1,34 @@
 <script lang="ts">
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import CodexLink from './CodexLink.svelte';
+  import StudioHandoff from './StudioHandoff.svelte';
 
   // A change to the course itself the teacher suggested in this reply (ADR 0016), asked right after it, where the
-  // learner is reading. Opening it fills Studio with the request and a chip naming the section; either choice closes it.
+  // learner is reading. Sending it is a hand-off to Studio (issue #229): the card stays to say how Studio is getting on.
   let { turnId }: { turnId: string } = $props();
 
   const change = $derived(app.changeBy(turnId));
-  const section = $derived(change ? app.concept(change.concept_id) : undefined);
+  const sent = $derived(app.handoff(`change:${turnId}`));
+  const section = $derived(app.concept(change?.concept_id ?? app.turn(turnId)?.concept_id));
+  const request = $derived(change?.request ?? sent?.request ?? '');
+  const context = $derived(section ? { label: t('Section: {section}', { section: section.title }), text: `section "${section.title}" (${section.id})` } : { label: t('Course change'), text: 'a lesson' });
 </script>
 
-{#if change}
+{#if change || sent}
   <div class="suggested-change" role="group" aria-label={t('Suggested course change')}>
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M4 15.5l1-3.5 8-8 2.5 2.5-8 8zM11.5 5.5l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" /></svg>
-    <p>{t('Change the course? {request}', { request: change.request })}</p>
+    <p>{t('Change the course? {request}', { request })}</p>
     <div class="change-actions">
-      <button class="btn btn-quiet btn-small" onclick={() => app.resolveChange(change.id, 'dismissed')}>{t('Not now')}</button>
-      <CodexLink
-        class="btn btn-small"
-        prompt={`$throughline ${change.request}`}
-        origin={section ? { label: t('Section: {section}', { section: section.title }), text: `section "${section.title}" (${section.id})` } : null}
-        onfollow={() => app.resolveChange(change.id, 'opened')}
-      >{t('Open in Studio')}</CodexLink>
+      {#if change && !sent}<button class="btn btn-quiet btn-small" onclick={() => app.resolveChange(change.id, 'dismissed')}>{t('Not now')}</button>{/if}
+      <StudioHandoff
+        id="change:{turnId}"
+        variant="button"
+        place={{ kind: 'section', concept: section?.id ?? '', turn: turnId }}
+        label={t('Change it in Studio')}
+        {request}
+        {context}
+        onsent={() => change && app.resolveChange(change.id, 'opened')}
+      />
     </div>
   </div>
 {/if}

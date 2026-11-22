@@ -31,13 +31,15 @@ NAMESPACES = {
     'curriculum': 'route', 'sources': 'route', 'source_revisions': 'route', 'page_readings': 'route', 'figures': 'route',
     # What the sender's teacher wrote. Route and lessons carries the lessons and exercises among them (`share`).
     'lessons': 'lessons', 'streams': 'lessons', 'practice_tasks': 'lessons',
+    # Key points come with the lessons they sum up (`share`); the changes the sender asked for stay theirs.
+    'key_points': 'lessons', 'chapter_sheets': 'lessons',
     # Frozen prompts hold the sender's course memory, profile and session, so they never leave a course below Everything.
     'stream_snapshots': 'everything',
     # The sender's own learning, and the work queued for it.
     'interactions': 'everything', 'evidence': 'everything', 'evidence_deferred': 'everything', 'evidence_resolutions': 'everything',
     'sidequestions': 'everything', 'web_branches': 'everything', 'teaching': 'everything', 'deferred_explanations': 'everything',
     'checkpoint_receipts': 'everything', 'memory': 'everything', 'memory_notes': 'everything', 'memory_requests': 'everything',
-    'memory_consolidations': 'everything', 'derived_notes': 'everything', 'annotations': 'everything', 'review_sets': 'everything',
+    'memory_consolidations': 'everything', 'derived_notes': 'everything', 'annotations': 'everything', 'review_sets': 'everything', 'drill_sessions': 'everything', 'studio_handoffs': 'everything', 'sheets': 'everything',
     'review_postponements': 'everything', 'review_warm_ups': 'everything', 'course_change': 'everything',
     'practice_jobs': 'everything', 'preparation_jobs': 'everything', 'preparation_payloads': 'everything',
     'chapter_builds': 'everything', 'background_jobs': 'everything', 'background_receipts': 'everything',
@@ -102,6 +104,11 @@ def share(rows, level, notes=False):
         for task in shared['practice_tasks'].values():
             if task.get('variant_of') not in shared['practice_tasks']:
                 task.pop('variant_of', None)
+        for value in kept.get('key_points', {}).values():
+            value['requests'] = []
+            for point in value['points']:
+                if point.get('turn_id') not in shared['streams']:
+                    point.pop('turn_id', None)
     if notes:
         branches = {}
         for key, branch in kept.pop('web_branches', {}).items():

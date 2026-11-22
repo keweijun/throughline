@@ -23,7 +23,7 @@ export function samplePdf(pages: string[][]) {
 }
 
 /** Starts a disposable course host from a Python fixture module and opens it. */
-async function open(page: Page, module: string, children: ChildProcess[]) {
+async function open(page: Page, module: string, children: ChildProcess[], options: { intro?: boolean } = {}) {
   // The launch update check never reaches GitHub from a test; tests that need an answer route /api/update themselves.
   const env = { ...process.env, GUIDED_LEARNING_UPDATE_URL: 'file:///nonexistent/pyproject.toml' };
   const child = spawn(python, ['-m', `tests.${module}`], { cwd: root, env, stdio: ['ignore', 'pipe', 'inherit'] });
@@ -34,14 +34,23 @@ async function open(page: Page, module: string, children: ChildProcess[]) {
   page.on('pageerror', (e) => errors.push(e.message));
   // Codex is never asked for its models from a test; tests that need a list route /api/models themselves.
   await page.route('**/api/models', (route) => route.fulfill({ json: { models: [] } }));
+  // The once-per-learner Studio introduction (issue #229) is taken as seen, unless a test asks to see it.
+  if (!options.intro) {
+    await page.route('**/api/seen', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, seen: [...(body.seen ?? []), 'studio-intro'] } });
+    });
+  }
   await page.goto(base);
   return { base, errors };
 }
 
-export const test = base.extend<{ course: (module: string) => Promise<{ base: string; errors: string[] }> }>({
+export const test = base.extend<{ course: (module: string, options?: { intro?: boolean }) => Promise<{ base: string; errors: string[] }> }>({
   course: async ({ page }, use) => {
     const children: ChildProcess[] = [];
-    await use((module) => open(page, module, children));
+    await use((module, options) => open(page, module, children, options));
     for (const child of children) child.kill();
   },
 });

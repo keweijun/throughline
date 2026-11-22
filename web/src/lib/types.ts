@@ -162,6 +162,11 @@ export type Task = {
   origin: 'source' | 'self_created' | 'review' | 'chapter_quiz';
   tests_concept_ids?: string[];
   set_id?: string;
+  /** A drill session's question: the session and the teacher turn that asked it (ADR 0025). */
+  session_id?: string;
+  drill_turn_id?: string;
+  /** A paper's marks for this question (`drill.write`). */
+  marks?: number;
   /** A review question is answered in writing (`apply`) or by choosing one of `options` (`recall`), recorded in `answer`. */
   kind?: 'apply' | 'recall';
   idea?: string;
@@ -292,6 +297,125 @@ export type State = {
   changes: CourseChange[];
   builds: ChapterBuild[];
   review: ReviewState;
+  key_points: SectionKeyPoints[];
+  chapter_sheets: ChapterSheet[];
+  mistakes: Mistake[];
+  drills: DrillSession[];
+  handoffs: Handoff[];
+  sheets: Sheet[];
+};
+
+/** A page Codex wrote in Studio for review (issue #229): a cheat sheet, formula sheet, mistakes on one page. */
+export type Sheet = {
+  id: string;
+  title: string;
+  markdown: string;
+  /** The chapters and sections it covers; empty for the whole course. */
+  scope: { chapter_ids?: string[]; concept_ids?: string[] };
+  created_at: number;
+  updated_at: number;
+};
+
+/** A request handed to Studio from a fast view (issue #229), and the Studio chat it started. */
+export type Handoff = {
+  id: string;
+  place: { kind: 'drill' | 'review' | 'chapter' | 'source' | 'section' | 'intro'; [key: string]: string };
+  label: string;
+  request: string;
+  thread_id: string;
+  created_at: number;
+  /** What Studio made for it, once it says so. */
+  result?: { kind: 'session' | 'sheet' | 'exercises'; id?: string; title?: string; concept_id?: string; task_ids?: string[]; at: number };
+};
+
+/**
+ * A drill session (ADR 0025): a back-and-forth with the fast teacher over a scope, kept and reopened at will. Its
+ * questions are review tasks with `session_id`; nothing in it is ever finished or due.
+ */
+export type DrillSession = {
+  id: string;
+  kind: 'drill' | 'chapter' | 'warm_up';
+  scope?: { chapter_ids?: string[]; concept_ids?: string[] };
+  chapter_id?: string;
+  concept_id?: string;
+  created_at: number;
+  updated_at?: number;
+  turn_ids: string[];
+  messages?: Record<string, string>;
+  way?: DrillWay;
+  /** Written by Codex in Studio (`drill.write`): its title, a note on what it covers, and whether it is an exam paper. */
+  origin?: 'studio';
+  title?: string;
+  note?: string;
+  exam?: boolean;
+  /** What a reply offered to hand to Studio, by turn: once sent, the chat it started. */
+  handoffs?: Record<string, { label: string; request: string }>;
+  sections: string[];
+  task_ids: string[];
+};
+
+export type DrillWay = 'questions' | 'explain' | 'oral' | 'confusable';
+
+export type DrillStart = {
+  kind?: DrillSession['kind'];
+  way?: DrillWay;
+  scope?: { chapter_ids?: string[]; concept_ids?: string[] };
+  chapter_id?: string;
+  concept_id?: string;
+  message?: string;
+};
+
+/**
+ * An entry of the mistakes book, worked out from what the course records: a missed exercise, quiz or review part, a
+ * wrong recall answer, or an idea whose check questions were missed more than once. `right_at` is when the learner
+ * later got it right; the entry stays.
+ */
+export type Mistake = {
+  id: string;
+  kind: 'exercise' | 'quiz' | 'review' | 'check';
+  concept_id: string;
+  concept_ids: string[];
+  task_id?: string;
+  chapter_id?: string;
+  turn_id?: string;
+  question: string;
+  part?: string;
+  answer?: string;
+  feedback?: string;
+  idea?: string;
+  chosen?: string | null;
+  correct_answer?: string;
+  why?: string;
+  missed_at: number | null;
+  last_missed_at: number | null;
+  right_at: number | null;
+};
+
+/** One key point of a section (ADR 0024): what to hold from it, when it holds, the mistake to avoid, and where it was taught. */
+export type KeyPoint = {
+  statement: string;
+  holds_when?: string;
+  common_mistake?: string;
+  /** The lesson turn (a step, or a single-reply lesson) that taught it. */
+  turn_id?: string;
+  source_refs: Ref[];
+};
+
+/** A studied section's key points, written by the teacher; the learner asks Codex to change them. */
+export type SectionKeyPoints = {
+  concept_id: string;
+  points: KeyPoint[];
+  origin: 'lesson' | 'backfill' | 'codex';
+  written_at: number;
+  requests: { text: string; at: number }[];
+};
+
+/** The paragraph that opens a chapter's key points sheet; `current` while it was written from the points shown. */
+export type ChapterSheet = {
+  chapter_id: string;
+  connection: string;
+  written_at: number;
+  current: boolean;
 };
 
 /** A change to the course itself that a lesson or side-question reply suggests making in Studio; `id` is its turn. */
@@ -327,6 +451,8 @@ export type ReviewSet = {
 export type ReviewState = {
   sets: ReviewSet[];
   reviewable: number;
+  /** The studied sections a review may cover, in route order. */
+  sections: string[];
   warm_ups: Record<string, string[]>;
   tasks: Task[];
   jobs: PracticeJob[];

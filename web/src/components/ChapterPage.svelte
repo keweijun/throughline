@@ -5,8 +5,8 @@
   import { open, solved } from '../lib/format';
   import CodexLink from './CodexLink.svelte';
   import ChapterBuild from './ChapterBuild.svelte';
-  import ChapterRecap from './ChapterRecap.svelte';
-  import ChapterQuiz from './ChapterQuiz.svelte';
+  import ChapterSheet from './ChapterSheet.svelte';
+  import ChapterDrill from './ChapterDrill.svelte';
   import Exercise from './Exercise.svelte';
 
   let { chapterId }: { chapterId: string } = $props();
@@ -92,12 +92,15 @@
 {#if chapter}
   <article class="page" aria-labelledby="chapter-title">
     <header class="head">
-      <p class="eyebrow">{t("Chapter {number} of {total}", { number: number + 1, total: chapters.length })}</p>
+      <!-- The way back sits on the eyebrow's line, as Bookmark section does on a section. -->
+      <div class="eyebrow-row">
+        <p class="eyebrow">{t("Chapter {number} of {total}", { number: number + 1, total: chapters.length })}</p>
+        {#if !isCurrent && app.currentId}
+          <button class="btn btn-quiet btn-small back" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
+        {/if}
+      </div>
       <h1 id="chapter-title">{chapter.title}</h1>
       {#if chapter.summary}<p class="summary">{chapter.summary}</p>{/if}
-      {#if !isCurrent && app.currentId}
-        <button class="btn btn-small back" onclick={() => app.view(app.currentId!)}>{t("Back to current section")}</button>
-      {/if}
     </header>
 
     {#if !ids.length}
@@ -150,22 +153,21 @@
       </section>
 
       {#if app.chapterStudied(chapterId)}
-        <ChapterRecap {chapter} />
-        <ChapterQuiz {chapter} />
+        <ChapterSheet {chapter} />
+        <ChapterDrill {chapter} />
       {:else}
-        <p class="note">{t("A recap and a quiz on this chapter open once you have studied one of its sections.")}</p>
+        <p class="note">{t("Key points and a drill on this chapter open once you have studied one of its sections.")}</p>
       {/if}
 
       {#if isCurrent && following && app.chapterOf(following.id)?.id !== chapterId}
-        <section class="actions" aria-label={t("Chapter actions")}>
-          <div>
-            {#if confirmSkip}
-              <InlineConfirm message={skipWarning} confirmLabel={t("Skip this chapter")} cancelLabel={t("Keep studying it")} onconfirm={skip} oncancel={() => (confirmSkip = false)} />
-            {:else}
-              <button class="btn" onclick={() => (confirmSkip = true)}>{t("Skip to the next chapter")}</button>
-              <p class="note">{t("Sections you skip stay on the route. You can come back and study them at any time.")}</p>
-            {/if}
-          </div>
+        <section class="actions" class:asking={confirmSkip} aria-label={t("Chapter actions")}>
+          {#if confirmSkip}
+            <InlineConfirm message={skipWarning} confirmLabel={t("Skip this chapter")} cancelLabel={t("Keep studying it")} onconfirm={skip} oncancel={() => (confirmSkip = false)} />
+          {:else}
+            <!-- What skipping means on the left, the choice on the right. -->
+            <p class="note">{t("Sections you skip stay on the route. You can come back and study them at any time.")}</p>
+            <button class="btn" onclick={() => (confirmSkip = true)}>{t("Skip to the next chapter")}</button>
+          {/if}
         </section>
       {/if}
     {/if}
@@ -202,8 +204,15 @@
     color: var(--ink-soft);
   }
 
+  .eyebrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
   .back {
-    margin-top: 1rem;
+    margin: -0.3rem 0;
   }
 
   h2 {
@@ -303,10 +312,22 @@
   }
 
   .actions {
-    display: grid;
-    gap: 1rem;
-    padding: 1.25rem 1.35rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1rem 1rem 1.35rem;
     border-radius: var(--radius);
     background: var(--accent-wash);
+  }
+
+  .actions .note {
+    flex: 1 1 18rem;
+    margin: 0;
+  }
+
+  .actions.asking {
+    display: grid;
   }
 </style>

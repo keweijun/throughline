@@ -15,6 +15,8 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
+from ..background import small_model
+
 from .. import library
 from ..codex import NOT_FOUND, app_server, codex_env
 from ..logs import Tail
@@ -611,7 +613,7 @@ class Studio:
         try:
             server = self._server()
             settings = self.settings.current()
-            model = settings['small_model'] or self._running()['model']
+            model = small_model(settings) or self._running()['model']
             started = server.call('thread/start', {
                 'cwd': str(self._cwd(course)), 'approvalPolicy': 'never', 'sandbox': 'read-only', 'ephemeral': True,
                 'serviceName': CLIENT, 'config': {'model_reasoning_effort': 'low', 'web_search': 'disabled'},

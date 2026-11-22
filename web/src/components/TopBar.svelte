@@ -158,21 +158,6 @@
         {app.connection === 'connecting' ? t("Connecting…") : t("Reconnecting · your work is saved")}
       </span>
     {/if}
-    {#if studying}
-      <div class="switcher" class:open={app.panelShown} role="group" aria-label={t("Questions and sources")}>
-      <button id="toggle-questions" class="btn btn-quiet" aria-label={t("Questions")} aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4.5h12v8.5H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Questions")}</span>{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
-      </button>
-      <button id="toggle-source" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Source")}</span>
-      </button>
-      <button id="toggle-notes" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Notes")}</span>
-      </button>
-      </div>
-    {/if}
     {#if studying && !app.studioShown && (studio.waiting.length || studio.working.length)}
       <!-- What Codex is doing in Studio, on every page; the question itself stays in Studio's transcript. -->
       <button
@@ -199,7 +184,7 @@
         <span>{t("Updating · {percent}%", { percent: Math.round(app.updating.progress) })}</span>
       </button>
     {:else if app.update?.available}
-      <!-- Noticeable but quiet: a small pill that waits beside Settings, never a banner or a toast. -->
+      <!-- Noticeable but quiet: a small pill before the side panel switcher, never a banner or a toast. -->
       <button
         class="btn btn-small update"
         onclick={() => {
@@ -211,6 +196,22 @@
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         <span class="wide-only">{t("Update available")}</span>
       </button>
+    {/if}
+    {#if studying}
+      <div class="switcher" class:open={app.panelShown} role="group" aria-label={t("Questions and sources")}>
+      <button id="toggle-questions" class="btn btn-quiet" aria-label={t("Questions")} aria-controls="auxiliary" aria-pressed={showing('questions')} onclick={() => toggle('questions')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 4.5h12v8.5H9l-3.5 3v-3H4z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Questions")}</span>{#if openQuestions}<span class="count">{openQuestions}</span>{/if}
+      </button>
+      <button id="toggle-source" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('source')} aria-label={t("Source")} title={t("Source reader (s)")} onclick={() => toggle('source')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Source")}</span>
+      </button>
+      <button id="toggle-notes" class="btn btn-quiet" aria-controls="auxiliary" aria-pressed={showing('notes')} aria-label={t("Notes")} onclick={() => toggle('notes')}>
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M13.5 3.5l3 3-9 9H4.5v-3zM11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>
+        <span class="wide-only">{t("Notes")}</span>
+      </button>
+      </div>
+      <span class="rule" aria-hidden="true"></span>
     {/if}
     {#if studying}
       <button id="open-search" class="btn btn-quiet icon" onclick={() => (app.searchOpen = true)} aria-label={t("Search this course")} title={t("Search this course (Shift Shift)")}>
@@ -441,11 +442,13 @@
     gap: 0.25rem;
   }
 
-  /* One control for the side panel's three views, so it reads as a single switch rather than three more buttons. */
+  /* One control for the side panel's three views, so it reads as a single switch rather than three more buttons.
+     Notices that come and go (connection, Studio, update) sit before it and grow leftward, so it never moves;
+     a rule after it sets it apart from the app's own tools. */
   .switcher {
     display: flex;
     gap: 2px;
-    margin-inline: 0.6rem 0.35rem;
+    margin-left: 0.6rem;
     padding: 2px;
     border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
     border-radius: 999px;
@@ -460,6 +463,14 @@
   .switcher .btn {
     min-height: 2rem;
     border-radius: 999px;
+  }
+
+  .rule {
+    flex: none;
+    width: 1px;
+    height: 1.25rem;
+    margin-inline: 0.5rem 0.25rem;
+    background: var(--rule-strong);
   }
 
   .count {

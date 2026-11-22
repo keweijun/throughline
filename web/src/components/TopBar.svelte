@@ -211,7 +211,6 @@
         <span class="wide-only">{t("Notes")}</span>
       </button>
       </div>
-      <span class="rule" aria-hidden="true"></span>
     {/if}
     {#if studying}
       <button id="open-search" class="btn btn-quiet icon" onclick={() => (app.searchOpen = true)} aria-label={t("Search this course")} title={t("Search this course (Shift Shift)")}>
@@ -443,12 +442,11 @@
   }
 
   /* One control for the side panel's three views, so it reads as a single switch rather than three more buttons.
-     Notices that come and go (connection, Studio, update) sit before it and grow leftward, so it never moves;
-     a rule after it sets it apart from the app's own tools. */
+     Notices that come and go (connection, Studio, update) sit before it and grow leftward, so it never moves. */
   .switcher {
     display: flex;
     gap: 2px;
-    margin-left: 0.6rem;
+    margin-inline: 0.6rem 0.35rem;
     padding: 2px;
     border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
     border-radius: 999px;
@@ -463,14 +461,6 @@
   .switcher .btn {
     min-height: 2rem;
     border-radius: 999px;
-  }
-
-  .rule {
-    flex: none;
-    width: 1px;
-    height: 1.25rem;
-    margin-inline: 0.5rem 0.25rem;
-    background: var(--rule-strong);
   }
 
   .count {

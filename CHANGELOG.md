@@ -4,7 +4,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 
 ## 0.58.1
 
-- **The Questions · Source · Notes switch in the top bar stays put.** Notices such as **Update available** and **Studio working…** now appear before it instead of pushing it aside, and a thin line sets it apart from Search, Settings and Help.
+- **The Questions · Source · Notes switch in the top bar stays put.** Notices such as **Update available** and **Studio working…** now appear before it instead of pushing it aside.
 
 ## 0.58.0
 

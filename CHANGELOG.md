@@ -8,6 +8,10 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **Keeping Throughline one click away.** "Opening Throughline next time" now offers **Add to Dock** on macOS and on GNOME, and on Windows shows the four clicks that pin it to the taskbar, in place of the unclear Show launcher.
 - **Clearer Chinese throughout.** The Simplified Chinese interface was reworded to read naturally and use one term for each thing: 讲解 for a lesson, 提问 for side questions, 自测 for drills, 复习页 for sheets, 贯学 for Throughline. A few mistranslations were fixed too, such as 个章节 where sections were counted.
 
+## 0.58.1
+
+- **The Questions · Source · Notes switch in the top bar stays put.** Notices such as **Update available** and **Studio working…** now appear before it instead of pushing it aside.
+
 ## 0.58.0
 
 - **Key points.**

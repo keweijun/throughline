@@ -24,6 +24,8 @@
   // The note draft is kept per section, like the other writing boxes, so it survives a look elsewhere.
   const draftKey = $derived(`note:${viewing}`);
   const draft = $derived(app.drafts.get(draftKey));
+  // A passage chosen with Note waits in the box above the text, as a passage chosen with Ask waits in Questions.
+  const quote = $derived(app.noteQuote);
   const words = $derived(search.toLowerCase().split(/\s+/).filter(Boolean));
   const matches = (a: Annotation) => words.every((w) => [a.passage, a.note, a.source?.label ?? ''].join(' ').toLowerCase().includes(w));
   // Notes on a chapter recap or quiz question belong to their chapter, not the section they were written from.
@@ -42,16 +44,21 @@
   const total = $derived(app.state?.annotations.length ?? 0);
 
   async function add() {
-    const section = viewing;
+    const passage = quote;
+    const section = passage?.concept_id ?? viewing;
     const text = draft;
     const key = draftKey;
     const images = app.drafts.images(key);
     if (!section || (!text.trim() && !images.length)) return;
-    if (!(await app.annotate({ kind: 'note', concept_id: section, note: text, ...(images.length ? { images } : {}) }))) return;
+    const withImages = images.length ? { images } : {};
+    // A quoted passage is saved as a highlight carrying the note, a note without one as the section's.
+    const kind = passage ? 'highlight' : 'note';
+    if (!(await app.annotate(passage ? { kind, ...passage, note: text, ...withImages } : { kind, concept_id: section, note: text, ...withImages }))) return;
+    if (app.noteQuote === passage) app.noteQuote = null;
     if (app.drafts.get(key) === text) app.drafts.set(key, '');
     if (JSON.stringify(app.drafts.images(key)) === JSON.stringify(images)) app.drafts.setImages(key, []);
     // The new note may land mid-list when several sections are shown; bring it into view.
-    const added = [...(app.state?.annotations ?? [])].reverse().find((a) => a.kind === 'note' && a.concept_id === section && a.note === text);
+    const added = [...(app.state?.annotations ?? [])].reverse().find((a) => a.kind === kind && a.concept_id === section && a.note === text.trim());
     if (added) app.focusAnnotation = added.id;
   }
 
@@ -99,6 +106,11 @@
       scopeChosen = true;
     }
     app.focusAnnotation = null;
+    // A clicked highlight's Add note or Edit note opens its note here for editing.
+    if (app.editAnnotation) {
+      app.editAnnotation = false;
+      if (item && !item.from_sender) start(item);
+    }
     flash = id;
     requestAnimationFrame(() => document.getElementById(`annotation-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     const timer = setTimeout(() => (flash = null), 1600);
@@ -177,20 +189,22 @@
     />
   </div>
 
-  {#if viewing}
+  {#if viewing || quote}
     {#snippet target()}
-      {t("Note on {section} · only you see this", { section: app.concept(viewing)?.title ?? '' })}
+      {quote ? t("Note on this passage · only you see this") : t("Note on {section} · only you see this", { section: app.concept(viewing)?.title ?? '' })}
     {/snippet}
     <div class="panel-foot">
       <Composer
         id="section-note"
         value={draft}
         onvalue={(value) => app.drafts.set(draftKey, value)}
-        label={t("Add a note to this section")}
-        placeholder={t("Add a note to this section…")}
+        label={quote ? t("Note on this passage") : t("Add a note to this section")}
+        placeholder={quote ? t("Write your note on this passage…") : t("Add a note to this section…")}
         submitLabel={t("Add note")}
         onsubmit={add}
         header={target}
+        quote={quote ? { text: quote.passage, source: quote.source?.label, id: 'note-selection' } : null}
+        onremovequote={() => (app.noteQuote = null)}
         compact
         imagesKey={draftKey}
         imagesAlone

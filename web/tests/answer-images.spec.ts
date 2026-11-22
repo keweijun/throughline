@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Locator } from '@playwright/test';
-import { test, expect } from './fixture';
+import { test, expect, dragSelect } from './fixture';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
@@ -94,6 +94,14 @@ test('a question about an exercise, a side question and a note take images too',
   const item = page.locator('.notes-panel .item.note');
   await expect(item.locator('.katex')).toHaveCount(2);
   await expect(item.getByRole('img')).toHaveCount(1);
+  // A note on a selected passage is written in the same box, so it takes images too.
+  expect((await dragSelect(page, task.locator('.question'), 120)).trim().length).toBeGreaterThan(3);
+  await page.getByRole('button', { name: 'Note', exact: true }).click();
+  const passageNote = page.getByRole('textbox', { name: 'Note on this passage' });
+  await pasteImage(passageNote, 4);
+  await expect(page.locator('.notes-panel .panel-foot').getByRole('img')).toHaveCount(1);
+  await passageNote.press('Control+Enter');
+  await expect(page.locator('.notes-panel .item.highlight').getByRole('img')).toHaveCount(1);
   // Exporting is on the Course page, for the whole course, so the Notes panel stays a list and a writing box.
   await expect(page.locator('.notes-panel').getByRole('button', { name: /Export/ })).toHaveCount(0);
   await page.locator('#open-course').click();

@@ -6,11 +6,30 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
   const paragraph = page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(5);
 
-  expect((await dragSelect(page, paragraph)).trim().length).toBeGreaterThan(5);
+  // Note puts the passage in the Notes box, as Ask puts it in Questions; the note is written there like any other.
+  const excerpt = (await dragSelect(page, paragraph)).trim();
+  expect(excerpt.length).toBeGreaterThan(5);
   await page.getByRole('button', { name: 'Note', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Check this against the textbook');
-  await page.getByRole('button', { name: 'Save note' }).click();
+  const foot = page.locator('#panel-notes .panel-foot');
+  await expect(foot.locator('#note-selection')).toContainText(excerpt.slice(0, 20));
+  await expect(foot.locator('.composer')).toContainText('Note on this passage · only you see this');
+  const passageNote = page.getByRole('textbox', { name: 'Note on this passage' });
+  await expect(passageNote).toBeFocused();
+  await passageNote.fill('Check this against $E = mc^2$');
+  await passageNote.press('Control+Enter');
   await expect(page.getByRole('button', { name: 'Open your note on this passage' })).toBeVisible();
+  expect(await page.evaluate(() => CSS.highlights.get('mine')?.size)).toBe(1);
+  await expect(page.locator('.notes-panel .item.highlight .text .katex')).toHaveCount(1);
+  // Once saved, the box is the section's again.
+  await expect(foot.locator('#note-selection')).toHaveCount(0);
+  await expect(foot.locator('.composer')).toContainText('Note on Wave superposition · only you see this');
+
+  // Removing the quote leaves a section note, and saves no highlight.
+  await dragSelect(page, page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(8));
+  await page.getByRole('button', { name: 'Note', exact: true }).click();
+  await foot.getByRole('button', { name: 'Remove quote' }).click();
+  await expect(foot.locator('#note-selection')).toHaveCount(0);
+  await expect(foot.locator('.composer')).toContainText('Note on Wave superposition · only you see this');
   expect(await page.evaluate(() => CSS.highlights.get('mine')?.size)).toBe(1);
 
   expect((await dragSelect(page, page.locator('.lesson-body p').filter({ hasText: 'This is a complete lesson paragraph' }).nth(12))).trim().length).toBeGreaterThan(5);
@@ -24,7 +43,7 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
   await page.reload();
   await page.getByRole('button', { name: 'Open your note on this passage' }).click();
   const notes = page.locator('.notes-panel');
-  await expect(notes.getByText('Check this against the textbook')).toBeVisible();
+  await expect(notes.getByText('Check this against')).toBeVisible();
   await expect(page.locator('.notes-panel .item')).toHaveCount(3);
 
   await page.locator('.notes-panel .item.highlight').filter({ hasText: 'Check this' }).getByRole('button', { name: 'Edit' }).click();
@@ -127,16 +146,18 @@ test('highlight and note a side-question answer', async ({ page, course }) => {
   // Asking still works from an answer; it becomes a follow-up in the same thread.
   await expect(page.getByRole('button', { name: 'Ask about this passage' })).toBeVisible();
   await page.getByRole('button', { name: 'Note', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Good intuition here');
-  await page.getByRole('button', { name: 'Save note' }).click();
+  const box = page.getByRole('textbox', { name: 'Note on this passage' });
+  await box.fill('Good intuition here');
+  await box.press('Control+Enter');
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBeGreaterThan(0);
 
-  await thread.getByRole('button', { name: '1 note' }).click();
   const item = page.locator('.notes-panel .item.highlight');
   await expect(item).toContainText('Answer to a side question');
   await expect(item).toContainText('Good intuition here');
   await item.getByRole('button', { name: 'Go to' }).click();
   await expect(thread).toBeInViewport();
+  await thread.getByRole('button', { name: '1 note' }).click();
+  await expect(item).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -147,8 +168,9 @@ test('highlight and note an exercise', async ({ page, course }) => {
   expect((await dragSelect(page, question, 120)).trim().length).toBeGreaterThan(3);
   await expect(page.getByRole('button', { name: 'Ask about this passage' })).toBeVisible();
   await page.getByRole('button', { name: 'Note', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Watch the sign');
-  await page.getByRole('button', { name: 'Save note' }).click();
+  const box = page.getByRole('textbox', { name: 'Note on this passage' });
+  await box.fill('Watch the sign');
+  await box.press('Control+Enter');
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
 
   await page.reload();
@@ -261,16 +283,17 @@ test('highlights show before the host answers, preview on hover and can be noted
   expect(y).toBeLessThan(box.y + box.height);
   await page.mouse.click(x, y);
   const toolbar = page.getByRole('toolbar', { name: 'Your highlight' });
+  // Its note is written in Notes, in the highlight's own edit box.
   await toolbar.getByRole('button', { name: 'Add note' }).click();
-  await page.getByRole('textbox', { name: 'Note on this passage' }).fill('Compare with the slit width');
-  await page.getByRole('button', { name: 'Save note' }).click();
+  const edit = page.locator('.notes-panel .item.highlight').getByRole('textbox', { name: 'Note' });
+  await expect(edit).toBeFocused();
+  await edit.fill('Compare with the slit width');
+  await page.locator('.notes-panel .item.highlight').getByRole('button', { name: 'Save', exact: true }).click();
+  // In Notes, a highlight carrying a note is called a note.
+  await expect(page.locator('.notes-panel .item.highlight .kind')).toHaveText('Note');
   const marker = page.getByRole('button', { name: 'Open your note on this passage' });
   await marker.hover();
   await expect(page.getByRole('tooltip').filter({ hasText: 'Compare with the slit width' })).toBeVisible();
-
-  // In Notes, a highlight carrying a note is called a note.
-  await page.locator('#toggle-notes').click();
-  await expect(page.locator('.notes-panel .item.highlight .kind')).toHaveText('Note');
   await page.locator('#toggle-notes').click();
 
   // Closing the panel unfolds the route and slides the lesson back; aim at the highlight once it has settled.

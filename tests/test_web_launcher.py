@@ -5,6 +5,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -26,7 +27,7 @@ class LauncherCard(unittest.TestCase):
         self.home = Path(scratch.name)
         self.started = []
 
-    def client(self, platform='linux', name='throughline.desktop', make=True, status=None):
+    def client(self, platform='linux', name='throughline.desktop', make=True, status=None, output=lambda c: None):
         folder = self.home / ('Applications' if platform == 'darwin' else 'applications')
         path = folder / name
         if make:
@@ -35,7 +36,7 @@ class LauncherCard(unittest.TestCase):
                 (path / 'Contents').mkdir(parents=True)
             else:
                 path.write_text('[Desktop Entry]\n', encoding='utf-8')
-        launcher = Launcher(path, platform=platform, desktop=self.home / 'Desktop', start=self.started.append, output=lambda c: '')
+        launcher = Launcher(path, platform=platform, desktop=self.home / 'Desktop', start=self.started.append, output=output)
         app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(self.home / 'config' / 'settings.json'),
                          library_root=self.home / 'library', launcher=launcher,
                          checks=status or codex_checks.CodexStatus(cheap=lambda: [], probe=lambda: None))
@@ -47,7 +48,7 @@ class LauncherCard(unittest.TestCase):
     def test_status_until_dismissed_and_after(self):
         client, path = self.client()
         self.assertEqual(client.get('/api/launcher').json(),
-                         {'platform': 'linux', 'path': str(path), 'exists': True, 'dismissed': False})
+                         {'platform': 'linux', 'path': str(path), 'exists': True, 'dock': False, 'docked': False, 'dismissed': False})
         self.assertEqual(client.post('/api/seen', json={'id': 'launcher'}).json(), {'seen': ['launcher']})
         self.assertTrue(client.get('/api/launcher').json()['dismissed'])
         saved = json.loads((self.home / 'config' / 'seen.json').read_text(encoding='utf-8'))
@@ -89,10 +90,52 @@ class LauncherCard(unittest.TestCase):
         mac.post('/api/launcher/show')
         self.assertEqual(self.started[-1], ['open', '-R', str(app)])
 
+    def test_on_gnome_add_to_dock_adds_it_to_the_favourite_apps(self):
+        favourites, ran = ["['firefox.desktop']"], []
+
+        def gsettings(command):
+            ran.append(command)
+            if command[1] == 'writable':
+                return 'true'
+            if command[1] == 'get':
+                return favourites[-1]
+            favourites.append(command[-1])
+            return ''
+        with mock.patch('guided_learning.launcher.shutil.which', return_value='/usr/bin/gsettings'):
+            client, _ = self.client(output=gsettings)
+            self.assertEqual(client.get('/api/launcher').json()['dock'], True)
+            self.assertFalse(client.get('/api/launcher').json()['docked'])
+            self.assertEqual(client.post('/api/launcher/dock').json(), {'docked': True})
+            self.assertEqual(favourites[-1], "['firefox.desktop', 'throughline.desktop']")
+            self.assertTrue(client.get('/api/launcher').json()['docked'])
+            sets = len([c for c in ran if c[1] == 'set'])
+            client.post('/api/launcher/dock')
+            self.assertEqual(len([c for c in ran if c[1] == 'set']), sets, 'never added twice')
+
+    def test_on_macos_add_to_dock_adds_a_tile_and_restarts_the_dock(self):
+        dock = ['(\n)']
+
+        def defaults(command):
+            if command[1] == 'read':
+                return dock[-1]
+            dock.append(command[-1])
+            return ''
+        client, app = self.client(platform='darwin', name='Throughline.app', output=defaults)
+        self.assertEqual(client.post('/api/launcher/dock').json(), {'docked': True})
+        self.assertIn(app.as_uri() + '/', dock[-1])
+        self.assertEqual(self.started, [['killall', 'Dock']])
+        self.assertTrue(client.get('/api/launcher').json()['docked'])
+
+    def test_where_no_program_may_pin_the_card_says_how_instead(self):
+        client, _ = self.client(platform='nt', name='Throughline.lnk')
+        self.assertFalse(client.get('/api/launcher').json()['dock'])
+        refused = client.post('/api/launcher/dock')
+        self.assertEqual((refused.status_code, refused.json()['code']), (409, 'cannot_dock'))
+
     def test_without_a_launcher_the_actions_say_how_to_add_one(self):
         client, _ = self.client(make=False)
         self.assertFalse(client.get('/api/launcher').json()['exists'])
-        for action in ('desktop', 'show'):
+        for action in ('desktop', 'dock', 'show'):
             refused = client.post(f'/api/launcher/{action}')
             self.assertEqual((refused.status_code, refused.json()['code']), (409, 'launcher_missing'))
             self.assertIn('guided-learning setup', refused.json()['error'])

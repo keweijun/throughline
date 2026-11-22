@@ -7,8 +7,9 @@ test('the library says how to open Throughline next time, once, in a dialog', as
 
   await card.getByRole('button', { name: 'Add to desktop' }).click();
   await expect(card.getByRole('status')).toHaveText('Added to your desktop.');
-  await card.getByRole('button', { name: 'Show launcher' }).click();
-  await expect(card.getByRole('status')).toHaveText('Opened its folder.');
+  // This Linux has no GNOME dock Throughline can add itself to, so the card says how instead.
+  await expect(card.getByRole('region', { name: 'Dock' })).toContainText('Right-click Throughline in your app menu');
+  await expect(card.getByRole('button', { name: /dock/i })).toHaveCount(0);
 
   await card.getByRole('button', { name: 'Got it' }).click();
   await expect(card).toBeHidden();
@@ -66,4 +67,19 @@ test('nothing shows while Codex is being checked', async ({ page, course }) => {
   await expect(page.getByRole('heading', { name: 'All courses', level: 1 })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect.poll(() => answered).toBe(true);
+});
+
+test('the card adds Throughline to the Dock where it can, and shows the clicks where Windows asks for them', async ({ page, course }) => {
+  let status = { platform: 'darwin', path: '/Applications/Throughline.app', exists: true, dock: true, docked: false, dismissed: false };
+  await page.route('**/api/launcher', (route) => route.fulfill({ json: status }));
+  await page.route('**/api/launcher/dock', (route) => route.fulfill({ json: { docked: true } }));
+  const { errors } = await course('launcher_browser_fixture');
+  const card = page.getByRole('dialog', { name: 'Opening Throughline next time' });
+  await card.getByRole('button', { name: 'Add to Dock' }).click();
+  await expect(card.getByRole('region', { name: 'Dock' }).getByRole('status')).toHaveText('In the Dock.');
+
+  status = { ...status, platform: 'nt', path: 'C:\\Throughline.lnk', dock: false };
+  await page.reload();
+  await expect(card.getByRole('region', { name: 'Taskbar' }).getByRole('listitem')).toHaveText(['⊞ Start', 'Type “Throughline”', 'Right-click it', 'Pin to taskbar']);
+  expect(errors).toEqual([]);
 });

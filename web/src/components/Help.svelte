@@ -18,6 +18,7 @@
     {
       title: 'Throughline',
       items: [
+        { title: 'How Throughline works', text: 'Making a course, learning and reviewing, and what Studio can do: the introduction shown when Throughline first opened.', open: () => (app.welcomeAgain = true) },
         { title: 'All courses', text: 'Every course in your Throughline folder, and the course switcher beside it. Open one, or make a new one.', target: '#open-courses' },
         { title: 'Settings', text: 'Appearance and language, the teacher model and its effort, and updates.', target: '#open-settings' },
       ],

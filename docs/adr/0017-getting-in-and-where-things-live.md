@@ -12,18 +12,33 @@ Studio (ADR 0016) moves course work into the app. That changes the first hour of
 The Codex prompt stays the main way to install, since every learner already has Codex. Beside it:
 
 - **An install script**, `install.sh` and `install.ps1` in the repository, run with one line (`curl … | sh`, `irm … | iex`). It installs uv when it is missing (uv brings its own Python, so Python stops being a prerequisite), removes the pre-0.5.1 package name, installs the package from `main` and runs `guided-learning setup`. It runs the same steps the README gives Codex, which the one-click update also follows (ADR 0016), so they are kept together. It checks that `codex` is on PATH and says how to get Codex if not; it does not install Codex.
-- **Setup opens the app** on the library when it finishes (`--no-open` to skip; the one-click update passes it, since Codex then restarts the host on the port the open tab uses). The welcome guide shrinks to the installed version, the library folder, where the launcher is, and "Throughline is open in your browser: make your first course in Studio". What studying looks like is explained in the app, where it can stay current.
+- **Setup opens the app** on the library when it finishes (`--no-open` to skip; the one-click update passes it, since Codex then restarts the host on the port the open tab uses), in the language setup was run in (`--language`, which the Codex prompt passes when the learner writes in Chinese). The welcome guide shrinks to the installed version, the library folder, where the launcher is, and "Throughline is open in your browser: make your first course in Studio". What studying looks like is explained in the app, where it can stay current.
 - **A `throughline` command**, the same as `guided-learning`, which stays for scripts and the skill.
 - **On macOS the launcher goes to `/Applications`** when it is writable, and to `~/Applications` otherwise.
 
 A native installer (`.exe`, `.dmg`) is not built: see below.
 
+## The first open
+
+The first time the library opens after installing, with no course in it yet, a short series shows once, centred over the page, one step at a time:
+
+1. **Language.** English or Simplified Chinese, already set to the language setup was run in, with the question in both languages. It changes the interface at once; Studio sets a new course's teaching language from the learner's own words, as before.
+2. **How Throughline works.** The big picture in three stages: make a course (bring your files, say what you want to learn; Codex reads every page, asks about your goal and builds the route), learn (lessons in steps, citing their pages; ask about any passage on the side; exercises checked by part), review (whenever you ask: questions from memory, a drill, a mock exam).
+3. **Codex works on your course.** What sets Throughline apart, and what learners otherwise never find out (ADR 0026): the teacher in Learn and Review is quick, Studio is Codex itself and can change the course whenever asked. Studio's writing box fills with one example request after another, then the access Studio runs with, since this is when the learner has just seen what it does. **Full access is the default**: reaching the step sets it, shown chosen and marked recommended, and the learner can pick Library access there or change it later in Studio's writing box. Studio is most useful when it can simply start rather than ask first. A learner who skips before this step keeps Library access, and the first course's introduction still offers Full access.
+4. **Opening Throughline next time** (below), when there is a launcher. It ends with **Make your first course**, which puts the caret in New course.
+
+Every step but the last has Skip, and Escape closes the series; however it ends, it does not show by itself again. Help keeps **How Throughline works**, which shows steps 2 and 3 again. A learner who already has courses (an update, not an install) sees only step 4, as before.
+
+The series is deliberately not a tour of the interface: no panels, gestures or shortcuts, which the places themselves and the one-time hints explain (below) and which change with every feature. It shows only the workflow and Studio, which change rarely.
+
 ## Finding the way back
 
-The library shows a card, **Opening Throughline next time**, until the learner dismisses it: where the launcher is on this computer, in the words of that platform, with two actions the host carries out:
+**Opening Throughline next time** is the last step of the first-open series, and for a learner who already has courses a dialog of its own, until the learner dismisses it: where the launcher is on this computer, in the words of that platform, and the two places worth keeping it, side by side:
 
-- **Add to desktop** copies the launcher there.
-- **Show launcher** reveals it in Finder or Explorer, where the learner can pin it to the Dock or taskbar. Pinning cannot be done reliably by a program, so the app does not try.
+- **Desktop: Add to desktop** copies the launcher there.
+- **Dock or taskbar.** On macOS, **Add to Dock** adds it to the Dock (a `persistent-apps` tile, then the Dock restarts to read it); on GNOME, **Add to dock** adds it to the favourite apps its dock shows. Windows lets no program pin itself to the taskbar or Start, so there the card shows the four clicks instead: Start, type "Throughline", right-click it, Pin to taskbar. On another Linux desktop it says to add it from the app menu.
+
+A **Show launcher** button, which revealed the launcher in Finder or Explorer for the learner to pin it there, came first. Learners did not know what a launcher was or what to do once it was shown.
 
 The same text stays in Settings → About after the card is dismissed. Nothing starts at login (ADR 0004).
 
@@ -103,5 +118,5 @@ A hint appears next to what it explains, the first time that thing appears, one 
 - **A Study / Studio mode switch.** It separates the two cleanly, but course work is occasional and almost always starts from something in a section; a mode would be one more state to be in.
 - **Keeping flat tabs and only reordering them.** The order would improve; the mixed levels would remain.
 - **An app-wide Studio** with threads filed by course. It would suit work across courses, which learners do not do.
-- **A guided tour.** It explains everything at once, before any of it matters, and goes stale with every feature.
+- **A guided tour of the interface.** It explains everything at once, before any of it matters, and goes stale with every feature. Only the big picture is shown at first open (above): without it, learners took Throughline for a chat tutor and never found Studio.
 - **Starting at login**, to remove the need for a launcher. ADR 0004 keeps the app from running unasked.

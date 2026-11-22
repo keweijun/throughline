@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.59.0
+
+- **A short welcome the first time Throughline opens.** Choose your language (it starts in the one you installed in), see how Throughline works in three steps (make a course from your files, learn, review), find out what Studio can do and how much it may do without asking (Full access unless you choose Library access), and learn how to open Throughline next time. Every step can be skipped, and Help → **How Throughline works** shows it again.
+- **Keeping Throughline one click away.** "Opening Throughline next time" now offers **Add to Dock** on macOS and on GNOME, and on Windows shows the four clicks that pin it to the taskbar, in place of the unclear Show launcher.
+- **Clearer Chinese throughout.** The Simplified Chinese interface was reworded to read naturally and use one term for each thing: 讲解 for a lesson, 提问 for side questions, 自测 for drills, 复习页 for sheets, 贯学 for Throughline. A few mistranslations were fixed too, such as 个章节 where sections were counted.
+
 ## 0.58.0
 
 - **Key points.**

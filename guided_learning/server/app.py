@@ -28,6 +28,7 @@ from starlette.background import BackgroundTask
 from .. import checks as codex_checks, files, images as attached, library, packages, updates
 from ..api import execute
 from ..launcher import Launcher
+from ..preferences import LANGUAGES
 from ..commands import version
 from ..store import OperationError
 from . import state as public_state
@@ -882,6 +883,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def launcher_to_desktop():
         return launcher.add_to_desktop()
 
+    @app.post('/api/launcher/dock')
+    def launcher_to_dock():
+        return launcher.add_to_dock()
+
     @app.post('/api/launcher/show')
     def show_launcher():
         return launcher.show()
@@ -1139,8 +1144,10 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def index(request: Request):
         given = request.query_params.get('code')
         if sign_in and given is not None:
-            # Sign this browser in and take the code out of the address bar.
-            response = RedirectResponse('/', 303)
+            # Sign this browser in and take the code out of the address bar. The language setup was run in stays, for
+            # the page to take (ADR 0017's first-run series).
+            language = request.query_params.get('language')
+            response = RedirectResponse(f'/?language={language}' if language in LANGUAGES else '/', 303)
             if sign_in.redeem(given):
                 response.set_cookie(cookie, sign_in.token, max_age=400 * 24 * 3600, httponly=True, samesite='strict')
             return response

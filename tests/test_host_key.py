@@ -51,6 +51,12 @@ class Signed(unittest.TestCase):
         self.assertIn('samesite=strict', cookie.lower())
         self.assertEqual(self.client.get('/api/library').status_code, 200)
 
+    def test_the_language_setup_was_run_in_stays_in_the_address(self):
+        response = self.client.get(f'/?code={self.code()}&language=zh-CN')
+        self.assertEqual(response.headers['location'], '/?language=zh-CN')
+        response = self.client.get(f'/?code={self.code()}&language=<script>')
+        self.assertEqual(response.headers['location'], '/')  # only a language Throughline has
+
     def test_a_code_signs_in_once(self):
         code = self.code()
         self.client.get(f'/?code={code}')
@@ -139,6 +145,10 @@ class Key(unittest.TestCase):
         call.assert_called_once_with(8765, 'POST', '/api/sign-in', {})
         with mock.patch.object(commands, '_call', side_effect=OSError('refused')):
             self.assertEqual(commands.app_url(8765), 'http://127.0.0.1:8765/')
+        with mock.patch.object(commands, '_call', return_value={'code': 'f' * 32}):
+            self.assertEqual(commands.app_url(8765, 'zh-CN'), 'http://127.0.0.1:8765/?code=' + 'f' * 32 + '&language=zh-CN')
+        with mock.patch.object(commands, '_call', side_effect=OSError('refused')):
+            self.assertEqual(commands.app_url(8765, 'zh-CN'), 'http://127.0.0.1:8765/?language=zh-CN')
 
     def run_host(self, *flags):
         printed = []

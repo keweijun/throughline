@@ -57,7 +57,8 @@
         <li><StudioHandoff variant="link" place={{ kind: 'intro', example: item.key }} label={item.label} request={item.request} {context} /></li>
       {/each}
     </ul>
-    {#if studio.access && !studio.access.full_access}
+    <!-- Asked once: the first-run series asks it too (ADR 0017), and then it is not asked again here. -->
+    {#if studio.access && !studio.access.full_access && !app.seen?.includes('studio-access')}
       <div class="access">
         <p>{t("Studio asks before each request. With full access it simply starts, and Codex can change files in this course's folder without asking.")}</p>
         <button class="btn btn-small" disabled={switching} onclick={fullAccess}>{t("Use full access")}</button>

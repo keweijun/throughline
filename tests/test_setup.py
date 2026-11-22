@@ -31,8 +31,14 @@ class SetupOpensTheApp(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home, mock.patch.object(commands, 'open_app', return_value=True) as opener:
             code, output = self.run_setup(home)
         self.assertEqual(code, 0)
-        opener.assert_called_once_with()
+        opener.assert_called_once_with('en')
         self.assertIn('Throughline is open in your browser', output)
+
+    def test_the_library_opens_in_the_language_setup_was_run_in(self):
+        # The page takes it for the library and the first-run series (ADR 0017).
+        with tempfile.TemporaryDirectory() as home, mock.patch.object(commands, 'open_app', return_value=True) as opener:
+            self.run_setup(home, language='zh-CN')
+        opener.assert_called_once_with('zh-CN')
 
     def test_no_open_skips_it(self):
         with tempfile.TemporaryDirectory() as home, mock.patch.object(commands, 'open_app') as opener:

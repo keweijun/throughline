@@ -32,7 +32,7 @@ Hand-offs today:
 
 ### Showing what Studio can do
 
-- **First-entry card.** The first time a learner opens a course, once per learner (`studio-intro` among the seen hints), a card explains Studio. It says "Codex works on this course with you", gives three requests drawn from this course (a formula sheet for its first chapter, its source's problems as exercises, and a mock exam once something in that chapter is studied, else a one-page map of the course), each a hand-off, and recommends full access when it is off.
+- **First-entry card.** The first time a learner opens a course, once per learner (`studio-intro` among the seen hints), a card explains Studio. It says "Codex works on this course with you", gives three requests drawn from this course (a formula sheet for its first chapter, its source's problems as exercises, and a mock exam once something in that chapter is studied, else a one-page map of the course), each a hand-off, and recommends full access when it is off, unless the learner already chose Studio's access in the first-open series (ADR 0017).
 - **In context, few.** Beyond that, Studio requests appear only where they fit, as above, not as buttons on every page (#134).
 
 ### Ways to review

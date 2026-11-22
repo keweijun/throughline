@@ -29,7 +29,7 @@ test('switching during generation preserves the turn and drafts but applies to t
   await page.getByRole('button', { name: 'Questions', exact: true }).click();
   await page.getByRole('textbox', { name: 'Side question', exact: true }).fill('My unfinished question 草稿');
   await chooseLanguage(page, 'zh-CN');
-  await expect.poll(() => editorText(page.getByRole('textbox', { name: '旁支问题', exact: true }))).toBe('My unfinished question 草稿');
+  await expect.poll(() => editorText(page.getByRole('textbox', { name: '提问', exact: true }))).toBe('My unfinished question 草稿');
   await expect(page.locator('.lesson-body')).toContainText('Lesson complete.');
   await page.getByRole('button', { name: '关闭侧栏' }).click();
   await page.getByRole('textbox').first().fill('A lesson draft');
@@ -57,8 +57,8 @@ test('practice controls and evidence labels translate while the answer draft sta
   await first.getByRole('button', { name: 'Full solution', exact: true }).click();
   await chooseLanguage(page, 'zh-CN');
   await expect.poll(() => editorText(first.getByRole('textbox', { name: '练习作答' }))).toBe('My answer draft');
-  await expect(first.getByRole('group', { name: '确认查看完整解答' })).toContainText('有帮助完成');
-  await expect(page.locator('#practice article').nth(2)).toContainText('需要再尝试');
+  await expect(first.getByRole('group', { name: '确认查看完整解答' })).toContainText('在帮助下完成');
+  await expect(page.locator('#practice article').nth(2)).toContainText('需要再试一次');
   await expect(page.locator('#practice article').nth(3)).toContainText('独立完成');
   await first.getByRole('button', { name: '继续尝试' }).click();
   await first.getByRole('button', { name: '稍后做' }).click();

@@ -56,11 +56,11 @@ def welcome(root, launcher, language, opened=False):
     hint = launcher_hint(launcher, language)
     # "New course" names the library's button both before and after Studio (#109 settles the final wording).
     if language == 'zh-CN':
-        first = ('贯学已在浏览器中打开：在课程库中选择“New course”（新建课程），建你的第一门课。' if opened
-                 else '现在打开贯学，在课程库中选择“New course”（新建课程），建你的第一门课。')
+        first = ('贯学已在浏览器中打开：在课程库中点 **新建课程**（New course），建你的第一门课。' if opened
+                 else '现在打开贯学，在课程库中点 **新建课程**（New course），建你的第一门课。')
         return f"""## 贯学（Throughline）{version()} 已安装
 
-- 贯学文件夹：`{root}`，每门课程是其中一个子文件夹。
+- 贯学文件夹：`{root}`，每门课程是其中的一个子文件夹。
 - 以后打开贯学：{hint}。
 
 {first}"""
@@ -352,7 +352,7 @@ def setup(args):
         import pypdf  # noqa: F401
     except ImportError:
         print('Warning: PDF support is missing; install the package with the [pdf] extra to read PDFs.')
-    opened = False if args.no_open else open_app()
+    opened = False if args.no_open else open_app(args.language)
     print()
     print('Show the learner this welcome guide as written:')
     print()
@@ -360,14 +360,15 @@ def setup(args):
     return 0
 
 
-def open_app():
-    """Start the host and open the library in the browser, as setup's last step. Never fails setup."""
+def open_app(language=None):
+    """Start the host and open the library in the browser, as setup's last step, in the `language` setup was run in.
+    Never fails setup."""
     try:
         record = current() or _spawn(8765) or _spawn(0)
         if not record:
             print(f'Throughline did not start; see {logs.output_path()} and {logs.log_path()}.')
             return False
-        url = app_url(record['port'])
+        url = app_url(record['port'], language)
         print(f'Throughline is open at {url}')
         # With no display, webbrowser would pick a console browser and take over the terminal Codex is reading.
         if platform() == 'linux' and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
@@ -378,13 +379,15 @@ def open_app():
         return False
 
 
-def app_url(port):
-    """The address that opens the library and signs the browser in, with a one-time code from the host."""
+def app_url(port, language=None):
+    """The address that opens the library and signs the browser in, with a one-time code from the host, and with
+    `language` for the page to start in (the host keeps it when it takes the code out of the address)."""
     try:
         code = _call(port, 'POST', '/api/sign-in', {})['code']
     except (OSError, ValueError, KeyError, TypeError):
         code = None  # a host from before codes: the page says to open Throughline from its launcher
-    return f'http://127.0.0.1:{port}/' + (f'?code={code}' if code else '')
+    query = '&'.join([*([f'code={code}'] if code else []), *([f'language={language}'] if language else [])])
+    return f'http://127.0.0.1:{port}/' + (f'?{query}' if query else '')
 
 
 def _call(port, method, path, body=None, timeout=2, key=None):

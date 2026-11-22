@@ -34,13 +34,14 @@ async function open(page: Page, module: string, children: ChildProcess[], option
   page.on('pageerror', (e) => errors.push(e.message));
   // Codex is never asked for its models from a test; tests that need a list route /api/models themselves.
   await page.route('**/api/models', (route) => route.fulfill({ json: { models: [] } }));
-  // The once-per-learner Studio introduction (issue #229) is taken as seen, unless a test asks to see it.
+  // The first-run series and the once-per-learner Studio introduction (ADR 0017, issue #229) are taken as seen, unless
+  // a test asks to see them.
   if (!options.intro) {
     await page.route('**/api/seen', async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       const response = await route.fetch();
       const body = await response.json();
-      await route.fulfill({ response, json: { ...body, seen: [...(body.seen ?? []), 'studio-intro'] } });
+      await route.fulfill({ response, json: { ...body, seen: [...(body.seen ?? []), 'studio-intro', 'welcome'] } });
     });
   }
   await page.goto(base);

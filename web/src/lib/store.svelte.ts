@@ -44,6 +44,21 @@ function rememberLanguage(language?: Language): Language | null {
   }
 }
 
+// Setup opens the library with the language the learner installed in (`?language=zh-CN`): it labels the library and
+// is picked in the first-run series. The address is cleaned so a reload does not set it again.
+(function takeLanguageFromAddress() {
+  try {
+    const url = new URL(location.href);
+    const given = url.searchParams.get('language');
+    if (given === null) return;
+    if (given === 'en' || given === 'zh-CN') rememberLanguage(given);
+    url.searchParams.delete('language');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  } catch {
+    // Without storage or history the library starts in English, and the first-run series asks.
+  }
+})();
+
 function drop(annotations: Annotation[], id: string) {
   const index = annotations.findIndex((a) => a.id === id);
   if (index >= 0) annotations.splice(index, 1);
@@ -216,6 +231,8 @@ class AppStore {
   phone = $state(false);
   /** Help: what the learner can do by level, with the keyboard shortcuts (ADR 0017). */
   helpOpen = $state(false);
+  /** Help asks for the first-run series' big picture again ("How Throughline works"). */
+  welcomeAgain = $state(false);
   /** Search across the course (Shift Shift, Ctrl+K). */
   searchOpen = $state(false);
   /** One-time hints the learner has seen, saved per user (ADR 0017); null until loaded, so none flashes up. */

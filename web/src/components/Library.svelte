@@ -3,18 +3,15 @@
   import { api } from '../lib/api';
   import { t, locale, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import type { CodexCheck, CodexChecks, DeletedCourse, LauncherStatus, LibraryCourse } from '../lib/types';
+  import type { CodexCheck, CodexChecks, DeletedCourse, LibraryCourse } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
-  import LauncherHelp from './LauncherHelp.svelte';
   import CourseImport from './CourseImport.svelte';
-  import { lightDismiss } from '../lib/dialog';
   import { pop } from '../lib/motion';
   import InlineConfirm from './InlineConfirm.svelte';
 
   let opening = $state<string | null>(null);
-  let launcher = $state<LauncherStatus | null>(null);
   let checks = $state<CodexCheck[]>([]);
   let checking = $state(false);
 
@@ -39,25 +36,8 @@
 
   onMount(() => {
     void loadChecks();
-    api.get<LauncherStatus>('/api/launcher').then((status) => (launcher = status), () => {});
   });
   onDestroy(() => clearTimeout(poll));
-
-  let nextTime = $state<HTMLDialogElement>();
-  $effect(() => {
-    // Only when there is a launcher to point to; without one, Settings → About says how to add it.
-    if (launcher?.exists && !launcher.dismissed && nextTime && !nextTime.open) nextTime.showModal();
-  });
-
-  async function dismissLauncher() {
-    if (!launcher || launcher.dismissed) return;
-    launcher = { ...launcher, dismissed: true };
-    try {
-      await api.post('/api/seen', { id: 'launcher' });
-    } catch (error) {
-      app.error = error instanceof Error ? error.message : String(error);
-    }
-  }
 
   /** What failed and what to do about it; a check this version does not know is shown as the host words it. */
   function problem(check: CodexCheck) {
@@ -337,16 +317,6 @@
       <button class="btn btn-small" disabled={checking} onclick={() => loadChecks(true)}>{checking ? t('Checking…') : t('Check again')}</button>
     </div>
   {/if}
-
-  <!-- Shown once, the first time the library opens after installing, as Settings is: centred, over the page. -->
-  <dialog class="next-time" bind:this={nextTime} use:lightDismiss onclose={dismissLauncher} aria-labelledby="next-time-title">
-    {#if launcher}
-      <h2 id="next-time-title">{t('Opening Throughline next time')}</h2>
-      <LauncherHelp {launcher} />
-      <p class="muted later">{t('You can find this again in Settings → About.')}</p>
-      <button class="btn btn-primary btn-small got-it" onclick={() => nextTime?.close()}>{t('Got it')}</button>
-    {/if}
-  </dialog>
 
   {#if importing}
     <CourseImport file={importing} onclose={() => (importing = null)} />
@@ -1026,35 +996,6 @@
   .checks strong {
     color: var(--caution);
     font-weight: 600;
-  }
-
-  .next-time {
-    width: min(34rem, calc(100vw - 2rem));
-    padding: 1.4rem 1.5rem 1.25rem;
-    border: 1px solid var(--rule);
-    border-radius: 10px;
-    background: var(--sheet);
-    color: var(--ink);
-    box-shadow: var(--shadow);
-  }
-
-  .next-time::backdrop {
-    background: rgb(17 20 27 / 0.45);
-  }
-
-  .next-time h2 {
-    margin-bottom: 0.6rem;
-    font-size: var(--step-1);
-    font-family: var(--sans);
-  }
-
-  .got-it {
-    display: block;
-    margin: 1.1rem 0 0 auto;
-  }
-
-  .later {
-    margin-top: 0.6rem;
   }
 
   .codex {

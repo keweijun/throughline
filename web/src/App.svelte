@@ -19,6 +19,7 @@
   import Search from './components/Search.svelte';
   import ErrorToast from './components/ErrorToast.svelte';
   import Library from './components/Library.svelte';
+  import Welcome from './components/Welcome.svelte';
 
   onMount(() => {
     void app.sync().then(handOver);
@@ -213,6 +214,7 @@
 <SettingsDialog />
 <CitationPeek />
 <Help />
+<Welcome />
 <Search />
 <ErrorToast />
 

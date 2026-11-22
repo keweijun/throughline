@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.58.1
+
+- **The Questions · Source · Notes switch in the top bar stays put.** Notices such as **Update available** and **Studio working…** now appear before it instead of pushing it aside.
+
 ## 0.58.0
 
 - **Key points.**

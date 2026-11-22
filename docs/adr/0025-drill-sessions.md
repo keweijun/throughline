@@ -35,8 +35,8 @@ A drill's questions are stored as practice tasks with `origin: review`, the `ses
 
 ### What becomes a session
 
-- **The chapter quiz** becomes **Drill this chapter** on the chapter page. It is a session of kind `chapter` scoped to the chapter, which opens in the Review place. Its rules begin it with one or two of the chapter's earlier exercises asked again, as the quiz did, then new questions spanning the chapter. Quizzes taken before stay on the chapter page, where unanswered questions can still be answered.
-- **The warm-up** is a session of kind `warm_up`, scoped to the stale prerequisites of the section about to be learned. It is offered as before, once per section, and runs inline on the section page with two or three recall questions.
+- **The chapter quiz** becomes **Drill this chapter** on the chapter page. It is a session of kind `chapter` scoped to the chapter, which opens in the Review place. Its rules begin it with one or two of the chapter's own exercises asked again, as the quiz did, then new questions spanning the chapter. The review state gives the teacher a few of those exercises with how each went, missed ones first. Quizzes taken before stay on the chapter page, where unanswered questions can still be answered.
+- **The warm-up** is a session of kind `warm_up`, scoped to the stale prerequisites of the section about to be learned, as they were when it was offered (`prerequisite_ids`). It is offered as before, once per section, and runs inline on the section page with two or three recall questions.
 - **Test me on this** under a key point, and **Try it again** under a mistake, start a session in that section with the request as the learner's first message.
 
 ### What goes

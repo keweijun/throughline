@@ -159,13 +159,25 @@ def view(store, request):
     return {'key_points': store.list(POINTS), 'chapter_sheets': sheets}
 
 
+def _stale(store, concept_id, value):
+    """Whether a section's points sum up a lesson a New lesson replaced (ADR 0023), whose own last step wrote none: the
+    new lesson is finished and began after they were written."""
+    lessons = [l for l in store.list('lessons') if l['concept_id'] == concept_id]
+    if not any(l.get('replaced_by') for l in lessons):
+        return False
+    current = max((l for l in lessons if not l.get('replaced_by')), key=lambda l: l.get('created_at', 0), default=None)
+    return bool(current and all(s.get('turn_id') for s in current['steps']) and current.get('created_at', 0) > value.get('written_at', 0))
+
+
 def pending(store, request):
-    """What the idle job could write: studied sections without points, in route order, and chapters whose paragraph is
-    missing or stale, with two or more sections that have points. `exclude` leaves out sections still being taught."""
+    """What the idle job could write: studied sections without points, or whose points sum up a replaced lesson, in
+    route order, and chapters whose paragraph is missing or stale, with two or more sections that have points. `exclude`
+    leaves out sections still being taught."""
     exclude = set(request.get('exclude') or [])
     taught = {t['concept_id'] for t in lesson_turns(store)}
     model = curriculum.model(store)
-    sections = [cid for cid in model['route'] if cid in taught and cid not in exclude and not store.get(POINTS, cid)]
+    sections = [cid for cid in model['route'] if cid in taught and cid not in exclude
+                and (not (value := store.get(POINTS, cid)) or _stale(store, cid, value))]
     chapters = []
     for chapter in model['chapters']:
         written = basis(store, chapter)

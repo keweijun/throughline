@@ -45,6 +45,19 @@ class Book(unittest.TestCase):
                          ('(b) probability', 'Closer', T0, T0 + 10, T0 + 20))
         self.assertNotIn('part', entries[0], 'a single-part exercise names no part')
 
+    def test_a_miss_carried_forward_to_a_later_answer_is_not_missed_again(self):
+        first = {**self.assess(['correct', 'not_yet'], T0), 'attempt': ['correct', 'not_yet']}
+        # The second answer only redid part (a); `parts` still says (b) is not yet.
+        second = {**self.assess(['correct', 'not_yet'], T0 + 10, answer='Redid (a)'), 'attempt': ['correct', 'not_attempted']}
+        self.task('t1', [first, second], parts=['(a) amplitude', {'text': '(b) probability', 'concept_ids': ['b']}])
+        entry = self.book()[0]
+        self.assertEqual((entry['last_missed_at'], entry['answer']), (T0, 'P = 1/2'))
+        self.assertEqual(entry['concept_ids'], ['b'], 'a part naming its sections is filed under them')
+
+    def test_an_assessment_recorded_without_parts_is_read_from_its_outcome(self):
+        self.task('old', [{'action': 'assess', 'outcome': 'needs_work', 'answer': 'x', 'feedback': 'y', 'evidence_id': self.assessed('e1', T0)}])
+        self.assertEqual([e['id'] for e in self.book()], ['part:old:0'])
+
     def test_review_and_quiz_misses_name_the_sections_they_test_and_replaced_exercises_are_left_out(self):
         self.task('r1', [self.assess(['not_yet'], T0)], origin='review', tests_concept_ids=['a', 'b'])
         self.task('q1', [self.assess(['not_yet'], T0 + 1)], origin='chapter_quiz', chapter_id='c1')

@@ -286,6 +286,22 @@ test('a course change the teacher suggests is sent to Studio in one go, and its 
   await expect(page.getByRole('group', { name: 'Suggested course change' }).getByRole('status'), 'the card still follows the chat after a reload').toBeVisible();
 });
 
+test("a hand-off goes to the course's Studio even when Studio was last open on the library", async ({ page, course }) => {
+  await course('studio_browser_fixture');
+  await page.locator('#open-courses').click();
+  await page.getByRole('button', { name: 'New course', exact: true }).click();
+  await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  await page.getByRole('button', { name: '← All courses' }).click();
+  await page.getByRole('button', { name: /^Back to / }).click();
+  await page.getByRole('button', { name: 'Start lesson' }).click();
+  const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
+  await suggestion.getByRole('button', { name: 'Change it in Studio' }).click();
+  await suggestion.getByRole('button', { name: 'Go ahead' }).click();
+  await expect(suggestion.getByRole('status')).toContainText(/Studio is working on it|Done in Studio/);
+  await suggestion.getByRole('button', { name: 'Open', exact: true }).click();
+  await expect(page.locator('#course-studio .user').first()).toContainText('Add a section on interference after Wave superposition');
+});
+
 test('the first course opened introduces Studio once, with examples from the course that are one click away', async ({ page, course }) => {
   await course('studio_browser_fixture', { intro: true });
   const intro = page.getByRole('complementary', { name: 'Codex works on this course with you' });

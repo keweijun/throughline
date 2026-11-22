@@ -56,6 +56,10 @@ def create(store, request):
         value.update(chapter_id=chapter, scope={'chapter_ids': [chapter]})
     elif kind == 'warm_up':
         value['concept_id'] = require_text(request, 'concept_id')
+        # The prerequisites the warm-up was offered for, not practised for a while; the others need no warming up.
+        offered = review.warm_ups(store, {})['warm_ups'].get(value['concept_id'])
+        if offered:
+            value['prerequisite_ids'] = offered
     else:
         scope = _scope(request.get('scope'))
         if scope:
@@ -184,11 +188,11 @@ def listing(store, _request):
     for task in store.list('practice_tasks'):
         if task.get('session_id'):
             tasks.setdefault(task['session_id'], []).append(task)
-    found = []
+    found, known = [], review.scope_basis(store)
     for value in sorted(store.list(SESSIONS), key=lambda s: -s.get('updated_at', s['created_at'])):
         # What Codex wrote comes first, then each teacher turn's questions in turn order.
         mine = sorted(tasks.get(value['id'], []), key=lambda t: (value['turn_ids'].index(t['drill_turn_id']) if t['drill_turn_id'] in value['turn_ids'] else -1, t['id']))
-        found.append({**value, 'sections': sections(store, value), 'task_ids': [t['id'] for t in mine]})
+        found.append({**value, 'sections': review.scope_sections(store, value, known), 'task_ids': [t['id'] for t in mine]})
     return {'sessions': found}
 
 

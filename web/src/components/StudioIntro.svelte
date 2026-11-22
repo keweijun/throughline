@@ -14,14 +14,18 @@
   const chapter = $derived(app.chapters[0]);
   const source = $derived(app.state?.sources.find((s) => s.status !== 'failed'));
   const sourceName = $derived(source?.path.split(/[\\/]/).pop() ?? '');
+  // A mock exam needs something studied to ask about (drill.write); before that, Studio can still map the course.
+  const studied = $derived(!!chapter && chapter.concept_ids.some((id) => app.studied(id)));
   const context = { label: t('Getting started'), text: 'the introduction to Studio shown in the first course' };
   const examples = $derived([
     ...(chapter ? [{ key: 'sheet', label: t('Make a formula sheet for "{chapter}"', { chapter: chapter.title }),
                      request: t('Make me a one-page formula sheet for the chapter "{chapter}": each result with when it holds.', { chapter: chapter.title }) }] : []),
     ...(source ? [{ key: 'exercises', label: t('Find the problems in {source} and add them as exercises', { source: sourceName }),
                     request: t('Find the problems and exercises in {source} and add them as exercises to the sections they practise.', { source: sourceName }) }] : []),
-    ...(chapter ? [{ key: 'mock', label: t('Write a mock exam on "{chapter}"', { chapter: chapter.title }),
+    ...(chapter && studied ? [{ key: 'mock', label: t('Write a mock exam on "{chapter}"', { chapter: chapter.title }),
                      request: t('Write me a mock exam on the chapter "{chapter}", built from the course\'s own exercises and any past papers among its sources.', { chapter: chapter.title }) }] : []),
+    ...(chapter && !studied ? [{ key: 'map', label: t('Map the whole course on one page'),
+                                 request: t('Make me a one-page map of this course: what each chapter covers and how the chapters build on one another.') }] : []),
   ]);
   let switching = $state(false);
 

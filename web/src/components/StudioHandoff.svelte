@@ -21,7 +21,8 @@
     variant = 'offer',
     onsent,
   }: {
-    /** A fixed id keeps the sent state across visits (a reply's offer); without one, each send is new. */
+    /** A fixed id names the one hand-off this card sends (a reply's offer); without one, the card follows the latest
+        hand-off of its request from its place, and sending again makes a new one. */
     id?: string | null;
     place: Handoff['place'];
     label: string;
@@ -32,12 +33,13 @@
     onsent?: () => void;
   } = $props();
 
-  let sentId = $state<string | null>(null);
   let confirming = $state(false);
   let sending = $state(false);
   let problem = $state<string | null>(null);
+  // Studio took the request but the course could not record it: the card cannot follow the chat, so it links to it.
+  let unrecorded = $state<string | null>(null);
 
-  const sent = $derived(app.handoff(id ?? sentId ?? ''));
+  const sent = $derived(id ? app.handoff(id) : app.handoffFor(place, request));
   const status = $derived.by(() => {
     if (!sent) return null;
     if (studio.waiting.some((r) => r.params.threadId === sent.thread_id)) return 'waiting';
@@ -59,11 +61,10 @@
     if (sending) return;
     sending = true;
     const identifier = id ?? `${place.kind}:${newId()}`;
-    problem = await app.handOff({ id: identifier, place, label, request }, context);
-    if (!problem) {
-      sentId = identifier;
-      onsent?.();
-    }
+    const result = await app.handOff({ id: identifier, place, label, request }, context);
+    problem = result.problem;
+    unrecorded = result.problem && result.thread ? result.thread : null;
+    if (result.thread) onsent?.();
     sending = false;
   }
 </script>
@@ -109,7 +110,13 @@
   {:else}
     <button class="link studio-link" onclick={start}>{label}</button>
   {/if}
-  {#if problem}<p class="problem">{problem} {t("The request is copied: paste it into a Codex chat.")}</p>{/if}
+  {#if problem}
+    <p class="problem">
+      {problem}
+      {#if unrecorded}<button class="link" onclick={() => app.showStudio({ thread: unrecorded! })}>{t("Open")}</button>
+      {:else}{t("The request is copied: paste it into a Codex chat.")}{/if}
+    </p>
+  {/if}
 </div>
 
 <style>

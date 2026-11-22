@@ -19,7 +19,7 @@ What a fast view cannot do is **handed off** to Studio, always through the same 
 - **The context note** says where the request came from (ADR 0016's `Context from Throughline: …`): the place, what it covers, and in a drill, the questions so far and how they went.
 - **The record.** The course keeps the hand-off (`handoff.save`, namespace `studio_handoffs`) with where it was asked and the chat it started.
 
-The learner stays where they were. The card that sent the request follows the chat: **Studio is working on it**, **Studio needs your answer**, or **Done in Studio**, each with **Open**. It keeps doing so after a reload.
+The learner stays where they were. The card that sent the request follows the chat: **Studio is working on it**, **Studio needs your answer**, or **Done in Studio**, each with **Open**. It keeps doing so after a reload: a card with no fixed id follows the latest hand-off of its request from its place. A hand-off always goes to the course's Studio, even when Studio was last open on the library. If the course cannot record a hand-off Studio has taken, the card says so and links to the chat.
 
 **Consent.** With full access a hand-off runs in one click. Without it, the card asks once, beside it: Studio will work on the course in its own chat and may add files, exercises or sheets. Where Studio cannot run, the card says so and copies the request for a Codex chat.
 
@@ -32,7 +32,7 @@ Hand-offs today:
 
 ### Showing what Studio can do
 
-- **First-entry card.** The first time a learner opens a course, once per learner (`studio-intro` among the seen hints), a card explains Studio. It says "Codex works on this course with you", gives three requests drawn from this course (a formula sheet for its first chapter, its source's problems as exercises, a mock exam), each a hand-off, and recommends full access when it is off.
+- **First-entry card.** The first time a learner opens a course, once per learner (`studio-intro` among the seen hints), a card explains Studio. It says "Codex works on this course with you", gives three requests drawn from this course (a formula sheet for its first chapter, its source's problems as exercises, and a mock exam once something in that chapter is studied, else a one-page map of the course), each a hand-off, and recommends full access when it is off.
 - **In context, few.** Beyond that, Studio requests appear only where they fit, as above, not as buttons on every page (#134).
 
 ### Ways to review

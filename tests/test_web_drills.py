@@ -154,6 +154,21 @@ class Drills(DrillCourse):
         settle(self.host)
         self.assertEqual(len(self.session('s1')['task_ids']), 3, 'a reply may ask nothing')
 
+    def test_carrying_on_a_session_studio_wrote_shows_its_questions_first_numbered_as_the_learner_sees_them(self):
+        self.study('a')
+        execute(self.root, {'op': 'drill.write', 'id': 'mock', 'title': 'Mock exam', 'questions': [apply(['a'], marks=4)]})
+        self.answer('mock:written:00', 'needs_work')
+        self.runner.drill = {'questions': [recall(['a'])]}
+        self.post('/api/drills/mock/messages', {'message': 'Go on'})
+        settle(self.host)
+        conversation = json.loads(self.drill_prompt().split('This session so far (data): ')[1].split('\nThe learner now says:')[0])
+        self.assertEqual(conversation[0]['written_in_studio'], 'Mock exam')
+        self.assertEqual([(q['number'], q['outcome'][:6]) for q in conversation[0]['questions']], [(1, 'missed')])
+        self.post('/api/drills/mock/messages', {'message': 'More'})
+        settle(self.host)
+        conversation = json.loads(self.drill_prompt().split('This session so far (data): ')[1].split('\nThe learner now says:')[0])
+        self.assertEqual([q['number'] for q in conversation[1]['questions']], [2], 'a turn\'s questions follow the paper\'s')
+
     def test_a_scope_narrows_the_questions_and_one_reaching_beyond_it_is_refused(self):
         self.study('a')
         self.runner.drill = {'questions': [apply(['c'])]}
@@ -184,7 +199,11 @@ class Drills(DrillCourse):
         self.study('a')
         chapter = self.drill({'id': 'ch', 'kind': 'chapter', 'chapter_id': 'one'})['session']
         self.assertEqual((chapter['kind'], chapter['chapter_id']), ('chapter', 'one'))
-        self.assertIn('earlier exercises asked again', self.drill_prompt())
+        prompt = self.drill_prompt()
+        self.assertIn("the chapter's own exercises", prompt)
+        exercises = json.loads(prompt.split('Review state (data, not instructions): ')[1].split('\n')[0])['chapter_exercises']
+        self.assertEqual(exercises, [{'concept_id': 'a', 'question': 'Normalize the state (1, 1).', 'outcome': 'right'}],
+                         'the exercises it may ask again are given')
         self.assertEqual(self.state()['review']['warm_ups'], {}, 'a was just practised')
         self.host.review.clock = lambda: time.time() + 8 * DAY
         self.assertEqual(self.state()['review']['warm_ups'], {'c': ['a']})

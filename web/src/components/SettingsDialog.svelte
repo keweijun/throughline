@@ -60,7 +60,9 @@
     return offered.length ? offered : EFFORTS;
   }
   const teacherEfforts = $derived(effortsFor(model));
-  const smallEfforts = $derived(effortsFor(smallModel || model));
+  // The model background work actually runs on: unset means the default small model, 'teacher' the teacher's own.
+  const effectiveSmall = $derived(smallModel === 'teacher' ? model : smallModel || 'gpt-6.1-terra');
+  const smallEfforts = $derived(effortsFor(effectiveSmall));
   // Switching to a model without the chosen effort picks the nearest one it has, at or below the old choice if possible.
   function nearest(current: Settings['effort'], offered: typeof EFFORTS) {
     if (offered.some((e) => e.id === current)) return current;

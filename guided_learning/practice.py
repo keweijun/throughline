@@ -325,7 +325,8 @@ def complete(store, request):
             if any(p in ('partly_correct','not_yet') for p in result['parts']):
                 evidence.record(store,{**base,'id':'practice-feedback-help:'+value['id'],'interaction_id':iid,'kind':'hint','level':'assessment_feedback'})
             task['status']='attempted'
-            task['history'].append({'action':'assess','feedback':feedback,'outcome':outcome,'parts':parts,'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer'],
+            # `parts` carries each part's latest status forward; `attempt` is what this answer itself got (the mistakes book).
+            task['history'].append({'action':'assess','feedback':feedback,'outcome':outcome,'parts':parts,'attempt':list(result['parts']),'evidence_id':item['id'],'kind':item['kind'],'answer':value['answer'],
                                     **({'images':value['images']} if value.get('images') else {})})
         else:
             evidence.record(store,{**base,'interaction_id':iid,'kind':'demonstrated' if value['action']=='solution' else 'hint','level':value['action']})

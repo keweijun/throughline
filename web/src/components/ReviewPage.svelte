@@ -39,10 +39,11 @@
   // The Review place opens on the key points, so it is never empty once something is studied.
   // The tab lives in the store, so what Studio made can be opened straight on it (a sheet).
   const tab = $derived(app.reviewTab);
-  // Sheets that touch the scope (a sheet for the whole course always does), newest first.
+  // Sheets that touch the scope (a sheet for the whole course always does), newest first, and the one asked for (what
+  // Studio made, opened from its card) even when it covers something else.
   const sheets = $derived(
     (app.state?.sheets ?? []).filter((sheet) => {
-      if (everything) return true;
+      if (everything || sheet.id === app.sheetOpen) return true;
       const covered = [...(sheet.scope.concept_ids ?? []), ...app.chapters.filter((c) => sheet.scope.chapter_ids?.includes(c.id)).flatMap((c) => c.concept_ids)];
       return !covered.length || covered.some((id) => sections.includes(id));
     }),
@@ -130,7 +131,7 @@
       {#if review.reviewable || sections.length}<ReviewScope value={scope} onchange={setScope} />{/if}
     </header>
 
-    {#if !review.reviewable && !sections.length && !shown.length && !sessions.length}
+    {#if !review.reviewable && !sections.length && !shown.length && !sessions.length && !sheets.length}
       <section class="empty">
         <h2>{t("Nothing to review yet")}</h2>
         <p>{t("Once you have studied a section, you can review it here.")}</p>
@@ -178,7 +179,8 @@
                   {/each}
                 </div>
               {/if}
-              <SheetView sheet={shownSheet} />
+              <!-- Keyed, so a removal asked on one sheet is not left asking on the next. -->
+              {#key shownSheet.id}<SheetView sheet={shownSheet} />{/key}
             </div>
           {/if}
         </div>

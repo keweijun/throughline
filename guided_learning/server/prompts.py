@@ -494,7 +494,7 @@ When an answer comes back (the conversation shows outcomes, or the learner's mes
 Studio, the course's Codex workspace, can do what this conversation cannot: write a file such as a cheat sheet, a formula sheet or a summary of the learner's mistakes; collect a problem set's questions into the course as exercises; plan the days before an exam; read a source the learner names. When the learner asks for something like that, or it would clearly help (a page of the results they keep confusing, say), do not attempt it here: say in a sentence that Studio can do it, and end the reply with one <studio-request>{{"label": "what Studio will do, in a few words", "request": "..."}}</studio-request> block. The app shows it as a button that sends request to Studio, together with this session's scope and recent questions, so write request as the learner would ask, complete on its own: what to make, from which sections or chapters, and any wish they gave. At most one per reply, and none when nothing calls for it.'''
 
 DRILL_KINDS = {
-    'chapter': 'This session drills one chapter, as a chapter quiz did: start with one or two of the chapter\'s earlier exercises asked again (as apply questions quoting them), then new questions that span its sections.',
+    'chapter': 'This session drills one chapter, as a chapter quiz did: start with one or two of the chapter\'s own exercises (chapter_exercises in the review state, missed ones first) asked again, as apply questions quoting them, then new questions that span its sections.',
     'warm_up': 'This is a short warm-up before the learner starts the section "{section}": two or three recall questions on what it builds on, then stop.',
 }
 

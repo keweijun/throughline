@@ -97,17 +97,24 @@ def last_practised(store):
     return times
 
 
-def scope_sections(store, value):
-    """The sections a set may test: reviewable ones, narrowed by its scope or, for a warm-up, to the section's prerequisites."""
-    allowed = reviewable(store)
+def scope_basis(store):
+    """What scope_sections works from: the reviewable sections, the sections by id and each chapter's sections."""
+    return (reviewable(store), {c['id']: c for c in curriculum.model(store)['concepts']},
+            {c['id']: c['concept_ids'] for c in curriculum.view(store, {})['chapters']})
+
+
+def scope_sections(store, value, known=None):
+    """The sections a set may test: reviewable ones, narrowed by its scope or, for a warm-up, to the section's prerequisites.
+    `known` is what scope_basis returned, for working out many scopes at once."""
+    allowed, concepts, chapters = known or scope_basis(store)
     if value.get('kind') == 'warm_up':
-        concept = next((c for c in curriculum.model(store)['concepts'] if c['id'] == value.get('concept_id')), None)
-        wanted = set(concept.get('prerequisites', [])) if concept else set()
+        concept = concepts.get(value.get('concept_id'))
+        # A drill's warm-up keeps the stale prerequisites it was offered for; a set's covered them all.
+        wanted = set(value['prerequisite_ids'] if 'prerequisite_ids' in value else concept.get('prerequisites', []) if concept else [])
         return [c for c in allowed if c in wanted]
     scope = value.get('scope') or {}
     if not scope:
         return allowed
-    chapters = {c['id']: c['concept_ids'] for c in curriculum.view(store, {})['chapters']}
     wanted = set(scope.get('concept_ids', [])) | {cid for ch in scope.get('chapter_ids', []) for cid in chapters.get(ch, [])}
     return [c for c in allowed if c in wanted]
 

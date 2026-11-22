@@ -1205,12 +1205,23 @@ class AppStore {
     return (this.state?.handoffs ?? []).find((h) => h.id === id);
   }
 
+  /** The latest hand-off of this request from this place: a card without a fixed id finds what it sent after a reload. */
+  handoffFor(place: Handoff['place'], request: string) {
+    const key = JSON.stringify(place);
+    return (this.state?.handoffs ?? [])
+      .filter((h) => h.request === request && JSON.stringify(h.place) === key)
+      .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))[0];
+  }
+
   /**
    * Hands a request to Studio (issue #229): a new Studio chat is sent `$throughline <request>` with `context` saying where
    * it came from, and the course records it, so the card that sent it can follow the chat. The learner stays where they
-   * are. Returns an error message when Studio cannot run here, after copying the request so it can be pasted into Codex.
+   * are. Returns an error message when Studio cannot run here, after copying the request so it can be pasted into Codex,
+   * and `thread` once Studio took the request, even when the course could not record it for the card to follow.
    */
-  async handOff(value: Omit<Handoff, 'thread_id' | 'created_at'>, context: StudioOrigin): Promise<string | null> {
+  async handOff(value: Omit<Handoff, 'thread_id' | 'created_at'>, context: StudioOrigin): Promise<{ problem: string | null; thread?: string }> {
+    // A hand-off is course work: after the library's Studio, Studio may still be on the library's scope.
+    studio.setScope('course');
     await studio.load();
     if (!studio.available) {
       try {
@@ -1218,24 +1229,34 @@ class AppStore {
       } catch {
         // The message says where the request is either way.
       }
-      return studio.error || t('Studio cannot run here.');
+      return { problem: studio.error || t('Studio cannot run here.') };
     }
     if (!studio.skills.length) await studio.loadSkills();
     const previous = { thread: studio.threadId, origin: studio.origin };
     // Codex names the hand-off when it saves what it made (`handoff_id`, as the skill says), so the card that asked can
     // link to it. The learner sees this note under their message, so it stays short.
     studio.handoff('', { ...context, text: `${context.text} · hand-off ${value.id}` });
+    let sent: { thread: string };
     try {
-      const sent = await studio.send(studio.messageFor(`$throughline ${value.request}`));
-      await this.act(() => api.post('/api/handoffs', { ...value, thread_id: sent.thread }));
-      void studio.loadActivity();
-      return null;
+      sent = await studio.send(studio.messageFor(`$throughline ${value.request}`));
     } catch (e) {
       // Studio stays on the chat the learner had open.
       studio.origin = previous.origin;
       if (previous.thread) void studio.open(previous.thread);
-      return e instanceof Error ? e.message : String(e);
+      return { problem: e instanceof Error ? e.message : String(e) };
     }
+    void studio.loadActivity();
+    // Studio has the request now; record it for the card, trying once more before saying it could not.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await api.post('/api/handoffs', { ...value, thread_id: sent.thread });
+        await this.sync();
+        return { problem: null, thread: sent.thread };
+      } catch {
+        // tried again below
+      }
+    }
+    return { problem: t('Studio is working on it, but this card could not keep track of it. Open the chat in Studio.'), thread: sent.thread };
   }
 
   /** The learner's next message in a drill session, or More questions without one. */

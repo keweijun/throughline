@@ -16,6 +16,8 @@ BLOCK = re.compile(r'\s*<(drill-questions|studio-request)>.*?(</\1>|$)', re.S)
 OFFER = re.compile(r'<studio-request>\s*(\{.*?\})\s*</studio-request>', re.S)
 CONVERSATION = 12  # earlier turns a prompt carries; a session can go on without its prompt growing for ever
 OPEN_MISTAKES = 12
+CHAPTER_EXERCISES = 8  # a chapter's own exercises its drill may ask again, missed ones first
+EXERCISE_TEXT = 600
 
 
 class Drills(Feature):
@@ -76,25 +78,49 @@ class Drills(Feature):
         # Ideas the learner keeps getting wrong, which telling confusable ideas apart starts from (course memory, ADR 0010).
         difficulties = [e['text'] for e in self.operation({'op': 'memory.view'})['entries']
                         if e['kind'] == 'difficulty' and e['status'] == 'active' and (not e.get('concept_id') or e['concept_id'] in covered)]
-        return {'sections': context['sections'], 'open_mistakes': mistakes[:OPEN_MISTAKES], 'difficulties': difficulties,
-                'earlier_review_questions': context['earlier']}
+        state = {'sections': context['sections'], 'open_mistakes': mistakes[:OPEN_MISTAKES], 'difficulties': difficulties,
+                 'earlier_review_questions': context['earlier']}
+        if session['kind'] == 'chapter':
+            state['chapter_exercises'] = self._chapter_exercises(covered)
+        return state
+
+    def _chapter_exercises(self, covered):
+        """The chapter's own exercises, which its drill starts by asking again: missed ones first, then those answered, then
+        the rest, with how each went."""
+        tasks = [t for t in self.host.practice.state()['tasks'] if t.get('concept_id') in covered and t.get('origin') not in ('review', 'chapter_quiz')
+                 and t.get('status') not in ('replaced', 'retired') and t.get('question')]
+        rank = {'missed': 0, 'right': 1, 'unanswered': 2}
+        found = [(self._outcome(t), t) for t in tasks]
+        found.sort(key=lambda f: rank[f[0].split(':')[0]])
+        return [{'concept_id': t['concept_id'], 'question': t['question'][:EXERCISE_TEXT], 'outcome': outcome.split(':')[0]}
+                for outcome, t in found[:CHAPTER_EXERCISES]]
 
     def _conversation(self, session, current):
-        """The session's earlier turns: what the learner said, what the teacher replied, and how each question went."""
+        """The session so far: the questions Studio wrote for it, if any, then its latest earlier turns, each with what the
+        learner said, what the teacher replied, and how each question went. Questions are numbered as the learner sees them."""
         tasks = {t['id']: t for t in self.host.review.state()['tasks']}
+        number = {task_id: index + 1 for index, task_id in enumerate(session['task_ids'])}
         sent = {h['id'] for h in self.operation({'op': 'handoff.list'})['handoffs']}
+
+        def questions(prefix):
+            return [{'number': number[i], 'question': tasks[i]['question'], 'kind': tasks[i].get('kind', 'apply'), 'outcome': self._outcome(tasks[i])}
+                    for i in session['task_ids'] if i.startswith(prefix) and i in tasks]
+
         found = []
-        for turn_id in session['turn_ids']:
-            if turn_id == current:
-                break
+        written = questions(session['id'] + ':written:')
+        if written:
+            found.append({'written_in_studio': session.get('title', ''), 'questions': written})
+        turn_ids = session['turn_ids']
+        earlier = turn_ids[:turn_ids.index(current)] if current in turn_ids else turn_ids
+        # Only the turns the prompt carries are read, so a long session costs no more than a short one.
+        for turn_id in earlier[-CONVERSATION:]:
             turn = self.operation({'op': 'stream.read', 'id': turn_id})['turn']
-            asked = [tasks[i] for i in session['task_ids'] if i.startswith(turn_id + ':') and i in tasks]
             offered = session.get('handoffs', {}).get(turn_id)
             found.append({'learner': '' if turn['prompt'] == prompts.DRILL_START else turn['prompt'],
                           'teacher': BLOCK.sub('', turn.get('final_text') or '').strip(),
                           **({'offered_to_studio': offered['label'], 'sent_to_studio': 'drill:' + turn_id in sent} if offered else {}),
-                          'questions': [{'question': t['question'], 'kind': t.get('kind', 'apply'), 'outcome': self._outcome(t)} for t in asked]})
-        return found[-CONVERSATION:]
+                          'questions': questions(turn_id + ':')})
+        return found
 
     @staticmethod
     def _outcome(task):

@@ -96,6 +96,20 @@ class Points(unittest.TestCase):
         self.assertFalse(self.op(op='key_points.view')['chapter_sheets'][0]['current'], 'new points leave the paragraph behind')
         self.assertEqual([c['chapter_id'] for c in self.op(op='key_points.pending')['chapters']], ['c1'])
 
+    def test_points_of_a_replaced_lesson_are_written_again_once_the_new_lesson_ends_without_any(self):
+        self.op(op='lesson.begin', id='old', concept_id='wave', steps=['Wave'])
+        self.study('wave', 't1')
+        self.op(op='lesson.step', id='old', turn_id='t1')
+        self.op(op='key_points.save', concept_id='wave', turn_id='t1', origin='lesson', points=[POINT])
+        time.sleep(.02)
+        self.op(op='lesson.begin', id='new', concept_id='wave', steps=['Wave'])
+        self.assertEqual(self.op(op='key_points.pending')['sections'], [], 'the new lesson is still being taught')
+        self.study('wave', 't2')
+        self.op(op='lesson.step', id='new', turn_id='t2')
+        self.assertEqual(self.op(op='key_points.pending')['sections'], ['wave'], 'its last step wrote no points')
+        self.op(op='key_points.save', concept_id='wave', turn_id='t3', origin='backfill', points=[POINT])
+        self.assertEqual(self.op(op='key_points.pending')['sections'], [])
+
 
 class LessonPoints(LessonHost):
     """The lesson writes the points as it ends."""

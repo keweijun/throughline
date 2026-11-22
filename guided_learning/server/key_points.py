@@ -186,7 +186,7 @@ class KeyPoints(Feature):
                     return started
             chapters = {c['id']: c for c in self.operation({'op': 'curriculum.view'})['chapters']}
             for chapter in pending['chapters']:
-                basis = [f'{cid}={at}' for cid, at in sorted(chapter['basis'].items())]
+                basis = self._sheet_basis(chapter)
                 # Like any chapter-owned turn, anchored to the chapter's last section (ADR 0006).
                 anchor = chapters[chapter['chapter_id']]['concept_ids'][-1]
                 started = self._start(self._job_id('chapter-sheet', chapter['chapter_id'], basis), anchor, 'chapter_sheet',
@@ -194,6 +194,10 @@ class KeyPoints(Feature):
                 if started is not False:
                     return started
             return None
+
+    @staticmethod
+    def _sheet_basis(chapter):
+        return [f'{cid}={at}' for cid, at in sorted(chapter['basis'].items())]
 
     def _teaching(self, concept_id):
         """Whether the section's current stepped lesson still has steps to teach; a replaced one never goes on."""
@@ -236,6 +240,11 @@ class KeyPoints(Feature):
         reply = tagged_json(SHEET_BLOCK, turn['final_text']) or {}
         chapter = next((c for c in self.operation({'op': 'key_points.pending'})['chapters'] if c['chapter_id'] == turn.get('chapter_id')), None)
         if not chapter or not isinstance(reply.get('connection'), str):
+            return None
+        # The paragraph was written from the points the job started with (its id); if they changed since, it is dropped,
+        # and the next idle job writes it from the new ones.
+        if turn['id'] != self._job_id('chapter-sheet', chapter['chapter_id'], self._sheet_basis(chapter)):
+            log.info('Chapter sheet from turn %s was written from points that have changed since', turn['id'])
             return None
         try:
             return self.operation({'op': 'key_points.save_sheet', 'chapter_id': chapter['chapter_id'], 'basis': chapter['basis'],

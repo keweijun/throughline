@@ -5,10 +5,10 @@ test('a lesson draws callouts, highlighted code, diagrams, plots and chemistry, 
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const lesson = page.locator('.prose').filter({ hasText: 'Water forms' }).first();
 
-  const callout = lesson.locator('blockquote.callout-warning');
-  await expect(callout.locator('.callout-title')).toHaveText('Warning');
+  const callout = lesson.locator('blockquote.callout-caution');
+  await expect(callout.locator('.callout-title')).toHaveText('Caution');
   await expect(callout).toContainText('Amplitudes add before squaring.');
-  await expect(callout).not.toContainText('[!WARNING]');
+  await expect(callout).not.toContainText('[!CAUTION]');
   await expect(lesson.locator('blockquote:not(.callout)')).toContainText('A plain quotation');
 
   await expect(lesson.locator('code.hljs .hljs-keyword').first()).toHaveText('def');

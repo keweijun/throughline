@@ -150,10 +150,11 @@ function parse(text: string, breaks = false): DocumentFragment {
   return fragment;
 }
 
-// Callout titles by language; "Note" alone would take the translation of a learner's note.
+// Callout titles by language; "Note" alone would take the translation of a learner's note. Unlike GitHub, caution is
+// milder than warning, as on safety signs (ADR 0013).
 const CALLOUTS = {
   note: { en: 'Note', 'zh-CN': '说明' }, tip: { en: 'Tip', 'zh-CN': '提示' }, important: { en: 'Important', 'zh-CN': '重点' },
-  warning: { en: 'Warning', 'zh-CN': '注意' }, caution: { en: 'Caution', 'zh-CN': '警告' },
+  caution: { en: 'Caution', 'zh-CN': '注意' }, warning: { en: 'Warning', 'zh-CN': '警告' },
 } as const;
 
 /** GitHub-style callouts: a blockquote whose first line is [!NOTE], [!TIP], [!IMPORTANT], [!WARNING] or [!CAUTION]. */

@@ -744,11 +744,12 @@ summary:focus-visible {
   --callout: var(--mine);
 }
 
-.prose blockquote.callout-warning {
+/* Caution is the milder of the two, as on safety signs: amber for a common mistake, red for real harm. */
+.prose blockquote.callout-caution {
   --callout: var(--caution);
 }
 
-.prose blockquote.callout-caution {
+.prose blockquote.callout-warning {
   --callout: var(--danger);
 }
 

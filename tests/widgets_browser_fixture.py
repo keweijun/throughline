@@ -9,7 +9,7 @@ from guided_learning.server import serve
 
 LESSON = r'''Water forms from hydrogen and oxygen: $\ce{2H2 + O2 -> 2H2O}$.
 
-> [!WARNING]
+> [!CAUTION]
 > Amplitudes add before squaring.
 
 > A plain quotation stays a quotation.

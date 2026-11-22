@@ -2,8 +2,9 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
-## 0.59.1
+## 0.60.0
 
+- **Common mistakes in lessons get their own box.** New lessons mark a common mistake with an amber **Caution** (注意) box and keep green **Important** (重点) for key results and the conditions they need. A red **Warning** (警告) is kept for real harm, such as a lab hazard. Lessons that already use Caution or Warning boxes show them with the new colours.
 - **Note, tip and important boxes in lessons, and first-visit tips, have rounded corners on every side**, like the other cards in the app.
 
 ## 0.59.0

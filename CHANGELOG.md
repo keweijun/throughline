@@ -2,14 +2,24 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
-## 0.61.0
+## 0.62.0
 
 - **All courses is redesigned.**
   - **The course you last studied leads the page**, with **Continue**. Your other courses follow as cards; click anywhere on a card to open its course.
   - **Each card shows less:** the title and the section you are at. The folder name, counts, date and goal are gone, and **Add files** moved into the card's ⋯ menu with Rename, Archive and Delete.
   - **A card tells you when Studio is working in its course or needs your answer**, so a chat you left is easy to find again.
-- **Starting a course has its own page.** New course, and Throughline before your first course, now asks **What would you like to learn?** with the writing box right under the question and four ways to begin: prepare for an exam, learn a subject, practise problems, or read a paper. Drop your files anywhere on the page.
+- **Starting a course has its own page.** New course, and Throughline before your first course, now asks **What would you like to learn?** with the writing box right under the question and four suggestions: prepare for an exam, learn a subject, practise problems, or read a paper. Drop your files anywhere on the page.
+- **A new chat in Studio starts the same way** in every course: the question, the box under it and a few suggestions of what Studio can do. When you send, the box moves to the bottom and the chat begins.
+- **Share… on a course's card opens below the card's row**, with room for its choices, and the card stays where it is.
 - **Courses have covers.** A cover is the subject's short name, such as 物化 or DS, over a pattern of thin lines that suits the subject. Codex chooses both when it makes a course. A course you already have shows a pattern alone until Codex next works on it; to get its cover now, or a different one, ask in the course's Studio, for example "give this course a cover" or "call it P-Chem on the cover".
+
+## 0.61.0
+
+- **Overview is now Studio.** The top bar reads **Studio · Learn · Review**. Studio, Codex working on your course, now runs from just under the top bar to the bottom of the window, so long chats, questions and work are easier to read back. Beside it stand the course's title and goal, the strip of its chapters, your Studio chats and **How you're taught**. `d` opens it; `m` is gone.
+- **Sources open beside Studio.** A page a Studio reply cites, or anything you open with **Source**, opens in the same side panel as in Learn and Review. When it needs the room, the column beside Studio folds away and your chats become a menu above the chat.
+- **Share a course from its card in the library, or from Studio.** **Share…** sits in the card's ⋯ menu beside Rename and Archive, and works whether or not the course is open. In an open course, the ⋯ beside its title in Studio has **Share…** and **Rename** too. It used to be a tab on the Overview, as were the course's Sources, which are all under **All sources** in the reader.
+- **Export notes is gone.** Your notes stay with the course, and a package at the Everything level carries them. To have them as one page, ask Studio to write them out.
+- **How you're taught has a × on each preference** to delete it. To change one, tell Studio.
 
 ## 0.60.0
 

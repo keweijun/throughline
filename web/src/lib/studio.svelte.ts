@@ -161,7 +161,7 @@ class StudioStore {
   threads = $state<StudioThread[]>([]);
   /** The open thread, or null for a new one that starts with the next message. */
   threadId = $state<string | null>(null);
-  /** How many chats the host knows of here, before Codex has listed them; null until it has said. */
+  /** How many chats the host knows of here, before Codex has listed them; null until it has said, -1 if it could not. */
   known = $state<number | null>(null);
   turns = $state<StudioTurn[]>([]);
   activeTurn = $state<string | null>(null);
@@ -296,10 +296,16 @@ class StudioStore {
     const scope = this.scope;
     try {
       const activity = await api.get<Activity>(this.url('/api/studio/activity'));
-      if (scope === this.scope) this.known = activity.chats ?? null;
+      if (scope === this.scope) this.known = activity.chats ?? -1;
     } catch {
-      // Without it the page waits for Codex to say.
+      // Unanswered: the page is laid out as a chat until Codex says.
+      if (scope === this.scope) this.known = -1;
     }
+  }
+
+  /** Whether it is known yet which way Studio opens, on an empty chat or on a chat; until then it shows neither. */
+  get placed() {
+    return this.available !== null || this.known !== null;
   }
 
   /**

@@ -2,33 +2,18 @@
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
-  import Composer from './Composer.svelte';
   import InlineConfirm from './InlineConfirm.svelte';
   import type { MemoryEntry } from '../lib/types';
 
   /**
    * How the learner likes to be taught in this course: the confirmed preferences in course memory (ADR 0010), which
    * the teacher follows in every lesson. They are added where they come up (a preference the teacher suggests in a
-   * lesson, or a lasting requirement told to Studio) and edited or deleted here. Taught terms and difficulties stay
-   * the teacher's working notes.
+   * lesson, or a lasting requirement told to Studio) and deleted here; changing one is asked of Studio, as adding one
+   * is. Taught terms and difficulties stay the teacher's working notes.
    */
   const preferences = $derived((app.state?.memory ?? []).filter((e) => e.kind === 'preference' && e.status === 'confirmed'));
 
-  let editing = $state<string | null>(null);
-  let edit = $state('');
-
-  function start(entry: MemoryEntry) {
-    editing = entry.id;
-    edit = entry.text;
-    requestAnimationFrame(() => document.getElementById(`preference-edit-${entry.id}`)?.focus());
-  }
-
-  async function save(entry: MemoryEntry) {
-    if (!edit.trim()) return;
-    if (await app.editMemory(entry.id, edit)) editing = null;
-  }
-
-  // Deleting is confirmed beside the entry.
+  // Deleting is confirmed beside the entry, since the teacher does not add a deleted preference back.
   let confirming = $state<string | null>(null);
 
   function remove(entry: MemoryEntry) {
@@ -36,8 +21,6 @@
     void app.removeMemory(entry.id);
   }
 </script>
-
-{#snippet editingEntry()}{t('Editing · the teacher uses this in every lesson')}{/snippet}
 
 <section class="preferences" id="course-preferences" aria-labelledby="preferences-title">
   <h2 id="preferences-title">{t("How you're taught")}</h2>
@@ -48,23 +31,13 @@
     <ul>
       {#each preferences as entry (entry.id)}
         <li class="item">
-          {#if editing === entry.id}
-            <Composer
-              id="preference-edit-{entry.id}"
-              value={edit}
-              onvalue={(value) => (edit = value)}
-              label={t("How you're taught")}
-              placeholder={t("How you're taught")}
-              submitLabel={t('Save')}
-              onsubmit={() => void save(entry)}
-              header={editingEntry}
-              onclose={() => (editing = null)}
-              oncancel={() => (editing = null)}
-              closeLabel={t('Cancel')}
-            />
+          <div class="text prose" use:markdown={{ language: locale.language, text: entry.text }}></div>
+          {#if confirming !== entry.id}
+            <button class="remove" aria-label={t('Delete')} title={t('Delete')} onclick={() => (confirming = entry.id)}>
+              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M6 6l8 8M14 6l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+            </button>
           {:else}
-            <div class="text prose" use:markdown={{ language: locale.language, text: entry.text }}></div>
-            {#if confirming === entry.id}
+            <div class="confirm">
               <InlineConfirm
                 danger
                 message={t('Delete this from the course memory? The teacher will not add it back.')}
@@ -72,12 +45,7 @@
                 onconfirm={() => remove(entry)}
                 oncancel={() => (confirming = null)}
               />
-            {:else}
-              <span class="actions">
-                <button class="btn btn-quiet btn-small" onclick={() => start(entry)}>{t('Edit')}</button>
-                <button class="btn btn-quiet btn-small" onclick={() => (confirming = entry.id)}>{t('Delete')}</button>
-              </span>
-            {/if}
+            </div>
           {/if}
         </li>
       {/each}
@@ -111,10 +79,13 @@
     list-style: none;
   }
 
+  /* The text, with a quiet × beside it to delete it. */
   .item {
     display: grid;
-    gap: 0.1rem;
-    padding: 0.45rem 0.6rem 0.25rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.25rem 0.4rem;
+    padding: 0.45rem 0.35rem 0.45rem 0.6rem;
     border: 1px solid var(--rule);
     border-radius: var(--radius);
     background: var(--raised);
@@ -132,9 +103,26 @@
     margin: 0;
   }
 
-  .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.2rem;
+  .remove {
+    display: grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    color: var(--pencil);
+    cursor: pointer;
+  }
+
+  .remove:hover,
+  .remove:focus-visible {
+    background: var(--accent-wash);
+    color: var(--danger);
+  }
+
+  .confirm {
+    grid-column: 1 / -1;
   }
 </style>

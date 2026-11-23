@@ -8,6 +8,7 @@
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
   import CourseImport from './CourseImport.svelte';
+  import CourseShare from './CourseShare.svelte';
   import { pop } from '../lib/motion';
   import InlineConfirm from './InlineConfirm.svelte';
   import CourseCover from './CourseCover.svelte';
@@ -177,6 +178,8 @@
   let renaming = $state<string | null>(null);
   let newTitle = $state('');
   let deleting = $state<string | null>(null);
+  // The course whose share options stand under its card (ADR 0020).
+  let sharing = $state<string | null>(null);
   let busy = $state(false);
 
   // What was just archived or deleted, said where the course was, with the way back. A deleted course that was open
@@ -213,6 +216,7 @@
   function startRename(course: LibraryCourse) {
     menuFor = null;
     deleting = null;
+    sharing = null;
     renaming = course.name;
     newTitle = label(course);
     requestAnimationFrame(() => {
@@ -237,9 +241,17 @@
     if (result) done = archived ? { kind: 'archived', title: label(course), name: course.name } : null;
   }
 
+  function startShare(course: LibraryCourse) {
+    menuFor = null;
+    renaming = null;
+    deleting = null;
+    sharing = course.name;
+  }
+
   function startDelete(course: LibraryCourse) {
     menuFor = null;
     renaming = null;
+    sharing = null;
     deleting = course.name;
   }
 
@@ -386,7 +398,7 @@
       {@const active = course.path === library?.active}
       {@const ready = !course.error && !!course.concepts}
       {@const go = () => (active ? (app.libraryOpen = false) : void open(course))}
-      <li class="course" class:leading class:ready class:menu-open={menuFor === course.name} class:opening={opening === course.name}>
+      <li class="course" class:leading class:ready class:sharing={sharing === course.name} class:menu-open={menuFor === course.name} class:opening={opening === course.name}>
         <div class="front"><CourseCover {course} large={leading} /></div>
         <div class="text">
           <div class="title-row">
@@ -429,6 +441,7 @@
                     <li role="none"><CodexLink class="menu-link" prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink></li>
                   {/if}
                   {#if !course.error}
+                    <li role="none"><button role="menuitem" onclick={() => startShare(course)}>{t('Share…')}</button></li>
                     <li role="none"><button role="menuitem" onclick={() => startRename(course)}>{t('Rename')}</button></li>
                   {/if}
                   <li role="none">
@@ -474,6 +487,15 @@
           </div>
         {/if}
       </li>
+      {#if sharing === course.name}
+        <!-- Sharing needs room for its choices: it opens across the list, under the row its card is in. -->
+        <li class="share-row">
+          <div class="share" role="group" aria-label={t('Share “{course}”', { course: label(course) })}>
+            <h2>{t('Share “{course}”', { course: label(course) })}</h2>
+            <CourseShare course={course.name} onclose={() => (sharing = null)} />
+          </div>
+        </li>
+      {/if}
     {/snippet}
     {#if done}
       <!-- What was just archived or deleted, where it was, with the way back. -->
@@ -806,6 +828,30 @@
     font-weight: 600;
   }
 
+  /* Sharing opens across the list under the row its card is in; the cards after it keep their places in that row. */
+  .share-row {
+    animation: enter-rise var(--settle) var(--ease-out);
+    grid-column: 1 / -1;
+    padding: 1.1rem 1.25rem 1.2rem;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--sheet);
+  }
+
+  .share {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .share h2 {
+    font-size: var(--step-0);
+  }
+
+  .course.sharing {
+    border-color: var(--accent);
+  }
+
+
   .done {
     animation: enter-rise var(--settle) var(--ease-out);
     display: flex;
@@ -940,6 +986,7 @@
   .courses {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    grid-auto-flow: row dense;
     gap: 0.9rem;
     margin: 0;
     padding: 0;

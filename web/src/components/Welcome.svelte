@@ -242,7 +242,7 @@
           {:else if step === 'studio'}
             <h2 id="welcome-title">{titles.studio}</h2>
             <p class="lead">{t('The teacher in Learn and Review is quick and answers about what you are reading. Studio is Codex itself: it can change the course whenever you ask, with your files and pages in reach.')}</p>
-            <p class="where">{t("Studio is on each course's Overview, and New course opens it here. Learn and Review send it what they cannot do themselves.")}</p>
+            <p class="where">{t("Studio is the first of each course's three places, beside Learn and Review, and New course opens it here. Learn and Review send it what they cannot do themselves.")}</p>
             <fieldset class="access" disabled={savingAccess || !studio.access}>
               <legend>{t('How much may Studio do without asking?')}</legend>
               {#if studio.access?.sandbox_missing}

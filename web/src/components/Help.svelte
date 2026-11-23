@@ -29,8 +29,7 @@
             title: 'This course' as MessageKey,
             items: [
               { title: 'Route', text: 'Chapters and sections in teaching order, with where you are. Select one to look at it without moving.', target: '#route' },
-              { title: 'Overview', text: 'The course as a whole: Studio, what the teacher remembers, sources and your notes. Overview, Learn and Review are the course\'s three places.', target: '#open-course', key: 'm' },
-              { title: 'Studio', text: 'Codex itself, working on your course. If you can describe a change, it can probably make it: new sections or exercises, added files, a different way of teaching.', key: 'd', open: () => app.showStudio({ focus: true }) },
+              { title: 'Studio', text: 'Codex itself, working on your course. If you can describe a change, it can probably make it: new sections or exercises, added files, a different way of teaching. Beside it, your chats with it and how you are taught. Studio, Learn and Review are the course\'s three places.', target: '#open-course', key: 'd', open: () => app.showStudio({ focus: true }) },
               { title: 'Review', text: 'Questions to answer from memory on what you have studied, whenever you ask for them.', target: '#open-review' },
               { title: 'Search', text: 'Find any section, lesson passage, question, exercise, note or source page in this course.', target: '#open-search', key: 'Shift Shift' },
             ] as Item[],
@@ -56,7 +55,6 @@
     [']', 'Next section'],
     ['s', 'Show or hide the source reader'],
     ['n', 'Show or hide your notes'],
-    ['m', 'Show or hide the course page'],
     ['d', 'Show or hide Studio'],
     ['r', 'Fold or unfold the route'],
     ['Esc', 'Close a drawer or popup'],

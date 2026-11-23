@@ -14,7 +14,7 @@ A **teaching widget** is part of a lesson's Markdown that the interface draws: a
 
 ## For the learner
 
-Add-ons stay out of the interface: there is no list or toggle in Settings or on the course page (Settings stays simple; teaching style goes through course memory, ADR 0010). When showing the chapter outline, Codex may say in plain words how the course will use them ("I'll graph the functions in chapters 2–4"). A learner who asks for more or fewer drawings changes the teaching through conversation and course memory; Codex changes the selection itself. A drawing the library cannot make is described in words.
+Add-ons stay out of the interface: there is no list or toggle in Settings or in Studio (Settings stays simple; teaching style goes through course memory, ADR 0010). When showing the chapter outline, Codex may say in plain words how the course will use them ("I'll graph the functions in chapters 2–4"). A learner who asks for more or fewer drawings changes the teaching through conversation and course memory; Codex changes the selection itself. A drawing the library cannot make is described in words.
 
 ## Consequences
 

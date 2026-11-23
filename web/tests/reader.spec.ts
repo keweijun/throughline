@@ -121,31 +121,33 @@ test('the top bar is the only navigation for the side panel and focus returns to
   await expect(page.locator('#toggle-notes')).toBeFocused();
 });
 
-test('the Overview has no side panel: Source opens its Sources tab, and Questions and Notes go back to Learn', async ({ page, course }) => {
+test('in Studio only Source opens beside it; Questions and Notes go back to Learn', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   const panel = page.locator('#auxiliary');
   await page.locator('#toggle-notes').click();
   await expect(panel).toBeVisible();
 
-  // The Overview has its own Sources, and Studio and the reader need the width; Learn gives the panel back as it was.
+  // Notes are about what is being read: Studio sets them aside, and Learn gives the panel back as it was.
   await page.locator('#open-course').click();
   await expect(panel).toBeHidden();
   await expect(page.locator('#toggle-notes')).toHaveAttribute('aria-pressed', 'false');
   await page.locator('#open-study').click();
   await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
 
-  // Source on the Overview is its Sources tab.
-  await page.keyboard.press('m');
+  // Source opens beside Studio, as it does beside a lesson (ADR 0017).
+  await page.locator('#open-course').click();
   await page.keyboard.press('s');
-  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('complementary', { name: 'Source' })).toBeVisible();
   await expect(page.locator('#toggle-source')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#course-title')).toBeVisible();
+  await page.keyboard.press('s');
   await expect(panel).toBeHidden();
 
-  // Questions and notes are about what is being read, so they take the learner back to Learn with the panel open.
+  // Questions and notes take the learner back to Learn with the panel open.
   await page.locator('#toggle-questions').click();
   await expect(page.locator('#course-title')).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: 'Questions' })).toBeVisible();
-  await page.keyboard.press('m');
+  await page.locator('#open-course').click();
   await expect(panel).toBeHidden();
   await page.keyboard.press('n');
   await expect(page.getByRole('complementary', { name: 'Notes' })).toBeVisible();
@@ -157,54 +159,31 @@ test('the Overview has no side panel: Source opens its Sources tab, and Question
   expect(errors).toEqual([]);
 });
 
-test("a document opens in the Overview's Sources tab beside the list and fills the window", async ({ page, course }) => {
+test('Studio is as tall as the window, and the course column folds away when a document beside it needs the room', async ({ page, course }) => {
   const { errors } = await course('demo_course_fixture');
   await page.locator('#open-course').click();
-  await page.getByRole('tab', { name: 'Sources' }).click();
-  const tab = page.locator('#course-sources');
-  await expect(tab.getByText('Every document in the course')).toBeVisible();
-  await tab.getByRole('button', { name: /lecture-2\.pdf/ }).click();
-  await expect(tab.locator('.pdf-page.cited canvas')).toBeVisible();
+  const stage = page.locator('#stage');
+  await expect(page.locator('#course-title')).toBeVisible();
 
-  // The list stays beside it, the document marked; beside the course's column, the reader ends at the window's foot.
-  await expect(tab.locator('.source-list [aria-current="true"]')).toContainText('lecture-2.pdf');
-  await expect(page.locator('#course-title')).toBeInViewport();
-  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.getElementById('course-sources')!.getBoundingClientRect().bottom);
-  expect(await foot()).toBeGreaterThan(8);
-  expect(await foot()).toBeLessThan(32);
-
-  // Narrower, the header stacks above the tab and steps aside, so the reader still reaches the foot.
-  await page.setViewportSize({ width: 1000, height: 900 });
-  await expect(page.locator('#course-title')).not.toBeInViewport();
-  await expect(page.getByRole('tab', { name: 'Sources' })).toBeInViewport();
+  // Studio's frame ends just above the window's foot, and the page itself never scrolls.
+  const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('.place .frame')!.getBoundingClientRect().bottom);
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
-  await page.setViewportSize({ width: 1440, height: 900 });
+  expect(await stage.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1);
 
-  // One line of header: the note on an unchecked location unfolds from its status; bookmark and original sit with the
-  // PDF's controls.
-  const header = tab.locator('.source-view header');
-  await expect(header.getByText(/Not yet checked against the original/)).toHaveCount(0);
-  await header.getByRole('button', { name: 'Not checked yet' }).click();
-  await expect(header.getByText(/Not yet checked against the original/)).toBeVisible();
-  const toolbar = tab.getByRole('toolbar', { name: 'PDF reader' });
-  await expect(toolbar.getByRole('button', { name: 'Bookmark page' })).toBeVisible();
-  await expect(toolbar.getByRole('link', { name: 'Open PDF ↗' })).toBeVisible();
-
-  // Learn's panel shows the same document at the cited page, though its own reader was hidden when it opened.
-  await page.locator('#open-study').click();
+  // A document opens in the side panel; where Studio and the column no longer both fit, the column folds away.
   await page.keyboard.press('s');
   const side = page.getByRole('complementary', { name: 'Source' });
-  await expect(side.getByRole('textbox', { name: 'Page number' })).toHaveValue('2');
-  await expect
-    .poll(() => side.locator('.pages').evaluate((pages) => Math.abs(pages.scrollTop - ((pages.querySelector('.cited') as HTMLElement).offsetTop - 12))))
-    .toBeLessThan(3);
+  await side.getByRole('button', { name: /lecture-2\.pdf/ }).click();
+  await expect(side.locator('.pdf-page.cited canvas')).toBeVisible();
+  await expect(page.locator('#open-course')).toHaveAttribute('aria-current', 'page');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator('#course-title')).toBeHidden();
+  await expect.poll(foot).toBeLessThan(32);
 
-  // Closing the document gives the tab back to the whole list.
-  await page.keyboard.press('m');
-  await tab.getByRole('button', { name: 'Close lecture-2.pdf' }).click();
-  await expect(tab.getByText('Every document in the course')).toBeVisible();
-  await expect(tab.locator('.source-view')).toHaveCount(0);
+  // Closing it gives the column back.
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await expect(page.locator('#course-title')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -343,7 +322,7 @@ test('help maps what the learner can do by level and shows where each thing is',
   const help = page.getByRole('dialog', { name: 'Help' });
   await expect(help.getByRole('heading', { level: 3 })).toHaveText(['Throughline', 'This course', 'The section you are reading']);
   await help.getByText('Keyboard shortcuts').click();
-  await expect(help.locator('kbd', { hasText: 'm' }).first()).toBeVisible();
+  await expect(help.locator('kbd', { hasText: 'd' }).first()).toBeVisible();
 
   // "Show me" closes Help and rings the real control where it is, without opening it.
   const notes = help.getByRole('listitem').filter({ hasText: 'Only you see them' });
@@ -431,7 +410,7 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
 });
 
-test('settings hold only what applies to every course; the course page holds the course', async ({ page, course }) => {
+test('Settings hold only what applies to every course; Studio holds the course', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const categories = page.getByRole('navigation', { name: 'Settings' }).getByRole('button');
@@ -441,21 +420,15 @@ test('settings hold only what applies to every course; the course page holds the
   await expect(page.getByRole('radiogroup', { name: 'Language' })).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 
-  // The course title opens the Course page, and the side panel no longer has a Memory view.
+  // Studio has no tabs: the course, its chats and how the learner is taught stand beside it.
   await expect(page.locator('#toggle-memory')).toHaveCount(0);
   await page.locator('#open-course').click();
-  const coursePage = page.locator('main article[aria-labelledby="course-title"]');
-  await expect(coursePage.getByRole('heading', { level: 1 })).toBeVisible();
-  // One tab at a time, and the arrow keys move between them; how the learner is taught sits beside Studio.
-  await expect(coursePage.getByRole('tab')).toHaveText(['Studio', 'Sources', 'Your notes', 'Share']);
-  await expect(coursePage.getByRole('region', { name: "How you're taught" })).toContainText('Nothing yet.');
-  await coursePage.getByRole('tab', { name: 'Studio' }).click();
-  await page.keyboard.press('ArrowRight');
-  await expect(coursePage.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
-  await expect(coursePage.getByRole('tabpanel')).toContainText('Every document in the course');
-  await expect(coursePage.getByRole('region', { name: "How you're taught" })).toBeHidden();
+  const studioPage = page.locator('main article[aria-labelledby="course-title"]');
+  await expect(studioPage.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(studioPage.getByRole('tab')).toHaveCount(0);
+  await expect(studioPage.getByRole('region', { name: "How you're taught" })).toContainText('Nothing yet.');
   await page.locator('#open-study').click();
-  await expect(coursePage).toHaveCount(0);
+  await expect(studioPage).toHaveCount(0);
   await expect(page.locator('main article[aria-labelledby="concept-title"]')).toBeVisible();
 });
 
@@ -469,20 +442,16 @@ test('appearance offers the theme as cards and applies the choice at once', asyn
   await expect(page.locator('html')).not.toHaveAttribute('data-theme');
 });
 
-test('Learn keeps its place while the learner goes to the Overview and back, however far the Overview scrolled', async ({ page, course }) => {
+test('Learn keeps its place while the learner goes to Studio and back', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.setViewportSize({ width: 1000, height: 800 });
   const stage = page.locator('#stage');
   await stage.evaluate((node) => node.scrollTo({ top: 400, behavior: 'instant' }));
   await expect.poll(() => stage.evaluate((node) => node.scrollTop)).toBe(400);
 
-  // Source opens the Overview's Sources tab; an open document there scrolls the course's header away.
-  await page.locator('#toggle-source').click();
   await page.locator('#open-course').click();
-  await page.locator('#toggle-source').click();
-  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
-  await page.locator('#course-sources').getByRole('button', { name: /lecture-2\.pdf/ }).click();
-  await expect(page.locator('#course-title')).not.toBeInViewport();
+  await expect(page.locator('#course-title')).toBeVisible();
+  await expect.poll(() => stage.evaluate((node) => node.scrollTop)).toBe(0);
 
   await page.locator('#open-study').click();
   await expect.poll(() => stage.evaluate((node) => node.scrollTop)).toBe(400);

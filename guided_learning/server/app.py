@@ -361,7 +361,7 @@ class Courses:
     # is one operation through the course's own host, and archiving writes only to the library's own folder. Deleting
     # moves the folder, so it waits for anything being written in the course.
 
-    def _named(self, name):
+    def named(self, name):
         if self.root is None:
             raise OperationError('no_library', 'This host was started for a single course')
         path = library.course_path(self.root, name)
@@ -370,7 +370,7 @@ class Courses:
         return path
 
     def rename(self, name, title):
-        path = self._named(name)
+        path = self.named(name)
         host = self.host
         if host and host.workspace == path:
             result = host.operation({'op': 'course.rename', 'title': title})
@@ -381,13 +381,13 @@ class Courses:
         return {'name': name, 'title': result['course']['title']}
 
     def archive(self, name, value):
-        self._named(name)
+        self.named(name)
         result = library.set_archived(self.root, name, value)
         self.events.publish({'type': 'changed', 'scope': 'library'})
         return result
 
     def delete(self, name):
-        path = self._named(name)
+        path = self.named(name)
         activity = self.studio.activity(path)
         if activity['running'] or activity['waiting']:
             raise OperationError('course_busy', 'Studio is working in this course. Wait for it to finish, or stop it, then delete the course.')
@@ -1116,15 +1116,19 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
         waiting_package(token).unlink(missing_ok=True)
         return {'dropped': True}
 
-    @app.get('/api/course/package')
-    def package_summary():
-        return {'name': host.workspace.name, 'levels': packages.summary(host.workspace)}
+    # Sharing is done from a course's card in the library (ADR 0020), so it names the course rather than acting on the
+    # open one; the package is written from the folder whether or not the course is open.
+    @app.get('/api/library/courses/{name}/package')
+    def package_summary(name: str):
+        workspace = courses.named(name)
+        return {'name': workspace.name, 'levels': packages.summary(workspace)}
 
-    @app.get('/api/course/package/{level}')
-    def package_export(level: Literal['route', 'lessons', 'everything']):
-        name = host.workspace.name + packages.SUFFIX
+    @app.get('/api/library/courses/{name}/package/{level}')
+    def package_export(name: str, level: Literal['route', 'lessons', 'everything']):
+        workspace = courses.named(name)
+        name = workspace.name + packages.SUFFIX
         folder = Path(tempfile.mkdtemp(prefix='throughline-export-'))
-        packages.export(host.workspace, folder / name, level)
+        packages.export(workspace, folder / name, level)
         return FileResponse(folder / name, media_type='application/zip', filename=name,
                             background=BackgroundTask(shutil.rmtree, folder, ignore_errors=True))
 

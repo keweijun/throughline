@@ -12,7 +12,6 @@ export type NoteQuote = Pick<Annotation, 'passage' | 'concept_id'> & Partial<Pic
 
 export type PanelTab = 'questions' | 'source' | 'notes';
 /** A tab of the Course page. */
-export type CoursePart = 'studio' | 'sources' | 'notes' | 'share';
 export type Connection = 'connecting' | 'live' | 'reconnecting';
 export type Quote = {
   text: string;
@@ -207,11 +206,9 @@ class AppStore {
   /** The Review place's tab, and the sheet open in Sheets. */
   reviewTab = $state<'points' | 'mistakes' | 'sheets'>('points');
   sheetOpen = $state<string | null>(null);
-  /** The Course page replaces the reading column: the course as a whole (ADR 0017). The side panel never shows there:
-   * the Overview has its own Sources, and Studio and the reader need the width. It comes back as it was in Learn. */
+  /** The course's Studio place replaces the reading column (ADR 0017): Codex working on the course, beside the course
+   * and its chats. Of the side panel only Source shows there; Questions and Notes come back as they were in Learn. */
   courseOpen = $state(false);
-  /** The Course page's tab; it stays as the learner left it until something asks for another. */
-  coursePart = $state<CoursePart>('studio');
 
   /** Whether the learner left the side panel open; `panelShown` says whether it is on screen. */
   panelOpen = $state(false);
@@ -952,10 +949,6 @@ class AppStore {
     return this.act(() => api.post('/api/memory', { id: newId(), text, concept_id: conceptId }));
   }
 
-  editMemory(id: string, text: string) {
-    return this.act(() => api.put(`/api/memory/${encodeURIComponent(id)}`, { text }));
-  }
-
   confirmMemory(id: string) {
     return this.act(() => api.post(`/api/memory/${encodeURIComponent(id)}/confirm`));
   }
@@ -1060,32 +1053,28 @@ class AppStore {
     return (this.state?.practice.tasks ?? []).filter((t) => !!chapterId && t.chapter_id === chapterId).sort((a, b) => (a.created_at ?? 0) - (b.created_at ?? 0));
   }
 
-  /** Opens a view of the side panel. On the Overview a source opens in its Sources tab instead, and questions and notes,
-   * which are about what is being read, take the learner back to Learn with the panel open (ADR 0017). */
+  /** Opens a view of the side panel. In Studio a source opens beside it; questions and notes, which are about what is
+   * being read, take the learner back to Learn with the panel open (ADR 0017). */
   openPanel(tab: PanelTab) {
-    if (this.courseOpen && tab === 'source') {
-      if (this.coursePart !== 'sources') this.showCourse('sources');
-      return;
-    }
-    this.courseOpen = false;
+    if (tab !== 'source') this.courseOpen = false;
     this.panelTab = tab;
     this.panelOpen = true;
   }
 
   get panelShown() {
-    return this.panelOpen && !this.courseOpen;
+    return this.panelOpen && (!this.courseOpen || this.panelTab === 'source');
   }
 
   /** Whether Studio is on screen; with `showStudio`, the one place that knows where Studio is mounted (ADR 0016). */
   get studioShown() {
-    return this.courseOpen && !this.libraryOpen && this.coursePart === 'studio';
+    return this.courseOpen && !this.libraryOpen;
   }
 
   /** Shows Studio: a hand-off, the top bar's indicator and `d` all go through here, with `thread` opened if given and
    * the box focused when `focus`. */
   showStudio({ thread = null, focus = false }: { thread?: string | null; focus?: boolean } = {}) {
-    // Studio is course-level, the first tab of the Course page (ADR 0017).
-    if (!this.studioShown) this.showCourse('studio');
+    // Studio is course-level, the first of the course's three places (ADR 0017).
+    if (!this.studioShown) this.showCourse();
     if (thread && studio.threadId !== thread) void studio.open(thread);
     if (focus) studio.focusRequest++;
   }
@@ -1186,9 +1175,8 @@ class AppStore {
     scrollStage(0);
   }
 
-  /** Opens the Course page, at one of its tabs when asked, else at the one the learner last had open. */
-  showCourse(part?: CoursePart) {
-    if (part) this.coursePart = part;
+  /** Opens the course's Studio place. */
+  showCourse() {
     this.courseOpen = true;
     this.reviewOpen = false;
     this.libraryOpen = false;

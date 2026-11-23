@@ -21,8 +21,8 @@
 
   const suggested = $derived((app.state?.memory ?? []).filter((e) => e.status === 'suggested').length);
 
-  // Study, Review or the course's Overview: the reading column shows one of them.
-  const place = $derived(app.courseOpen ? 'overview' : app.reviewOpen ? 'review' : 'study');
+  // Studio, Learn or Review: the reading column shows one of them.
+  const place = $derived(app.courseOpen ? 'studio' : app.reviewOpen ? 'review' : 'study');
 
   // The course switcher lists the library's other courses that can be opened, the open one first.
   let menuOpen = $state(false);
@@ -58,11 +58,10 @@
   const review = $derived(app.state?.review);
 
   // The side panel's views are switched only from here: picking another view swaps it, picking the open one closes the panel.
-  // The Overview has no side panel: Source is its Sources tab, and Questions and Notes go back to Learn (ADR 0017).
-  const showing = (tab: PanelTab) =>
-    studying && (app.courseOpen ? tab === 'source' && app.coursePart === 'sources' : app.panelShown && app.panelTab === tab);
+  // In Studio only Source opens beside it; Questions and Notes go back to Learn (ADR 0017).
+  const showing = (tab: PanelTab) => studying && app.panelShown && app.panelTab === tab;
   function toggle(tab: PanelTab) {
-    if (showing(tab) && !app.courseOpen) app.panelOpen = false;
+    if (showing(tab)) app.panelOpen = false;
     else app.openPanel(tab);
   }
 </script>
@@ -128,12 +127,12 @@
     <div class="places" role="group" aria-label={t("This course")}>
       <button
         id="open-course"
-        class="place" aria-label={t("Overview")}
-        aria-current={place === 'overview' ? 'page' : undefined}
-        title={t("This course: changing it, what the teacher remembers, sources and notes (m)")}
-        onclick={() => app.showCourse()}
+        class="place" aria-label={t("Studio")}
+        aria-current={place === 'studio' ? 'page' : undefined}
+        title={t("Codex working on this course: changes, files, sheets and mock exams (d)")}
+        onclick={() => app.showStudio()}
       >
-        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Overview")}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
+        <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M10 2.5l1.7 4.6 4.8 1.4-4.8 1.4L10 14.5l-1.7-4.6-4.8-1.4 4.8-1.4zM15.5 13l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Studio")}</span>{#if suggested}<span class="dot" aria-label={t("A preference to confirm")}></span>{/if}
       </button>
       <button id="open-study" class="place" aria-label={t("Learn")} aria-current={place === 'study' ? 'page' : undefined} onclick={() => ((app.courseOpen = false), (app.reviewOpen = false))}>
         <svg class="narrow-only" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 4.5c2.5-1 5-1 7 .5v11c-2-1.5-4.5-1.5-7-.5zM17 4.5c-2.5-1-5-1-7 .5v11c2-1.5 4.5-1.5 7-.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg><span class="wide-only">{t("Learn")}</span>

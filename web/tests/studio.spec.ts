@@ -25,13 +25,12 @@ test('files Codex links to open: a course source in the reader, any other file o
   await outline.click();
   await expect(reply.getByRole('status')).toHaveText('Opened.');
 
-  // A course source opens in the reader at the line Codex named: the Overview's Sources tab, as it has no side panel.
+  // A course source opens in the reader at the line Codex named, in the side panel beside Studio.
   const reading = reply.getByRole('button', { name: 'the reading' });
   await expect(reading).toHaveAttribute('title', 'waves/inputs/reading.md, line 3');
   await reading.click();
-  await expect(page.getByRole('tab', { name: 'Sources' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#auxiliary')).toBeHidden();
-  await expect(page.locator('#course-sources .source-view .line.cited')).toHaveText(/The line Codex links to\./);
+  await expect(page.locator('#auxiliary .source-view .line.cited')).toHaveText(/The line Codex links to\./);
+  await expect(page.locator('#open-course')).toHaveAttribute('aria-current', 'page');
   expect(errors).toEqual([]);
 });
 
@@ -39,8 +38,8 @@ test('Studio sends a message with a skill chip and shows Codex reply', async ({ 
   const { errors } = await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
-  // The tab names Studio; an empty chat asks what to change, in the middle of the frame.
-  await expect(page.getByRole('tab', { name: 'Studio' })).toHaveAttribute('aria-selected', 'true');
+  // The top bar names Studio; an empty chat asks what to change, in the middle of the frame.
+  await expect(page.locator('#open-course')).toHaveAttribute('aria-current', 'page');
   await expect(panel.getByRole('heading', { name: 'What would you like to change in this course?' })).toBeVisible();
 
   const box = page.locator('#studio-input');
@@ -103,17 +102,45 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await page.keyboard.press('d');
   const box = page.locator('#studio-input');
   await expect(box).toBeFocused(); // `d` puts the caret in the box, even before Studio has loaded
-  const before = await box.boundingBox();
+  // The host has said the course has no chat yet, so the box is already under the question, where it will stay.
+  const settled = () => box.evaluate((node) => Promise.all(node.closest('.box')!.getAnimations().map((a) => a.finished)));
+  const question = page.locator('#course-studio').getByRole('heading', { name: 'What would you like to change in this course?' });
+  await expect(question).toBeVisible();
+  await settled();
+  const before = (await box.boundingBox())!;
   await page.keyboard.type('wait for me');
+  expect((await box.boundingBox())!.y).toBe(before.y);
   await page.keyboard.press('Control+Enter'); // sent while Codex is still starting: it waits, it is not dropped
   release();
   await expect(page.locator('#course-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
   await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
-  expect((await box.boundingBox())?.y).toBe(before?.y);
+  // Sending is what begins the chat: the box goes to the frame's foot, and Codex arriving moves nothing more.
+  await settled();
+  const foot = (await box.boundingBox())!;
+  expect(foot.y).toBeGreaterThan(before.y + 100);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  // With a chat to open, the box is at the foot from the first moment, and stays there when Codex has loaded the chat.
+  let open = () => {};
+  const held = new Promise<void>((resolve) => (open = resolve));
+  await page.route('**/api/studio', async (route) => {
+    const response = await route.fetch();
+    await held;
+    await route.fulfill({ response });
+  });
+  await page.reload();
+  await page.keyboard.press('d');
+  await expect(box).toBeFocused();
+  await expect(question).toHaveCount(0);
+  const waiting = (await box.boundingBox())!;
+  open();
+  await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
+  await settled();
+  expect((await box.boundingBox())!.y).toBe(waiting.y);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
-test('Studio fills the window: beside the course column on a wide window, and on a narrower one under the header, which writing scrolls away without moving the box', async ({ page, course }) => {
+test('Studio is as tall as the window beside the course column, and writing moves nothing', async ({ page, course }) => {
   await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const frame = page.locator('#course-studio .frame');
@@ -123,43 +150,24 @@ test('Studio fills the window: beside the course column on a wide window, and on
   await expect.poll(foot).toBeGreaterThan(8);
   expect(await foot()).toBeLessThan(32);
 
-  // Wide, the course's header and its tabs are a column beside Studio, which starts level with the title; writing moves
-  // nothing, as there is no header above Studio to step aside.
+  // The course's column stands beside Studio, which starts level with the title and is no wider than a chat needs.
   const title = page.locator('#course-title');
-  await expect(page.getByRole('tablist', { name: 'This course' })).toHaveAttribute('aria-orientation', 'vertical');
   expect(Math.abs((await frame.boundingBox())!.y - (await title.boundingBox())!.y)).toBeLessThan(16);
+  expect((await frame.boundingBox())!.width).toBeLessThan(46 * 16 + 1);
   const box = page.locator('#studio-input');
-  let before = (await box.boundingBox())!;
-  let height = (await frame.boundingBox())!.height;
+  await box.evaluate((node) => Promise.all(node.closest('.box')!.getAnimations().map((a) => a.finished)));  // it arrives with a small rise
+  const before = (await box.boundingBox())!;
+  const height = (await frame.boundingBox())!.height;
   await box.click();
   await expect(title).toBeInViewport();
   expect((await frame.boundingBox())!.height).toBeCloseTo(height, 0);
   expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
 
-  // Narrower, the header and tabs stack above Studio, and the frame still reaches the foot.
-  await page.locator('#course-tab-sources').click();
-  await page.setViewportSize({ width: 1000, height: 1000 });
-  await page.locator('#course-tab-studio').click();
-  await expect(page.getByRole('tablist', { name: 'This course' })).toHaveAttribute('aria-orientation', 'horizontal');
+  // A shorter window keeps it to the window's height.
+  await page.setViewportSize({ width: 1440, height: 700 });
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
-  before = (await box.boundingBox())!;
-  height = (await frame.boundingBox())!.height;
-  await expect(title).toBeInViewport();
-
-  // Writing scrolls the header away under the pinned tabs, and the frame grows upward by as much.
-  await box.click();
-  await expect(title).not.toBeInViewport();
-  await expect(page.getByRole('tab', { name: 'Studio' })).toBeInViewport();
-  expect((await frame.boundingBox())!.height).toBeGreaterThan(height + 50);
-  expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
-  expect(await foot()).toBeLessThan(32);
-  expect(await foot()).toBeGreaterThan(8);
-
-  // Another tab gives the header back its room.
-  await page.getByRole('tab', { name: 'Sources' }).click();
-  await page.getByRole('tab', { name: 'Studio' }).click();
-  await expect.poll(async () => (await frame.boundingBox())!.height).toBeCloseTo(height, 0);
+  expect(await page.locator('#stage').evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThan(2);
 });
 
 test('a long list of how the learner is taught scrolls beside Studio rather than past the window', async ({ page, course }) => {
@@ -252,7 +260,7 @@ test('an empty chat suggests a range of course work that fills the box without s
   const panel = page.locator('#course-studio');
   await expect(panel).toContainText('This is Codex itself, working on this course.');
   // Adding files always shows; three more are drawn from the rest.
-  const suggestions = panel.locator('.examples button');
+  const suggestions = panel.locator('.starts button');
   await expect(suggestions).toHaveCount(4);
   await expect(suggestions.first()).toHaveText('Add files to this course');
   await suggestions.nth(1).click();
@@ -433,7 +441,7 @@ test("the library page has its own Studio for new courses; a course card's actio
   await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
 
-  // A course card's action is work on that course: it opens the course's own Studio, on its Overview, filled in.
+  // A course card's action is work on that course: it opens the course's own Studio, filled in.
   await page.getByRole('button', { name: /^More actions for/ }).first().click();
   await page.getByRole('menuitem', { name: 'Add files' }).click();
   const box = page.locator('#studio-input');
@@ -666,5 +674,31 @@ test('on Windows without Codex sandbox, Studio asks before working with Full acc
   await card.getByRole('button', { name: 'Use Full access' }).click();
   await expect(card).toBeHidden();
   await expect(page.locator('#studio-access')).toHaveText('Full access');
+  expect(errors).toEqual([]);
+});
+
+test("the course's ⋯ beside its title in Studio shares and renames it, as its card in the library does", async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const more = page.locator('#course-studio').getByRole('button', { name: 'More actions for Waves' });
+
+  // Share… opens the share levels over Studio, from the ⋯; Escape closes them.
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Share…' }).click();
+  const share = page.getByRole('group', { name: 'Share “Waves”' });
+  await expect(share.getByRole('link', { name: 'Download the file' })).toHaveAttribute('href', '/api/library/courses/waves/package/lessons');
+  await expect(share).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(share).toHaveCount(0);
+
+  // Rename edits the title in place; the top bar follows, and Escape would have kept the old one.
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
+  const field = page.getByRole('textbox', { name: 'Course title' });
+  await expect(field).toBeFocused();
+  await field.fill('Waves and interference');
+  await field.press('Enter');
+  await expect(page.locator('#course-title')).toHaveText('Waves and interference');
+  await expect(page.locator('#course-switcher')).toContainText('Waves and interference');
   expect(errors).toEqual([]);
 });

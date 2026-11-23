@@ -334,12 +334,15 @@ class CoursePackages(unittest.TestCase):
         settings = TeacherSettings(self.home / 'settings.json')
         app = create_app(self.course, runner=None, settings=settings, library_root=self.sender, watch_interval=60)
         with TestClient(app, base_url='http://127.0.0.1:8765') as client:
-            levels = client.get('/api/course/package').json()['levels']
+            # Shared from the course's card in the library, by name.
+            name = self.course.name
+            levels = client.get(f'/api/library/courses/{name}/package').json()['levels']
             self.assertEqual((levels['everything']['notes'], levels['lessons']['notes'], levels['route']['exercises']), (1, 0, 0))
-            download = client.get('/api/course/package/everything')
+            download = client.get(f'/api/library/courses/{name}/package/everything')
             self.assertEqual(download.status_code, 200)
             self.assertIn('quantum-v1.throughline', download.headers['content-disposition'])
-            self.assertEqual(client.get('/api/course/package/all').status_code, 400)
+            self.assertEqual(client.get(f'/api/library/courses/{name}/package/all').status_code, 400)
+            self.assertEqual(client.get('/api/library/courses/nowhere/package').status_code, 404)
 
             waiting = client.post('/api/library/packages', content=download.content, headers={'content-type': 'application/zip'}).json()
             self.assertEqual((waiting['title'], waiting['level'], waiting['name'], waiting['modes']),

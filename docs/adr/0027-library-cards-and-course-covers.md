@@ -12,15 +12,16 @@ The library listed every course as a card carrying all it knew: the folder name,
 - **What Studio is doing in a course shows on its card**, from what the host saw (`studio.activity`), so a learner who left a chat finds it again. A new course still being made is a dashed card that reopens its chat.
 - **Archived courses, deleted courses and the library folder** share one quiet row below the cards.
 
-### Where a course begins
+### An empty chat, and where a course begins
 
-New course, which is also the whole library before a first course exists, opened on a large empty frame with a small question in its middle and the writing box at the window's foot.
+An empty Studio chat was a small question in the middle of a large empty frame, a long paragraph, suggestions that wrapped unevenly, and the writing box far below at the frame's foot. New course, which is also the whole library before a first course exists, was that frame across the page.
 
-- **Before anything is said, the page is the question, the writing box and ways to begin**, gathered in the middle of the window: "What would you like to learn?", the box right under it, and four suggestions (**Prepare for an exam**, **Learn a subject**, **Practise problems**, **Read a paper**) that start the request and leave the caret after it. Each is something a learner wants to do, so they stand at one level; where the files come from is not among them, since files are dropped whatever the aim (`lib/starts.ts`, which the library's Studio also suggests from). They are small chips, as suggestions are elsewhere in Studio: on this page nothing but a course looks like a course's card. **Import a course** is a line below them.
-- **A contour map lies behind it**, clear where the question and the box are and fading towards the window's edges. It is drawn as the covers are (`covers.backdrop`), so the first page a learner sees is in the hand of the library it will fill.
-- **Files let go anywhere on the page go to the box**, since the page asks for them; a course package still starts an import.
-- **The first message turns the page into the chat** (ADR 0016): the frame across the page, the box at its foot. Reopening a chat that has begun shows the chat.
-- The page is the same while Codex is starting, so nothing moves when it is ready.
+- **Before anything is said, Studio is the question, the writing box and suggestions**, gathered in the middle of its frame: the question, the box right under it, and suggestions under the box that start a request and leave the caret after it. This is Studio's own layout (`studio.starting`), so a course's Studio and New course look alike.
+- **Suggestions are small chips with an icon**, not cards: on these pages nothing but a course looks like a course's card. New course suggests four things a learner wants to do (**Prepare for an exam**, **Learn a subject**, **Practise problems**, **Read a paper**), so they stand at one level; where the files come from is not among them, since files are dropped whatever the aim. A course's Studio suggests adding files and three kinds of course work drawn from its range (ADR 0026), two to a row (`lib/starts.ts`).
+- **The first message, or a chat opened, turns it into the chat** (ADR 0016), and the box travels to the frame's foot rather than jumping there. Starting a new chat brings it back the same way.
+- **Studio is first seen in the layout it will keep.** Whether a course has a chat to open is asked of the host before Codex has started (`chats` in `/api/studio/activity`); until it answers, a moment, Studio shows nothing. So the box never moves under a learner who did not move it.
+- **New course lays a contour map behind it**, clear where the question and the box are and fading towards the window's edges, drawn as the covers are (`covers.backdrop`), and drops the frame and the page's heading. The first page a learner sees is in the hand of the library it will fill.
+- **Files let go anywhere on the New course page go to the box**, since the page asks for them; a course package still starts an import. **Import a course** is a line under the suggestions.
 
 ### The cover
 
@@ -51,4 +52,5 @@ The cover is an additive course record (`course/cover`), absent until set, so co
 - `cover.list` and `cover.save` join the operations the skill names, so they are kept through 1.x (`docs/stability.md`); `course.status` gains `cover` once one is set.
 - The patterns' names are stored in courses. A pattern may be redrawn, and new ones added; one that is removed is drawn as contours from then on.
 - `/api/library` gains `cover` and `studio` for each course, and the page asks again when Studio starts, stops, asks or is answered in any course.
-- ADR 0016 and ADR 0022 said a card carries Add files, Check sources and a menu beside Open; they are amended by this record.
+- ADR 0016 and ADR 0022 said a card carries Add files, Check sources and a menu beside Open; they are amended by this record. Share (ADR 0020) opens across the list under the row its card is in, since its choices need more room than a card has.
+- `/api/studio/activity` gains `chats`, the number of chats a course has, which costs nothing to ask.

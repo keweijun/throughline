@@ -31,7 +31,8 @@
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
-  // Settings hold only what applies to every course; the course's own things are on its Course page (ADR 0017).
+  // Settings hold only what applies to every course; the course's own things are in Studio and on its card in the
+  // library (ADR 0017).
   const panes: { id: Pane; label: MessageKey }[] = [
     { id: 'appearance', label: 'Appearance' },
     { id: 'teacher', label: 'Teacher' },

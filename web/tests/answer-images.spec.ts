@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import type { Locator } from '@playwright/test';
 import { test, expect, dragSelect } from './fixture';
 
@@ -102,19 +101,5 @@ test('a question about an exercise, a side question and a note take images too',
   await expect(page.locator('.notes-panel .panel-foot').getByRole('img')).toHaveCount(1);
   await passageNote.press('Control+Enter');
   await expect(page.locator('.notes-panel .item.highlight').getByRole('img')).toHaveCount(1);
-  // Exporting is on the Course page, for the whole course, so the Notes panel stays a list and a writing box.
-  await expect(page.locator('.notes-panel').getByRole('button', { name: /Export/ })).toHaveCount(0);
-  await page.locator('#open-course').click();
-  await page.getByRole('tab', { name: 'Your notes' }).click();
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export notes' }).click();
-  const archive = await download;
-  expect(archive.suggestedFilename()).toBe('Handwritten answers.zip');
-  const bytes = (await readFile((await archive.path())!)).toString('latin1');
-  expect(bytes.startsWith('PK')).toBe(true);
-  expect(bytes).toContain('Handwritten answers.md');
-  expect(bytes).toContain('## Integrals');
-  expect(bytes).toMatch(/!\[Attached image 1\]\(images\/[0-9a-f]{64}\.png\)/);
-  expect(bytes).toMatch(/images\/[0-9a-f]{64}\.png\x89PNG/);
   expect(errors).toEqual([]);
 });

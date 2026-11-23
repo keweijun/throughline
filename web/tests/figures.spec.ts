@@ -24,8 +24,8 @@ test('a lesson shows a source figure cropped from its page, opens the page, and 
   await expect(page.getByRole('textbox', { name: 'Page number' })).toHaveValue('1');
 
   // The PDF's second page is not read yet, which the course's sources say.
-  await page.locator('#open-course').click();
-  await page.getByRole('tab', { name: 'Sources' }).click();
-  await expect(page.getByRole('tabpanel')).toContainText('1 page not read yet');
+  const side = page.getByRole('complementary', { name: 'Source' });
+  await side.getByRole('button', { name: /All sources/ }).click();
+  await expect(side).toContainText('1 page not read yet');
   expect(errors).toEqual([]);
 });

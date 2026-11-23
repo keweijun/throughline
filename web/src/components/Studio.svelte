@@ -210,14 +210,17 @@
   // The box travels there rather than jumping: where it was is measured before the page changes and where it is after.
   let box = $state<HTMLElement>();
   let boxWas: DOMRect | undefined;
+  // Only a change the learner sees both sides of: Studio settling into its first layout is not one.
+  let placedBefore = false;
   $effect.pre(() => {
-    void studio.starting;
-    boxWas = box?.getBoundingClientRect();
+    void [studio.starting, studio.placed];
+    boxWas = placedBefore ? box?.getBoundingClientRect() : undefined;
   });
   $effect(() => {
     void studio.starting;
     const was = boxWas;
     boxWas = undefined;
+    placedBefore = studio.placed;
     if (!was || !box || prefersReducedMotion.current) return;
     const now = box.getBoundingClientRect();
     const [dx, dy] = [was.left - now.left, was.top - now.top];
@@ -289,7 +292,7 @@
 
 </script>
 
-<section class="panel-view studio" class:starting={studio.starting} class:from-elsewhere={!!studio.origin} aria-labelledby="studio-title">
+<section class="panel-view studio" class:starting={studio.starting} class:unplaced={!studio.placed} class:from-elsewhere={!!studio.origin} aria-labelledby="studio-title">
   <header class="panel-head pinned">
     <div class="panel-bar">
       <h2 id="studio-title">{t("Studio")}</h2>
@@ -483,6 +486,12 @@
 
   .studio {
     position: relative;
+  }
+
+  /* For the moment before the host has said whether there is a chat to open, Studio shows neither layout, so the
+     box is first seen where it will stay. It still takes the caret. */
+  .studio.unplaced > * {
+    opacity: 0;
   }
 
   /* The chat picker, when there are chats to pick, keeps to the frame's top, out of what is gathered in the middle. */

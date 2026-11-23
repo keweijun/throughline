@@ -6,7 +6,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 
 - **Overview is now Studio.** The top bar reads **Studio · Learn · Review**. Studio, Codex working on your course, now runs from just under the top bar to the bottom of the window, so long chats, questions and work are easier to read back. Beside it stand the course's title and goal, the strip of its chapters, your Studio chats and **How you're taught**. `d` opens it; `m` is gone.
 - **Sources open beside Studio.** A page a Studio reply cites, or anything you open with **Source**, opens in the same side panel as in Learn and Review. When it needs the room, the column beside Studio folds away and your chats become a menu above the chat.
-- **Share a course from its card in the library.** **Share…** sits in the card's ⋯ menu beside Rename and Archive, and works whether or not the course is open. It used to be a tab on the Overview, as were the course's Sources, which are all under **All sources** in the reader.
+- **Share a course from its card in the library, or from Studio.** **Share…** sits in the card's ⋯ menu beside Rename and Archive, and works whether or not the course is open. In an open course, the ⋯ beside its title in Studio has **Share…** and **Rename** too. It used to be a tab on the Overview, as were the course's Sources, which are all under **All sources** in the reader.
 - **Export notes is gone.** Your notes stay with the course, and a package at the Everything level carries them. To have them as one page, ask Studio to write them out.
 - **How you're taught has a × on each preference** to delete it. To change one, tell Studio.
 

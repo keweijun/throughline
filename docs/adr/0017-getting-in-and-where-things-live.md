@@ -62,7 +62,7 @@ The places choose what fills the reading column; the side panel accompanies it. 
 
 **The Studio place** is the course-level place, labelled **Studio**, the first of the course's three places. The route rail steps aside for it, since its strip of chapters shows the route. It has no tabs. Studio stands in a frame from just under the top bar to just above the window's foot, at most 46rem wide, since a chat needs height to read back its history, questions and work, not width. Beside it, a column, as Codex lists its threads beside a chat:
 
-1. **The course**: its title and goal, a strip of its chapters, each as wide as its sections and filled as they are studied (each opens its chapter page), and which chapter the learner is in. A course of one chapter shows no chapter line, since the title already names it.
+1. **The course**: its title, with a ⋯ beside it for **Share…** and **Rename**, the same as on the course's card in the library (ADR 0022), its goal, a strip of its chapters, each as wide as its sections and filled as they are studied (each opens its chapter page), and which chapter the learner is in. A course of one chapter shows no chapter line, since the title already names it.
 2. **Chats**: this course's Studio threads, most recent first.
 3. **How you're taught**: the confirmed preferences in course memory. Each has a × to delete it, confirmed beside it, since the teacher does not add a deleted one back; changing one is asked of Studio, as adding one is. They are added where they come up: a preference the teacher suggests is asked inline, right after what suggested it, and a lasting requirement told to Studio is recorded by it. A Memory tab with its own writing box came first; it duplicated Studio (ADR 0010).
 
@@ -77,7 +77,7 @@ The column scrolls on its own, however many chats and preferences there are, so 
 
 Review stays one of the three places rather than a part of Studio: it is studying, used often. A plain course button, and before it a course title that opened the page, were tried first; learners did not read a title as something to click, and "Courses" beside a course's name (课程 beside 物理化学) read as two names for the same thing.
 
-**Settings** keeps only what applies to every course: Appearance, Teacher and About, in that order. What is done to a course as a whole, now and then, is on its card in the library, in the card's ⋯ menu: **Share…** (a package, ADR 0020) beside Rename, Archive and Delete (ADR 0022). Language stays in Settings, under Appearance and shown first, even though a course keeps its own: it also sets the interface, and Settings is where learners look for it. Teaching preferences need no entry of their own, since they are course memory.
+**Settings** keeps only what applies to every course: Appearance, Teacher and About, in that order. What is done to a course as a whole, now and then, is on its card in the library, in the card's ⋯ menu: **Share…** (a package, ADR 0020) beside Rename, Archive and Delete (ADR 0022). An open course has Share… and Rename in the ⋯ beside its title in Studio too, since a learner who is in a course does not go back to the library to find them; Archive and Delete take the course out of view, so they stay in the library. Language stays in Settings, under Appearance and shown first, even though a course keeps its own: it also sets the interface, and Settings is where learners look for it. Teaching preferences need no entry of their own, since they are course memory.
 
 ## Studio's level
 

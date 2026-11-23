@@ -621,3 +621,29 @@ test('on Windows without Codex sandbox, Studio asks before working with Full acc
   await expect(page.locator('#studio-access')).toHaveText('Full access');
   expect(errors).toEqual([]);
 });
+
+test("the course's ⋯ beside its title in Studio shares and renames it, as its card in the library does", async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  const more = page.locator('#course-studio').getByRole('button', { name: 'More actions for Waves' });
+
+  // Share… opens the share levels over Studio, from the ⋯; Escape closes them.
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Share…' }).click();
+  const share = page.getByRole('group', { name: 'Share “Waves”' });
+  await expect(share.getByRole('link', { name: 'Download the file' })).toHaveAttribute('href', '/api/library/courses/waves/package/lessons');
+  await expect(share).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(share).toHaveCount(0);
+
+  // Rename edits the title in place; the top bar follows, and Escape would have kept the old one.
+  await more.click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
+  const field = page.getByRole('textbox', { name: 'Course title' });
+  await expect(field).toBeFocused();
+  await field.fill('Waves and interference');
+  await field.press('Enter');
+  await expect(page.locator('#course-title')).toHaveText('Waves and interference');
+  await expect(page.locator('#course-switcher')).toContainText('Waves and interference');
+  expect(errors).toEqual([]);
+});

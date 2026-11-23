@@ -1,11 +1,14 @@
 <script lang="ts">
+  import { api } from '../lib/api';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
+  import { pop } from '../lib/motion';
   import { studio } from '../lib/studio.svelte';
   import CodexLink from './CodexLink.svelte';
   import Studio from './Studio.svelte';
   import StudioChats from './StudioChats.svelte';
   import TeachingPreferences from './TeachingPreferences.svelte';
+  import CourseShare from './CourseShare.svelte';
 
   // The course's Studio place, the first of its three places (ADR 0017): Codex working on the course, as tall as the
   // window and no wider than a chat needs, with the course and its chats in a column beside it, as Codex lists its
@@ -28,6 +31,59 @@
   // for the learner's own until Studio records it.
   const imported = $derived(app.state?.course.imported ?? null);
   const builtFor = $derived(app.state?.course.built_for ?? null);
+
+  // The course's own actions beside its title, the same as on its card in the library (ADR 0022): Share… and Rename.
+  // The menu and the share options float over Studio rather than inside the column, which is too narrow for them and
+  // scrolls on its own, so they are placed from the button's position.
+  let more = $state<HTMLElement>();
+  let opened = $state<'menu' | 'share' | null>(null);
+  let at = $state({ top: 0, left: 0 });
+  function open(what: 'menu' | 'share') {
+    const box = more?.getBoundingClientRect();
+    if (box) at = { top: box.bottom + 6, left: box.left };
+    opened = what;
+  }
+  $effect(() => {
+    if (!opened) return;
+    const away = (event: Event) => !(event.target as Element).closest?.('[data-course-actions]') && (opened = null);
+    const escape = (event: KeyboardEvent) => event.key === 'Escape' && (opened = null);
+    const close = () => (opened = null);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+      window.removeEventListener('resize', close);
+    };
+  });
+
+  let renaming = $state(false);
+  let title = $state('');
+  let saving = $state(false);
+  function startRename() {
+    opened = null;
+    title = app.state?.course.title ?? '';
+    renaming = true;
+    requestAnimationFrame(() => (document.getElementById('course-rename') as HTMLTextAreaElement | null)?.select());
+  }
+  async function rename() {
+    const name = course?.name;
+    if (!name || !title.trim() || saving) return;
+    if (title.trim() !== app.state?.course.title) {
+      saving = true;
+      try {
+        await api.put(`/api/library/courses/${encodeURIComponent(name)}/title`, { title });
+        await app.loadLibrary(true);
+      } catch (error) {
+        app.error = error instanceof Error ? error.message : String(error);
+        return;
+      } finally {
+        saving = false;
+      }
+    }
+    renaming = false;
+  }
 </script>
 
 <article class="page still filling" aria-labelledby="course-title">
@@ -36,7 +92,42 @@
          and Studio's own chats menu comes back. -->
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
-        <h1 id="course-title">{app.state?.course.title}</h1>
+        {#if renaming}
+          <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename())}>
+            <textarea
+              id="course-rename"
+              aria-label={t('Course title')}
+              rows="2"
+              maxlength="200"
+              bind:value={title}
+              onkeydown={(event) => {
+                if (event.key === 'Escape') renaming = false;
+                else if (event.key === 'Enter' && !event.shiftKey) (event.preventDefault(), void rename());
+              }}
+            ></textarea>
+            <div class="rename-actions">
+              <button class="btn btn-small" type="submit" disabled={saving || !title.trim()}>{t('Save')}</button>
+              <button class="btn btn-quiet btn-small" type="button" onclick={() => (renaming = false)}>{t('Cancel')}</button>
+            </div>
+          </form>
+        {:else}
+          <div class="title-row">
+            <h1 id="course-title">{app.state?.course.title}</h1>
+            {#if course}
+              <button
+                class="btn btn-quiet btn-small more"
+                bind:this={more}
+                data-course-actions
+                aria-haspopup="menu"
+                aria-expanded={opened === 'menu'}
+                aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}
+                onclick={() => (opened === 'menu' ? (opened = null) : open('menu'))}
+              >
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
+              </button>
+            {/if}
+          </div>
+        {/if}
         {#if course?.goal}<p class="goal" title={course.goal}>{course.goal}</p>{/if}
         {#if imported}
           <div class="shared">
@@ -105,6 +196,17 @@
       </div>
     {/if}
   </div>
+
+  {#if opened === 'menu'}
+    <ul class="course-menu" role="menu" data-course-actions style:top="{at.top}px" style:left="{at.left}px" transition:pop={{ from: 'above' }} aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}>
+      <li role="none"><button role="menuitem" onclick={() => open('share')}>{t('Share…')}</button></li>
+      <li role="none"><button role="menuitem" onclick={startRename}>{t('Rename')}</button></li>
+    </ul>
+  {:else if opened === 'share' && course}
+    <div class="course-share" role="group" data-course-actions style:top="{at.top}px" style:left="{at.left}px" transition:pop={{ from: 'above' }} aria-label={t('Share “{course}”', { course: app.state?.course.title ?? '' })}>
+      <CourseShare course={course.name} onclose={() => (opened = null)} />
+    </div>
+  {/if}
 </article>
 
 <style>
@@ -145,6 +247,88 @@
     font-size: var(--step-2);
     font-weight: 600;
     line-height: 1.25;
+  }
+
+  .title-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.25rem;
+  }
+
+  .more {
+    margin-top: 0.15rem;
+    padding: 0.25rem 0.35rem;
+  }
+
+  .rename {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .rename textarea {
+    width: 100%;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: var(--step-2);
+    font-weight: 600;
+    line-height: 1.25;
+    resize: none;
+  }
+
+  .rename-actions {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  /* Over Studio, from the ⋯ beside the title; the same look as the course card's menu in the library. */
+  .course-menu,
+  .course-share {
+    position: fixed;
+    z-index: 50;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--sheet);
+    box-shadow: var(--shadow);
+  }
+
+  .course-menu {
+    display: grid;
+    min-width: 11rem;
+    margin: 0;
+    padding: 0.3rem;
+    list-style: none;
+  }
+
+  .course-menu button {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--step--1);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .course-menu button:hover,
+  .course-menu button:focus-visible {
+    background: var(--accent-wash);
+  }
+
+  .course-share {
+    display: grid;
+    gap: 0.6rem;
+    width: min(30rem, calc(100vw - 2rem));
+    max-height: calc(100dvh - 6rem);
+    overflow-y: auto;
+    padding: 1rem 1.1rem;
   }
 
   /* A long goal stays four lines; the whole of it is in the tooltip. */

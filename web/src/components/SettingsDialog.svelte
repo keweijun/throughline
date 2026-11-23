@@ -6,12 +6,10 @@
   import type { CodexModel, LauncherStatus, Settings, UpdateProgress } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
-  import CourseShare from './CourseShare.svelte';
-  import { exportNotes } from '../lib/notes';
   import { lightDismiss } from '../lib/dialog';
 
   type Theme = 'system' | 'light' | 'dark';
-  type Pane = 'teacher' | 'appearance' | 'course' | 'about';
+  type Pane = 'teacher' | 'appearance' | 'about';
 
 
   let dialog: HTMLDialogElement | undefined = $state();
@@ -33,21 +31,13 @@
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
 
   const settings = $derived(app.settings);
-  // What applies to every course, then, while a course is open, what is done to it now and then: sharing it and
-  // exporting its notes (ADR 0017). Changing the course is Studio's.
-  const panes: { id: Pane; label: MessageKey }[] = $derived([
+  // Settings hold only what applies to every course; the course's own things are in Studio and on its card in the
+  // library (ADR 0017).
+  const panes: { id: Pane; label: MessageKey }[] = [
     { id: 'appearance', label: 'Appearance' },
     { id: 'teacher', label: 'Teacher' },
-    ...(app.state && !app.libraryOpen ? [{ id: 'course' as Pane, label: 'This course' as MessageKey }] : []),
     { id: 'about', label: 'About' },
-  ]);
-  const notes = $derived(app.state?.annotations.length ?? 0);
-  let exporting = $state(false);
-  async function exportAll() {
-    exporting = true;
-    await exportNotes();
-    exporting = false;
-  }
+  ];
   // The tier Codex calls Fast for the chosen teacher model (or the Codex default model).
   const fastTier = $derived.by(() => {
     const chosen = models?.find((m) => (model ? m.id === model : m.default));
@@ -211,13 +201,11 @@
 </script>
 
 {#snippet icon(id: Pane)}
-  <!-- One 24-unit grid and one stroke weight, so they read as a set. -->
+  <!-- One 24-unit grid and one stroke weight, so the four read as a set. -->
   <span class="glyph" aria-hidden="true">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       {#if id === 'teacher'}
         <path d="M12 4.5 2.5 9 12 13.5 21.5 9zM6.5 11.2v4.4c1.6 1.6 3.4 2.4 5.5 2.4s3.9-.8 5.5-2.4v-4.4M21.5 9v5.5" />
-      {:else if id === 'course'}
-        <path d="M5 5.5A2 2 0 0 1 7 3.5h12v13.5H7a2 2 0 0 0-2 2zM5 19a2 2 0 0 0 2 2h12M9 8h6" />
       {:else if id === 'about'}
         <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.2" /><circle cx="12" cy="7.9" r="1.1" fill="currentColor" stroke="none" />
       {:else}
@@ -261,7 +249,7 @@
           {#if item.id === 'about' && app.update?.available}<span class="tag">{t("Update")}</span>{/if}
         </button>
       {/each}
-      {#if pane !== 'about' && pane !== 'course'}
+      {#if pane !== 'about'}
         <p class="scope">
           {pane === 'teacher' ? t("Saved for your user account, for every course.") : t("Saved in this browser.")}
         </p>
@@ -364,23 +352,6 @@
             <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
           </div>
         {/if}
-      {:else if pane === 'course'}
-        <h3>{t("This course")}</h3>
-        <p class="lead">{app.state?.course.title}</p>
-        <div class="setting stacked divided">
-          <div class="text"><span class="title">{t("Share")}</span></div>
-          <div class="share"><CourseShare active={app.settingsOpen && pane === 'course'} /></div>
-        </div>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Your notes")}</span>
-            <p>
-              {notes === 1 ? t('1 highlight, note or bookmark') : t('{count} highlights, notes and bookmarks', { count: notes })}.
-              {t('Export them as one Markdown file, by chapter and section; notes with images come as a ZIP with an images folder.')}
-            </p>
-          </div>
-          <button class="btn btn-small" disabled={!notes || exporting} onclick={exportAll}>{exporting ? t('Exporting…') : t('Export notes')}</button>
-        </div>
       {:else if pane === 'about'}
         <div class="identity">
           <img src="/favicon.svg" alt="" width="48" height="48" />
@@ -667,15 +638,6 @@
   .setting.stacked {
     grid-template-columns: 1fr;
     border-bottom: 0;
-  }
-
-  .setting.divided {
-    border-bottom: 1px solid var(--rule);
-  }
-
-  .share {
-    display: grid;
-    gap: 0.75rem;
   }
 
   .update-actions {

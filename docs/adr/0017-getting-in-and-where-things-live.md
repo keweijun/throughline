@@ -53,7 +53,7 @@ Everything in the app belongs to one of three levels, and each level has its pla
 | Level | What belongs there | Where |
 |---|---|---|
 | **App** | The course library and making a new course; app-wide settings | The library page; Settings |
-| **Course** | The route and chapters; review; changing the course; what the teacher remembers; sharing the course and exporting its notes | The route rail; chapter pages; the review page; the **Studio place**; Settings → This course |
+| **Course** | The route and chapters; review; changing the course; what the teacher remembers; sharing, renaming, archiving or deleting the course | The route rail; chapter pages; the review page; the **Studio place**; the course's card in the library |
 | **Section** | The lesson and practice, and what is used while reading them | The reading column; the side panel |
 
 **The side panel holds only what is used while reading a section**, in this order: **Questions** (used most, and it carries the count of open questions), **Source** (opened by citations), **Notes** (the learner's own). Memory leaves the side panel.
@@ -77,7 +77,7 @@ The column scrolls on its own, however many chats and preferences there are, so 
 
 Review stays one of the three places rather than a part of Studio: it is studying, used often. A plain course button, and before it a course title that opened the page, were tried first; learners did not read a title as something to click, and "Courses" beside a course's name (课程 beside 物理化学) read as two names for the same thing.
 
-**Settings** holds what applies to every course, Appearance, Teacher and About, and, while a course is open, **This course** before About: sharing the course as a package (ADR 0020) and exporting its notes. Both are done now and then, so they stay out of the working places; changing the course is Studio's. Language stays in Settings, under Appearance and shown first, even though a course keeps its own: it also sets the interface, and Settings is where learners look for it. Teaching preferences need no entry of their own, since they are course memory.
+**Settings** keeps only what applies to every course: Appearance, Teacher and About, in that order. What is done to a course as a whole, now and then, is on its card in the library, in the card's ⋯ menu: **Share…** (a package, ADR 0020) beside Rename, Archive and Delete (ADR 0022). Language stays in Settings, under Appearance and shown first, even though a course keeps its own: it also sets the interface, and Settings is where learners look for it. Teaching preferences need no entry of their own, since they are course memory.
 
 ## Studio's level
 
@@ -117,6 +117,8 @@ A hint appears next to what it explains, the first time that thing appears, one 
 - **A course page labelled Overview**, with a header, a chapter strip and four tabs (Studio, Sources, Your notes, Share), as first written. It held almost no overview, so the label hid Studio, the agent that is Throughline's edge (ADR 0026), behind a word nobody reads as "Codex works on your course". Its own Sources duplicated the side panel's All sources and turned the top bar's Source into "go to a tab"; Your notes and Share each took a tab for one button or one form; and Studio had to share the page's height with the header, which took measuring code and a header that scrolled away as the learner wrote.
 - **A course dashboard** in its place: the chapters, progress, what comes next, review. The route rail, the chapter pages and Review already show each of these, so it would be a fourth copy of the route, and it would put Studio one step further away.
 - **A wide Studio.** A chat reads at a reading width; what it needs is the window's height.
+- **Settings → This course**, a pane for sharing the open course and exporting its notes. Settings would then hold things of two levels again, and the course's other whole-course actions (rename, archive, delete) were already on its card.
+- **Exporting notes** as one Markdown file (with images, a ZIP). Few used it: an Everything package keeps the notes with the course, and Studio can write them out as a page on request (`annotations.list`).
 - **The side panel kept off Studio** (the Overview as first written). A source cited in a Studio reply then opened in a tab of its own away from the chat, and the course had two readers and two lists of its documents.
 - **Memory as a side panel view** that the learner talks to while reading (#114 as first written). Telling the teacher how to teach is about the whole course, like Studio, and suggested preferences are already asked inline where they come up, so nothing about Memory needs the section beside it. Keeping it in the panel would also split the course-level things between two places again.
 - **A Study / Studio mode switch.** It separates the two cleanly, but course work is occasional and almost always starts from something in a section; a mode would be one more state to be in.

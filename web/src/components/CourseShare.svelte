@@ -1,20 +1,20 @@
 <script lang="ts">
-  import { api, courseUrl } from '../lib/api';
+  import { api } from '../lib/api';
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import type { PackageContents, ShareLevel } from '../lib/types';
 
-  // Sharing or backing up the course as one course package (ADR 0020). The learner picks how much it holds; the counts
-  // say what each level shares before anything is written.
-  let { active }: { active: boolean } = $props();
+  // Sharing or backing up a course as one course package (ADR 0020), from its card in the library, under the card. The
+  // learner picks how much it holds; the counts say what each level shares before anything is written.
+  let { course, onclose }: { course: string; onclose: () => void } = $props();
 
   let levels = $state<Record<ShareLevel, PackageContents> | null>(null);
   let name = $state('');
   let level = $state<ShareLevel>('lessons');
+  const path = $derived(`/api/library/courses/${encodeURIComponent(course)}/package`);
 
   $effect(() => {
-    if (!active) return;
-    api.get<{ name: string; levels: Record<ShareLevel, PackageContents> }>('/api/course/package').then(
+    api.get<{ name: string; levels: Record<ShareLevel, PackageContents> }>(path).then(
       (view) => {
         levels = view.levels;
         name = view.name;
@@ -63,7 +63,8 @@
 </fieldset>
 <p class="note">{t('The file holds the course’s source documents. Share it only with people allowed to have them.')}</p>
 <div class="actions">
-  <a class="btn btn-primary btn-small" class:disabled={!levels} href={courseUrl(`/api/course/package/${level}`)} download="{name}.throughline">{t('Download the file')}</a>
+  <a class="btn btn-primary btn-small" class:disabled={!levels} href="{path}/{level}" download="{name}.throughline">{t('Download the file')}</a>
+  <button class="btn btn-quiet btn-small" onclick={onclose}>{t('Close')}</button>
 </div>
 
 <style>

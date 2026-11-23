@@ -410,18 +410,14 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(page.getByRole('combobox', { name: 'Small model', exact: true })).toHaveValue('gpt-6-luna');
 });
 
-test('Settings hold what applies to every course and, for the open course, sharing it and exporting its notes; Studio holds the rest', async ({ page, course }) => {
+test('Settings hold only what applies to every course; Studio holds the course', async ({ page, course }) => {
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const categories = page.getByRole('navigation', { name: 'Settings' }).getByRole('button');
-  await expect(categories).toHaveText(['Appearance', 'Teacher', 'This course', 'About']);
+  await expect(categories).toHaveText(['Appearance', 'Teacher', 'About']);
   await expect(page.getByRole('spinbutton', { name: 'Daily reviews' })).toHaveCount(0);
   // Language also sets the interface, so it stays in Settings, first, even though the course keeps it.
   await expect(page.getByRole('radiogroup', { name: 'Language' })).toBeVisible();
-  await categories.filter({ hasText: 'This course' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await expect(dialog.getByRole('link', { name: 'Download the file' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Export notes' })).toBeVisible();
   await page.getByRole('button', { name: 'Close' }).click();
 
   // Studio has no tabs: the course, its chats and how the learner is taught stand beside it.

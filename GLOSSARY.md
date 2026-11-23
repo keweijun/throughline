@@ -128,7 +128,7 @@ _Avoid_: Finished, completed, closed, hidden forever.
 _Avoid_: Recycle bin (the system's), permanent deletion, backups (copies kept before a format update).
 
 **Course package**: One file holding a copy of a course at a share level, with its sources, to give to someone else or to move or back up one's own. Importing it makes a new course; nothing syncs back (ADR 0020).
-_Avoid_: Course folder copy, template, sync, the Notes export (Markdown, never read back).
+_Avoid_: Course folder copy, template, sync.
 
 **Share level**: How much of a course a package holds: Route (the route and sources), Route and lessons (adds lessons and exercises without the sender's answers) or Everything. The recipient takes at most that much when importing.
 _Avoid_: Privacy setting, export format.

@@ -245,9 +245,9 @@ test('in a long course the route opens at where the learner is, and folding keep
   expect(errors).toEqual([]);
 });
 
-test('the course page shows every chapter at a glance and opens one', async ({ page, course }) => {
+test('Studio shows every chapter at a glance and opens one', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
-  await page.keyboard.press('m');
+  await page.locator('#open-course').click();
   const strip = page.getByRole('list', { name: 'Chapters' }).getByRole('button');
   await expect(strip).not.toHaveCount(0);
   // The chapter being studied is outlined, and each segment says how far it has got.
@@ -260,15 +260,15 @@ test('the course page shows every chapter at a glance and opens one', async ({ p
   expect(errors).toEqual([]);
 });
 
-test('the top bar says where you are: all courses, this course, and Overview, Learn or Review', async ({ page, course }) => {
+test('the top bar says where you are: all courses, this course, and Studio, Learn or Review', async ({ page, course }) => {
   const { errors } = await course('chapters_browser_fixture');
   const current = page.locator('.places [aria-current="page"]');
-  await expect(page.locator('.places .place')).toHaveText(['Overview', 'Learn', 'Review']);
+  await expect(page.locator('.places .place')).toHaveText(['Studio', 'Learn', 'Review']);
   await expect(current).toHaveText('Learn');
 
-  // Overview takes the reading column whole: the route steps aside for its chapter strip.
+  // Studio takes the reading column whole: the route steps aside for its chapter strip.
   await page.locator('#open-course').click();
-  await expect(current).toHaveText('Overview');
+  await expect(current).toHaveText('Studio');
   await expect(page.locator('#route')).toHaveCount(0);
   await expect(page.locator('main article[aria-labelledby="course-title"]')).toBeVisible();
 

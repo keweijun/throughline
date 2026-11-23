@@ -148,8 +148,8 @@ _Avoid_: An extracted image file, an image from the web, a drawing the teacher w
 **Coverage ledger**: A list linking teaching content in the materials to concepts, source locations, and inclusion or deferral decisions; it does not establish learner mastery.
 _Avoid_: Mastery, reading progress.
 
-**Course page**: The place for one course as a whole, labelled Overview, one of the course's three places with Learn and Review: Studio with the course's threads and, beside it, how the learner is taught (the confirmed preferences in course memory), the course's sources and the learner's notes (ADR 0017).
-_Avoid_: Chapter page, Settings (app-wide), the side panel (used while reading a section).
+**Studio place**: The first of a course's three places, with Learn and Review, labelled Studio: Studio as tall as the window and, in a column beside it, the course (title, goal, chapter strip), its Studio threads and how the learner is taught (the confirmed preferences in course memory) (ADR 0017).
+_Avoid_: Course page, Overview (both retired: the page had almost no overview and hid Studio), dashboard, chapter page, the side panel (used while reading a section).
 
 **Learning companion panel**: A view alongside the teaching conversation that continually presents course structure, current position, and related materials.
 _Avoid_: A second course with separate progress, a complete chat mirror.

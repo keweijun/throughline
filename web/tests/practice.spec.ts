@@ -82,7 +82,7 @@ test('skipping two exercises for the same reason suggests a preference to confir
   await expect(page.locator('#open-course .dot')).toHaveCount(1);
   await banner.getByRole('button', { name: 'Remember', exact: true }).click();
   await expect(banner).toBeHidden();
-  await page.keyboard.press('m');
+  await page.locator('#open-course').click();
   await expect(page.locator('#course-preferences')).toContainText('Fewer long calculations');
 });
 

@@ -1,14 +1,14 @@
 import { test, expect } from './fixture';
 
-test('the teacher suggests a preference inline, and the Overview lists the confirmed ones to edit or delete', async ({ page, course }) => {
+test('the teacher suggests a preference inline, and Studio lists the confirmed ones, each with a × to delete it', async ({ page, course }) => {
   const { errors } = await course('memory_browser_fixture');
   await page.getByRole('button', { name: 'Start lesson' }).click();
   await expect(page.locator('.lesson-body')).toContainText('has one wavelength');
   await expect(page.locator('.lesson-body')).not.toContainText('course-memory');
   await expect(page.locator('.lesson-body')).not.toContainText('One step at a time');
 
-  // A suggested preference is asked right after the lesson step that suggested it, and nowhere else; Overview is
-  // marked until it is answered.
+  // A suggested preference is asked right after the lesson step that suggested it, and nowhere else; Studio is marked
+  // until it is answered.
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested preference' });
   await expect(suggestion).toContainText('Remember: One step at a time?');
   await expect(page.getByRole('group', { name: 'Suggested preference' })).toHaveCount(1);
@@ -17,7 +17,7 @@ test('the teacher suggests a preference inline, and the Overview lists the confi
   await expect(suggestion).toHaveCount(0);
   await expect(page.locator('#open-course .dot')).toHaveCount(0);
 
-  // How the learner is taught sits beside Studio on the Overview (ADR 0017); there is no Memory tab.
+  // How the learner is taught sits beside Studio (ADR 0017); there is no Memory tab.
   await page.locator('#open-course').click();
   await expect(page.getByRole('tab', { name: 'Course memory' })).toHaveCount(0);
   const taught = page.locator('#course-preferences');
@@ -26,10 +26,8 @@ test('the teacher suggests a preference inline, and the Overview lists the confi
   await expect(taught).not.toContainText('plane wave');
   await expect(taught).not.toContainText('Adding probabilities');
 
-  await taught.locator('.item').getByRole('button', { name: 'Edit' }).click();
-  await taught.getByRole('textbox').fill('One step at a time, then $e^{ikx}$');
-  await taught.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(taught.locator('.katex')).toBeVisible();
+  // Changing one is asked of Studio, as adding one is: the list offers only a × to delete it.
+  await expect(taught.getByRole('button', { name: 'Edit' })).toHaveCount(0);
 
   // Deleting is confirmed beside the entry, never in a popup; Escape keeps it.
   page.on('dialog', () => errors.push('native dialog'));
@@ -43,7 +41,7 @@ test('the teacher suggests a preference inline, and the Overview lists the confi
   await expect(taught.locator('.item')).toHaveCount(0);
 
   await page.reload();
-  await page.keyboard.press('m');
+  await page.locator('#open-course').click();
   await expect(page.locator('#course-preferences')).toContainText('Nothing yet.');
   expect(errors).toEqual([]);
 });

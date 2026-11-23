@@ -93,6 +93,12 @@
     gap: 0.1rem;
   }
 
+  /* Under its bold label, each level's detail is quieter, at the size of the lead above them. */
+  .choice .muted {
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+  }
+
   .counts {
     font-size: 0.85rem;
   }

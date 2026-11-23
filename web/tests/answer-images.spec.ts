@@ -104,8 +104,8 @@ test('a question about an exercise, a side question and a note take images too',
   await expect(page.locator('.notes-panel .item.highlight').getByRole('img')).toHaveCount(1);
   // Exporting is on the Course page, for the whole course, so the Notes panel stays a list and a writing box.
   await expect(page.locator('.notes-panel').getByRole('button', { name: /Export/ })).toHaveCount(0);
-  await page.locator('#open-course').click();
-  await page.getByRole('tab', { name: 'Your notes' }).click();
+  await page.locator('#open-settings').click();
+  await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'This course' }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export notes' }).click();
   const archive = await download;

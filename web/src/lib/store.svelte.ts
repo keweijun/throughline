@@ -102,6 +102,8 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Drafts of the library page, and of Studio before a course exists, kept apart from every course's. */
 const LIBRARY_DRAFTS = 'library';
+// Studio events after which a course may have started or stopped working, or begun or stopped waiting on the learner.
+const STUDIO_ACTIVITY = ['turn/started', 'turn/completed', 'studio/request', 'studio/resolved', 'studio/closed'];
 
 /**
  * Unsent text the learner typed (exercise answers, lesson requests, side questions, Studio messages), keyed by what it
@@ -705,7 +707,14 @@ class AppStore {
     events.onmessage = (message) => this.#apply(JSON.parse(message.data) as HostEvent);
   }
 
+  #libraryAgain: ReturnType<typeof setTimeout> | undefined;
+
   #apply(event: HostEvent) {
+    // The library says what Studio is doing in every course, so it asks again when that may have changed in any of them.
+    if (event.type === 'studio' && this.libraryOpen && STUDIO_ACTIVITY.includes(event.method)) {
+      clearTimeout(this.#libraryAgain);
+      this.#libraryAgain = setTimeout(() => void this.loadLibrary(true), 300);
+    }
     // What another course's host published, before this page learned the course switched, is not for this page.
     if ('course' in event && event.course && course.key && event.course !== course.key) return;
     if (event.type === 'studio') {

@@ -292,7 +292,7 @@ test("a hand-off goes to the course's Studio even when Studio was last open on t
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
   await page.getByRole('button', { name: '← All courses' }).click();
-  await page.getByRole('button', { name: /^Back to / }).click();
+  await page.locator('.courses > li').first().getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
   await suggestion.getByRole('button', { name: 'Change it in Studio' }).click();
@@ -434,7 +434,8 @@ test("the library page has its own Studio for new courses; a course card's actio
   await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
 
   // A course card's action is work on that course: it opens the course's own Studio, on its Overview, filled in.
-  await page.getByRole('button', { name: 'Add files', exact: true }).click();
+  await page.getByRole('button', { name: /^More actions for/ }).first().click();
+  await page.getByRole('menuitem', { name: 'Add files' }).click();
   const box = page.locator('#studio-input');
   await expect(page.locator('#course-studio')).toBeVisible();
   await expect(box).toBeFocused();
@@ -445,8 +446,37 @@ test("the library page has its own Studio for new courses; a course card's actio
   await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'New course', level: 1 })).toBeVisible();
-  await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
-  // Studio takes the page: wider than the list of courses, its frame reaching just above the window's foot.
+  // Before anything is said, the page is the question, the writing box under it and ways to begin under that.
+  const question = library.getByRole('heading', { name: 'What would you like to learn?' });
+  await expect(question).toBeVisible();
+  const exam = library.getByRole('button', { name: 'Prepare for an exam' });
+  const top = async (locator: typeof question) => (await locator.boundingBox())!.y;
+  expect(await top(box)).toBeGreaterThan(await top(question));
+  expect(await top(exam)).toBeGreaterThan(await top(box));
+  expect(await top(exam), 'gathered in the window, not at its foot').toBeLessThan(700);
+  await expect(box).toBeFocused();
+  // A way to begin starts the request, and the caret waits after it.
+  await exam.click();
+  await expect(box).toBeFocused();
+  await page.keyboard.type('15 January');
+  await expect(box).toContainText('$throughline Make a course for my exam on 15 January');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  // A file let go anywhere on the page goes to the box, as the page asks for files.
+  await page.locator('section.library').evaluate((section) => {
+    const data = new DataTransfer();
+    data.items.add(new File(['%PDF-1.4'], 'lecture 1.pdf', { type: 'application/pdf' }));
+    section.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+  await expect(box).toContainText('lecture 1.pdf');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(library.locator('.said-by-codex')).toHaveText('done');
+  // Once the chat has begun, Studio takes the page: wider than the list of courses, its frame reaching just above
+  // the window's foot.
+  await expect(question).toHaveCount(0);
   const frame = page.locator('.studio-part .frame');
   expect((await frame.boundingBox())!.width).toBeGreaterThan(1000);
   const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('.studio-part .frame')!.getBoundingClientRect().bottom);
@@ -456,10 +486,6 @@ test("the library page has its own Studio for new courses; a course card's actio
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(box).toBeFocused();
-  await box.pressSequentially('hello');
-  await page.keyboard.press('Control+Enter');
-  await expect(library.locator('.said-by-codex')).toHaveText('done');
   expect((await (await page.request.get(base + '/api/studio?scope=library')).json()).threads).toHaveLength(1);
   expect((await (await page.request.get(base + '/api/studio')).json()).threads).toHaveLength(0);
 

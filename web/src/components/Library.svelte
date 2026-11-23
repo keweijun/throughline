@@ -10,6 +10,10 @@
   import CourseImport from './CourseImport.svelte';
   import { pop } from '../lib/motion';
   import InlineConfirm from './InlineConfirm.svelte';
+  import CourseCover from './CourseCover.svelte';
+  import { backdrop, BACKDROP } from '../lib/covers';
+  import { fade } from 'svelte/transition';
+  import { prefersReducedMotion } from 'svelte/motion';
 
   let opening = $state<string | null>(null);
   let checks = $state<CodexCheck[]>([]);
@@ -49,11 +53,6 @@
   const library = $derived(app.library);
   const newCourse = $derived(t('$throughline create a new course from these files: '));
 
-  function updated(course: LibraryCourse) {
-    if (!course.updated) return '';
-    return new Intl.DateTimeFormat(locale.language, { dateStyle: 'medium' }).format(new Date(course.updated * 1000));
-  }
-
   // Studio is the way to make courses here (#109); where Codex cannot run it, the buttons open a Codex chat.
   const studioHere = $derived(!!library?.root && studio.available !== false);
   // Whether Codex can run Studio decides New course and the cards' actions, so ask once the library is known, as
@@ -70,6 +69,10 @@
   // is the page.
   // A library whose courses are all in the trash still shows the list, so they can be restored.
   const making = $derived(studioHere && (app.libraryView === 'new' || (!!library && !library.courses.length && !library.trash?.length)));
+
+  // A new course's chat before anything is said in it: the page is Studio's question, writing box and ways to begin
+  // (ADR 0027), over a contour map, with no heading or frame of its own.
+  const starting = $derived(making && studio.starting);
 
   /** New course: the library's Studio, a new chat with the request typed in (if any) and the caret after it. */
   function ask(prompt = '') {
@@ -99,22 +102,36 @@
   }
 
   // A course package to import (ADR 0020): chosen with Import course or dropped anywhere on the library. Other files
-  // dropped here, on Studio, are attachments as before.
+  // dropped on Studio's writing box are attachments, and before a new course's chat has begun the whole page takes
+  // them for the box, since the page asks for them.
   let importing = $state<File | null>(null);
   let picker = $state<HTMLInputElement>();
   const isPackage = (file: File) => file.name.toLowerCase().endsWith('.throughline');
 
+  let dropping = $state(false);
+
   function dropped(event: DragEvent) {
+    dropping = false;
     const file = [...(event.dataTransfer?.files ?? [])].find(isPackage);
-    if (!file || !library?.root) return;
+    if (file && library?.root) {
+      event.preventDefault();
+      event.stopPropagation();
+      app.libraryView = 'list';
+      importing = file;
+      return;
+    }
+    const box = document.querySelector('.studio-part .composer');
+    if (!starting || !box || !event.dataTransfer?.files.length || box.contains(event.target as Node)) return;
+    // Handed to the writing box as if dropped on it, while this drop's files can still be read.
     event.preventDefault();
     event.stopPropagation();
-    app.libraryView = 'list';
-    importing = file;
+    box.dispatchEvent(new DragEvent('drop', { dataTransfer: event.dataTransfer, cancelable: true }));
   }
 
   function dragging(event: DragEvent) {
-    if (library?.root && [...(event.dataTransfer?.items ?? [])].some((item) => item.kind === 'file')) event.preventDefault();
+    if (!library?.root || ![...(event.dataTransfer?.items ?? [])].some((item) => item.kind === 'file')) return;
+    event.preventDefault();
+    dropping = true;
   }
 
   function picked() {
@@ -135,6 +152,9 @@
   // Looking after courses (ADR 0022): rename, archive and delete sit in a small menu on each card, since they are
   // rarely used. Archived courses and the trash are folded below the list.
   const listed = $derived((library?.courses ?? []).filter((c) => !c.archived));
+  // The course to carry on with leads the page: the one that is open, or else the one studied last.
+  const lead = $derived(listed.find((c) => c.path === library?.active && !c.error && c.concepts) ?? listed.find((c) => !c.error && c.concepts));
+  const others = $derived(listed.filter((c) => c !== lead));
   const archivedCourses = $derived((library?.courses ?? []).filter((c) => c.archived));
   const trash = $derived(library?.trash ?? []);
   let showArchived = $state(false);
@@ -270,7 +290,16 @@
   }
 </script>
 
-<section class="library" class:making aria-labelledby="library-title" ondropcapture={dropped} ondragover={dragging}>
+<section
+  class="library"
+  class:making
+  class:starting
+  class:dropping
+  aria-labelledby="library-title"
+  ondropcapture={dropped}
+  ondragover={dragging}
+  ondragleave={(event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && (dropping = false)}
+>
   <input class="picker" type="file" accept=".throughline" bind:this={picker} onchange={picked} tabindex="-1" aria-hidden="true" />
   <header>
     {#if making}
@@ -278,24 +307,22 @@
         {#if library?.courses.length}
           <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.libraryView = 'list')}>← {t('All courses')}</button>
         {/if}
-        <h1 id="library-title">{t('New course')}</h1>
+        <h1 id="library-title" class:visually-hidden={starting}>{t('New course')}</h1>
       </div>
-      {#if library?.root}
+      {#if library?.root && !starting}
         <div class="header-actions">
           <button class="btn btn-small" onclick={() => picker?.click()}>{t('Import a course')}</button>
         </div>
       {/if}
     {:else}
-      <div>
-        <h1 id="library-title">{t('All courses')}</h1>
-        {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
-      </div>
+      <h1 id="library-title">{t('All courses')}</h1>
       <div class="header-actions">
-        {#if app.state}
-          <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
+        <!-- The open course leads the list with Continue; when it does not (it is archived, say), the way back is here. -->
+        {#if app.state && lead?.path !== library?.active}
+          <button class="btn btn-quiet btn-small" onclick={() => (app.libraryOpen = false)}>{t('Back to {course}', { course: app.state.course.title })}</button>
         {/if}
         {#if library?.root}
-          <button class="btn btn-small" onclick={() => picker?.click()}>{t('Import a course')}</button>
+          <button class="btn btn-quiet btn-small" onclick={() => picker?.click()}>{t('Import a course')}</button>
         {/if}
         {#if studioHere}
           <button class="btn btn-primary btn-small" onclick={() => ask()}>{t('New course')}</button>
@@ -324,8 +351,17 @@
     <!-- New course: the library's Studio across the page (ADR 0016, #109). When the course it makes is ready, the chat
          moves into that course's own Studio by itself. -->
     <section class="studio-part" aria-label={t('Studio')}>
+      {#if starting}
+        <svg class="backdrop" viewBox="0 0 {BACKDROP.width} {BACKDROP.height}" preserveAspectRatio="xMidYMid slice" aria-hidden="true" out:fade={{ duration: prefersReducedMotion.current ? 0 : 220 }}>
+          {#each backdrop() as mark}<path d={mark.d} class={mark.tone} />{/each}
+        </svg>
+      {/if}
       <div class="frame" data-scroller>
-        <Studio scope="library" />
+        <Studio scope="library">
+          {#snippet after()}
+            <p class="have">{t('Have a course file from someone?')} <button class="link" onclick={() => picker?.click()}>{t('Import a course')}</button></p>
+          {/snippet}
+        </Studio>
       </div>
     </section>
   {:else if !library && app.libraryError}
@@ -346,98 +382,85 @@
       <CodexLink class="btn btn-primary" prompt={newCourse}>{t('New course in Codex')}</CodexLink>
     </div>
   {:else}
-    {#snippet card(course: LibraryCourse)}
+    {#snippet card(course: LibraryCourse, leading = false)}
       {@const active = course.path === library?.active}
-      <li class:active class:menu-open={menuFor === course.name}>
-        <div class="summary">
-          {#if renaming === course.name}
-            <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename(course))}>
-              <input
-                id="rename-{course.name}"
-                aria-label={t('Course title')}
-                bind:value={newTitle}
-                maxlength="200"
-                onkeydown={(event) => event.key === 'Escape' && (renaming = null)}
-              />
-              <button class="btn btn-small" type="submit" disabled={busy || !newTitle.trim()}>{t('Save')}</button>
-              <button class="btn btn-quiet btn-small" type="button" onclick={() => (renaming = null)}>{t('Cancel')}</button>
-            </form>
-          {:else}
-            <h2>{label(course)}</h2>
-          {/if}
+      {@const ready = !course.error && !!course.concepts}
+      {@const go = () => (active ? (app.libraryOpen = false) : void open(course))}
+      <li class="course" class:leading class:ready class:menu-open={menuFor === course.name} class:opening={opening === course.name}>
+        <div class="front"><CourseCover {course} large={leading} /></div>
+        <div class="text">
+          <div class="title-row">
+            {#if renaming === course.name}
+              <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename(course))}>
+                <input
+                  id="rename-{course.name}"
+                  aria-label={t('Course title')}
+                  bind:value={newTitle}
+                  maxlength="200"
+                  onkeydown={(event) => event.key === 'Escape' && (renaming = null)}
+                />
+                <button class="btn btn-small" type="submit" disabled={busy || !newTitle.trim()}>{t('Save')}</button>
+                <button class="btn btn-quiet btn-small" type="button" onclick={() => (renaming = null)}>{t('Cancel')}</button>
+              </form>
+            {:else if ready}
+              <!-- The whole card opens the course: the title's button reaches over it. -->
+              <h2><button class="open" disabled={opening !== null} onclick={go}>{label(course)}</button></h2>
+            {:else}
+              <h2>{label(course)}</h2>
+            {/if}
+            <!-- Rarely used, so kept out of sight in a small menu (ADR 0022). -->
+            <div class="more" data-menu={course.name}>
+              <button
+                class="btn btn-quiet btn-small more-button"
+                aria-haspopup="menu"
+                aria-expanded={menuFor === course.name}
+                aria-label={t('More actions for {course}', { course: label(course) })}
+                onclick={() => (menuFor = menuFor === course.name ? null : course.name)}
+              >
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
+              </button>
+              {#if menuFor === course.name}
+                <ul class="card-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t('More actions for {course}', { course: label(course) })}>
+                  {#if !course.error && library?.root && studioHere}
+                    <!-- Work on one course goes to that course's own Studio. -->
+                    <li role="none"><button role="menuitem" onclick={() => ((menuFor = null), courseStudio(course.name, t('$throughline add these files to the course {course}: ', { course: course.name })))}>{t('Add files')}</button></li>
+                  {/if}
+                  {#if !course.error && library?.root && !studioHere}
+                    <li role="none"><CodexLink class="menu-link" prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink></li>
+                  {/if}
+                  {#if !course.error}
+                    <li role="none"><button role="menuitem" onclick={() => startRename(course)}>{t('Rename')}</button></li>
+                  {/if}
+                  <li role="none">
+                    <button role="menuitem" onclick={() => void archive(course, !course.archived)}>{course.archived ? t('Unarchive') : t('Archive')}</button>
+                  </li>
+                  <li role="none" class="danger"><button role="menuitem" onclick={() => startDelete(course)}>{t('Delete…')}</button></li>
+                </ul>
+              {/if}
+            </div>
+          </div>
           {#if course.error}
             <p class="problem">{t('This course could not be read: {error}', { error: course.error })}</p>
-          {:else}
-            <p class="facts">
-              <span>{course.name}</span>
-              <span>{t('Sources: {count}', { count: course.sources ?? 0 })}</span>
-              <span>{t('Sections: {count}', { count: course.concepts ?? 0 })}</span>
-              {#if updated(course)}<span>{t('Updated {date}', { date: updated(course) })}</span>{/if}
+          {:else if course.studio === 'waiting'}
+            <p class="status waiting"><span class="dot"></span>{t('Studio needs your answer')}</p>
+          {:else if course.studio === 'working'}
+            <p class="status working"><span class="dot"></span>{t('Studio is working on it')}</p>
+          {:else if !course.concepts}
+            <p class="status">
+              {t('Route not built yet')}
+              {#if library?.root && studioHere}
+                <button class="link" onclick={() => ask(t('$throughline build the route for the course {course}', { course: course.name }))}>{t('Build the route')}</button>
+              {:else if library?.root}
+                <CodexLink prompt={t('$throughline build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
+              {/if}
             </p>
-            {#if course.goal}<p class="current">{t('Goal: {goal}', { goal: course.goal })}</p>{/if}
-            {#if course.current}<p class="current">{t('Now studying: {section}', { section: course.current })}</p>{/if}
+          {:else if course.current}
+            <p class="status">{course.current}</p>
+          {/if}
+          {#if leading && ready}
+            <button class="btn btn-primary continue" disabled={opening !== null} onclick={go}>{opening === course.name ? t('Opening…') : t('Continue')}</button>
           {/if}
         </div>
-        <div class="state">
-          {#if course.needs_review}
-            <span class="chip chip-caution">{t('{count} source locations not checked yet', { count: course.needs_review })}</span>
-          {/if}
-          {#if active}
-            <button class="btn btn-small" onclick={() => (app.libraryOpen = false)}>{t('Continue')}</button>
-          {:else if !course.error && course.concepts}
-            <button class="btn btn-primary btn-small" disabled={opening !== null} onclick={() => open(course)}>
-              {opening === course.name ? t('Opening…') : t('Open')}
-            </button>
-          {:else if !course.error}
-            <span class="chip chip-plain">{t('Route not built yet')}</span>
-          {/if}
-          <!-- Rarely used, so kept out of sight in a small menu (ADR 0022). -->
-          <div class="more" data-menu={course.name}>
-            <button
-              class="btn btn-quiet btn-small more-button"
-              aria-haspopup="menu"
-              aria-expanded={menuFor === course.name}
-              aria-label={t('More actions for {course}', { course: label(course) })}
-              onclick={() => (menuFor = menuFor === course.name ? null : course.name)}
-            >
-              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
-            </button>
-            {#if menuFor === course.name}
-              <ul class="card-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t('More actions for {course}', { course: label(course) })}>
-                {#if !course.error}
-                  <li role="none"><button role="menuitem" onclick={() => startRename(course)}>{t('Rename')}</button></li>
-                {/if}
-                <li role="none">
-                  <button role="menuitem" onclick={() => void archive(course, !course.archived)}>{course.archived ? t('Unarchive') : t('Archive')}</button>
-                </li>
-                <li role="none" class="danger"><button role="menuitem" onclick={() => startDelete(course)}>{t('Delete…')}</button></li>
-              </ul>
-            {/if}
-          </div>
-        </div>
-        {#if !course.error && library?.root && studioHere}
-          <!-- Course work asked here goes to Studio above, naming the course, as a Codex chat would. -->
-          <div class="codex-actions">
-            {#if !course.concepts}
-              <button class="link" onclick={() => ask(t('$throughline build the route for the course {course}', { course: course.name }))}>{t('Build the route')}</button>
-            {/if}
-            <!-- Work on one course goes to that course's own Studio, on its Overview. -->
-            <button class="link" onclick={() => courseStudio(course.name, t('$throughline add these files to the course {course}: ', { course: course.name }))}>{t('Add files')}</button>
-            {#if course.needs_review}
-              <button class="link" onclick={() => courseStudio(course.name, t('$throughline review the pages that still need review in the course {course}', { course: course.name }))}>{t('Check sources')}</button>
-            {/if}
-          </div>
-        {:else if !course.error && library?.root}
-          <div class="codex-actions">
-            {#if !course.concepts}
-              <CodexLink prompt={t('$throughline build the route for the course {course}', { course: course.name })}>{t('Build the route in Codex')}</CodexLink>
-            {/if}
-            <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })}>{t('Add files in Codex')}</CodexLink>
-            {#if course.needs_review}
-              <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>{t('Check sources in Codex')}</CodexLink>
-            {/if}
-          </div>
-        {/if}
         {#if deleting === course.name}
           <div class="confirm-row">
             <InlineConfirm
@@ -461,41 +484,42 @@
       </p>
     {/if}
     <ul class="courses">
+      {#if lead}{@render card(lead, true)}{/if}
+      {#each others as course (course.path)}
+        {@render card(course)}
+      {/each}
       {#if unfinished && (unfinished.running.length || unfinished.waiting.length)}
         <!-- A new course still being made, so leaving its chat never loses it. -->
-        <li class="unfinished">
-          <div class="summary">
+        <li class="course unfinished">
+          <div class="text">
             <h2>{t('New course')}</h2>
-            <p class="current">{unfinished.waiting.length ? t('Codex is waiting for your answer.') : t('Codex is making it.')}</p>
-          </div>
-          <div class="state">
-            <button class="btn btn-primary btn-small" onclick={() => (app.libraryView = 'new')}>{t('Open the chat')}</button>
+            <p class="status" class:waiting={unfinished.waiting.length > 0} class:working={!unfinished.waiting.length}>
+              <span class="dot"></span>{unfinished.waiting.length ? t('Codex is waiting for your answer.') : t('Codex is making it.')}
+              <!-- The whole card opens the chat. -->
+              <button class="link open" onclick={() => (app.libraryView = 'new')}>{t('Open the chat')}</button>
+            </p>
           </div>
         </li>
       {/if}
-      {#each listed as course (course.path)}
-        {@render card(course)}
-      {/each}
     </ul>
     {#if !listed.length && archivedCourses.length}
       <p class="muted all-archived">{t('All your courses are archived.')}</p>
     {/if}
 
-    {#if archivedCourses.length || trash.length}
-      <!-- Archived courses and the trash, folded below the list. -->
-      <div class="folded">
-        {#if archivedCourses.length}
-          <button class="btn btn-quiet btn-small btn-flush" aria-expanded={showArchived} onclick={() => (showArchived = !showArchived)}>
-            {t('Archived courses ({count})', { count: archivedCourses.length })}
-          </button>
-        {/if}
-        {#if trash.length}
-          <button class="btn btn-quiet btn-small btn-flush" aria-expanded={showTrash} onclick={() => (showTrash = !showTrash)}>
-            {t('Deleted courses ({count})', { count: trash.length })}
-          </button>
-        {/if}
-      </div>
-    {/if}
+    <!-- Archived courses, the trash and where the library is kept, in one quiet row below the list. -->
+    <div class="folded">
+      {#if archivedCourses.length}
+        <button class="btn btn-quiet btn-small btn-flush" aria-expanded={showArchived} onclick={() => (showArchived = !showArchived)}>
+          {t('Archived courses ({count})', { count: archivedCourses.length })}
+        </button>
+      {/if}
+      {#if trash.length}
+        <button class="btn btn-quiet btn-small btn-flush" aria-expanded={showTrash} onclick={() => (showTrash = !showTrash)}>
+          {t('Deleted courses ({count})', { count: trash.length })}
+        </button>
+      {/if}
+      {#if library?.root}<p class="root">{t('Library folder')} <code>{library.root}</code></p>{/if}
+    </div>
     {#if showArchived && archivedCourses.length}
       <section class="kept" aria-labelledby="archived-title">
         <h2 id="archived-title" class="kept-title">{t('Archived courses')}</h2>
@@ -598,6 +622,84 @@
     margin-bottom: 0.4rem;
   }
 
+  /* Before anything is said, New course is Studio's question, box and ways to begin (ADR 0027) over a contour map:
+     the frame gives up its edge and paper, so the page is the map with the box on it. */
+  .starting .studio-part {
+    position: relative;
+    --studio-question: var(--step-4);
+  }
+
+  .starting .studio-part .frame {
+    position: relative;
+    overflow: visible;
+    padding: 0;
+    border-color: transparent;
+    background: none;
+  }
+
+  /* The frame's paper comes in as the chat begins. */
+  .studio-part .frame {
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+
+  /* Files held over the page are for the box, wherever they are let go. */
+  .starting.dropping .studio-part :global(.composer) {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash), var(--shadow);
+  }
+
+  .backdrop path {
+    fill: none;
+    stroke: color-mix(in srgb, var(--accent) 17%, transparent);
+    stroke-width: 1;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .backdrop path.faint {
+    stroke: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+
+  /* Behind the page the marked lines are a tint, not a highlight: they must not pull the eye from the box. */
+  .backdrop path.marked {
+    stroke: color-mix(in srgb, var(--marker) 62%, transparent);
+    stroke-width: 1.2;
+  }
+
+  .studio-part :global(.have) {
+    justify-self: center;
+    color: var(--pencil);
+    font-size: var(--step--1);
+  }
+
+  .studio-part :global(.have .link) {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .studio-part :global(.have .link:hover) {
+    text-decoration: underline;
+  }
+
+  /* A contour map behind the question, fading out all round, in the hand of the covers the courses will have. */
+  .backdrop {
+    /* The map comes up slowly behind the question, after it. */
+    animation: enter-fade 700ms ease 80ms backwards;
+    position: fixed;
+    inset: var(--topbar) 0 0;
+    width: 100%;
+    height: calc(100% - var(--topbar));
+    pointer-events: none;
+    /* Clear in the middle, where the question and the box are, and fading out towards the window's edges. */
+    mask-image: radial-gradient(ellipse 70% 75% at 50% 42%, transparent 34%, #000 62%, transparent 100%);
+  }
+
+
   .picker {
     display: none;
   }
@@ -616,11 +718,6 @@
   .more-button:hover,
   .more-button[aria-expanded='true'] {
     color: var(--ink);
-  }
-
-  .courses > li.menu-open {
-    position: relative;
-    z-index: 2;
   }
 
   .card-menu {
@@ -657,6 +754,22 @@
     background: var(--accent-wash);
   }
 
+  /* Where Studio cannot run, Add files opens a Codex chat; it reads as the menu's other items do. */
+  .card-menu :global(a.menu-link) {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius);
+    color: var(--ink);
+    font-size: var(--step--1);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .card-menu :global(a.menu-link:hover) {
+    background: var(--accent-wash);
+    text-decoration: none;
+  }
+
   .card-menu .danger {
     margin-top: 0.2rem;
     padding-top: 0.2rem;
@@ -673,6 +786,7 @@
   }
 
   .rename {
+    flex: 1;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -690,10 +804,6 @@
     font-family: var(--serif);
     font-size: var(--step-1);
     font-weight: 600;
-  }
-
-  .confirm-row {
-    flex-basis: 100%;
   }
 
   .done {
@@ -720,9 +830,14 @@
   .folded {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.25rem 1.25rem;
     margin-top: 1.25rem;
     padding-left: 0.1rem;
+  }
+
+  .folded .root {
+    margin-left: auto;
   }
 
   .folded button {
@@ -749,10 +864,6 @@
   .kept-title {
     font-family: var(--sans);
     font-size: var(--step-0);
-  }
-
-  .courses.archived > li {
-    background: transparent;
   }
 
   .show-folder {
@@ -789,44 +900,10 @@
     font-weight: 600;
   }
 
-  /* A new course still being made reads as a course to come, not a finished one. */
-  .courses > li.unfinished {
-    border-style: dashed;
-    border-color: var(--accent);
-    background: var(--accent-wash);
-  }
-
-  /* On a wide screen the courses sit two by two, so a library of several fits one screen. */
-  @media (min-width: 64rem) {
-    .library:not(.making) {
-      max-width: 72rem;
-    }
-
-    .courses {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: stretch;
-    }
-  }
-
-  .codex-actions .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    font: inherit;
-    font-size: var(--step--1);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .codex-actions .link:hover {
-    text-decoration: underline;
-  }
-
   .library {
     grid-column: 1 / -1;
     width: 100%;
-    max-width: 52rem;
+    max-width: 72rem;
     margin-inline: auto;
     padding: 2.5rem clamp(1rem, 4vw, 3rem) 6rem;
   }
@@ -834,7 +911,7 @@
   header {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1.5rem;
@@ -852,73 +929,278 @@
   }
 
   .root,
-  .muted,
-  .facts {
+  .muted {
     color: var(--pencil);
     font-size: var(--step--1);
     overflow-wrap: anywhere;
   }
 
+  /* The courses: the one to carry on with across the top, the rest three to a row. Each card is a cover, a title and
+     one line; the whole card opens the course, and what is rarely needed waits in its menu. */
   .courses {
     display: grid;
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 0.9rem;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .courses > li:nth-child(2) {
-    animation-delay: 40ms;
-  }
-
-  .courses > li:nth-child(3) {
-    animation-delay: 80ms;
-  }
-
-  .courses > li:nth-child(n + 4) {
-    animation-delay: 120ms;
-  }
-
-  .courses > li {
+  .course {
     animation: enter-rise var(--settle) var(--ease-out) backwards;
+    position: relative;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem 1.5rem;
-    padding: 1rem 1.25rem;
+    flex-direction: column;
+    min-width: 0;
     border: 1px solid var(--rule);
     border-radius: 10px;
     background: var(--sheet);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, translate 0.15s ease;
   }
 
-  .courses > li.active {
-    border-color: var(--accent);
-    box-shadow: inset 3px 0 0 var(--accent);
+  .course:nth-child(2) {
+    animation-delay: 40ms;
   }
 
-  .summary {
+  .course:nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  .course:nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
+
+  .course.ready:hover,
+  .course.ready:focus-within,
+  .course.menu-open {
+    border-color: var(--rule-strong);
+    box-shadow: var(--shadow);
+  }
+
+  .course.menu-open {
+    z-index: 2;
+  }
+
+  .course.opening {
+    opacity: 0.7;
+  }
+
+  .front {
+    height: 7rem;
+    overflow: hidden;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 9px 9px 0 0;
+  }
+
+  .text {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.8rem 0.6rem 0.9rem 1.1rem;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
     min-width: 0;
-    flex: 1 1 18rem;
   }
 
   h2 {
+    flex: 1;
+    min-width: 0;
     font-family: var(--serif);
     font-size: var(--step-1);
     font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.2rem 0.9rem;
-    margin-top: 0.2rem;
+  .open {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
 
-  .current {
-    margin-top: 0.35rem;
+  /* The title's button reaches over the whole card; the menu and the links sit above it. */
+  .open::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+  }
+
+  .open:focus-visible {
+    outline: none;
+  }
+
+  .open:focus-visible::after {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .more,
+  .status .link,
+  .status :global(a),
+  .continue,
+  .rename,
+  .confirm-row {
+    position: relative;
+    z-index: 1;
+  }
+
+  .more {
+    margin-top: -0.15rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .course:hover .more,
+  .course:focus-within .more,
+  .course.menu-open .more {
+    opacity: 1;
+  }
+
+  .status {
+    overflow: hidden;
+    padding-right: 0.5rem;
+    color: var(--pencil);
     font-size: var(--step--1);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status .dot {
+    display: inline-block;
+    width: 0.45rem;
+    height: 0.45rem;
+    margin-right: 0.4rem;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: 0.05em;
+  }
+
+  .status.working {
     color: var(--ink-soft);
   }
+
+  .status.waiting {
+    color: var(--caution);
+    font-weight: 600;
+  }
+
+  .status.waiting .dot {
+    background: var(--caution);
+  }
+
+  .status .link {
+    margin-left: 0.35rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .status .link:hover {
+    text-decoration: underline;
+  }
+
+  /* A link that opens what its card is about reaches over the whole card, as a title does. */
+  .status .link.open {
+    display: inline;
+    position: static;
+  }
+
+  .confirm-row {
+    padding: 0 1.1rem 0.9rem;
+  }
+
+  /* The course to carry on with: wider, its cover beside its title, and the page's one strong button. */
+  .course.leading {
+    grid-column: 1 / -1;
+    flex-flow: row wrap;
+    box-shadow: var(--shadow);
+  }
+
+  .leading .front {
+    flex: 0 0 42%;
+    height: auto;
+    min-height: 10.5rem;
+    border-right: 1px solid var(--rule);
+    border-bottom: 0;
+    border-radius: 9px 0 0 9px;
+  }
+
+  .leading .text {
+    flex: 1;
+    align-content: center;
+    gap: 0.3rem;
+    min-width: 0;
+    padding: 1.4rem 1rem 1.4rem 1.75rem;
+  }
+
+  .leading h2 {
+    font-size: var(--step-2);
+  }
+
+  .leading .status {
+    font-size: var(--step-0);
+  }
+
+  .continue {
+    justify-self: start;
+    margin-top: 0.7rem;
+  }
+
+  .leading .confirm-row {
+    flex-basis: 100%;
+    padding-top: 0.2rem;
+  }
+
+  /* A new course still being made reads as a course to come, not a finished one. */
+  .course.unfinished {
+    justify-content: center;
+    min-height: 7rem;
+    border-style: dashed;
+    border-color: var(--rule-strong);
+    background: transparent;
+  }
+
+  .courses.archived .course {
+    background: transparent;
+  }
+
+  /* On a narrow window the leading course stacks like the others. */
+  @media (max-width: 44rem) {
+    .course.leading {
+      flex-direction: column;
+    }
+
+    .leading .front {
+      flex: none;
+      height: 7rem;
+      min-height: 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--rule);
+      border-radius: 9px 9px 0 0;
+    }
+
+    .leading .text {
+      padding: 1rem 0.6rem 1.1rem 1.1rem;
+    }
+  }
+
 
   .problem {
     color: var(--danger);
@@ -934,23 +1216,6 @@
 
   .load-failed .problem {
     margin: 0;
-  }
-
-  .codex-actions {
-    flex-basis: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1.1rem;
-    padding-top: 0.6rem;
-    border-top: 1px solid var(--rule);
-    font-size: var(--step--1);
-  }
-
-  .state {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem;
   }
 
   .empty {

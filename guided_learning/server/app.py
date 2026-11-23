@@ -430,6 +430,9 @@ class Courses:
         active = str(self.host.workspace) if self.host else None
         if active and not any(c['path'] == active for c in courses):
             courses.insert(0, library.summary(active))
+        for course in courses:  # what Studio is doing in each course, from what this host saw; never starts Codex
+            activity = self.studio.activity(Path(course['path']))
+            course['studio'] = 'waiting' if activity['waiting'] else 'working' if activity['running'] else None
         return {'root': str(self.root) if self.root else None, 'active': active, 'courses': courses,
                 'trash': [{k: e[k] for k in ('id', 'name', 'title', 'deleted')} for e in library.trashed(self.root)] if self.root else [],
                 'trash_folder': str(library.trash_dir(self.root)) if self.root else None}

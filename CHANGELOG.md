@@ -2,6 +2,15 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.61.0
+
+- **All courses is redesigned.**
+  - **The course you last studied leads the page**, with **Continue**. Your other courses follow as cards; click anywhere on a card to open its course.
+  - **Each card shows less:** the title and the section you are at. The folder name, counts, date and goal are gone, and **Add files** moved into the card's ⋯ menu with Rename, Archive and Delete.
+  - **A card tells you when Studio is working in its course or needs your answer**, so a chat you left is easy to find again.
+- **Starting a course has its own page.** New course, and Throughline before your first course, now asks **What would you like to learn?** with the writing box right under the question and four ways to begin: prepare for an exam, learn a subject, practise problems, or read a paper. Drop your files anywhere on the page.
+- **Courses have covers.** A cover is the subject's short name, such as 物化 or DS, over a pattern of thin lines that suits the subject. Codex chooses both when it makes a course. A course you already have shows a pattern alone until Codex next works on it; to get its cover now, or a different one, ask in the course's Studio, for example "give this course a cover" or "call it P-Chem on the cover".
+
 ## 0.60.0
 
 - **Common mistakes in lessons get their own box.** New lessons mark a common mistake with an amber **Caution** (注意) box and keep green **Important** (重点) for key results and the conditions they need. A red **Warning** (警告) is kept for real harm, such as a lab hazard. Lessons that already use Caution or Warning boxes show them with the new colours.

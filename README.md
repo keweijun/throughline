@@ -87,11 +87,11 @@ Throughline is where you study, and where you make and change your courses with 
 
 - **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it), or run `throughline`. Lessons, questions and practice run Codex in the background, so you never need Codex open to study. The library tells you where the launcher is, can add it to your desktop, and says so if Codex can't answer.
 - **Change a course in Studio.** **Overview**, next to Learn and Review in the top bar, shows the course as a whole; its first tab, **Studio** (or press `d`), is a Codex chat inside Throughline with the same `$throughline` skill. Ask it to add a problem set, rebuild a chapter, check pages or teach a chapter more rigorously; attach or drop files, mention them with `@`, and approve what Codex asks. You can keep studying while it works: the top bar says when Studio needs you. **Add files in Studio** below the route and **Check this location in Studio** in the reader open it with the request filled in, and what you ask it to remember about how you like to be taught goes into the course memory.
-- **Start a course in the library.** **New course** on **All courses** opens the library's own Studio. Codex reads your files and builds the route, and the chat then moves into the new course by itself, which opens at its Studio. A course card's **Add files** and **Check sources** open that course's Studio with the request filled in. A Codex chat with `$throughline` works too, for example `$throughline add this problem set to quantum`.
+- **Start a course in the library.** **New course** on **All courses** opens the library's own Studio. Codex reads your files and builds the route, and the chat then moves into the new course by itself, which opens at its Studio. Each course is a card with a cover Codex chose for it, the subject's short name over a pattern; click the card to open the course, and **Add files** in its ⋯ menu opens that course's Studio with the request filled in. A Codex chat with `$throughline` works too, for example `$throughline add this problem set to quantum`.
 
 ![Studio on the course page: a Codex chat inside Throughline, asking a question before it adds a problem set](docs/images/studio-en.png)
 
-![The course library listing three courses, with where to find Throughline next time](docs/images/library-en.png)
+![All courses: the course to carry on with across the top, and a card for each of the others, each with the cover Codex chose for it](docs/images/library-en.png)
 
 ## Study
 

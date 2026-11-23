@@ -5,7 +5,7 @@ import path from 'node:path';
 
 test('a course shared as a package is imported fresh, and its written lesson is revealed without the teacher', async ({ page, course }) => {
   const { errors } = await course('packages_browser_fixture');
-  await page.locator('.courses > li').filter({ hasText: 'Introductory Quantum Mechanics' }).getByRole('button', { name: 'Open' }).click();
+  await page.locator('.courses > li').filter({ hasText: 'Introductory Quantum Mechanics' }).getByRole('heading').getByRole('button').click();
   await expect(page.locator('.topbar .course')).toHaveText('Introductory Quantum Mechanics');
 
   // Share: the Overview's Share tab, at the route and lessons level.

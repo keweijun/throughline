@@ -354,7 +354,8 @@ export function editor(node: HTMLElement, initial: EditorOptions) {
       if (next.placeholder !== options.placeholder) view.dispatch({ effects: placeholder.reconfigure(hint(next.placeholder)) });
       options = next;
       if (next.value !== view.state.doc.toString()) {
-        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next.value } });
+        // Text set from outside (a request filled in, a draft brought back) leaves the caret after it, to go on from.
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next.value }, selection: { anchor: next.value.length } });
       }
       // Attributes are read from the options when the view updates; an empty transaction makes it read them again.
       if (changed) view.dispatch({});

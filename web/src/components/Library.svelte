@@ -8,6 +8,7 @@
   import Studio from './Studio.svelte';
   import { studio } from '../lib/studio.svelte';
   import CourseImport from './CourseImport.svelte';
+  import CourseShare from './CourseShare.svelte';
   import { pop } from '../lib/motion';
   import InlineConfirm from './InlineConfirm.svelte';
 
@@ -157,6 +158,8 @@
   let renaming = $state<string | null>(null);
   let newTitle = $state('');
   let deleting = $state<string | null>(null);
+  // The course whose share options stand under its card (ADR 0020).
+  let sharing = $state<string | null>(null);
   let busy = $state(false);
 
   // What was just archived or deleted, said where the course was, with the way back. A deleted course that was open
@@ -193,6 +196,7 @@
   function startRename(course: LibraryCourse) {
     menuFor = null;
     deleting = null;
+    sharing = null;
     renaming = course.name;
     newTitle = label(course);
     requestAnimationFrame(() => {
@@ -217,9 +221,17 @@
     if (result) done = archived ? { kind: 'archived', title: label(course), name: course.name } : null;
   }
 
+  function startShare(course: LibraryCourse) {
+    menuFor = null;
+    renaming = null;
+    deleting = null;
+    sharing = course.name;
+  }
+
   function startDelete(course: LibraryCourse) {
     menuFor = null;
     renaming = null;
+    sharing = null;
     deleting = course.name;
   }
 
@@ -405,6 +417,7 @@
             {#if menuFor === course.name}
               <ul class="card-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t('More actions for {course}', { course: label(course) })}>
                 {#if !course.error}
+                  <li role="none"><button role="menuitem" onclick={() => startShare(course)}>{t('Share…')}</button></li>
                   <li role="none"><button role="menuitem" onclick={() => startRename(course)}>{t('Rename')}</button></li>
                 {/if}
                 <li role="none">
@@ -421,7 +434,7 @@
             {#if !course.concepts}
               <button class="link" onclick={() => ask(t('$throughline build the route for the course {course}', { course: course.name }))}>{t('Build the route')}</button>
             {/if}
-            <!-- Work on one course goes to that course's own Studio, on its Overview. -->
+            <!-- Work on one course goes to that course's own Studio. -->
             <button class="link" onclick={() => courseStudio(course.name, t('$throughline add these files to the course {course}: ', { course: course.name }))}>{t('Add files')}</button>
             {#if course.needs_review}
               <button class="link" onclick={() => courseStudio(course.name, t('$throughline review the pages that still need review in the course {course}', { course: course.name }))}>{t('Check sources')}</button>
@@ -436,6 +449,12 @@
             {#if course.needs_review}
               <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>{t('Check sources in Codex')}</CodexLink>
             {/if}
+          </div>
+        {/if}
+        {#if sharing === course.name}
+          <!-- Under the card that asked for it, as renaming and deleting are. -->
+          <div class="share-row" role="group" aria-label={t('Share “{course}”', { course: label(course) })}>
+            <CourseShare course={course.name} onclose={() => (sharing = null)} />
           </div>
         {/if}
         {#if deleting === course.name}
@@ -694,6 +713,16 @@
 
   .confirm-row {
     flex-basis: 100%;
+  }
+
+  .share-row {
+    animation: enter-rise var(--settle) var(--ease-out);
+    flex-basis: 100%;
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--rule);
   }
 
   .done {

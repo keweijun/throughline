@@ -69,7 +69,7 @@ Added with the review rework (issue #219). Review is a place with several ways o
 - **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** starts a drill session on that idea, asked again in a new situation.
 - **Drill**: drill sessions over the scope (ADR 0025), beside the other two when the page is wide enough and below them otherwise.
 
-Like the Overview, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
+Like Studio, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
 
 Reading key points and mistakes needs no model turn. Questions come from drill sessions with a fast teacher (ADR 0025).
 

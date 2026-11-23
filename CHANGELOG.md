@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.61.0
+
+- **Overview is now Studio.** The top bar reads **Studio · Learn · Review**. Studio, Codex working on your course, now runs from just under the top bar to the bottom of the window, so long chats, questions and work are easier to read back. Beside it stand the course's title and goal, the strip of its chapters, your Studio chats and **How you're taught**. `d` opens it; `m` is gone.
+- **Sources open beside Studio.** A page a Studio reply cites, or anything you open with **Source**, opens in the same side panel as in Learn and Review. When it needs the room, the column beside Studio folds away and your chats become a menu above the chat.
+- **Share a course from its card in the library, or from Studio.** **Share…** sits in the card's ⋯ menu beside Rename and Archive, and works whether or not the course is open. In an open course, the ⋯ beside its title in Studio has **Share…** and **Rename** too. It used to be a tab on the Overview, as were the course's Sources, which are all under **All sources** in the reader.
+- **Export notes is gone.** Your notes stay with the course, and a package at the Everything level carries them. To have them as one page, ask Studio to write them out.
+- **How you're taught has a × on each preference** to delete it. To change one, tell Studio.
+
 ## 0.60.0
 
 - **Common mistakes in lessons get their own box.** New lessons mark a common mistake with an amber **Caution** (注意) box and keep green **Important** (重点) for key results and the conditions they need. A red **Warning** (警告) is kept for real harm, such as a lab hazard. Lessons that already use Caution or Warning boxes show them with the new colours.

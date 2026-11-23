@@ -3,7 +3,7 @@
 Throughline has two things a learner talks to:
 
 - **The teacher in Learn and Review:** fast and scoped. It teaches, answers side questions, assesses and drills, but cannot touch files or sources or change the course.
-- **Studio:** Codex itself (ADR 0016). It can do anything, but it is slower and sits on the Overview.
+- **Studio:** Codex itself (ADR 0016). It can do anything, but it is slower and has a place of its own, the first of the course's three (ADR 0017).
 
 Both are a box you type into, and nothing shows how far apart they are. New users never find out what Studio can do, so the app reads as one more chat-based tutor, while Throughline's edge is that Codex works on the course (issue #229). The bridges we had were one-offs: suggested course changes prefilled in Studio, "in Studio" links, and a drill teacher saying "ask Studio".
 

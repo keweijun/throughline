@@ -10,7 +10,7 @@
   import ConceptPage from './components/ConceptPage.svelte';
   import ChapterPage from './components/ChapterPage.svelte';
   import ReviewPage from './components/ReviewPage.svelte';
-  import CoursePage from './components/CoursePage.svelte';
+  import StudioPage from './components/StudioPage.svelte';
   import SidePanel from './components/SidePanel.svelte';
   import SelectionAsk from './components/SelectionAsk.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
@@ -47,10 +47,10 @@
     app.showStudio({ focus: true });
   }
 
-  // Going to the Overview and back returns Learn or Review to where the learner was on it. The stage is one scroller for
-  // every place, so without this the page came back at whatever offset the Overview had last been scrolled to.
+  // Going to Studio and back returns Learn or Review to where the learner was on it. The stage is one scroller for every
+  // place, so without this the page came back at whatever offset Studio had last been scrolled to.
   const place = $derived(
-    app.libraryOpen ? 'library' : app.courseOpen ? 'overview' : app.reviewOpen ? 'review' : `learn:${app.viewingChapter ?? app.viewing ?? app.currentId}`,
+    app.libraryOpen ? 'library' : app.courseOpen ? 'studio' : app.reviewOpen ? 'review' : `learn:${app.viewingChapter ?? app.viewing ?? app.currentId}`,
   );
   let scrolled = { place: '', top: 0 };
   let left: { place: string; top: number } | null = null;
@@ -67,8 +67,8 @@
     untrack(() => {
       const before = shown;
       shown = now;
-      if (now === 'overview' && before) left = { place: before, top: scrolled.place === before ? scrolled.top : 0 };
-      else if (before === 'overview' && left?.place === now) stage?.scrollTo({ top: left.top, behavior: 'instant' });
+      if (now === 'studio' && before) left = { place: before, top: scrolled.place === before ? scrolled.top : 0 };
+      else if (before === 'studio' && left?.place === now) stage?.scrollTo({ top: left.top, behavior: 'instant' });
     });
   });
 
@@ -148,10 +148,9 @@
       requestAnimationFrame(() => document.getElementById('question-input')?.focus());
     } else if (event.key === '[') step(-1);
     else if (event.key === ']') step(1);
-    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source'); // on the Overview, its Sources tab
+    else if (event.key === 's') app.panelShown && app.panelTab === 'source' ? (app.panelOpen = false) : app.openPanel('source');
     else if (event.key === 'n') app.panelShown && app.panelTab === 'notes' ? (app.panelOpen = false) : app.openPanel('notes');
     else if (event.key === 'r') app.toggleRoute();
-    else if (event.key === 'm') app.courseOpen ? (app.courseOpen = false) : app.showCourse();
     else if (event.key === 'd') app.studioShown ? (app.courseOpen = false) : app.showStudio({ focus: true });
     else if (event.key === 'c') (document.getElementById('continue-step') as HTMLButtonElement | null)?.click();
     else if (event.key === '?') app.helpOpen = true;
@@ -165,7 +164,7 @@
 <!-- The stage scrolls on its own, so its scrollbar ends where the side panel begins. -->
 <div class="workspace" style:--panel="{app.panelWidth}px">
 <div id="stage" class="stage" bind:this={stage}>
-<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:overview={app.courseOpen || app.libraryOpen || app.reviewOpen}>
+<div class="layout" class:with-panel={app.panelShown} class:folded={app.folded && !app.libraryOpen} class:own-width={app.courseOpen || app.libraryOpen || app.reviewOpen}>
   {#if app.signedOut}
     <main id="main" class="loading" role="alert">
       <h1 class="signed-out">{t('Open Throughline from its launcher')}</h1>
@@ -175,12 +174,12 @@
     <Library />
   {:else if app.state}
     <div class="scrim" class:visible={app.routeOpen} onclick={() => (app.routeOpen = false)} aria-hidden="true"></div>
-    <!-- The course's Overview shows the whole route in its chapter strip, and Review has its own scope picker, so the
-         rail steps aside for those places. -->
+    <!-- Studio shows the whole route in its chapter strip, and Review has its own scope picker, so the rail steps aside
+         for those places. -->
     {#if !app.courseOpen && !app.reviewOpen}<RouteRail />{/if}
     <main id="main">
       {#if app.courseOpen}
-        <CoursePage />
+        <StudioPage />
       {:else if app.reviewOpen}
         <ReviewPage />
       {:else if app.viewingChapter}
@@ -258,8 +257,8 @@
   }
 
   /* Folded, the capsule sits at the stage's left edge and the reading column centres in the rest. */
-  /* The Overview and the library set their own widths: wide for Studio and the reader, a reading width for lists. */
-  .layout.overview {
+  /* Studio, Review and the library set their own widths. */
+  .layout.own-width {
     grid-template-columns: minmax(0, 1fr);
     max-width: none;
   }
@@ -270,7 +269,7 @@
     max-width: 100vw;
   }
 
-  .layout.overview.folded {
+  .layout.own-width.folded {
     grid-template-columns: minmax(0, 1fr);
     max-width: none;
   }
@@ -280,9 +279,9 @@
     padding: 2.5rem clamp(1rem, 4vw, 3.5rem) 6rem;
   }
 
-  /* Studio or a document fills the window to just above its bottom edge. */
+  /* Studio fills the window, from just under the top bar to just above its bottom edge. */
   main:has(> :global(.page.filling)) {
-    padding-bottom: 1.25rem;
+    padding-block: 1.25rem;
   }
 
   .loading {

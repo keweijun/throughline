@@ -1055,7 +1055,7 @@ textarea {
   }
 }
 
-/* A page arrives the same way whichever page it is: a section, a chapter, review. The course page holds Studio's
+/* A page arrives the same way whichever page it is: a section, a chapter, review. Studio holds its
    writing box, which takes the caret as the page opens, so it fades in rather than moving under the learner. */
 #main > .page {
   animation: enter-rise var(--settle) var(--ease-out);

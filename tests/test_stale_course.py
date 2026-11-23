@@ -58,15 +58,11 @@ class StalePages(unittest.TestCase):
         self.assertEqual(self.note(self.beta).status_code, 200, "the open course's own page still writes")
         self.assertEqual(notes(self.root / 'beta'), ['Meant for Alpha'])
 
-    def test_an_export_from_a_page_of_another_course_is_refused(self):
-        # A download link cannot send a header, so it names the course in the address.
-        stale = self.client.get('/api/course/package/everything?course=' + self.alpha)
-        self.assertEqual((stale.status_code, stale.json()['code']), (409, 'course_changed'))
-        stale = self.client.get('/api/course/package', headers={'X-Throughline-Course': self.alpha})
-        self.assertEqual(stale.status_code, 409)
-        fresh = self.client.get('/api/course/package/everything?course=' + self.beta)
-        self.assertEqual(fresh.status_code, 200)
-        self.assertIn('beta.throughline', fresh.headers['content-disposition'])
+    def test_a_share_names_its_course_so_another_open_course_never_answers_for_it(self):
+        # Sharing is done from a course's card in the library, which names the course, whichever one is open.
+        shared = self.client.get('/api/library/courses/alpha/package/everything')
+        self.assertEqual(shared.status_code, 200)
+        self.assertIn('alpha.throughline', shared.headers['content-disposition'])
 
     def test_reads_of_the_state_are_refused_too(self):
         self.assertEqual(self.client.get('/api/state', headers={'X-Throughline-Course': self.alpha}).json()['code'], 'course_changed')
@@ -79,8 +75,8 @@ class StalePages(unittest.TestCase):
         response = self.note(self.alpha)
         self.assertEqual((response.status_code, response.json()['code']), (409, 'course_changed'))
         self.assertEqual(notes(self.root / 'alpha-copy'), [], 'a page of the original writes nothing into the copy')
-        stale = self.client.get('/api/course/package/everything?course=' + self.alpha)
-        self.assertEqual(stale.status_code, 409, "nor downloads the copy's package")
+        stale = self.client.get('/api/state?course=' + self.alpha)
+        self.assertEqual(stale.status_code, 409, "nor reads the copy's records")
         copy = self.client.get('/api/state').json()['course']['key']
         self.assertEqual(self.note(copy).status_code, 200)
 

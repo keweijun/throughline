@@ -93,8 +93,25 @@
          and Studio's own chats menu comes back. -->
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
-        <!-- The course's cover, as on its card in the library (ADR 0027). -->
-        {#if course}<div class="cover"><CourseCover {course} /></div>{/if}
+        <!-- The course's cover, as on its card in the library (ADR 0027), with the course's own actions on its corner.
+             The cover names the course here and the top bar gives its title, so the title is not written a third
+             time; a course whose cover has no name yet shows its title under it. -->
+        {#if course}
+          <div class="cover">
+            <CourseCover {course} />
+            <button
+              class="btn btn-quiet btn-small more"
+              bind:this={more}
+              data-course-actions
+              aria-haspopup="menu"
+              aria-expanded={opened === 'menu'}
+              aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}
+              onclick={() => (opened === 'menu' ? (opened = null) : open('menu'))}
+            >
+              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
+            </button>
+          </div>
+        {/if}
         {#if renaming}
           <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename())}>
             <textarea
@@ -114,22 +131,7 @@
             </div>
           </form>
         {:else}
-          <div class="title-row">
-            <h1 id="course-title">{app.state?.course.title}</h1>
-            {#if course}
-              <button
-                class="btn btn-quiet btn-small more"
-                bind:this={more}
-                data-course-actions
-                aria-haspopup="menu"
-                aria-expanded={opened === 'menu'}
-                aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}
-                onclick={() => (opened === 'menu' ? (opened = null) : open('menu'))}
-              >
-                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
-              </button>
-            {/if}
-          </div>
+          <h1 id="course-title" class:visually-hidden={!!course?.cover?.name}>{app.state?.course.title}</h1>
         {/if}
         {#if course?.goal}<p class="goal" title={course.goal}>{course.goal}</p>{/if}
         {#if imported}
@@ -261,16 +263,24 @@
     line-height: 1.25;
   }
 
-  .title-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 0.25rem;
+
+  /* On the cover's corner, quiet until the cover is pointed at. */
+  .more {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    padding: 0.25rem 0.35rem;
+    color: var(--pencil);
+    opacity: 0.55;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
   }
 
-  .more {
-    margin-top: 0.15rem;
-    padding: 0.25rem 0.35rem;
+  .cover:hover .more,
+  .more:focus-visible,
+  .more[aria-expanded='true'] {
+    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    color: var(--ink);
+    opacity: 1;
   }
 
   .rename {
@@ -553,8 +563,9 @@
 
   /* The course's cover tops its column. */
   .cover {
-    height: 5rem;
-    margin-bottom: 0.35rem;
+    position: relative;
+    height: 5.5rem;
+    margin-bottom: 0.2rem;
     overflow: hidden;
     border: 1px solid var(--rule);
     border-radius: 10px;

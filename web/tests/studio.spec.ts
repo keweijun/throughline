@@ -188,6 +188,40 @@ test('Studio is as tall as the window beside the course column, and writing move
   await expect(paper).toHaveCSS('opacity', '0');
 });
 
+test('the course is named once in the bar and once on its cover, and the switcher lists courses by their covers', async ({ page, course }) => {
+  const { base, errors } = await course('studio_browser_fixture');
+  const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
+  await page.locator('#open-course').click();
+  const column = page.locator('#course-studio .studio-aside');
+  const title = column.locator('#course-title');
+  // A course whose cover has no name yet shows its title under the cover.
+  await expect(title).toBeVisible();
+  await expect(title).not.toHaveClass(/visually-hidden/);
+  courseOperation(waves, { op: 'cover.save', name: 'Waves', pattern: 'waves' });
+  await page.reload();
+  await page.locator('#open-course').click();
+  // Once the cover names it, the title is not written a third time; it still names the page to a screen reader.
+  await expect(column.locator('.cover .name')).toHaveText('Waves');
+  await expect(title).toHaveClass(/visually-hidden/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Waves' })).toBeAttached();
+  // The course's own actions are on the cover's corner.
+  await column.locator('.cover').getByRole('button', { name: 'More actions for Waves' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // The switcher: each course by its cover's pattern and its title, the open one marked, then the ways out.
+  await page.locator('#course-switcher').click();
+  const menu = page.getByRole('menu', { name: 'Switch course' });
+  const open = menu.getByRole('menuitem', { name: /Waves/ });
+  await expect(open).toHaveAttribute('aria-current', 'true');
+  await expect(open.locator('.swatch svg path').first()).toBeAttached();
+  await expect(menu.getByRole('menuitem', { name: 'All courses' })).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'New course' }).click();
+  await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  await expect(page.locator('#studio-input')).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test('a course of many chapters keeps its chapter strip inside the column, which never scrolls sideways', async ({ page, course }) => {
   const { base } = await course('studio_browser_fixture');
   const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;

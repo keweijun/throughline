@@ -4,6 +4,7 @@
   import { studio } from '../lib/studio.svelte';
   import type { LibraryCourse } from '../lib/types';
   import { pop } from '../lib/motion';
+  import CourseCover from './CourseCover.svelte';
 
   const studying = $derived(!!app.state && !app.libraryOpen);
   // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
@@ -35,6 +36,13 @@
   function toggleMenu() {
     menuOpen = !menuOpen;
     if (menuOpen) void app.loadLibrary(true);
+  }
+  /** New course, from anywhere in a course: the library's start page, with the caret in its box. */
+  function newCourse() {
+    menuOpen = false;
+    app.showLibrary();
+    app.libraryView = 'new';
+    studio.focusRequest++;
   }
   function switchTo(course: LibraryCourse) {
     menuOpen = false;
@@ -101,17 +109,32 @@
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         {#if menuOpen}
+          <!-- Each course by its cover's pattern and its title, the open one marked; then the ways out of the list. -->
           <ul class="course-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t("Switch course")}>
             {#each others as course (course.path)}
+              {@const open = course.path === app.library?.active}
               <li role="none">
-                <button role="menuitem" class:active={course.path === app.library?.active} onclick={() => switchTo(course)}>
-                  <span class="title">{course.title ?? course.name}</span>
-                  {#if course.current}<span class="meta">{course.current}</span>{/if}
+                <button role="menuitem" class="course-item" class:active={open} aria-current={open ? 'true' : undefined} onclick={() => switchTo(course)}>
+                  <span class="swatch"><CourseCover {course} swatch /></span>
+                  <span class="text">
+                    <span class="title">{course.title ?? course.name}</span>
+                    {#if course.current}<span class="meta">{course.current}</span>{/if}
+                  </span>
+                  {#if open}<svg class="tick" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 10.5l3.2 3.2L15 6.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
                 </button>
               </li>
             {/each}
             <li role="none" class="all">
-              <button role="menuitem" onclick={() => ((menuOpen = false), app.showLibrary())}>{t("All courses")}</button>
+              <button role="menuitem" class="plain" onclick={() => ((menuOpen = false), app.showLibrary())}>
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3.5 3.5h5.5v5.5H3.5zM11 3.5h5.5v5.5H11zM3.5 11h5.5v5.5H3.5zM11 11h5.5v5.5H11z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                {t("All courses")}
+              </button>
+            </li>
+            <li role="none">
+              <button role="menuitem" class="plain" onclick={newCourse}>
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+                {t("New course")}
+              </button>
             </li>
           </ul>
         {/if}
@@ -329,9 +352,9 @@
     left: 0;
     z-index: 50;
     display: grid;
-    min-width: 18rem;
-    max-width: 26rem;
-    max-height: 60vh;
+    width: 21rem;
+    max-width: calc(100vw - 2rem);
+    max-height: 70vh;
     margin: 0;
     padding: 0.35rem;
     overflow-y: auto;
@@ -343,10 +366,11 @@
   }
 
   .course-menu button {
-    display: grid;
-    gap: 0.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
     width: 100%;
-    padding: 0.45rem 0.6rem;
+    padding: 0.4rem 0.5rem;
     border: 0;
     border-radius: var(--radius);
     background: transparent;
@@ -361,12 +385,35 @@
     background: var(--accent-wash);
   }
 
-  .course-menu button.active .title::after {
-    content: ' ✓';
-    color: var(--accent);
+  /* A course: its cover's pattern as a small swatch, its title and where the learner is in it. */
+  .course-menu .swatch {
+    flex: none;
+    width: 2.75rem;
+    height: 1.9rem;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+  }
+
+  .course-menu .text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .course-menu .title,
+  .course-menu .meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .course-menu .title {
+    font-size: var(--step-0);
+    font-weight: 500;
+  }
+
+  .course-menu .active .title {
     font-weight: 600;
   }
 
@@ -375,10 +422,28 @@
     color: var(--pencil);
   }
 
+  .course-menu .tick {
+    flex: none;
+    color: var(--accent);
+  }
+
+  /* The ways out of the list, quieter than the courses. */
   .course-menu .all {
-    margin-top: 0.25rem;
-    padding-top: 0.25rem;
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
     border-top: 1px solid var(--rule);
+  }
+
+  .course-menu .plain {
+    padding: 0.4rem 0.6rem;
+    color: var(--ink-soft);
+    font-size: var(--step--1);
+    font-weight: 500;
+  }
+
+  .course-menu .plain svg {
+    flex: none;
+    color: var(--pencil);
   }
 
   /* One quiet switch for the course's three places: the open one is lifted onto a sheet rather than filled with ink. */

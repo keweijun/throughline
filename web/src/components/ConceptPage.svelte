@@ -3,7 +3,6 @@
   import { untrack } from 'svelte';
   import { api } from '../lib/api';
   import { app } from '../lib/store.svelte';
-  import { open as isOpen } from '../lib/format';
   import type { Preview } from '../lib/types';
   import UnitOverview from './UnitOverview.svelte';
   import Lesson from './Lesson.svelte';
@@ -47,32 +46,16 @@
   const comeBackTo = $derived(app.returnSection ?? app.currentId);
   // A prerequisite not studied yet is named before the learner moves here, so they choose knowingly; nothing blocks it.
   const missing = $derived((concept?.prerequisites ?? []).filter((id) => !app.studied(id)).map((id) => app.concept(id)?.title ?? id));
-  // A goal that only repeats the section's title says nothing, so the header leaves it out, as it does when there is
-  // no goal at all.
+  // The section's goal, shown inside About this section. One that only repeats the title, or the teacher's
+  // "Afterwards you can" in the same card, says nothing, so it is left out.
   const goal = $derived.by(() => {
-    const text = (position?.goal || concept?.objective || concept?.goal || (preview?.overview.origin === 'teacher' ? preview.overview.target_ability : '') || '').trim();
+    const text = ((isCurrent ? position?.goal : '') || concept?.objective || concept?.goal || '').trim();
     const plain = (s: string) => s.toLocaleLowerCase().replace(/[\s.:;!?·…-]+/g, ' ').trim();
-    return text && plain(text) !== plain(concept?.title ?? '') ? text : '';
+    const ability = preview?.overview.origin === 'teacher' ? preview.overview.target_ability : '';
+    return text && plain(text) !== plain(concept?.title ?? '') && plain(text) !== plain(ability ?? '') ? text : '';
   });
-
-  // The host records where a section starts; what to do next follows from the lessons and practice so far. While a
-  // lesson is written, or a step waits for Continue, the lesson itself shows the way on, so the header says nothing.
-  const nextStep = $derived.by(() => {
-    if (lessons.some((l) => l.status === 'running')) return '';
-    const stepped = app.openLesson(conceptId);
-    if (stepped) {
-      const latest = app.turn(stepped.steps.filter((s) => s.turn_id).at(-1)?.turn_id);
-      return latest?.status === 'completed' ? '' : t("Regenerate the unfinished step to go on.");
-    }
-    if (!lessons.some((l) => l.status === 'completed')) return t("Regenerate the unfinished lesson, or start a new one.");
-    const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
-    if (generating) return t("Exercises are being prepared from this lesson.");
-    const open = app.tasks(conceptId).filter(isOpen).length;
-    const last = index === total - 1;
-    if (open === 1) return last ? t("Try the open exercise below.") : t("Try the open exercise below, or enter the next section.");
-    if (open) return last ? t("Try the {count} open exercises below.", { count: open }) : t("Try the {count} open exercises below, or enter the next section.", { count: open });
-    return last ? t("Review this section. It is the last one on the route.") : t("Enter the next section when you are ready.");
-  });
+  // The question the section answers, from the teacher's overview; it stands on the card itself.
+  const question = $derived(preview?.overview.origin === 'teacher' ? preview.overview.core_problem : '');
 
   function openQuestion(id: string) {
     app.focusThread = id.replace(/^web:/, '');
@@ -106,10 +89,16 @@
   });
 
 
+
   function toggleOverview(event: Event) {
     overviewOpen = (event.currentTarget as HTMLDetailsElement).open;
   }
 </script>
+
+{#snippet chevron()}
+  <svg class="chev" viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+{/snippet}
+
 
 {#if !conceptId || !concept}
   <section class="empty">
@@ -167,25 +156,25 @@
         </button>
       </div>
       <h1 id="concept-title">{concept.title}</h1>
+      <!-- One card under the title: the question the section answers, opening to its overview, goal and sources. What to
+           do next is shown where it is done (the lesson's Continue, Practice, Up next), so the header does not say it. -->
+      {#if preview}
+        <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
+          <summary>
+            {#if question}
+              <span class="question">{question}</span>
+              <span class="more">{t("About this section")} {@render chevron()}</span>
+            {:else}
+              <span class="label">{t("About this section")}</span>
+              {@render chevron()}
+            {/if}
+          </summary>
+          <div class="about-body"><UnitOverview {preview} {goal} asked={!!question} /></div>
+        </details>
+      {:else if !previewFailed}
+        <p class="overview loading" aria-busy="true">{t("Loading the section overview…")}</p>
+      {/if}
       {#if isCurrent}
-        <!-- Before the first lesson, the Start card below says what comes next. -->
-        {@const next = lessons.length ? nextStep : ''}
-        {#if goal || next}
-          <dl class="position">
-            {#if goal}
-              <div>
-                <dt>{t("Goal")}</dt>
-                <dd>{goal}</dd>
-              </div>
-            {/if}
-            {#if next}
-              <div>
-                <dt>{t("Next step")}</dt>
-                <dd id="next-step">{next}</dd>
-              </div>
-            {/if}
-          </dl>
-        {/if}
         {#if app.returnSection}
           <p class="detour">
             {t("After this section, you go back to {section}.", { section: app.concept(app.returnSection)?.title ?? '' })}
@@ -231,19 +220,6 @@
       </section>
     {/if}
 
-    {#if preview}
-      <details class="overview" open={overviewOpen} ontoggle={toggleOverview}>
-        <summary>
-          {t("About this section")}
-          {#if preview.overview.origin === 'teacher' && preview.overview.core_problem && !overviewOpen}
-            <span class="teaser">{preview.overview.core_problem}</span>
-          {/if}
-        </summary>
-        <UnitOverview {preview} />
-      </details>
-    {:else if !previewFailed}
-      <p class="overview loading" aria-busy="true">{t("Loading the section overview…")}</p>
-    {/if}
 
     {#if lessons.length}
       <div class="lessons">
@@ -411,27 +387,6 @@
     text-wrap: balance;
   }
 
-  .position {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 1.25rem;
-    margin: 1.5rem 0 0;
-    padding-top: 1rem;
-    border-top: 1px solid var(--rule);
-  }
-
-  .position dt {
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--pencil);
-  }
-
-  .position dd {
-    margin: 0.2rem 0 0;
-    font-size: var(--step-0);
-    color: var(--ink);
-  }
 
   .detour {
     display: flex;
@@ -449,8 +404,7 @@
     color: var(--ink-soft);
   }
 
-  .left-off summary,
-  .overview summary {
+  .left-off summary {
     cursor: pointer;
     color: var(--accent);
     font-weight: 500;
@@ -461,29 +415,81 @@
     margin-top: 0.4rem;
   }
 
+  /* The card under the title: the section's question, and About this section, which opens it. */
   .overview {
-    margin-bottom: 2rem;
+    margin-top: 1.25rem;
     padding: 0.85rem 1.1rem;
     border-radius: var(--radius);
     background: var(--sheet);
     border: 1px solid var(--rule);
   }
 
-  .overview[open] summary {
-    margin-bottom: 0.9rem;
+  /* One line of the page's size, as the loading line is, so the card is the same height loaded or not. */
+  .overview summary {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 1.5em;
+    font-size: var(--step-0);
+    line-height: 1.5;
+    cursor: pointer;
+    list-style: none;
   }
 
-  .teaser {
-    margin-left: 0.4rem;
+  .overview summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* Its own chevron, on the right, replaces the page's ▸ before a summary. */
+  .overview summary::before {
+    content: none;
+    display: none;
+  }
+
+  .overview .question {
+    flex: 1;
+    min-width: 0;
     font-family: var(--serif);
     font-style: italic;
-    font-weight: 400;
     color: var(--ink-soft);
   }
 
+  .overview .label {
+    flex: 1;
+    color: var(--ink);
+  }
+
+  .overview .more {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--accent);
+    font-size: var(--step--1);
+    font-weight: 600;
+  }
+
+  .overview .chev {
+    flex: none;
+    color: var(--accent);
+    transition: rotate var(--quick) ease;
+  }
+
+  .overview[open] .chev {
+    rotate: 180deg;
+  }
+
+  .about-body {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* While the overview loads, the card keeps its place and size, so nothing below it moves when it arrives. */
   .overview.loading {
     color: var(--pencil);
     font-size: var(--step-0);
+    line-height: 1.5;
   }
 
   .points.top {
@@ -618,12 +624,5 @@
   .warm-offer p {
     flex: 1 1 18rem;
     margin: 0;
-  }
-
-  @media (max-width: 40rem) {
-    .position {
-      grid-template-columns: 1fr;
-      gap: 0.75rem;
-    }
   }
 </style>

@@ -5,7 +5,8 @@
   import { verification } from '../lib/format';
   import type { Preview } from '../lib/types';
 
-  let { preview }: { preview: Preview } = $props();
+  // `goal`: the section's goal, shown here when the header leaves it out; `asked`: the header already shows the core question.
+  let { preview, goal = '', asked = false }: { preview: Preview; goal?: string; asked?: boolean } = $props();
 
   const o = $derived(preview.overview);
   const next = $derived(app.concept(preview.next_concept_id));
@@ -15,8 +16,9 @@
 </script>
 
 <div class="overview">
+  {#if goal}<dl><div><dt>{t("Goal")}</dt><dd>{goal}</dd></div></dl>{/if}
   {#if o.origin === 'teacher'}
-    <p class="problem">{o.core_problem}</p>
+    {#if !asked}<p class="problem">{o.core_problem}</p>{/if}
     <ol class="steps">
       {#each o.steps as step}
         <li>{step}</li>

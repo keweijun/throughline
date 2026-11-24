@@ -243,7 +243,7 @@
   .months {
     margin-inline-start: 2.25rem;
     margin-bottom: 0.3rem;
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     color: var(--pencil);
     white-space: nowrap;
   }
@@ -263,7 +263,7 @@
     display: grid;
     grid-template-rows: repeat(7, 1fr);
     row-gap: 3px;
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     color: var(--pencil);
     align-items: center;
   }

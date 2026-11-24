@@ -290,6 +290,16 @@ class AppStore {
     return this.state?.curriculum.chapters ?? [];
   }
 
+  /** A route saved without chapters is one chapter titled after the course (ADR 0006); it is not named as a chapter. */
+  get wholeCourse(): boolean {
+    return this.chapters.length === 1 && this.chapters[0].id === 'course';
+  }
+
+  /** How the route names a chapter: "Chapter 2 · Title", or "All sections" for a course without chapters. */
+  chapterName(chapter: Chapter, index: number): string {
+    return this.wholeCourse ? t('All sections') : t('Chapter {number}', { number: index + 1 }) + ' · ' + chapter.title;
+  }
+
   chapterOf(conceptId: string | null | undefined): Chapter | undefined {
     return this.chapters.find((c) => conceptId && c.concept_ids.includes(conceptId));
   }

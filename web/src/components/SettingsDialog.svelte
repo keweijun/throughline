@@ -323,9 +323,11 @@
       {#if settings}
         <section class="group" aria-labelledby="group-teaching">
           <div class="label">
-            <h4 id="group-teaching">{t("Teaching")}</h4>
+            <h4 id="group-teaching">{t("Lessons and answers")}</h4>
             {@render saveStatus('teaching')}
           </div>
+          <!-- The teacher's model and the small model are set alike: a model, then its reasoning effort under it. -->
+          <p class="note above">{t("Lessons, side answers and feedback on your answers.")}</p>
           <div class="card">
             <div class="setting">
               <div class="text">
@@ -345,12 +347,12 @@
                 <input id="teacher-model" type="text" bind:value={model} onchange={() => saveTeacher('teaching')} placeholder={t("Codex default")} autocomplete="off" />
               {/if}
             </div>
-            <div class="setting">
+            <div class="setting stacked">
               <div class="text">
-                <span class="title">{t("Reasoning effort")}</span>
+                <span class="title" id="effort-title">{t("Reasoning effort")}</span>
                 <p>{t("More effort gives more careful answers, and takes longer.")}</p>
               </div>
-              <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
+              <div class="segmented" role="radiogroup" aria-labelledby="effort-title">
                 {#each teacherEfforts as option (option.id)}
                   <label><input type="radio" name="effort" value={option.id} bind:group={effort} onchange={() => saveTeacher('teaching')} />{t(option.label)}</label>
                 {/each}
@@ -428,15 +430,16 @@
                 <input id="small-model" type="text" bind:value={smallModel} onchange={() => saveTeacher('background')} placeholder={t("Default: gpt-6.1-terra")} autocomplete="off" />
               {/if}
             </div>
-            <div class="setting">
+            <div class="setting stacked">
               <!-- The group already says whose effort this is; the name keeps it apart from the teacher's. -->
-              <div class="text"><label class="title" for="small-effort">{t("Reasoning effort")}</label></div>
-              <select id="small-effort" aria-label={t("Small model reasoning effort")} bind:value={smallEffort} onchange={() => saveTeacher('background')}>
-                <option value="">{t("Same as the teacher")}</option>
+              <div class="text"><span class="title">{t("Reasoning effort")}</span></div>
+              <!-- Empty follows the teacher's effort. -->
+              <div class="segmented" role="radiogroup" aria-label={t("Small model reasoning effort")}>
+                <label><input type="radio" name="small-effort" value="" bind:group={smallEffort} onchange={() => saveTeacher('background')} />{t("Same as the teacher")}</label>
                 {#each smallEfforts as option (option.id)}
-                  <option value={option.id}>{t(option.label)}</option>
+                  <label><input type="radio" name="small-effort" value={option.id} bind:group={smallEffort} onchange={() => saveTeacher('background')} />{t(option.label)}</label>
                 {/each}
-              </select>
+              </div>
             </div>
           </div>
         </section>
@@ -536,7 +539,7 @@
               <span class="title">{t("Language")}</span>
               <p>
                 {app.state
-                  ? t("The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.")
+                  ? t("The interface, and new teaching in this course. Sources and saved lessons keep their language.")
                   : t("For this page. Each course keeps its own language once it is open.")}
               </p>
             </div>
@@ -669,7 +672,7 @@
     border-radius: 999px;
     background: var(--accent-wash);
     color: var(--accent);
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     font-weight: 600;
   }
 

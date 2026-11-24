@@ -94,8 +94,8 @@
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
         <!-- The course's cover, as on its card in the library (ADR 0027), with the course's own actions on its corner.
-             The cover names the course here and the top bar gives its title, so the title is not written a third
-             time; a course whose cover has no name yet shows its title under it. -->
+             The cover names the course here (its title, until Codex gives it a name) and the top bar gives its title,
+             so the title is not written a third time. -->
         {#if course}
           <div class="cover">
             <CourseCover {course} />
@@ -131,7 +131,7 @@
             </div>
           </form>
         {:else}
-          <h1 id="course-title" class:visually-hidden={!!course?.cover?.name}>{app.state?.course.title}</h1>
+          <h1 id="course-title" class:visually-hidden={!!course}>{app.state?.course.title}</h1>
         {/if}
         {#if course?.goal}<p class="goal" title={course.goal}>{course.goal}</p>{/if}
         {#if imported}
@@ -171,6 +171,9 @@
             {t('Chapter {number}', { number: currentNumber })} · {current.title}
             <span>{t('{studied} of {total} sections studied', { studied: currentDone, total: current.concept_ids.length })}</span>
           </p>
+        {:else if strip.length === 1}
+          <!-- A course of one chapter: the bar is the course, so it says how far along it is. -->
+          <p class="now"><span>{t('{studied} of {total} sections studied', { studied: strip[0].done, total: strip[0].total })}</span></p>
         {/if}
       </header>
       {#if studio.available}<StudioChats />{/if}
@@ -265,22 +268,23 @@
 
 
   /* On the cover's corner, quiet until the cover is pointed at. */
+  /* On a small chip of paper, so it reads over any pattern. */
   .more {
     position: absolute;
-    top: 0.3rem;
-    right: 0.3rem;
-    padding: 0.25rem 0.35rem;
-    color: var(--pencil);
-    opacity: 0.55;
-    transition: opacity 0.15s ease, background-color 0.15s ease;
+    top: 0.35rem;
+    right: 0.35rem;
+    padding: 0.15rem 0.3rem;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    color: var(--ink-soft);
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
   .cover:hover .more,
   .more:focus-visible,
   .more[aria-expanded='true'] {
-    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    background: var(--sheet);
     color: var(--ink);
-    opacity: 1;
   }
 
   .rename {

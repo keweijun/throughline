@@ -209,7 +209,7 @@
     border-radius: 999px;
     background: none;
     color: var(--pencil);
-    font-size: 0.75rem;
+    font-size: var(--step--2);
     white-space: nowrap;
     text-overflow: ellipsis;
     cursor: pointer;

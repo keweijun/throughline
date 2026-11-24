@@ -16,7 +16,9 @@
     if (!seconds) return '';
     const minutes = Math.round((seconds * 1000 - now) / 60_000);
     const format = new Intl.RelativeTimeFormat(locale.language, { numeric: 'auto', style: 'narrow' });
-    if (Math.abs(minutes) < 60) return format.format(Math.min(minutes, 0), 'minute');
+    // "this minute" reads oddly in a list; under a minute is just now.
+    if (minutes > -1) return t('just now');
+    if (Math.abs(minutes) < 60) return format.format(minutes, 'minute');
     if (Math.abs(minutes) < 60 * 24) return format.format(Math.round(minutes / 60), 'hour');
     return format.format(Math.round(minutes / (60 * 24)), 'day');
   }
@@ -130,7 +132,7 @@
 
   .when {
     flex: none;
-    font-size: 0.75rem;
+    font-size: var(--step--2);
     font-weight: 400;
     color: var(--pencil);
   }

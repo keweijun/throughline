@@ -53,10 +53,11 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
 
   // Enter breaks the line and Ctrl+Enter sends, as in every writing box.
   const sectionNote = page.getByRole('textbox', { name: 'Add a note to this section' });
+  // Shift+Enter starts a new line; Enter sends.
   await sectionNote.fill('Overall:');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Shift+Enter');
   await sectionNote.pressSequentially('revisit');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Shift+Enter');
   await sectionNote.pressSequentially('interference');
   await expect.poll(() => editorText(sectionNote)).toBe('Overall:\nrevisit\ninterference');
   await sectionNote.press('Control+Enter');
@@ -217,7 +218,8 @@ test('a highlight running across a citation chip is still painted, without the c
   await page.getByRole('button', { name: 'Highlight', exact: true }).click();
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
-  await page.locator('#panel-notes').getByRole('radio', { name: /^All/ }).check();
+  // With one highlight, Section, Chapter and All would list the same, so no choice is offered.
+  await expect(page.locator('#panel-notes').getByRole('radio', { name: /^All/ })).toHaveCount(0);
   await expect(page.locator('#panel-notes .item.highlight')).toContainText('probability amplitudes');
   await expect(page.locator('#panel-notes .item.highlight')).not.toContainText('p. 2');
   expect(errors).toEqual([]);

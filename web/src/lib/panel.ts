@@ -49,3 +49,8 @@ export function scopeCounts<T>(items: T[], sectionOf: (item: T) => string | null
   const count = (scope: PanelScope) => groupBySection(items, scope, sectionOf, chapterOf).reduce((n, g) => n + g.items.length, 0);
   return { section: count('section'), chapter: count('chapter'), all: items.length };
 }
+
+/** Whether choosing Section, Chapter or All would change the list: the choice is offered only then. */
+export function narrows(counts: Record<PanelScope, number>) {
+  return new Set([counts.section, counts.chapter, counts.all]).size > 1;
+}

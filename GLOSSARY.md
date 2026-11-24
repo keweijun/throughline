@@ -190,7 +190,7 @@ _Avoid_: Needs-work assessment (one result), misconception label, weakness score
 **Teaching widget**: Part of a lesson's Markdown that the interface draws: LaTeX, highlighted code, a callout or a Mermaid diagram (the basics, always available), or an add-on (ADR 0013).
 _Avoid_: Plugin, interactive simulation, embed.
 
-**Cover**: What a course's card in the library shows above its title: the subject's short name, as a student would say it, over a pattern of thin lines. Codex chooses both (`cover.save`) and the app draws the pattern; a course without one shows a pattern alone (ADR 0027).
+**Cover**: What a course's card in the library shows above its title: the subject's short name, as a student would say it, over a pattern of thin lines. Codex chooses both (`cover.save`) and the app draws the pattern; a course without one shows its title over a pattern (ADR 0027).
 _Avoid_: Thumbnail, icon, a picture of a source page, the course's title.
 
 **Add-on**: A teaching widget for particular subjects, such as function plots or chemical equations, from the library in this repository. Codex selects a course's add-ons; only their guides enter the teacher's instructions, while the interface draws every add-on in every course. Learners never see or manage them.

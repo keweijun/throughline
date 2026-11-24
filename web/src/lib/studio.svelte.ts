@@ -146,6 +146,8 @@ type Activity = { running: string[]; waiting: StudioRequest[]; chats?: number };
 export type StudioScope = 'course' | 'library';
 
 class StudioStore {
+  /** Told when a turn ends or Codex asks the learner something, in any of the scope's chats, for a notification. */
+  onNotice: ((kind: 'finished' | 'waiting', thread: string) => void) | null = null;
   /** The course whose Overview shows Studio, or the library page; switching starts from that place's chats. */
   scope = $state<StudioScope>('course');
   /** On the library page, the courses there were when this chat began, so a course Codex makes can be offered. The
@@ -551,7 +553,10 @@ class StudioStore {
     }
     if (method === 'studio/request') {
       const request = params as StudioRequest;
-      if (!this.waiting.some((p) => p.id === request.id)) this.waiting.push(request);
+      if (!this.waiting.some((p) => p.id === request.id)) {
+        this.waiting.push(request);
+        this.onNotice?.('waiting', request.params.threadId);
+      }
       if (request.params.threadId === this.threadId && !this.pending.some((p) => p.id === request.id)) this.pending.push(request);
       return;
     }
@@ -566,6 +571,8 @@ class StudioStore {
     if (method === 'turn/completed') {
       this.working = this.working.filter((t) => t !== thread);
       this.waiting = this.waiting.filter((p) => p.params.turnId !== params.turn.id);
+      // A turn the learner stopped needs no telling.
+      if (params.turn.status !== 'interrupted') this.onNotice?.('finished', thread);
     }
     if (thread !== this.threadId) {
       if (method === 'turn/started' || method === 'turn/completed') void this.refreshThreads();

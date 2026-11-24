@@ -1067,6 +1067,13 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     def restore_course(entry: str):
         return courses.restore(entry)
 
+    @app.post('/api/library/show')
+    def show_library():
+        """Opens the Throughline folder in the file manager, from Settings → About."""
+        if courses.root is None:
+            raise OperationError('no_library', 'This host was started for a single course')
+        return opener.open(courses.root)
+
     @app.post('/api/library/trash/show')
     def show_trash():
         if courses.root is None:

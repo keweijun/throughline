@@ -60,6 +60,19 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The reading size chosen in Settings → Appearance (data-reading on the root element); the default is set above. */
+:root[data-reading='small'] {
+  --reading: 1rem;
+}
+
+:root[data-reading='large'] {
+  --reading: 1.25rem;
+}
+
+:root[data-reading='larger'] {
+  --reading: 1.375rem;
+}
+
 /* The only rules that differ between the themes: which side of each colour applies, and the deeper dark shadow. */
 :root[data-theme='dark'] {
   color-scheme: dark;

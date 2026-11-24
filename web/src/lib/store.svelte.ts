@@ -5,6 +5,7 @@ import { flash, locate, occurrences } from './highlight';
 import type { Target } from './search';
 import { scrollStage, stageHeight, stageOffset, stageScroll } from './stage';
 import { studio, type StudioOrigin } from './studio.svelte';
+import { notify } from './notify.svelte';
 import type { Annotation, AnnotationSource, ChangeScope, Channel, Chapter, CheckChoice, ChapterBuild, DrillStart, Handoff, DeltaEvent, HostEvent, LessonKind, Library, Preferences, Question, Ref, Settings, SourceView, State, Task, Turn, UpdateCheck, UpdateInstall, UpdateProgress } from './types';
 
 /** A passage waiting in the Notes box: saving the box highlights it with the note written there. */
@@ -1384,4 +1385,15 @@ class AppStore {
 }
 
 export const app = new AppStore();
+// Studio's work can take minutes; a learner who turned on notifications hears when it ends or needs them.
+studio.onNotice = async (kind, thread) => {
+  const course = studio.scope === 'course' ? app.state?.course.title : undefined;
+  // A chat begun moments ago is named only once the list is read again.
+  await studio.refreshThreads();
+  const chat = studio.label(thread);
+  const body = kind === 'waiting' ? t('Studio needs your answer in “{chat}”.', { chat }) : t('Studio finished in “{chat}”.', { chat });
+  notify(course ?? t('Throughline'), body, `studio-${thread}`, () => {
+    if (studio.scope === 'course') app.showStudio({ thread });
+  });
+};
 signIn.refused = () => (app.signedOut = true);

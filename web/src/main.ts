@@ -12,6 +12,8 @@ import { copyFormulasAsTex } from './lib/selection';
 try {
   const theme = localStorage.getItem('theme');
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+  const reading = localStorage.getItem('reading');
+  if (reading === 'small' || reading === 'large' || reading === 'larger') document.documentElement.dataset.reading = reading;
 } catch {
   // Storage can be unavailable in private windows; the system theme still applies.
 }

@@ -46,7 +46,8 @@ test('switching during generation preserves the turn and drafts but applies to t
   await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '老师', exact: true }).click();
   await expect(page.getByRole('radiogroup', { name: '推理强度', exact: true }).getByRole('radio', { name: '中', exact: true })).toBeChecked();
-  await expect(page.getByText('按用户保存，适用于所有课程。')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '教学', exact: true })).toBeVisible();
+  await expect(page.getByText('课程工坊也使用这个模型，直到你在它的输入框里另选。')).toBeVisible();
   expect(errors).toEqual([]);
 });
 

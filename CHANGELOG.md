@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.62.1
+
+- **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Teaching** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.
+
 ## 0.62.0
 
 - **All courses is redesigned.**

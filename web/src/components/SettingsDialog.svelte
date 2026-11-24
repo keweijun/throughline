@@ -10,7 +10,7 @@
 
   type Theme = 'system' | 'light' | 'dark';
   type Pane = 'teacher' | 'appearance' | 'about';
-
+  type Group = 'teaching' | 'background';
 
   let dialog: HTMLDialogElement | undefined = $state();
   let pane = $state<Pane>('appearance');
@@ -21,7 +21,8 @@
   let modelsError = $state('');
   let effort = $state<Settings['effort']>('medium');
   let smallEffort = $state<Settings['small_effort']>('');
-  let teacherSaved = $state(false);
+  // The group whose change is saving or was last saved, so the word shows beside what was changed.
+  let savedGroup = $state<Group | null>(null);
   let savingTeacher = $state(false);
   let savingLanguage = $state(false);
   let about = $state<{ version: string } | null>(null);
@@ -147,7 +148,7 @@
       void loadAbout();
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
-      teacherSaved = false;
+      savedGroup = null;
       const asked = panes.find((p) => p.id === app.settingsPane);
       app.settingsPane = null;
       if (asked) pane = asked.id;
@@ -178,7 +179,8 @@
   // Every teacher choice saves at once, after a new model has settled the effort it supports. Saves run one at a
   // time, each sending the choices as they are when it starts, so a quick series of changes ends with the last.
   let queue = Promise.resolve();
-  function saveTeacher() {
+  function saveTeacher(group: Group) {
+    savedGroup = group;
     queue = queue.then(sendTeacher);
     return queue;
   }
@@ -186,7 +188,6 @@
   async function sendTeacher() {
     await tick();
     savingTeacher = true;
-    teacherSaved = false;
     const result = await app.saveSettings({
       model,
       small_model: smallModel,
@@ -196,7 +197,7 @@
       service_tier: models && !fastTier ? '' : serviceTier,
     });
     savingTeacher = false;
-    teacherSaved = !!result;
+    if (!result) savedGroup = null;
   }
 </script>
 
@@ -214,6 +215,16 @@
       {/if}
     </svg>
   </span>
+{/snippet}
+
+{#snippet saveStatus(group: Group)}
+  {#if savedGroup === group}
+    {#if savingTeacher}
+      <span class="status" role="status">{t("Saving…")}</span>
+    {:else}
+      <span class="status saved" role="status">{t("Saved")}</span>
+    {/if}
+  {/if}
 {/snippet}
 
 {#snippet languageChoice()}
@@ -234,213 +245,230 @@
 {/snippet}
 
 <dialog bind:this={dialog} use:lightDismiss onclose={() => (app.settingsOpen = false)} aria-labelledby="settings-title">
-  <header>
+  <button class="btn btn-quiet close" onclick={() => (app.settingsOpen = false)} aria-label={t("Close")}>
+    <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
+  </button>
+
+  <!-- Four levels, each a step quieter than the one above: the dialog's name over its categories, the open
+       category's title, a group's label over its card, and each row's title over its description. -->
+  <nav aria-label={t("Settings")}>
     <h2 id="settings-title">{t("Settings")}</h2>
-    <button class="btn btn-quiet close" onclick={() => (app.settingsOpen = false)} aria-label={t("Close")}>
-      <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg>
-    </button>
-  </header>
+    {#each panes as item (item.id)}
+      <button class="category" aria-current={pane === item.id ? 'page' : undefined} onclick={() => (pane = item.id)}>
+        {@render icon(item.id)}{t(item.label)}
+        {#if item.id === 'about' && app.update?.available}<span class="tag">{t("Update")}</span>{/if}
+      </button>
+    {/each}
+  </nav>
 
-  <div class="body">
-    <nav aria-label={t("Settings")}>
-      {#each panes as item (item.id)}
-        <button class="category" aria-current={pane === item.id ? 'page' : undefined} onclick={() => (pane = item.id)}>
-          {@render icon(item.id)}{t(item.label)}
-          {#if item.id === 'about' && app.update?.available}<span class="tag">{t("Update")}</span>{/if}
-        </button>
-      {/each}
-      {#if pane !== 'about'}
-        <p class="scope">
-          {pane === 'teacher' ? t("Saved for your user account, for every course.") : t("Saved in this browser.")}
-        </p>
-      {/if}
-    </nav>
-
-    <div class="pane">
-      {#if pane === 'teacher'}
+  <div class="pane">
+    {#if pane === 'teacher'}
+      <div class="head">
         <h3>{t("Teacher")}</h3>
         <p class="lead">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
-        {#if settings}
-          <div class="setting">
-            <div class="text">
-              <label class="title" for="teacher-model">{t("Model")}</label>
-              {#if !models}
-                <p role="status">{modelsError ? `${t("Could not load models from Codex:")} ${modelsError}` : t("Loading models from Codex…")}</p>
-              {/if}
-            </div>
-            {#if models}
-              <select id="teacher-model" bind:value={model} onchange={saveTeacher}>
-                <option value="">{t("Codex default")}</option>
-                {#each choices(model) as option (option.id)}
-                  <option value={option.id} title={option.description}>{option.name}</option>
-                {/each}
-              </select>
-            {:else}
-              <input id="teacher-model" type="text" bind:value={model} onchange={saveTeacher} placeholder={t("Codex default")} autocomplete="off" />
-            {/if}
+      </div>
+      {#if settings}
+        <section class="group" aria-labelledby="group-teaching">
+          <div class="label">
+            <h4 id="group-teaching">{t("Teaching")}</h4>
+            {@render saveStatus('teaching')}
           </div>
-          <div class="setting">
-            <div class="text">
-              <span class="title">{t("Reasoning effort")}</span>
-              <p>{t("More effort gives more careful answers, and takes longer.")}</p>
-            </div>
-            <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
-              {#each teacherEfforts as option (option.id)}
-                <label><input type="radio" name="effort" value={option.id} bind:group={effort} onchange={saveTeacher} />{t(option.label)}</label>
-              {/each}
-            </div>
-          </div>
-          {#if fastId}
+          <div class="card">
             <div class="setting">
               <div class="text">
-                <label class="title" for="fast-mode">{t("Fast mode")}</label>
-                <p>{fastTier?.description ? `${fastTier.description}. ` : ''}{t("Applies to lessons, answers and feedback; background preparation keeps the standard speed.")}</p>
+                <label class="title" for="teacher-model">{t("Model")}</label>
+                {#if !models}
+                  <p role="status">{modelsError ? `${t("Could not load models from Codex:")} ${modelsError}` : t("Loading models from Codex…")}</p>
+                {/if}
               </div>
-              <input
-                id="fast-mode"
-                class="switch"
-                type="checkbox"
-                role="switch"
-                checked={serviceTier === fastId}
-                onchange={(event) => {
-                  serviceTier = event.currentTarget.checked ? fastId : '';
-                  void saveTeacher();
-                }}
-              />
+              {#if models}
+                <select id="teacher-model" bind:value={model} onchange={() => saveTeacher('teaching')}>
+                  <option value="">{t("Codex default")}</option>
+                  {#each choices(model) as option (option.id)}
+                    <option value={option.id} title={option.description}>{option.name}</option>
+                  {/each}
+                </select>
+              {:else}
+                <input id="teacher-model" type="text" bind:value={model} onchange={() => saveTeacher('teaching')} placeholder={t("Codex default")} autocomplete="off" />
+              {/if}
             </div>
-          {/if}
+            <div class="setting">
+              <div class="text">
+                <span class="title">{t("Reasoning effort")}</span>
+                <p>{t("More effort gives more careful answers, and takes longer.")}</p>
+              </div>
+              <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
+                {#each teacherEfforts as option (option.id)}
+                  <label><input type="radio" name="effort" value={option.id} bind:group={effort} onchange={() => saveTeacher('teaching')} />{t(option.label)}</label>
+                {/each}
+              </div>
+            </div>
+            {#if fastId}
+              <div class="setting">
+                <div class="text">
+                  <label class="title" for="fast-mode">{t("Fast mode")}</label>
+                  <p>{fastTier?.description ? `${fastTier.description}. ` : ''}{t("Applies to lessons, answers and feedback; background preparation keeps the standard speed.")}</p>
+                </div>
+                <input
+                  id="fast-mode"
+                  class="switch"
+                  type="checkbox"
+                  role="switch"
+                  checked={serviceTier === fastId}
+                  onchange={(event) => {
+                    serviceTier = event.currentTarget.checked ? fastId : '';
+                    void saveTeacher('teaching');
+                  }}
+                />
+              </div>
+            {/if}
+          </div>
+          <p class="note">{t("Studio uses this model too, until you choose its own in Studio's writing box.")}</p>
+        </section>
 
-          <h4>{t("Studio")}</h4>
-          <p class="lead">{t("Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.")}</p>
-
-          <h4>{t("Background work")}</h4>
-          <p class="lead">{t("The small model prepares upcoming sections, consolidates notes in the background, and runs the quick teacher of drills in Review.")}</p>
-          <div class="setting">
-            <div class="text"><label class="title" for="small-model">{t("Small model")}</label></div>
-            {#if models}
-              <select id="small-model" bind:value={smallModel} onchange={saveTeacher}>
-                <!-- Empty is Throughline's default small model; `teacher` the teacher's (background.small_model). -->
-                <option value="">{t("Default (GPT-6.1 Terra)")}</option>
-                <option value="teacher">{t("Same as the teacher model")}</option>
-                {#each choices(smallModel === "teacher" ? "" : smallModel) as option (option.id)}
-                  <option value={option.id} title={option.description}>{option.name}</option>
+        <section class="group" aria-labelledby="group-background">
+          <div class="label">
+            <h4 id="group-background">{t("Background work")}</h4>
+            {@render saveStatus('background')}
+          </div>
+          <p class="note above">{t("The small model prepares upcoming sections, consolidates notes in the background, and runs the quick teacher of drills in Review.")}</p>
+          <div class="card">
+            <div class="setting">
+              <div class="text"><label class="title" for="small-model">{t("Small model")}</label></div>
+              {#if models}
+                <select id="small-model" bind:value={smallModel} onchange={() => saveTeacher('background')}>
+                  <!-- Empty is Throughline's default small model; `teacher` the teacher's (background.small_model). -->
+                  <option value="">{t("Default (GPT-6.1 Terra)")}</option>
+                  <option value="teacher">{t("Same as the teacher model")}</option>
+                  {#each choices(smallModel === "teacher" ? "" : smallModel) as option (option.id)}
+                    <option value={option.id} title={option.description}>{option.name}</option>
+                  {/each}
+                </select>
+              {:else}
+                <input id="small-model" type="text" bind:value={smallModel} onchange={() => saveTeacher('background')} placeholder={t("Default: gpt-6.1-terra")} autocomplete="off" />
+              {/if}
+            </div>
+            <div class="setting">
+              <!-- The group already says whose effort this is; the name keeps it apart from the teacher's. -->
+              <div class="text"><label class="title" for="small-effort">{t("Reasoning effort")}</label></div>
+              <select id="small-effort" aria-label={t("Small model reasoning effort")} bind:value={smallEffort} onchange={() => saveTeacher('background')}>
+                <option value="">{t("Same as the teacher")}</option>
+                {#each smallEfforts as option (option.id)}
+                  <option value={option.id}>{t(option.label)}</option>
                 {/each}
               </select>
-            {:else}
-              <input id="small-model" type="text" bind:value={smallModel} onchange={saveTeacher} placeholder={t("Default: gpt-6.1-terra")} autocomplete="off" />
-            {/if}
-          </div>
-          <div class="setting">
-            <div class="text"><label class="title" for="small-effort">{t("Small model reasoning effort")}</label></div>
-            <select id="small-effort" bind:value={smallEffort} onchange={saveTeacher}>
-              <option value="">{t("Same as the teacher")}</option>
-              {#each smallEfforts as option (option.id)}
-                <option value={option.id}>{t(option.label)}</option>
-              {/each}
-            </select>
-          </div>
-
-          <div class="foot">
-            {#if savingTeacher}
-              <span role="status">{t("Saving…")}</span>
-            {:else if teacherSaved}
-              <span class="saved" role="status">{t("Saved. New lessons, answers and feedback use these settings.")}</span>
-            {/if}
-            {#if settings.overridden}
-              <p>{t("This host was started with model or effort options. Changes here replace them.")}</p>
-            {/if}
-            <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
-          </div>
-        {/if}
-      {:else if pane === 'about'}
-        <div class="identity">
-          <img src="/favicon.svg" alt="" width="48" height="48" />
-          <div>
-            <h3>{t("Throughline")}</h3>
-            <p class="lead">{about ? t("Version {version}", { version: about.version }) : '\u00a0'}</p>
-          </div>
-        </div>
-        <p class="tagline">{t("One line of teaching through all your documents.")}</p>
-        <p class="lead">{t("A local study app that turns your PDFs and notes into a guided course. Codex teaches on this computer, with your own sign-in; your courses stay in your Throughline folder.")}</p>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Updates")}</span>
-            {#if updating && !updating.failed}
-              <p role="status">{t(UPDATE_STEP[updating.step], { version: updating.to })}</p>
-            {:else if updating?.failed}
-              <p role="status">{t("The update did not finish:")} {updating.failed}</p>
-            {:else if app.updated && !app.update?.available}
-              <p role="status">{t("Updated to version {version}. Your courses are as you left them.", { version: app.updated })}</p>
-            {:else if app.update?.available}
-              <p role="status">{t("Version {latest} is available.", { latest: app.update.latest })} {t("Codex installs it in the background and keeps your courses. Throughline closes for a minute or two and comes back by itself.")}</p>
-            {:else if updateError}
-              <p role="status">{t("Could not check for updates:")} {updateError}</p>
-            {:else if app.update}
-              <p role="status">{t("You have the latest version.")}</p>
-            {/if}
-          </div>
-          {#if updating && !updating.failed}
-            <span class="percent" aria-hidden="true">{Math.round(updating.progress)}%</span>
-          {:else if app.update?.available || updating?.failed}
-            <div class="update-actions">
-              {#if updating?.failed}
-                <CodexLink chat class="btn btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
-              {/if}
-              <button class="btn btn-primary btn-small" onclick={installUpdate} disabled={starting}>{t(updating?.failed ? "Try again" : "Update")}</button>
             </div>
-          {:else}
-            <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
-          {/if}
-          {#if updating && !updating.failed}
-            <div class="progress" role="progressbar" aria-label={t("Update progress")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(updating.progress)}>
-              <span style:width="{updating.progress}%"></span>
-            </div>
-          {/if}
-        </div>
+          </div>
+        </section>
 
-        {#if launcher}
-          <div class="setting stacked">
-            <div class="text"><span class="title">{t("Opening Throughline next time")}</span></div>
-            <div><LauncherHelp {launcher} /></div>
-          </div>
-        {/if}
-
-        <h4>{t("Credits")}</h4>
-        <div class="credits">
-          <p>{t("Made by")} <a href="https://github.com/keweijun" target="_blank" rel="noreferrer">Keweijun</a></p>
-          <p><a href="https://github.com/keweijun/throughline" target="_blank" rel="noreferrer">{t("Source code on GitHub")}</a> · {t("MIT License")}</p>
-          <p class="lead">
-            {t("Built with PDF.js, KaTeX, marked and DOMPurify, set in Source Serif 4 and IBM Plex Sans.")}
-            <a href="https://github.com/keweijun/throughline/blob/main/THIRD_PARTY_LICENSES.md" target="_blank" rel="noreferrer">{t("Their licenses")}</a>
-          </p>
-        </div>
-      {:else}
-        <h3>{t("Appearance")}</h3>
-        <div class="setting">
-          <div class="text">
-            <span class="title">{t("Language")}</span>
-            <p>
-              {app.state
-                ? t("The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.")
-                : t("For this page. Each course keeps its own language once it is open.")}
-            </p>
-          </div>
-          {@render languageChoice()}
-        </div>
-        <div class="setting stacked">
-          <div class="text"><span class="title">{t("Theme")}</span></div>
-          <div class="themes" role="radiogroup" aria-label={t("Theme")}>
-            {#each [['system', 'Match the system'], ['light', 'Light'], ['dark', 'Dark']] as const as [id, label] (id)}
-              <label class="theme">
-                <input type="radio" name="theme" value={id} checked={theme === id} onchange={() => changeTheme(id)} />
-                <span class="swatch {id}" aria-hidden="true"></span>
-                {t(label)}
-              </label>
-            {/each}
-          </div>
+        <div class="foot">
+          {#if settings.overridden}
+            <p>{t("This host was started with model or effort options. Changes here replace them.")}</p>
+          {/if}
+          <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
         </div>
       {/if}
-    </div>
+    {:else if pane === 'about'}
+      <div class="head identity">
+        <img src="/favicon.svg" alt="" width="44" height="44" />
+        <div>
+          <h3>{t("Throughline")}</h3>
+          <p class="lead">{about ? t("Version {version}", { version: about.version }) : '\u00a0'}</p>
+        </div>
+      </div>
+      <p class="tagline">{t("One line of teaching through all your documents.")}</p>
+      <p class="blurb">{t("A local study app that turns your PDFs and notes into a guided course. Codex teaches on this computer, with your own sign-in; your courses stay in your Throughline folder.")}</p>
+
+      <section class="group" aria-label={t("Updates")}>
+        <div class="card">
+          <div class="setting">
+            <div class="text">
+              <span class="title">{t("Updates")}</span>
+              {#if updating && !updating.failed}
+                <p role="status">{t(UPDATE_STEP[updating.step], { version: updating.to })}</p>
+              {:else if updating?.failed}
+                <p role="status">{t("The update did not finish:")} {updating.failed}</p>
+              {:else if app.updated && !app.update?.available}
+                <p role="status">{t("Updated to version {version}. Your courses are as you left them.", { version: app.updated })}</p>
+              {:else if app.update?.available}
+                <p role="status">{t("Version {latest} is available.", { latest: app.update.latest })} {t("Codex installs it in the background and keeps your courses. Throughline closes for a minute or two and comes back by itself.")}</p>
+              {:else if updateError}
+                <p role="status">{t("Could not check for updates:")} {updateError}</p>
+              {:else if app.update}
+                <p role="status">{t("You have the latest version.")}</p>
+              {/if}
+            </div>
+            {#if updating && !updating.failed}
+              <span class="percent" aria-hidden="true">{Math.round(updating.progress)}%</span>
+            {:else if app.update?.available || updating?.failed}
+              <div class="update-actions">
+                {#if updating?.failed}
+                  <CodexLink chat class="btn btn-small" prompt={t("Update https://github.com/keweijun/throughline")}>{t("Update in Codex")}</CodexLink>
+                {/if}
+                <button class="btn btn-primary btn-small" onclick={installUpdate} disabled={starting}>{t(updating?.failed ? "Try again" : "Update")}</button>
+              </div>
+            {:else}
+              <button class="btn btn-small" onclick={checkForUpdates} disabled={checking}>{t(checking ? "Checking…" : "Check for updates")}</button>
+            {/if}
+            {#if updating && !updating.failed}
+              <div class="progress" role="progressbar" aria-label={t("Update progress")} aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(updating.progress)}>
+                <span style:width="{updating.progress}%"></span>
+              </div>
+            {/if}
+          </div>
+        </div>
+      </section>
+
+      {#if launcher}
+        <section class="group" aria-labelledby="group-launcher">
+          <div class="label"><h4 id="group-launcher">{t("Opening Throughline next time")}</h4></div>
+          <LauncherHelp {launcher} />
+        </section>
+      {/if}
+
+      <section class="group credits" aria-labelledby="group-credits">
+        <div class="label"><h4 id="group-credits">{t("Credits")}</h4></div>
+        <p>{t("Made by")} <a href="https://github.com/keweijun" target="_blank" rel="noreferrer">Keweijun</a> · <a href="https://github.com/keweijun/throughline" target="_blank" rel="noreferrer">{t("Source code on GitHub")}</a> · {t("MIT License")}</p>
+        <p class="note">
+          {t("Built with PDF.js, KaTeX, marked and DOMPurify, set in Source Serif 4 and IBM Plex Sans.")}
+          <a href="https://github.com/keweijun/throughline/blob/main/THIRD_PARTY_LICENSES.md" target="_blank" rel="noreferrer">{t("Their licenses")}</a>
+        </p>
+      </section>
+    {:else}
+      <div class="head">
+        <h3>{t("Appearance")}</h3>
+      </div>
+      <section class="group" aria-label={t("Appearance")}>
+        <div class="card">
+          <div class="setting">
+            <div class="text">
+              <span class="title">{t("Language")}</span>
+              <p>
+                {app.state
+                  ? t("The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.")
+                  : t("For this page. Each course keeps its own language once it is open.")}
+              </p>
+            </div>
+            {@render languageChoice()}
+          </div>
+          <div class="setting stacked">
+            <div class="text">
+              <span class="title">{t("Theme")}</span>
+              <p>{t("Saved in this browser.")}</p>
+            </div>
+            <div class="themes" role="radiogroup" aria-label={t("Theme")}>
+              {#each [['system', 'Match the system'], ['light', 'Light'], ['dark', 'Dark']] as const as [id, label] (id)}
+                <label class="theme">
+                  <input type="radio" name="theme" value={id} checked={theme === id} onchange={() => changeTheme(id)} />
+                  <span class="swatch {id}" aria-hidden="true"></span>
+                  {t(label)}
+                </label>
+              {/each}
+            </div>
+          </div>
+        </div>
+      </section>
+    {/if}
   </div>
 </dialog>
 
@@ -458,53 +486,49 @@
   }
 
   dialog[open] {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 13.5rem minmax(0, 1fr);
   }
 
   dialog::backdrop {
     background: rgb(17 20 27 / 0.45);
   }
 
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.25rem 1rem 1.5rem;
-    border-bottom: 1px solid var(--rule);
-  }
-
-  h2 {
-    font-family: var(--serif);
-    font-size: var(--step-2);
-    font-weight: 600;
-  }
-
   .close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 1;
     padding: 0.35rem;
   }
 
-  .body {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: 13rem 1fr;
+  /* Rows scroll under it, so it keeps the sheet behind it. */
+  .close:not(:hover) {
+    background: var(--sheet);
   }
 
   nav {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding: 1rem 0.75rem;
+    gap: 0.125rem;
+    padding: 1.25rem 0.75rem 1rem;
     border-right: 1px solid var(--rule);
     background: var(--ground);
+  }
+
+  h2 {
+    padding: 0 0.5rem 0.875rem;
+    font-family: var(--serif);
+    font-size: var(--step-2);
+    font-weight: 600;
+    line-height: 1.2;
   }
 
   .category {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    padding: 0.4rem 0.6rem 0.4rem 0.4rem;
+    gap: 0.6rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.35rem;
     border: 1px solid transparent;
     border-radius: 8px;
     background: none;
@@ -523,14 +547,18 @@
     display: grid;
     place-items: center;
     flex: none;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
-    color: var(--ink-soft);
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 7px;
+    color: var(--pencil);
     transition:
       background-color var(--quick) var(--ease-out),
       color var(--quick) var(--ease-out);
+  }
+
+  .glyph svg {
+    width: 18px;
+    height: 18px;
   }
 
   .tag {
@@ -573,71 +601,133 @@
     }
   }
 
-  .scope {
-    margin-top: auto;
-    padding: 0.75rem 0.75rem 0;
-    border-top: 1px solid var(--rule);
-    font-size: var(--step--1);
-    color: var(--pencil);
-  }
-
   .pane {
     overflow-y: auto;
-    padding: 1.25rem 1.75rem 1.75rem;
+    padding: 1.5rem 2rem 2rem;
+  }
+
+  .head {
+    /* Clear of the close button in the corner. */
+    padding-inline-end: 2.5rem;
+    margin-bottom: 1.5rem;
   }
 
   h3 {
-    font-size: var(--step-1);
+    font-size: var(--step-2);
     font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  h4 {
-    margin-top: 1.75rem;
-    font-size: var(--step-0);
-    font-weight: 600;
+    line-height: 1.25;
   }
 
   .lead {
-    font-size: var(--step--1);
+    margin-top: 0.25rem;
     color: var(--pencil);
-    margin-bottom: 0.25rem;
   }
 
   .identity {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
+    gap: 0.875rem;
+    margin-bottom: 1.25rem;
   }
 
   .identity h3 {
     font-family: var(--serif);
-    margin-bottom: 0;
+  }
+
+  .identity .lead {
+    margin-top: 0;
+    font-size: var(--step--1);
   }
 
   .tagline {
-    margin-top: 1rem;
     font-family: var(--serif);
+    font-size: var(--step-1);
   }
 
-  .credits {
-    display: grid;
-    gap: 0.4rem;
+  .blurb {
+    margin: 0.35rem 0 1.5rem;
+    color: var(--pencil);
+  }
+
+  /* A group: a quiet label, then its rows on one card. */
+  .group + .group {
+    margin-top: 1.75rem;
+  }
+
+  .label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 1.5rem;
+    margin-bottom: 0.5rem;
+    padding-inline: 0.125rem;
+  }
+
+  h4 {
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+  }
+
+  .status {
+    font-size: var(--step--1);
+    color: var(--pencil);
+    animation: enter-fade var(--quick) ease;
+  }
+
+  .saved {
+    color: var(--good);
+  }
+
+  .note {
     margin-top: 0.5rem;
+    padding-inline: 0.125rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .note.above {
+    margin: -0.25rem 0 0.625rem;
+  }
+
+  .card {
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--raised);
   }
 
   .setting {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.5rem 1.5rem;
-    padding-block: 1rem;
-    border-bottom: 1px solid var(--rule);
+    gap: 0.75rem 1.5rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .setting + .setting {
+    border-top: 1px solid var(--rule);
   }
 
   .setting.stacked {
     grid-template-columns: 1fr;
-    border-bottom: 0;
+  }
+
+  .title {
+    font-weight: 500;
+  }
+
+  .text p {
+    margin-top: 0.125rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+    overflow-wrap: anywhere;
+  }
+
+  .setting > select,
+  .setting > input[type='text'] {
+    width: 14rem;
   }
 
   .update-actions {
@@ -672,22 +762,6 @@
     .progress span {
       transition: none;
     }
-  }
-
-  .setting > select,
-  .setting > input[type='text'] {
-    width: 15rem;
-  }
-
-  .title {
-    font-weight: 500;
-  }
-
-  .text p {
-    margin-top: 0.15rem;
-    font-size: var(--step--1);
-    color: var(--pencil);
-    overflow-wrap: anywhere;
   }
 
   .switch {
@@ -732,12 +806,13 @@
   .theme {
     position: relative;
     display: grid;
-    gap: 0.6rem;
-    padding: 0.75rem;
+    gap: 0.5rem;
+    padding: 0.625rem;
     border: 1px solid var(--rule);
     border-radius: 8px;
-    background: var(--raised);
+    background: var(--sheet);
     color: var(--ink-soft);
+    font-size: var(--step--1);
     font-weight: 500;
     cursor: pointer;
   }
@@ -763,7 +838,7 @@
   }
 
   .swatch {
-    height: 3.5rem;
+    height: 3rem;
     border: 1px solid var(--rule);
     border-radius: var(--radius);
   }
@@ -780,42 +855,40 @@
     background: linear-gradient(135deg, #fbfcfd 50%, #171b24 50%);
   }
 
+  .credits p:not(.note) {
+    padding-inline: 0.125rem;
+  }
+
   .foot {
     display: grid;
     gap: 0.35rem;
-    margin-top: 1.25rem;
+    margin-top: 1.75rem;
+    padding-inline: 0.125rem;
     font-size: var(--step--1);
     color: var(--pencil);
     overflow-wrap: anywhere;
   }
 
-  .saved {
-    color: var(--good);
-  }
-
   @media (max-width: 40rem) {
-    .body {
+    dialog[open] {
       grid-template-columns: 1fr;
       grid-template-rows: auto 1fr;
     }
 
     nav {
       flex-direction: row;
+      flex-wrap: wrap;
       border-right: 0;
       border-bottom: 1px solid var(--rule);
     }
 
-    .scope {
-      display: none;
+    h2 {
+      flex-basis: 100%;
     }
   }
 
   /* A pane that comes into view fades in rather than replacing the last one in a blink. */
   .pane > * {
-    animation: enter-fade var(--quick) ease;
-  }
-
-  .foot [role='status'] {
     animation: enter-fade var(--quick) ease;
   }
 </style>

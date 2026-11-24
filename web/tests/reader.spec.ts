@@ -401,6 +401,10 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   const smallEffort = page.getByRole('combobox', { name: 'Small model reasoning effort' });
   await expect(smallEffort.locator('option')).toHaveText(['Same as the teacher', 'Low']);
   await smallEffort.selectOption('low');
+  // Saved shows beside the group that was changed, not at the foot of the pane.
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('region', { name: 'Background work' }).getByRole('status')).toHaveText('Saved');
+  await expect(dialog.getByRole('region', { name: 'Teaching' }).getByRole('status')).toHaveCount(0);
   await expect.poll(async () => {
     const settings = await (await page.request.get(base + '/api/settings')).json();
     return [settings.model, settings.small_model, settings.small_effort, settings.service_tier];

@@ -19,7 +19,7 @@ test('a question box grows with its text instead of offering a resize handle', a
   const before = (await box.boundingBox())!.height;
   for (const line of ['First line', 'Second line', 'Third line', 'Fourth line']) {
     await page.keyboard.type(line);
-    await page.keyboard.press('Enter');
+    await page.keyboard.press('Shift+Enter');
   }
   await page.keyboard.type('Fifth line');
   await expect.poll(async () => (await box.boundingBox())!.height).toBeGreaterThan(before + 20);

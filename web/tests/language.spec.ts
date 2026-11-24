@@ -7,7 +7,7 @@ test('language persists without rewriting history and remains available on mobil
   const original = (await (await page.request.get(base + '/api/state')).json()).turns[0].text;
   await chooseLanguage(page, 'zh-CN');
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
-  await expect(page.getByRole('button', { name: '再讲一次', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '再讲一次…', exact: true })).toBeVisible();
   expect((await (await page.request.get(base + '/api/state')).json()).turns[0].text).toBe(original);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
@@ -18,7 +18,7 @@ test('language persists without rewriting history and remains available on mobil
   await page.setViewportSize({ width: 375, height: 812 });
   await expect(page.getByRole('button', { name: '设置', exact: true })).toBeInViewport();
   await chooseLanguage(page, 'en');
-  await expect(page.getByRole('button', { name: 'Teach again', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again…', exact: true })).toBeVisible();
 });
 
 
@@ -32,6 +32,7 @@ test('switching during generation preserves the turn and drafts but applies to t
   await expect.poll(() => editorText(page.getByRole('textbox', { name: '提问', exact: true }))).toBe('My unfinished question 草稿');
   await expect(page.locator('.lesson-body')).toContainText('Lesson complete.');
   await page.getByRole('button', { name: '关闭侧栏' }).click();
+  await page.getByRole('button', { name: '再讲一次…', exact: true }).click();
   await page.getByRole('textbox').first().fill('A lesson draft');
   await chooseLanguage(page, 'en');
   await expect.poll(() => editorText(page.getByRole('textbox').first())).toBe('A lesson draft');
@@ -46,7 +47,7 @@ test('switching during generation preserves the turn and drafts but applies to t
   await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '老师', exact: true }).click();
   await expect(page.getByRole('radiogroup', { name: '推理强度', exact: true }).getByRole('radio', { name: '中', exact: true })).toBeChecked();
-  await expect(page.getByRole('heading', { name: '教学', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '讲解与回答', exact: true })).toBeVisible();
   await expect(page.getByText('在你于课程工坊的输入框里另选模型之前，它使用老师的模型。')).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -62,7 +63,8 @@ test('practice controls and evidence labels translate while the answer draft sta
   await expect(page.locator('#practice article').nth(2)).toContainText('需要再试一次');
   await expect(page.locator('#practice article').nth(3)).toContainText('独立完成');
   await first.getByRole('button', { name: '继续尝试' }).click();
-  await first.getByRole('button', { name: '稍后做' }).click();
+  await first.getByRole('button', { name: '更多操作' }).click();
+  await first.getByRole('menuitem', { name: '稍后做' }).click();
   await expect(first).toContainText('已留待稍后');
 });
 

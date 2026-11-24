@@ -15,6 +15,8 @@
 
   // Deleting is confirmed beside the entry, since the teacher does not add a deleted preference back.
   let confirming = $state<string | null>(null);
+  // How preferences come and go waits behind a ? beside the heading, so the column stays a list.
+  let explaining = $state(false);
 
   function remove(entry: MemoryEntry) {
     confirming = null;
@@ -23,8 +25,16 @@
 </script>
 
 <section class="preferences" id="course-preferences" aria-labelledby="preferences-title">
-  <h2 id="preferences-title">{t("How you're taught")}</h2>
-  <p class="intro">{t('The teacher follows these in every lesson. To add or change one, tell Studio, or confirm one the teacher suggests during a lesson.')}</p>
+  <!-- While the list is empty the explanation is the content; once there are preferences it waits behind a ?. -->
+  <div class="title-row">
+    <h2 id="preferences-title">{t("How you're taught")}</h2>
+    {#if preferences.length}
+      <button class="why" aria-expanded={explaining} aria-controls="preferences-about" aria-label={t('About how you are taught')} title={t('About how you are taught')} onclick={() => (explaining = !explaining)}>?</button>
+    {/if}
+  </div>
+  {#if !preferences.length || explaining}
+    <p class="intro" id="preferences-about">{t('The teacher follows these in every lesson. Tell Studio how you like to be taught, or confirm a preference the teacher suggests in a lesson.')}</p>
+  {/if}
   {#if preferences.length}
     <ul>
       {#each preferences as entry (entry.id)}
@@ -69,6 +79,33 @@
   .intro {
     font-size: var(--step--1);
     color: var(--pencil);
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* A small ring with a question mark, as quiet as the label beside it. */
+  .why {
+    display: grid;
+    place-items: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    padding: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--pencil);
+    font: 600 0.68rem/1 var(--sans);
+    cursor: pointer;
+  }
+
+  .why:hover,
+  .why[aria-expanded='true'] {
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   ul {

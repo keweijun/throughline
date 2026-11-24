@@ -43,7 +43,7 @@ test('the teacher suggests a preference inline, and Studio lists the confirmed o
   await page.reload();
   await page.locator('#open-course').click();
   // With none left, the section says how one is added and lists nothing.
-  await expect(page.locator('#course-preferences')).toContainText('To add or change one, tell Studio');
+  await expect(page.locator('#course-preferences')).toContainText('Tell Studio how you like to be taught');
   await expect(page.locator('#course-preferences .item')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

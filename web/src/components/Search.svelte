@@ -289,7 +289,7 @@
   }
 
   .count {
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     font-weight: 400;
     color: var(--pencil);
   }
@@ -419,7 +419,7 @@
     border-radius: 4px;
     background: var(--raised);
     font-family: var(--mono);
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     text-align: center;
   }
 </style>

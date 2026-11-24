@@ -1,4 +1,11 @@
 import { test, expect, editorText } from './fixture';
+import type { Locator } from '@playwright/test';
+
+/** Another like this, Do later and Skip wait in the exercise's ⋯ menu. */
+async function setAside(exercise: Locator, action: string) {
+  await exercise.getByRole('button', { name: 'More actions' }).click();
+  await exercise.getByRole('menuitem', { name: action, exact: true }).click();
+}
 
 test('deferred and unfinished exercises follow the learner into the next section of the chapter', async ({ page, course }) => {
   await course('practice_continuity_browser_fixture');
@@ -9,7 +16,7 @@ test('deferred and unfinished exercises follow the learner into the next section
   // An exercise that needs another try is still open when moving on.
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('3 exercises stay open');
 
-  await exercises.first().getByRole('button', { name: 'Do later' }).click();
+  await setAside(exercises.first(), 'Do later');
   await expect(exercises.first()).toContainText('Saved for later');
   await page.getByRole('button', { name: 'Enter next section' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Next section');
@@ -34,16 +41,16 @@ test('a skipped exercise is closed, folded under Skipped and does not follow the
   await expect(page.getByRole('region', { name: 'Next section' })).toContainText('3 exercises stay open');
   await expect(page.locator('#practice .tally')).toContainText('1 of 4 solved');
   await expect(skipped).toHaveCount(0);
-  await expect(exercises.nth(3).getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+  await expect(exercises.nth(3).getByRole('button', { name: 'More actions' }), 'a solved exercise is not set aside').toHaveCount(0);
 
   const first = exercises.first();
-  await first.getByRole('button', { name: 'Skip', exact: true }).click();
+  await setAside(first, 'Skip');
   const reasons = first.getByRole('group', { name: 'Skip this exercise' });
   await expect(reasons).toContainText('does not come back later');
   await reasons.getByRole('button', { name: 'Cancel' }).click();
   await expect(reasons).toHaveCount(0);
 
-  await first.getByRole('button', { name: 'Skip', exact: true }).click();
+  await setAside(first, 'Skip');
   await reasons.getByRole('button', { name: 'Too easy' }).click();
   // It leaves the list, which is numbered again without it, and is not counted.
   await expect(exercises).toHaveCount(3);
@@ -54,9 +61,11 @@ test('a skipped exercise is closed, folded under Skipped and does not follow the
   await expect(skipped.locator('article')).not.toBeVisible();
   await skipped.locator('summary').click();
   await expect(skipped.locator('article')).toContainText('Skipped · Too easy');
-  await expect(skipped.getByRole('button', { name: 'Skip', exact: true })).toHaveCount(0);
+  await skipped.getByRole('button', { name: 'More actions' }).click();
+  await expect(skipped.getByRole('menuitem', { name: 'Skip', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
-  await exercises.first().getByRole('button', { name: 'Skip', exact: true }).click();
+  await setAside(exercises.first(), 'Skip');
   await exercises.first().getByRole('button', { name: 'Skip without a reason' }).click();
   await expect(skipped.locator('summary')).toHaveText('Skipped (2)');
   await expect(skipped.locator('article').nth(1).locator('header .chip')).toHaveText('Skipped');
@@ -73,7 +82,7 @@ test('skipping two exercises for the same reason suggests a preference to confir
   // It is asked in Practice, where the skipped exercises were, not inside the folded list.
   const banner = page.locator('#practice').getByRole('group', { name: 'Suggested preference' }).filter({ hasText: 'Remember: Fewer long calculations?' });
   for (const count of [1, 2]) {
-    await exercises.first().getByRole('button', { name: 'Skip', exact: true }).click();
+    await setAside(exercises.first(), 'Skip');
     await exercises.first().getByRole('button', { name: 'Too tedious' }).click();
     await expect(page.locator('#practice .skipped summary')).toHaveText(`Skipped (${count})`);
     if (count === 1) await expect(banner).toHaveCount(0);
@@ -280,9 +289,31 @@ test('asking for different exercises replaces only the untouched ones the teache
 test('another like this adds one exercise right after the one it is like', async ({ page, course }) => {
   const { errors } = await course('different_exercises_browser_fixture');
   const exercises = page.locator('#practice article');
-  await exercises.first().getByRole('button', { name: 'Another like this' }).click();
+  await setAside(exercises.first(), 'Another like this');
   await expect(exercises).toHaveCount(4);
   await expect(exercises.nth(1)).toContainText('Another one like the first');
   await expect(exercises.nth(2)).toContainText('Second exercise');
+  expect(errors).toEqual([]);
+});
+
+test('Enter sends a question but starts a new line in an answer', async ({ page, course }) => {
+  const { errors } = await course('practice_continuity_browser_fixture');
+  const exercise = page.locator('#practice > article').first();
+  const answer = exercise.getByRole('textbox', { name: 'Exercise answer' });
+  await answer.click();
+  await page.keyboard.type('x = 1');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('so y = 2');
+  // An answer is worked over several lines and recorded once checked: Enter is a line break there.
+  await expect.poll(() => editorText(answer)).toBe('x = 1\nso y = 2');
+  await expect(exercise.getByRole('region', { name: 'Submitted answer' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  const question = page.getByRole('textbox', { name: 'Side question', exact: true });
+  await question.click();
+  await page.keyboard.type('Why is the rule true?');
+  await page.keyboard.press('Enter');
+  // A question sends with Enter, as in a chat.
+  await expect(page.locator('#branch-panel article').first()).toContainText('Why is the rule true?');
   expect(errors).toEqual([]);
 });

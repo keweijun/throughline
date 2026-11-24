@@ -108,7 +108,7 @@
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         {#if menuOpen}
-          <!-- Each course by its title and where the learner is in it, the open one marked; then the ways out of the list. -->
+          <!-- Each course by its title and where the learner is in it, the open one on a tinted row; then the ways out of the list. -->
           <ul class="course-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t("Switch course")}>
             {#each others as course (course.path)}
               {@const open = course.path === app.library?.active}
@@ -118,7 +118,6 @@
                     <span class="title">{course.title ?? course.name}</span>
                     {#if course.current}<span class="meta">{course.current}</span>{/if}
                   </span>
-                  {#if open}<svg class="tick" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 10.5l3.2 3.2L15 6.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>{/if}
                 </button>
               </li>
             {/each}
@@ -410,9 +409,9 @@
     color: var(--pencil);
   }
 
-  .course-menu .tick {
-    flex: none;
-    color: var(--accent);
+  /* The open course rests on a tint rather than carrying a mark. */
+  .course-menu .active {
+    background: color-mix(in srgb, var(--accent-wash) 70%, transparent);
   }
 
   /* The ways out of the list, quieter than the courses. */
@@ -521,7 +520,7 @@
     border-radius: 999px;
     background: var(--marker);
     color: #2a2208;
-    font-size: 0.75rem;
+    font-size: var(--step--2);
     line-height: 1.25rem;
     font-weight: 600;
   }

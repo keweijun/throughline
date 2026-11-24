@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.63.0
+
+- **Studio can tell you when it's done.** Turn on **Settings → Teacher → Studio → Notifications**, and while you're in another tab or app Throughline notifies you when Studio finishes or needs your answer. Click the notification to go straight to that chat.
+- **Choose a text size for reading.** **Settings → Appearance → Text size** makes lessons, exercises, key points and notes smaller or larger without zooming the whole window.
+- **Find your courses on disk.** **Settings → About** shows your Throughline folder, with **Open folder**.
+- Each category in Settings now opens at its top, rather than scrolled to where the last one was.
+
 ## 0.62.2
 
 - **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Lessons and answers** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.

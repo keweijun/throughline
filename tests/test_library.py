@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from guided_learning import api, library, sources
 from guided_learning.api import execute
 from guided_learning.store import OperationError, Store
+from guided_learning.files import Opener
 from guided_learning.server import Host, create_app
 from guided_learning.server import host as host_module
 from guided_learning.server.builds import ChapterBuilds
@@ -542,6 +543,14 @@ class LookingAfterCourses(unittest.TestCase):
         # The move died without moving the course; nothing holds the lock any more.
         execute(self.root / 'alpha', {'op': 'memory.save', 'id': 'pref-2', 'kind': 'preference', 'text': 'Short'})
         self.assertFalse((self.root / 'alpha' / api.MOVING).exists())
+
+    def test_settings_opens_the_throughline_folder_in_the_file_manager(self):
+        started = []
+        app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(self.config / 'o.json'), library_root=self.root,
+                         opener=Opener(platform='linux', start=started.append))
+        with TestClient(app, base_url='http://127.0.0.1:8765') as client:
+            self.assertEqual(client.post('/api/library/show').json(), {'opened': str(self.root), 'shown': True})
+        self.assertEqual(started, [['xdg-open', str(self.root)]])
 
     def test_a_deleted_course_takes_no_writes_in_the_trash(self):
         entry = library.trash(self.root, 'alpha')

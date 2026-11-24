@@ -7,8 +7,10 @@
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
   import { lightDismiss } from '../lib/dialog';
+  import { notifications, refreshNotifications, setNotifications } from '../lib/notify.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
+  type Reading = 'small' | 'default' | 'large' | 'larger';
   type Pane = 'teacher' | 'appearance' | 'about';
   type Group = 'teaching' | 'background';
 
@@ -30,6 +32,21 @@
   let updateError = $state('');
   let checking = $state(false);
   let theme = $state<Theme>((document.documentElement.dataset.theme as Theme | undefined) ?? 'system');
+  let reading = $state<Reading>((document.documentElement.dataset.reading as Reading | undefined) ?? 'default');
+  const READING: { id: Reading; label: MessageKey }[] = [
+    { id: 'small', label: 'Small' },
+    { id: 'default', label: 'Default' },
+    { id: 'large', label: 'Large' },
+    { id: 'larger', label: 'Larger' },
+  ];
+  let notifying = $state(false);
+  let paneElement: HTMLDivElement | undefined = $state();
+  // Each category opens at its top, not where the last one was scrolled to.
+  $effect(() => {
+    void pane;
+    if (paneElement) paneElement.scrollTop = 0;
+  });
+  let opening = $state(false);
 
   const settings = $derived(app.settings);
   // Settings hold only what applies to every course; the course's own things are in Studio and on its card in the
@@ -146,6 +163,7 @@
       serviceTier = settings?.service_tier ?? '';
       void loadModels();
       void loadAbout();
+      refreshNotifications();
       effort = settings?.effort ?? 'medium';
       smallEffort = settings?.small_effort ?? '';
       savedGroup = null;
@@ -174,6 +192,35 @@
     } catch {
       // The choice still applies for this visit.
     }
+  }
+
+  function changeReading(next: Reading) {
+    reading = next;
+    const root = document.documentElement;
+    if (reading === 'default') delete root.dataset.reading;
+    else root.dataset.reading = reading;
+    try {
+      if (reading === 'default') localStorage.removeItem('reading');
+      else localStorage.setItem('reading', reading);
+    } catch {
+      // The choice still applies for this visit.
+    }
+  }
+
+  async function changeNotifications(on: boolean) {
+    notifying = true;
+    await setNotifications(on);
+    notifying = false;
+  }
+
+  async function showFolder() {
+    opening = true;
+    try {
+      await api.post('/api/library/show');
+    } catch (error) {
+      app.error = error instanceof Error ? error.message : String(error);
+    }
+    opening = false;
   }
 
   // Every teacher choice saves at once, after a new model has settled the effort it supports. Saves run one at a
@@ -261,7 +308,7 @@
     {/each}
   </nav>
 
-  <div class="pane">
+  <div class="pane" bind:this={paneElement}>
     {#if pane === 'teacher'}
       <div class="head">
         <h3>{t("Teacher")}</h3>
@@ -325,7 +372,34 @@
               </div>
             {/if}
           </div>
-          <p class="note">{t("Studio uses this model too, until you choose its own in Studio's writing box.")}</p>
+        </section>
+
+        <section class="group" aria-labelledby="group-studio">
+          <div class="label"><h4 id="group-studio">{t("Studio")}</h4></div>
+          <p class="note above">{t("Studio uses the teacher's model until you choose its own in Studio's writing box.")}</p>
+          <div class="card">
+            <div class="setting">
+              <div class="text">
+                <label class="title" for="notify-studio">{t("Notifications")}</label>
+                {#if notifications.permission === 'denied'}
+                  <p role="status">{t("Your browser blocks notifications from Throughline. Allow them in the browser's site settings, then turn this on.")}</p>
+                {:else if notifications.permission === 'unsupported'}
+                  <p>{t("This browser cannot show notifications.")}</p>
+                {:else}
+                  <p>{t("Tell me when Studio finishes or needs my answer while I'm in another tab or app. Saved in this browser.")}</p>
+                {/if}
+              </div>
+              <input
+                id="notify-studio"
+                class="switch"
+                type="checkbox"
+                role="switch"
+                checked={notifications.on}
+                disabled={notifying || notifications.permission === 'denied' || notifications.permission === 'unsupported'}
+                onchange={(event) => changeNotifications(event.currentTarget.checked)}
+              />
+            </div>
+          </div>
         </section>
 
         <section class="group" aria-labelledby="group-background">
@@ -382,7 +456,7 @@
       <p class="tagline">{t("One line of teaching through all your documents.")}</p>
       <p class="blurb">{t("A local study app that turns your PDFs and notes into a guided course. Codex teaches on this computer, with your own sign-in; your courses stay in your Throughline folder.")}</p>
 
-      <section class="group" aria-label={t("Updates")}>
+      <section class="group" aria-label={t("Updates and folder")}>
         <div class="card">
           <div class="setting">
             <div class="text">
@@ -419,6 +493,15 @@
               </div>
             {/if}
           </div>
+          {#if app.library?.root}
+            <div class="setting">
+              <div class="text">
+                <span class="title">{t("Throughline folder")}</span>
+                <p>{t("Your courses, each in its own folder.")} <code>{app.library.root}</code></p>
+              </div>
+              <button class="btn btn-small" onclick={showFolder} disabled={opening}>{t("Open folder")}</button>
+            </div>
+          {/if}
         </div>
       </section>
 
@@ -453,6 +536,17 @@
               </p>
             </div>
             {@render languageChoice()}
+          </div>
+          <div class="setting">
+            <div class="text">
+              <span class="title">{t("Text size")}</span>
+              <p>{t("For lessons, exercises, key points and notes. Saved in this browser.")}</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-label={t("Text size")}>
+              {#each READING as option (option.id)}
+                <label><input type="radio" name="reading" value={option.id} checked={reading === option.id} onchange={() => changeReading(option.id)} />{t(option.label)}</label>
+              {/each}
+            </div>
           </div>
           <div class="setting stacked">
             <div class="text">

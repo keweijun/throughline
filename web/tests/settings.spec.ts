@@ -100,3 +100,15 @@ test('About shows the Throughline folder and opens it', async ({ page, course })
   expect(opened).toEqual(['POST']);
   expect(errors).toEqual([]);
 });
+
+test('each category opens at its top', async ({ page, course }) => {
+  const { errors } = await course('demo_course_fixture');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('button', { name: 'Teacher', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Small model reasoning effort' }).scrollIntoViewIfNeeded();
+  expect(await dialog.locator('.pane').evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
+  await dialog.getByRole('button', { name: 'About' }).click();
+  await expect(dialog.getByRole('heading', { name: 'Throughline', exact: true })).toBeInViewport({ ratio: 1 });
+  expect(errors).toEqual([]);
+});

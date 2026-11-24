@@ -40,6 +40,12 @@
     { id: 'larger', label: 'Larger' },
   ];
   let notifying = $state(false);
+  let paneElement: HTMLDivElement | undefined = $state();
+  // Each category opens at its top, not where the last one was scrolled to.
+  $effect(() => {
+    void pane;
+    if (paneElement) paneElement.scrollTop = 0;
+  });
   let opening = $state(false);
 
   const settings = $derived(app.settings);
@@ -302,7 +308,7 @@
     {/each}
   </nav>
 
-  <div class="pane">
+  <div class="pane" bind:this={paneElement}>
     {#if pane === 'teacher'}
       <div class="head">
         <h3>{t("Teacher")}</h3>

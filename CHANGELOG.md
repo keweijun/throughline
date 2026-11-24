@@ -7,6 +7,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **Studio can tell you when it's done.** Turn on **Settings → Teacher → Studio → Notifications**, and while you're in another tab or app Throughline notifies you when Studio finishes or needs your answer. Click the notification to go straight to that chat.
 - **Choose a text size for reading.** **Settings → Appearance → Text size** makes lessons, exercises, key points and notes smaller or larger without zooming the whole window.
 - **Find your courses on disk.** **Settings → About** shows your Throughline folder, with **Open folder**.
+- Each category in Settings now opens at its top, rather than scrolled to where the last one was.
 
 ## 0.62.1
 

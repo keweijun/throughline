@@ -45,7 +45,7 @@ NAMESPACES = {
     'chapter_builds': 'everything', 'background_jobs': 'everything', 'background_receipts': 'everything',
 }
 # The course namespace holds both kinds, so its keys are classified one by one.
-COURSE_KEYS = {'metadata': 'route', 'schema': 'route', 'preferences': 'route', 'widgets': 'route', 'built_for': 'route', 'imported': 'route',
+COURSE_KEYS = {'metadata': 'route', 'schema': 'route', 'preferences': 'route', 'widgets': 'route', 'cover': 'route', 'built_for': 'route', 'imported': 'route',
                'position': 'everything', 'profile': 'everything'}
 
 # What a shared lesson step, turn and exercise keep: what the teacher wrote, never the sender's answers or prompts.

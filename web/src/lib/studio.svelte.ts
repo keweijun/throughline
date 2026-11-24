@@ -140,7 +140,7 @@ type History = {
   /** For a chat begun on the library page, the courses there were then, as the host recorded them. */
   courses_before?: string[] | null;
 };
-type Activity = { running: string[]; waiting: StudioRequest[] };
+type Activity = { running: string[]; waiting: StudioRequest[]; chats?: number };
 
 /** Where Studio works: the open course, or the library page before a course is open (#109). */
 export type StudioScope = 'course' | 'library';
@@ -161,6 +161,8 @@ class StudioStore {
   threads = $state<StudioThread[]>([]);
   /** The open thread, or null for a new one that starts with the next message. */
   threadId = $state<string | null>(null);
+  /** How many chats the host knows of here, before Codex has listed them; null until it has said, -1 if it could not. */
+  known = $state<number | null>(null);
   turns = $state<StudioTurn[]>([]);
   activeTurn = $state<string | null>(null);
   pending = $state<StudioRequest[]>([]);
@@ -207,6 +209,7 @@ class StudioStore {
     this.origin = null;
     this.skills = [];
     this.coursesBefore = null;
+    this.known = null;
   }
 
   get running() {
@@ -283,6 +286,35 @@ class StudioStore {
     } catch {
       // Skills are a convenience of the box; Codex still reads `$name` in the text.
     }
+  }
+
+  /**
+   * How many chats this scope has, asked of the host without starting Codex: it says, before Codex answers, whether
+   * Studio will open on a chat or on an empty one, so the page is laid out once and nothing moves when Codex is ready.
+   */
+  async loadKnown() {
+    const scope = this.scope;
+    try {
+      const activity = await api.get<Activity>(this.url('/api/studio/activity'));
+      if (scope === this.scope) this.known = activity.chats ?? -1;
+    } catch {
+      // Unanswered: the page is laid out as a chat until Codex says.
+      if (scope === this.scope) this.known = -1;
+    }
+  }
+
+  /** Whether it is known yet which way Studio opens, on an empty chat or on a chat; until then it shows neither. */
+  get placed() {
+    return this.available !== null || this.known !== null;
+  }
+
+  /**
+   * Whether Studio is at the start of a new chat, with nothing said: the question, the writing box under it and
+   * ways to begin (ADR 0027). While Codex is still starting, that is so when the host knows of no chat to open.
+   */
+  get starting() {
+    if (this.available === false || this.threadId || this.turns.length || this.pending.length) return false;
+    return this.available === true || this.known === 0;
   }
 
   /** What Codex is doing in the course, for the top bar; cheap, so every page asks when a course opens. */

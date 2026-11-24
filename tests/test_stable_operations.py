@@ -12,7 +12,7 @@ SKILL = Path(api.__file__).resolve().parent / 'skill'
 
 STABLE = {
     'annotations.delete', 'annotations.list', 'annotations.save', 'course.init', 'course.profile.save', 'course.rename',
-    'course.status',
+    'course.status', 'cover.list', 'cover.save',
     'curriculum.chapter.save', 'curriculum.chapter.view', 'curriculum.check', 'curriculum.context', 'curriculum.coverage',
     'curriculum.outline', 'curriculum.save', 'curriculum.view', 'drill.list', 'drill.write', 'key_points.revise', 'key_points.view', 'mainline.enter', 'mistakes.list', 'memory.confirm', 'memory.save',
     'position.save', 'practice.add', 'practice.list', 'practice.retire', 'practice.revise', 'preferences.save',

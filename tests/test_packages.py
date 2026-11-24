@@ -246,6 +246,13 @@ class CoursePackages(unittest.TestCase):
                 course = Path(packages.import_package(self.package, self.recipient, f'copy-{level}')['path'])
                 self.assertEqual(len(execute(course, {'op': 'course.status'})['sources']), 2)
 
+    def test_a_courses_cover_travels_at_every_level(self):
+        execute(self.course, {'op': 'cover.save', 'name': 'QM', 'pattern': 'orbits'})
+        for level in packages.LEVELS:
+            packages.export(self.course, self.package, level)
+            imported = packages.import_package(self.package, self.recipient, name=f'quantum-{level}')
+            self.assertEqual(execute(Path(imported['path']), {'op': 'course.status'})['cover'], {'name': 'QM', 'pattern': 'orbits'}, level)
+
     def test_a_package_unpacking_far_beyond_its_size_is_still_refused(self):
         packages.export(self.course, self.package)
         zeros = b'\0' * (60 << 20)

@@ -207,6 +207,7 @@ def _summary(path):
             'needs_review': sum(1 for unit in coverage['units'] if unit['disposition'] in ('needs_review', 'unmapped')),
             'current': concepts.get(current, {}).get('title'),
             'goal': (status.get('profile') or {}).get('goal'),
+            'cover': status.get('cover'),
             'updated': (path / 'course.sqlite3').stat().st_mtime}
 
 

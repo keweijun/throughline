@@ -133,6 +133,16 @@ class Results(Contract):
         self.assertEqual(self.op('widgets.save', ids=['chemistry', 'figure'])['selected'], ['chemistry', 'figure'])
         self.assertEqual(self.op('widgets.list')['selected'], ['chemistry', 'figure'], 'save replaces the add-ons')
 
+    def test_cover(self):
+        listed = self.op('cover.list')
+        self.assertFields(listed, ('patterns', 'cover'))
+        for pattern in listed['patterns']:
+            self.assertFields(pattern, ('id', 'looks', 'subjects'), 'a pattern')
+        self.assertTrue({'contours', 'waves', 'lattice', 'grid', 'orbits', 'field', 'branches', 'scatter', 'ruled'} <= {p['id'] for p in listed['patterns']},
+                        'a pattern a course may have saved stays')
+        self.assertEqual(self.op('cover.save', name='QM', pattern='orbits'), {'cover': {'name': 'QM', 'pattern': 'orbits'}})
+        self.assertEqual(self.op('course.status')['cover'], {'name': 'QM', 'pattern': 'orbits'})
+
     def test_text_sources(self):
         read = self.op('source.read', source_id=self.source['id'])
         self.assertFields(read, ('source_id', 'revision', 'path', 'status', 'errors', 'verification', 'units'))
@@ -383,6 +393,10 @@ class Errors(Contract):
 
     def test_unknown_widget(self):
         self.refused('unknown_widget', 'widgets.save', ids=['plot', 'sparkles'])
+
+    def test_cover_errors(self):
+        self.refused('unknown_pattern', 'cover.save', name='QM', pattern='sparkles')
+        self.refused('invalid_cover', 'cover.save', name='Introductory Quantum Mechanics', pattern='orbits')
 
     def test_a_newer_course_is_refused(self):
         db = sqlite3.connect(self.course / 'course.sqlite3')

@@ -572,6 +572,20 @@ class LookingAfterCourses(unittest.TestCase):
         with host._streams:
             host._live.clear()
 
+    def test_the_library_says_what_studio_is_doing_in_each_course(self):
+        self.assertEqual({name: c['studio'] for name, c in self.listed().items()}, {'alpha': None, 'beta': None})
+        beta = self.root / 'beta'
+        def activity(path):
+            return {'running': ['thread-1'], 'waiting': []} if path == beta else {'running': [], 'waiting': [{'id': 1}]}
+        with mock.patch.object(self.courses.studio, 'activity', side_effect=activity):
+            self.assertEqual({name: c['studio'] for name, c in self.listed().items()}, {'alpha': 'waiting', 'beta': 'working'})
+
+    def test_the_library_lists_a_cover_once_codex_has_chosen_it(self):
+        self.assertIsNone(self.listed()['alpha']['cover'])
+        execute(self.root / 'alpha', {'op': 'cover.save', 'name': 'Alpha', 'pattern': 'grid'})
+        written_ago(self.root / 'alpha', 10)
+        self.assertEqual(self.listed()['alpha']['cover'], {'name': 'Alpha', 'pattern': 'grid'})
+
     def test_deleting_waits_for_studio(self):
         with mock.patch.object(self.courses.studio, 'activity', return_value={'running': ['thread-1'], 'waiting': []}):
             refused = self.client.delete('/api/library/courses/beta')

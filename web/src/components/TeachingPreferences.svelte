@@ -25,9 +25,7 @@
 <section class="preferences" id="course-preferences" aria-labelledby="preferences-title">
   <h2 id="preferences-title">{t("How you're taught")}</h2>
   <p class="intro">{t('The teacher follows these in every lesson. To add or change one, tell Studio, or confirm one the teacher suggests during a lesson.')}</p>
-  {#if !preferences.length}
-    <p class="empty">{t('Nothing yet.')}</p>
-  {:else}
+  {#if preferences.length}
     <ul>
       {#each preferences as entry (entry.id)}
         <li class="item">
@@ -60,35 +58,34 @@
     align-content: start;
   }
 
+  /* A label for the list, not a heading that competes with the course's title. */
   h2 {
-    font-size: var(--step-0);
+    font-size: var(--step--1);
     font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--pencil);
   }
 
-  .intro,
-  .empty {
+  .intro {
     font-size: var(--step--1);
     color: var(--pencil);
   }
 
   ul {
     display: grid;
-    gap: 0.4rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* The text, with a quiet × beside it to delete it. */
+  /* Each preference is a line of the list, with a × beside it, shown when the line is pointed at, to delete it. */
   .item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     gap: 0.25rem 0.4rem;
-    padding: 0.45rem 0.35rem 0.45rem 0.6rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--raised);
+    padding: 0.45rem 0;
+    border-top: 1px solid var(--rule);
   }
 
   /* In the aside's narrow column, at the size of the chats above it, so a long list stays a list to scan. */
@@ -114,6 +111,16 @@
     background: none;
     color: var(--pencil);
     cursor: pointer;
+  }
+
+  .remove {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .item:hover .remove,
+  .remove:focus-visible {
+    opacity: 1;
   }
 
   .remove:hover,

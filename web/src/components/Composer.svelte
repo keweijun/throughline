@@ -35,6 +35,7 @@
     preview = true,
     tools,
     actions,
+    submit = true,
     rows = 2,
     compact = false,
     completions,
@@ -74,6 +75,8 @@
     tools?: Snippet;
     /** Buttons beside the send button at the end of the bottom row, such as Stop. */
     actions?: Snippet;
+    /** False when `actions` holds the one button that stands where Send does, as Stop does while Codex works. */
+    submit?: boolean;
     rows?: number;
     /** Empty and unfocused, the box rests as one line, its header and tools out of the way of what is listed above it. */
     compact?: boolean;
@@ -288,7 +291,7 @@
     {@render tools?.()}
     <span class="keys" id={hintId}>{t("{keys} to send", { keys: sendKeys })}</span>
     {@render actions?.()}
-    <button class="btn btn-small btn-primary send" type="submit" disabled={!ready}>{submitLabel}</button>
+    {#if submit}<button class="btn btn-small btn-primary send" type="submit" disabled={!ready}>{submitLabel}</button>{/if}
   </div>
 </form>
 

@@ -60,6 +60,8 @@
   const draftKey = $derived(`studio:${library ? 'library:' : ''}${studio.threadId ?? 'new'}`);
   const draft = $derived(app.drafts.get(draftKey));
   const images = $derived(app.drafts.images(draftKey));
+  // While Codex works and nothing is written, the button by the box stops it; with something written, it adds that.
+  const stopping = $derived(studio.running && !draft.trim() && !images.length);
 
   // What Studio suggests in an empty chat (`lib/starts.ts`); each fills the box rather than sending. In a course,
   // adding files always shows and three more are drawn from the rest each time Studio opens, so the learner sees its
@@ -363,15 +365,17 @@
     </span>
   {/snippet}
   {#snippet tools()}
-    <StudioControls />
+    <StudioControls part="access" />
     {#if studio.context !== null}
       <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
     {/if}
     {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
   {/snippet}
-  <!-- Stop sits beside Send, where Codex puts it. -->
+  <!-- The model beside Send, as in Codex. While Codex works, one button stands there: Stop, until something is
+       written to add to what it is doing. -->
   {#snippet actions()}
-    {#if studio.running}
+    <StudioControls part="model" />
+    {#if stopping}
       <button type="button" class="btn btn-small stop" onclick={() => void studio.stop()} title={t("Stop Codex")}>
         <span class="square" aria-hidden="true"></span>{t("Stop")}
       </button>
@@ -393,6 +397,7 @@
         label={t("Message to Codex")}
         placeholder={studio.running ? t("Add to what Codex is doing…") : library && !studio.turns.length ? t("Say what you want to learn, and drop your files here…") : t("Ask Codex for course work · $ for skills, @ for files")}
         submitLabel={studio.running ? t("Add") : t("Send")}
+        submit={!stopping}
         disabled={busy || attaching > 0}
         onsubmit={send}
         header={target}

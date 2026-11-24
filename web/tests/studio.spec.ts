@@ -152,7 +152,12 @@ test('Studio is as tall as the window beside the course column, and writing move
 
   // The course's column stands beside Studio, which starts level with the title and is no wider than a chat needs.
   const title = page.locator('#course-title');
-  expect(Math.abs((await frame.boundingBox())!.y - (await title.boundingBox())!.y)).toBeLessThan(16);
+  // The column opens with the course's cover, level with Studio's frame, and its title under it.
+  const cover = page.locator('#course-studio .studio-aside .cover').first();
+  expect(Math.abs((await frame.boundingBox())!.y - (await cover.boundingBox())!.y)).toBeLessThan(16);
+  expect((await title.boundingBox())!.y).toBeGreaterThan((await cover.boundingBox())!.y);
+  // An empty chat has no sheet; it comes when the chat begins (checked below).
+  await expect(page.locator('#course-studio .sheet .paper')).toHaveCSS('opacity', '0');
   expect((await frame.boundingBox())!.width).toBeLessThan(46 * 16 + 1);
   const box = page.locator('#studio-input');
   await box.evaluate((node) => Promise.all(node.closest('.box')!.getAnimations().map((a) => a.finished)));  // it arrives with a small rise
@@ -168,6 +173,19 @@ test('Studio is as tall as the window beside the course column, and writing move
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
   expect(await page.locator('#stage').evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThan(2);
+
+  // The sheet comes with the chat, as tall as the frame, and stays for a chat that has begun.
+  await box.click();
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
+  const paper = page.locator('#course-studio .sheet .paper');
+  await expect(paper).toHaveCSS('opacity', '1');
+  await paper.evaluate((node) => Promise.all(node.getAnimations().map((a) => a.finished)));
+  expect((await paper.boundingBox())!.height).toBeCloseTo((await frame.boundingBox())!.height, -1);
+  // A new chat folds it away again.
+  await page.getByRole('region', { name: 'Chats' }).getByRole('button', { name: 'New chat' }).click();
+  await expect(paper).toHaveCSS('opacity', '0');
 });
 
 test('a long list of how the learner is taught scrolls beside Studio rather than past the window', async ({ page, course }) => {
@@ -197,9 +215,12 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
+  // While Codex works one button stands by the box: Stop, until something is written to add to what it is doing.
   await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
   await box.pressSequentially('also add the solutions');
+  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Stop' })).toHaveCount(0);
   await page.keyboard.press('Control+Enter');
   await expect(panel.locator('.said-by-codex').last()).toHaveText('steered: also add the solutions');
 
@@ -209,6 +230,7 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await page.keyboard.press('Control+Enter');
   await panel.getByRole('button', { name: 'Stop' }).click();
   await expect(panel.locator('.ended')).toHaveText('Stopped');
+  await expect(panel.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 });
 
 test('Stop restarts a Codex that stopped answering, and says so', async ({ page, course }) => {
@@ -640,11 +662,14 @@ test('chats are listed beside Studio on a wide page, and pinned above the transc
   await frame.evaluate((f) => (f.scrollTop = f.scrollHeight));
   const top = (await frame.boundingBox())!.y;
   await expect.poll(async () => (await picker.boundingBox())!.y - top).toBeLessThan(30);
-  // Stop sits at the end of the row, beside the send button, as in Codex.
+  // Stop stands where Send does, at the end of the row, with the model beside it and the access by the attachments,
+  // as in Codex.
   const stop = panel.getByRole('button', { name: 'Stop' });
-  const send = panel.getByRole('button', { name: 'Add' });
-  expect((await stop.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
-  expect((await stop.boundingBox())!.x).toBeLessThan((await send.boundingBox())!.x);
+  const model = panel.locator('#studio-model');
+  const access = panel.locator('#studio-access');
+  expect((await model.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
+  expect((await stop.boundingBox())!.x).toBeGreaterThan((await model.boundingBox())!.x);
+  expect((await access.boundingBox())!.x).toBeLessThan((await panel.locator('.keys').boundingBox())!.x);
   await stop.click();
   expect(errors).toEqual([]);
 });

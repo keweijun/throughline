@@ -9,6 +9,7 @@
   import StudioChats from './StudioChats.svelte';
   import TeachingPreferences from './TeachingPreferences.svelte';
   import CourseShare from './CourseShare.svelte';
+  import CourseCover from './CourseCover.svelte';
 
   // The course's Studio place, the first of its three places (ADR 0017): Codex working on the course, as tall as the
   // window and no wider than a chat needs, with the course and its chats in a column beside it, as Codex lists its
@@ -92,6 +93,8 @@
          and Studio's own chats menu comes back. -->
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
+        <!-- The course's cover, as on its card in the library (ADR 0027). -->
+        {#if course}<div class="cover"><CourseCover {course} /></div>{/if}
         {#if renaming}
           <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename())}>
             <textarea
@@ -191,8 +194,13 @@
       </section>
     {:else}
       <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
-      <div class="frame studio-frame" data-scroller>
-        <Studio active={app.courseOpen} />
+      <!-- An empty chat has no sheet: the question and the box stand on the page (ADR 0027). The sheet comes with the
+           chat, opening out from the middle as the box goes to its foot. -->
+      <div class="sheet" class:starting={studio.starting} class:unplaced={!studio.placed}>
+        <div class="paper" aria-hidden="true"></div>
+        <div class="frame studio-frame" data-scroller>
+          <Studio active={app.courseOpen} />
+        </div>
       </div>
     {/if}
   </div>
@@ -422,7 +430,40 @@
   /* Studio is built for the side panel: the same surface and padding here keep its raised writing box and its pinned
      strip (.panel-foot, painted in --sheet) on one ground. Its frame keeps one height, which Studio fills with its box
      at the bottom, so content loading inside it never moves the box from under the learner's pointer. */
+  .sheet {
+    position: relative;
+    min-width: 0;
+    /* The frame inside scrolls, so the sheet is never taller than the place however long the chat is. */
+    min-height: 0;
+    height: 100%;
+    /* Inside the sheet's edge, so what is pinned in the frame never paints over it. */
+    padding: 1px;
+  }
+
+  /* The sheet itself, under the frame that scrolls: with an empty chat it is folded away below the question, and it
+     rises to the frame's top as the chat begins. Its foot never moves, so the box always lands on it. */
+  .paper {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    transition: inset 320ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 200ms ease;
+  }
+
+  .starting .paper {
+    inset: 40% 0 0;
+    opacity: 0;
+  }
+
+  /* Until it is known whether there is a chat to open, no sheet, and none arriving in motion. */
+  .unplaced .paper {
+    opacity: 0;
+    transition: none;
+  }
+
   .frame {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -431,9 +472,6 @@
     /* Scrolling past the transcript's ends never carries on into the page. */
     overscroll-behavior: contain;
     padding: 1.1rem 1.1rem 0;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--sheet);
   }
 
   /* The place names Studio and lists its chats beside it, so Studio's own heading and chats menu step aside. */
@@ -485,9 +523,28 @@
     }
   }
 
+  /* The course's cover tops its column. */
+  .cover {
+    height: 5rem;
+    margin-bottom: 0.35rem;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+  }
+
+  .cover :global(.name) {
+    font-size: 1.5rem;
+  }
+
+  /* Beside its list of chats the box need not name the chat again; it still says where a request came from. */
+  .frame :global(.studio:not(.from-elsewhere) .composer .head) {
+    display: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .segment,
-    .fill {
+    .fill,
+    .paper {
       transition: none;
     }
   }

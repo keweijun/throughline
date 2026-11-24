@@ -89,6 +89,8 @@ Studio is course work as a Codex chat. `Studio` keeps one long-lived `codex app-
 | DELETE | `/api/library/courses/{name}` | Move a course to the trash and return `{id, name, title, deleted}`; 409 `course_busy` while something is written in it or Studio works in it, `host_running` while another host holds it |
 | POST | `/api/library/trash/{id}/restore` | Put a deleted course back, under a free name when its own is taken; returns `{name, title}` |
 | POST | `/api/library/trash/show` | Open the trash folder in the file manager |
+| POST | `/api/library/show` | Open the Throughline folder in the file manager (Settings → About) |
+| GET | `/api/activity` | Every library course's study activity as `{kinds, courses: [{name, title, archived, events: [[time, kind index]]}]}`, read read-only from what courses record (`activity.py`, ADR 0028) |
 | POST | `/api/library/packages` | A course package as the raw body, up to 4 GiB (ADR 0020): kept in the library's `.throughline/packages/` and checked as an import checks it; returns `{token, level, title, name, language, contents, built_for, sources, modes}`, `name` being the course name an import would take. A refused package is not kept |
 | POST | `/api/library/packages/{token}` | `{mode: continue\|fresh\|fresh-with-notes, name?}`: import the waiting package as a new course, remove it and return `{name, title}` (publishes `changed` with scope `library`) |
 | DELETE | `/api/library/packages/{token}` | Drop a waiting package |

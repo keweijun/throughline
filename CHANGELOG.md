@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.64.0
+
+- **See when you studied.** **Settings → Activity** shows the last six months as a calendar, each day shaded by how long you studied, across all your courses. Choose a day to see what you did in each course: lesson steps, answers, questions, notes and drill messages. Below that, each course shows when you last studied it and roughly how long you have spent on it. Your history is already there, worked out from what your courses recorded; time is an estimate. There are no streaks or goals to keep up.
+
 ## 0.63.0
 
 - **Studio can tell you when it's done.** Turn on **Settings → Teacher → Studio → Notifications**, and while you're in another tab or app Throughline notifies you when Studio finishes or needs your answer. Click the notification to go straight to that chat.

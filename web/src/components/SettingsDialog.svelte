@@ -6,12 +6,13 @@
   import type { CodexModel, LauncherStatus, Settings, UpdateProgress } from '../lib/types';
   import CodexLink from './CodexLink.svelte';
   import LauncherHelp from './LauncherHelp.svelte';
+  import Activity from './Activity.svelte';
   import { lightDismiss } from '../lib/dialog';
   import { notifications, refreshNotifications, setNotifications } from '../lib/notify.svelte';
 
   type Theme = 'system' | 'light' | 'dark';
   type Reading = 'small' | 'default' | 'large' | 'larger';
-  type Pane = 'teacher' | 'appearance' | 'about';
+  type Pane = 'teacher' | 'appearance' | 'activity' | 'about';
   type Group = 'teaching' | 'background';
 
   let dialog: HTMLDialogElement | undefined = $state();
@@ -54,6 +55,7 @@
   const panes: { id: Pane; label: MessageKey }[] = [
     { id: 'appearance', label: 'Appearance' },
     { id: 'teacher', label: 'Teacher' },
+    { id: 'activity', label: 'Activity' },
     { id: 'about', label: 'About' },
   ];
   // The tier Codex calls Fast for the chosen teacher model (or the Codex default model).
@@ -171,6 +173,7 @@
       app.settingsPane = null;
       if (asked) pane = asked.id;
       else if (!panes.some((p) => p.id === pane)) pane = panes[0].id;
+      if (paneElement) paneElement.scrollTop = 0;
       dialog.showModal();
     } else if (!app.settingsOpen && dialog.open) dialog.close();
   });
@@ -254,6 +257,9 @@
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       {#if id === 'teacher'}
         <path d="M12 4.5 2.5 9 12 13.5 21.5 9zM6.5 11.2v4.4c1.6 1.6 3.4 2.4 5.5 2.4s3.9-.8 5.5-2.4v-4.4M21.5 9v5.5" />
+      {:else if id === 'activity'}
+        <rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" />
+        <rect x="7" y="12.5" width="3" height="3" rx=".6" fill="currentColor" stroke="none" /><rect x="11.5" y="12.5" width="3" height="3" rx=".6" fill="currentColor" stroke="none" opacity=".45" />
       {:else if id === 'about'}
         <circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.2" /><circle cx="12" cy="7.9" r="1.1" fill="currentColor" stroke="none" />
       {:else}
@@ -442,6 +448,8 @@
           <p>{t("Saved in")} <code>{settings.path}</code>{t(", never inside a course folder.")}</p>
         </div>
       {/if}
+    {:else if pane === 'activity'}
+      <Activity />
     {:else if pane === 'about'}
       <div class="head identity">
         <img src="/favicon.svg" alt="" width="44" height="44" />
@@ -700,19 +708,19 @@
     padding: 1.5rem 2rem 2rem;
   }
 
-  .head {
+  .pane :global(.head) {
     /* Clear of the close button in the corner. */
     padding-inline-end: 2.5rem;
     margin-bottom: 1.5rem;
   }
 
-  h3 {
+  .pane :global(.head h3) {
     font-size: var(--step-2);
     font-weight: 600;
     line-height: 1.25;
   }
 
-  .lead {
+  .pane :global(.lead) {
     margin-top: 0.25rem;
     color: var(--pencil);
   }
@@ -744,11 +752,11 @@
   }
 
   /* A group: a quiet label, then its rows on one card. */
-  .group + .group {
+  .pane :global(.group + .group) {
     margin-top: 1.75rem;
   }
 
-  .label {
+  .pane :global(.label) {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -758,7 +766,7 @@
     padding-inline: 0.125rem;
   }
 
-  h4 {
+  .pane :global(.label h4) {
     font-size: var(--step--1);
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -775,24 +783,24 @@
     color: var(--good);
   }
 
-  .note {
+  .pane :global(.note) {
     margin-top: 0.5rem;
     padding-inline: 0.125rem;
     font-size: var(--step--1);
     color: var(--pencil);
   }
 
-  .note.above {
+  .pane :global(.note.above) {
     margin: -0.25rem 0 0.625rem;
   }
 
-  .card {
+  .pane :global(.card) {
     border: 1px solid var(--rule);
     border-radius: 10px;
     background: var(--raised);
   }
 
-  .setting {
+  .pane :global(.setting) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
@@ -800,7 +808,7 @@
     padding: 0.875rem 1rem;
   }
 
-  .setting + .setting {
+  .pane :global(.setting + .setting) {
     border-top: 1px solid var(--rule);
   }
 
@@ -808,11 +816,11 @@
     grid-template-columns: 1fr;
   }
 
-  .title {
+  .pane :global(.title) {
     font-weight: 500;
   }
 
-  .text p {
+  .pane :global(.text p) {
     margin-top: 0.125rem;
     font-size: var(--step--1);
     color: var(--pencil);
@@ -953,7 +961,7 @@
     padding-inline: 0.125rem;
   }
 
-  .foot {
+  .pane :global(.foot) {
     display: grid;
     gap: 0.35rem;
     margin-top: 1.75rem;

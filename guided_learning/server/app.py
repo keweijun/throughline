@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.background import BackgroundTask
 
-from .. import checks as codex_checks, files, images as attached, library, packages, updates
+from .. import activity, checks as codex_checks, files, images as attached, library, packages, updates
 from ..api import execute
 from ..launcher import Launcher
 from ..preferences import LANGUAGES
@@ -52,8 +52,8 @@ PACKAGE_TOKEN = re.compile(r'[0-9a-f]{32}')
 # Routes for the library, Studio as a whole or this computer; every other /api/ route acts on the open course
 # (`course_scoped`). A prefix covers the routes below it.
 LIBRARY_ROUTES = ('/api/events', '/api/seen', '/api/settings', '/api/models', '/api/about', '/api/update', '/api/launcher',
-                  '/api/checks', '/api/health', '/api/library', '/api/shutdown', '/api/studio/access', '/api/studio/sandbox',
-                  '/api/studio/model', '/api/studio/requests', '/api/sign-in')
+                  '/api/checks', '/api/health', '/api/library', '/api/activity', '/api/shutdown', '/api/studio/access',
+                  '/api/studio/sandbox', '/api/studio/model', '/api/studio/requests', '/api/sign-in')
 COURSE_HEADER = 'x-throughline-course'
 # The host a course-scoped request was checked against, for its whole duration; unset outside one (`ActiveHost`).
 PINNED = contextvars.ContextVar('pinned_host')
@@ -1066,6 +1066,15 @@ def create_app(workspace=None, port=8765, runner=None, settings=None, library_ro
     @app.post('/api/library/trash/{entry}/restore')
     def restore_course(entry: str):
         return courses.restore(entry)
+
+    @app.get('/api/activity')
+    def study_activity():
+        """When the learner studied, in every course of the library (Settings → Activity)."""
+        listed = library.list_courses(courses.root) if courses.root else []
+        active = str(courses.host.workspace) if courses.host else None
+        if active and not any(c['path'] == active for c in listed):
+            listed.insert(0, library.summary(active))
+        return activity.view(listed)
 
     @app.post('/api/library/show')
     def show_library():

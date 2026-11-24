@@ -79,6 +79,9 @@ _Avoid_: Chapter exam, mastery test, gate, the section's exercises.
 **Review**: Going over sections already studied, in the Review place, when the learner chooses: reading key points, the mistakes book, or a drill session over a review scope. There is no schedule and nothing comes due (ADR 0014, ADR 0025).
 _Avoid_: Revision of the course plan, reviewing source locations in Codex, a test that must be passed, a due list.
 
+**Study activity**: When the learner studied, across every course, in Settings → Activity: days, each day's lesson steps, answers, questions, notes and drill messages by course, and an estimate of time studied. It is worked out from what courses already record and asks nothing of the learner (ADR 0028).
+_Avoid_: Streak, goal, progress (where the learner stands in a course), time tracking.
+
 **Review scope**: What the Review place covers: everything studied, or the chapters and sections the learner chose. Key points, the mistakes book and the questions asked there all follow it, and the course remembers the last choice in the learner's browser (ADR 0014).
 _Avoid_: A review set's own scope (what one request asked about), a filter on the route.
 

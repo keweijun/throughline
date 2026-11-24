@@ -51,7 +51,7 @@
 </script>
 
 {#if !running || running.concept_id !== conceptId}
-  <div class="request" class:first={!hasLesson}>
+  <div class="request" class:first={!hasLesson} class:quiet={hasLesson && !writing}>
     {#if !hasLesson}
       <h2>{t("Start this section")}</h2>
       {@const chapter = app.chapterOf(conceptId)}
@@ -116,6 +116,13 @@
     margin-top: 2.5rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--rule);
+  }
+
+  /* Folded to one quiet offer under a lesson, it needs no rule of its own: the lesson's end and Practice's frame it. */
+  .request.quiet {
+    margin-top: 0.75rem;
+    padding-top: 0;
+    border-top: 0;
   }
 
   .request.first {

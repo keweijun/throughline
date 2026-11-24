@@ -420,7 +420,7 @@ test('Settings hold only what applies to every course; Studio holds the course',
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const categories = page.getByRole('navigation', { name: 'Settings' }).getByRole('button');
-  await expect(categories).toHaveText(['Appearance', 'Teacher', 'About']);
+  await expect(categories).toHaveText(['Appearance', 'Teacher', 'Activity', 'About']);
   await expect(page.getByRole('spinbutton', { name: 'Daily reviews' })).toHaveCount(0);
   // Language also sets the interface, so it stays in Settings, first, even though the course keeps it.
   await expect(page.getByRole('radiogroup', { name: 'Language' })).toBeVisible();

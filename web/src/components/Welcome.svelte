@@ -167,16 +167,19 @@
 
 <dialog class="welcome" bind:this={dialog} onclose={closed} aria-labelledby="welcome-title">
   {#if step}
-    {#key step}
-      <div class="step" class:back>
+    <!-- Every step is laid in the same place and only the current one shows, so the dialog keeps the height of the
+         tallest and its buttons stay put from step to step. -->
+    <div class="steps">
+    {#each steps as s (s)}
+      <div class="step" class:current={s === step} class:back inert={s !== step}>
         <!-- Each step opens with a picture of what it is about; the words below carry everything it says. -->
         <div class="hero hero-{step}" aria-hidden="true">
-          {#if step === 'language'}
+          {#if s === 'language'}
             <div class="brand">
               {@render logo(56)}
               <span class="wordmark">Throughline <span class="sep">·</span> 贯学</span>
             </div>
-          {:else if step === 'workflow'}
+          {:else if s === 'workflow'}
             <svg class="thread" viewBox="0 0 600 120" preserveAspectRatio="none">
               <path d="M-10 78 C40 78 60 60 100 60 S170 34 200 34 S260 60 300 60 S370 86 400 86 S460 60 500 60 S570 40 610 40" />
             </svg>
@@ -185,7 +188,7 @@
                 <li><span class="node">{@render stageIcon(i)}</span></li>
               {/each}
             </ol>
-          {:else if step === 'studio'}
+          {:else if s === 'studio'}
             <div class="mock">
               <div class="mock-head">
                 <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 15.5 13.5 6l1.8 1.8L5.8 17.3H4z" /><path d="M12 4.5 15.5 8" /><path d="M14.5 2.8 17.2 5.5" /></svg>
@@ -203,7 +206,7 @@
                 {#each examples as _, i (i)}<li class:on={i === shown}></li>{/each}
               </ol>
             </div>
-          {:else if step === 'launcher'}
+          {:else if s === 'launcher'}
             <div class="dock">
               <span class="app"></span>
               <span class="app"></span>
@@ -214,9 +217,9 @@
         </div>
 
         <div class="body">
-          {#if step === 'language'}
+          {#if s === 'language'}
             <!-- Both languages, so either reader knows what is asked before choosing. -->
-            <h2 id="welcome-title">{locale.language === 'zh-CN' ? '选择语言 · Choose your language' : 'Choose your language · 选择语言'}</h2>
+            <h2 id={s === step ? 'welcome-title' : undefined}>{locale.language === 'zh-CN' ? '选择语言 · Choose your language' : 'Choose your language · 选择语言'}</h2>
             <p class="lead">{t('Throughline shows everything in this language. A new course is taught in the language you write to Codex in, and your files keep their own.')}</p>
             <div class="tiles" role="radiogroup" aria-label={t('Language')}>
               {#each [['en', 'English', 'Aa'], ['zh-CN', '简体中文', '文']] as [id, name, glyph] (id)}
@@ -229,8 +232,8 @@
               {/each}
             </div>
             <p class="later">{t('You can change it in Settings → Appearance.')}</p>
-          {:else if step === 'workflow'}
-            <h2 id="welcome-title">{titles.workflow}</h2>
+          {:else if s === 'workflow'}
+            <h2 id={s === step ? 'welcome-title' : undefined}>{titles.workflow}</h2>
             <ol class="stages">
               {#each stages as stage, i (i)}
                 <li>
@@ -239,8 +242,8 @@
                 </li>
               {/each}
             </ol>
-          {:else if step === 'studio'}
-            <h2 id="welcome-title">{titles.studio}</h2>
+          {:else if s === 'studio'}
+            <h2 id={s === step ? 'welcome-title' : undefined}>{titles.studio}</h2>
             <p class="lead">{t('The teacher in Learn and Review is quick and answers about what you are reading. Studio is Codex itself: it can change the course whenever you ask, with your files and pages in reach.')}</p>
             <p class="where">{t("Studio is the first of each course's three places, beside Learn and Review, and New course opens it here. Learn and Review send it what they cannot do themselves.")}</p>
             <fieldset class="access" disabled={savingAccess || !studio.access}>
@@ -266,14 +269,15 @@
               </div>
               <p class="later">{t("You can change it any time in Studio's writing box.")}</p>
             </fieldset>
-          {:else if step === 'launcher' && launcher}
-            <h2 id="welcome-title">{titles.launcher}</h2>
+          {:else if s === 'launcher' && launcher}
+            <h2 id={s === step ? 'welcome-title' : undefined}>{titles.launcher}</h2>
             <LauncherHelp {launcher} />
             <p class="later">{t('You can find this again in Settings → About.')}</p>
           {/if}
         </div>
       </div>
-    {/key}
+    {/each}
+    </div>
 
     <footer>
       {#if steps.length > 1}
@@ -314,11 +318,19 @@
     background: rgb(17 20 27 / 0.5);
   }
 
+  .steps {
+    display: grid;
+  }
   /* A step slides in from the side the learner is going to. */
   .step {
+    grid-area: 1 / 1;
+    visibility: hidden;
+  }
+  .step.current {
+    visibility: visible;
     animation: step-in var(--settle) var(--ease-out);
   }
-  .step.back {
+  .step.current.back {
     animation-name: step-back;
   }
   @keyframes step-in {

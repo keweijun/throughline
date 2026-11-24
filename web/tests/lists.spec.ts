@@ -44,7 +44,7 @@ test('the source tab lists every course document and returns to the open one', a
   await expect(page.locator('.pdf-page.cited canvas')).toBeVisible();
   await page.getByRole('button', { name: /^All sources \(\d+\)$/ }).click();
   const list = page.locator('.source-list');
-  await expect(list.getByRole('heading', { name: 'Course sources' })).toBeVisible();
+  await expect(list.getByRole('heading', { name: 'Sources' })).toBeVisible();
   await expect(list.locator('li')).not.toHaveCount(0);
   await expect(list).toContainText('lecture-2.pdf');
   await expect(list).toContainText('PDF');

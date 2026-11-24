@@ -11,7 +11,7 @@ test('a lesson is taught in steps: continue, an added step, pause and regenerate
   const next = first.getByRole('group', { name: 'Next step' });
   await expect(next.locator('li').first()).toContainText('Complex numbers refresher');
   await expect(next.locator('li').first()).toContainText('Added step');
-  await expect(page.locator('#next-step')).toHaveText('Continue with the next step when you are ready.');
+  await expect(page.locator('#next-step'), 'the step plan under the lesson says what comes next').toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Teach again' }), 'Continue is the way on while steps remain').toHaveCount(0);
   await expect(page.locator('#practice article')).toHaveCount(0);
 
@@ -192,7 +192,7 @@ test('a new lesson restarts an unfinished one, which stays folded to read', asyn
   await expect(replaced.getByRole('group', { name: 'Next step' })).toHaveCount(0);
   await expect(replaced.getByRole('button', { name: 'Regenerate step' })).toHaveCount(0);
   await expect(replaced.getByRole('group', { name: 'Check question' }), 'an unanswered check of a replaced lesson is closed').toHaveCount(0);
-  await expect(page.locator('#next-step')).toHaveText('Continue with the next step when you are ready.');
+  await expect(page.locator('#next-step')).toHaveCount(0);
 
   await page.reload();
   await expect(page.locator('details.replaced')).toHaveCount(1);

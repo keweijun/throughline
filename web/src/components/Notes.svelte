@@ -122,7 +122,7 @@
 
 <section class="notes-panel panel-view" aria-labelledby="notes-title">
   <header class="panel-head">
-    <div class="panel-bar"><h2 id="notes-title">{t("Your notes")}</h2></div>
+    <div class="panel-bar"><h2 id="notes-title">{t("Notes")}</h2></div>
     <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
     {#if total}
       <PanelScope bind:scope {counts} label={t("Show notes from")} onchoose={() => (scopeChosen = true)} />

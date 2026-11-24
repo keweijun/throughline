@@ -347,7 +347,7 @@ test('teacher settings save the Codex model and effort as they change', async ({
   await expect(page.getByText('Codex CLI not found')).toBeVisible();
   await page.getByRole('textbox', { name: 'Model', exact: true }).fill('gpt-6.1-sol');
   await page.getByRole('textbox', { name: 'Model', exact: true }).press('Tab');
-  await page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio', { name: 'High', exact: true }).check();
+  await page.getByRole('radiogroup', { name: 'Reasoning effort', exact: true }).getByRole('radio', { name: 'High', exact: true }).check();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await expect.poll(async () => {
     const settings = await (await page.request.get(base + '/api/settings')).json();
@@ -366,7 +366,7 @@ test('reasoning effort offers the levels the model lists up to max, never ultra'
   await page.route('**/api/models', (route) => route.fulfill({ json: { models } }));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort' });
+  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort', exact: true });
   await expect(effort.getByRole('radio')).toHaveCount(5);
   await expect(effort.locator('label')).toHaveText(['Low', 'Medium', 'High', 'Extra high', 'Max']);
   await effort.getByRole('radio', { name: 'Max' }).check();
@@ -389,18 +389,20 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   const fastMode = page.getByRole('switch', { name: 'Fast mode' });
   await expect(fastMode).toBeVisible();
   // Reasoning efforts follow what the chosen model supports.
-  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort' }).getByRole('radio');
+  const effort = page.getByRole('radiogroup', { name: 'Reasoning effort', exact: true }).getByRole('radio');
   await expect(effort).toHaveCount(2);
   await model.selectOption('gpt-6-luna');
   await expect(effort).toHaveCount(1);
-  await expect(page.getByRole('radio', { name: 'Low' })).toBeChecked();
+  await expect(effort.and(page.getByRole('radio', { name: 'Low' }))).toBeChecked();
   await expect(fastMode).toHaveCount(0);
   await model.selectOption('gpt-6.1-sol');
   await fastMode.check();
   await page.getByRole('combobox', { name: 'Small model', exact: true }).selectOption('gpt-6-luna');
-  const smallEffort = page.getByRole('combobox', { name: 'Small model reasoning effort' });
-  await expect(smallEffort.locator('option')).toHaveText(['Same as the teacher', 'Low']);
-  await smallEffort.selectOption('low');
+  // The small model's effort is chosen the same way as the teacher's, and follows the teacher's until chosen.
+  const smallEffort = page.getByRole('radiogroup', { name: 'Small model reasoning effort' });
+  await expect(smallEffort.locator('label')).toHaveText(['Same as the teacher', 'Low']);
+  await expect(smallEffort.getByRole('radio', { name: 'Same as the teacher' })).toBeChecked();
+  await smallEffort.getByRole('radio', { name: 'Low' }).check();
   await expect.poll(async () => {
     const settings = await (await page.request.get(base + '/api/settings')).json();
     return [settings.model, settings.small_model, settings.small_effort, settings.service_tier];

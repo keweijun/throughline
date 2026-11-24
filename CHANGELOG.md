@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.61.1
+
+- **Exercises are calmer.** Under the answer box are only the ways to get help: Hint, Key steps, Full solution and Ask about this. **Another like this**, **Do later** and **Skip** are in the ⋯ at the top right of the exercise. The answer box has a shorter prompt.
+- **A section's header says less when there is less to say.** The goal is left out when it only repeats the section's title, and "Next step" no longer repeats what the lesson right below shows: following the lesson as it is written, or pressing Continue.
+- **The side panel's headings match the top bar:** Questions, Notes and Sources.
+- **Settings → Teacher sets both models the same way.** The teacher's model and the small model each have a model and a reasoning effort under it, chosen with the same buttons; the small model's starts at **Same as the teacher**.
+- **The welcome no longer changes size from step to step**, so Next and Back stay where they are.
+
 ## 0.61.0
 
 - **Overview is now Studio.** The top bar reads **Studio · Learn · Review**. Studio, Codex working on your course, now runs from just under the top bar to the bottom of the window, so long chats, questions and work are easier to read back. Beside it stand the course's title and goal, the strip of its chapters, your Studio chats and **How you're taught**. `d` opens it; `m` is gone.

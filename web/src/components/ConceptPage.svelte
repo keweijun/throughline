@@ -47,20 +47,22 @@
   const comeBackTo = $derived(app.returnSection ?? app.currentId);
   // A prerequisite not studied yet is named before the learner moves here, so they choose knowingly; nothing blocks it.
   const missing = $derived((concept?.prerequisites ?? []).filter((id) => !app.studied(id)).map((id) => app.concept(id)?.title ?? id));
-  const goal = $derived(
-    position?.goal ||
-      concept?.objective ||
-      concept?.goal ||
-      (preview?.overview.origin === 'teacher' ? preview.overview.target_ability : t("Read the lesson, then try the exercises")),
-  );
+  // A goal that only repeats the section's title says nothing, so the header leaves it out, as it does when there is
+  // no goal at all.
+  const goal = $derived.by(() => {
+    const text = (position?.goal || concept?.objective || concept?.goal || (preview?.overview.origin === 'teacher' ? preview.overview.target_ability : '') || '').trim();
+    const plain = (s: string) => s.toLocaleLowerCase().replace(/[\s.:;!?·…-]+/g, ' ').trim();
+    return text && plain(text) !== plain(concept?.title ?? '') ? text : '';
+  });
 
-  // The host records where a section starts; what to do next follows from the lessons and practice so far.
+  // The host records where a section starts; what to do next follows from the lessons and practice so far. While a
+  // lesson is written, or a step waits for Continue, the lesson itself shows the way on, so the header says nothing.
   const nextStep = $derived.by(() => {
-    if (lessons.some((l) => l.status === 'running')) return t("Follow the lesson as it is written. Select any passage to ask about it.");
+    if (lessons.some((l) => l.status === 'running')) return '';
     const stepped = app.openLesson(conceptId);
     if (stepped) {
       const latest = app.turn(stepped.steps.filter((s) => s.turn_id).at(-1)?.turn_id);
-      return latest?.status === 'completed' ? t("Continue with the next step when you are ready.") : t("Regenerate the unfinished step to go on.");
+      return latest?.status === 'completed' ? '' : t("Regenerate the unfinished step to go on.");
     }
     if (!lessons.some((l) => l.status === 'completed')) return t("Regenerate the unfinished lesson, or start a new one.");
     const generating = (app.state?.practice.jobs ?? []).some((j) => j.concept_id === conceptId && j.action === 'generate' && !j.purpose && !j.processed);
@@ -166,19 +168,24 @@
       </div>
       <h1 id="concept-title">{concept.title}</h1>
       {#if isCurrent}
-        <dl class="position">
-          <div>
-            <dt>{t("Goal")}</dt>
-            <dd>{goal}</dd>
-          </div>
-          <!-- Before the first lesson, the Start card below says what comes next. -->
-          {#if lessons.length}
-            <div>
-              <dt>{t("Next step")}</dt>
-              <dd id="next-step">{nextStep}</dd>
-            </div>
-          {/if}
-        </dl>
+        <!-- Before the first lesson, the Start card below says what comes next. -->
+        {@const next = lessons.length ? nextStep : ''}
+        {#if goal || next}
+          <dl class="position">
+            {#if goal}
+              <div>
+                <dt>{t("Goal")}</dt>
+                <dd>{goal}</dd>
+              </div>
+            {/if}
+            {#if next}
+              <div>
+                <dt>{t("Next step")}</dt>
+                <dd id="next-step">{next}</dd>
+              </div>
+            {/if}
+          </dl>
+        {/if}
         {#if app.returnSection}
           <p class="detour">
             {t("After this section, you go back to {section}.", { section: app.concept(app.returnSection)?.title ?? '' })}
@@ -406,7 +413,8 @@
 
   .position {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 1.25rem;
     margin: 1.5rem 0 0;
     padding-top: 1rem;

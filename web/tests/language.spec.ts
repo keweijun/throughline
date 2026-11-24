@@ -61,7 +61,8 @@ test('practice controls and evidence labels translate while the answer draft sta
   await expect(page.locator('#practice article').nth(2)).toContainText('需要再试一次');
   await expect(page.locator('#practice article').nth(3)).toContainText('独立完成');
   await first.getByRole('button', { name: '继续尝试' }).click();
-  await first.getByRole('button', { name: '稍后做' }).click();
+  await first.getByRole('button', { name: '更多操作' }).click();
+  await first.getByRole('menuitem', { name: '稍后做' }).click();
   await expect(first).toContainText('已留待稍后');
 });
 

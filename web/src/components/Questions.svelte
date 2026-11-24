@@ -161,7 +161,7 @@
 
 <section id="branch-panel" class="panel-view" aria-labelledby="questions-title">
   <header class="panel-head">
-    <div class="panel-bar"><h2 id="questions-title">{t("Your questions")}</h2></div>
+    <div class="panel-bar"><h2 id="questions-title">{t("Questions")}</h2></div>
     <p class="panel-intro">{t("Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
     {#if questions.length}
       <PanelScope bind:scope {counts} label={t("Show questions from")} onchoose={() => (scopeChosen = true)} />

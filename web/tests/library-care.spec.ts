@@ -28,10 +28,9 @@ test('a course is renamed in place on its card', async ({ page, course }) => {
   await title.press('Enter');
   const renamed = card(page, 'Linear Algebra for Physicists');
   await expect(renamed).toBeVisible();
-  await expect(renamed, 'the folder name stays').toContainText('linear-algebra');
 
-  // Opening it shows the new title in the top bar.
-  await renamed.getByRole('button', { name: 'Open' }).click();
+  // Opening it shows the new title in the top bar; the folder name stays, as the listing below shows.
+  await renamed.getByRole('heading').getByRole('button').click();
   await expect(page.locator('.topbar .course')).toHaveText('Linear Algebra for Physicists');
   const library = await (await page.request.get(base + '/api/library')).json();
   expect(library.courses.map((c: { name: string }) => c.name).sort()).toEqual(['linear-algebra', 'quantum-v1', 'thermo']);
@@ -57,9 +56,9 @@ test('an archived course leaves the list and comes back', async ({ page, course 
   const archived = page.locator('.courses.archived > li');
   await expect(archived).toHaveCount(1);
   await expect(archived).toContainText('Linear Algebra');
-  await expect(archived.getByRole('button', { name: 'Open' })).toBeVisible();
+  await expect(archived.getByRole('heading').getByRole('button')).toBeVisible();
   // The course switcher leaves it out too, once another course is open.
-  await card(page, 'Introductory Quantum Mechanics').getByRole('button', { name: 'Open' }).click();
+  await card(page, 'Introductory Quantum Mechanics').getByRole('heading').getByRole('button').click();
   await page.locator('#course-switcher').click();
   await expect(page.getByRole('menu', { name: 'Switch course' })).not.toContainText('Linear Algebra');
   await page.getByRole('menu', { name: 'Switch course' }).getByRole('menuitem', { name: 'All courses' }).click();
@@ -105,7 +104,7 @@ test('a deleted course goes to the trash after an inline confirmation and is res
 test('deleting the open course closes it and leaves the library showing what happened', async ({ page, course }) => {
   const { base, errors } = await course('library_browser_fixture');
   page.on('dialog', () => errors.push('native dialog'));
-  await card(page, 'Linear Algebra').getByRole('button', { name: 'Open' }).click();
+  await card(page, 'Linear Algebra').getByRole('heading').getByRole('button').click();
   await expect(page.getByRole('heading', { name: 'Eigenvectors' }).first()).toBeVisible();
   await page.locator('#open-courses').click();
 

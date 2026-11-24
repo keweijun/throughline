@@ -426,7 +426,7 @@ test('Settings hold only what applies to every course; Studio holds the course',
   const studioPage = page.locator('main article[aria-labelledby="course-title"]');
   await expect(studioPage.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(studioPage.getByRole('tab')).toHaveCount(0);
-  await expect(studioPage.getByRole('region', { name: "How you're taught" })).toContainText('Nothing yet.');
+  await expect(studioPage.getByRole('region', { name: "How you're taught" })).toContainText('tell Studio');
   await page.locator('#open-study').click();
   await expect(studioPage).toHaveCount(0);
   await expect(page.locator('main article[aria-labelledby="concept-title"]')).toBeVisible();

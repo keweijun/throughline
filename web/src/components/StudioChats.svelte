@@ -29,13 +29,14 @@
   );
 </script>
 
+<!-- No chats yet: the section waits until there is one, as the chat on screen is the new one. -->
+{#if listed.length}
 <section class="chats" aria-labelledby="studio-chats-title">
   <div class="head">
     <h2 id="studio-chats-title">{t('Chats')}</h2>
-    <button class="btn btn-small" disabled={!studio.threadId} onclick={() => studio.newThread()}>{t('New chat')}</button>
+    <button class="btn btn-quiet btn-small" disabled={!studio.threadId} onclick={() => studio.newThread()}>{t('New chat')}</button>
   </div>
-  {#if listed.length}
-    <ul>
+  <ul>
       {#each listed as thread (thread.id)}
         <li>
           <button class="chat" aria-current={thread.id === studio.threadId ? 'true' : undefined} onclick={() => thread.id !== studio.threadId && void studio.open(thread.id)}>
@@ -49,10 +50,8 @@
         </li>
       {/each}
     </ul>
-  {:else}
-    <p class="empty">{t('Nothing yet.')}</p>
-  {/if}
 </section>
+{/if}
 
 <style>
   .chats {
@@ -68,19 +67,19 @@
     gap: 0.5rem;
   }
 
+  /* A label for the list, not a heading that competes with the course's title. */
   h2 {
-    font-size: var(--step-0);
-    font-weight: 600;
-  }
-
-  .empty {
     font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--pencil);
   }
 
   /* Long lists scroll on their own, so how the learner is taught stays in reach below. */
   ul {
     display: grid;
+    /* One column no wider than the list, so a long title is cut with an ellipsis and never pushes the time out of view. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.1rem;
     max-height: 18rem;
     margin: 0;

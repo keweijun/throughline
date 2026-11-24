@@ -261,13 +261,14 @@ class StudioTest(unittest.TestCase):
         self.assertEqual(sent[1], {'type': 'text', 'text': 'Context from Throughline: Chapter "Interference", source s1 page 4', 'text_elements': []})
 
     def test_activity_names_the_threads_codex_works_in_or_waits_on_without_starting_codex(self):
-        self.assertEqual(self.client.get('/api/studio/activity').json(), {'running': [], 'waiting': []})
+        self.assertEqual(self.client.get('/api/studio/activity').json(), {'running': [], 'waiting': [], 'chats': 0})
         self.assertFalse(self.log.exists())  # asking did not start the App Server
         thread = self.send('please approve this')['thread']
         self.history(thread, lambda h: h['pending'])
         activity = self.client.get('/api/studio/activity').json()
         self.assertEqual(activity['running'], [thread])
         self.assertEqual([w['method'] for w in activity['waiting']], ['item/commandExecution/requestApproval'])
+        self.assertEqual(activity['chats'], 1, 'the page learns the course has a chat before Codex is asked for it')
 
     def test_a_codex_without_the_methods_studio_needs_leaves_it_unavailable(self):
         other = self.tmp / 'library' / 'optics'

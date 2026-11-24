@@ -2,11 +2,14 @@
   import type { Completion, CompletionContext, CompletionSource } from '@codemirror/autocomplete';
   import type { EditorView } from '@codemirror/view';
   import { insertChip, type ChipRange } from '../lib/editor';
-  import { t, type MessageKey } from '../lib/i18n.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { api, ApiError } from '../lib/api';
   import { app } from '../lib/store.svelte';
   import { untrack } from 'svelte';
   import { studio, type StudioMessage, type StudioScope } from '../lib/studio.svelte';
+  import { ADD_FILES, COURSE_IDEAS, COURSE_STARTS } from '../lib/starts';
+  import { prefersReducedMotion } from 'svelte/motion';
+  import type { Snippet } from 'svelte';
   import Composer from './Composer.svelte';
   import StudioTurn from './StudioTurn.svelte';
   import StudioRequest from './StudioRequest.svelte';
@@ -21,7 +24,8 @@
    * scrolls it, keeping its writing box at that container's bottom.
    */
   // `scope` is where Studio is mounted: a course's Overview, or the library page before a course is open (#109).
-  let { active = true, scope = 'course' }: { active?: boolean; scope?: StudioScope } = $props();
+  // `after` is shown under the suggestions of an empty chat, for what the page Studio is on adds to them.
+  let { active = true, scope = 'course', after }: { active?: boolean; scope?: StudioScope; after?: Snippet } = $props();
 
   let busy = $state(false);
   let attaching = $state(0);
@@ -43,7 +47,10 @@
     const where = scope;
     // Moving the store is not something this effect reads, so two mounts never hand it back and forth.
     untrack(() => studio.setScope(where));
-    if (active) void studio.load();
+    if (!active) return;
+    // Asked first and answered at once, so the page is laid out for an empty chat or a chat before Codex has started.
+    if (untrack(() => studio.known) === null) void studio.loadKnown();
+    void studio.load();
   });
   const library = $derived(scope === 'library');
 
@@ -53,39 +60,22 @@
   const draftKey = $derived(`studio:${library ? 'library:' : ''}${studio.threadId ?? 'new'}`);
   const draft = $derived(app.drafts.get(draftKey));
   const images = $derived(app.drafts.images(draftKey));
+  // While Codex works and nothing is written, the button by the box stops it; with something written, it adds that.
+  const stopping = $derived(studio.running && !draft.trim() && !images.length);
 
-  // Course work Studio can do, offered when a chat is empty; each fills the box rather than sending. Adding files
-  // always shows; three more are drawn from the rest each time Studio opens, so the learner sees its range over time.
-  const IDEAS: [MessageKey, MessageKey][] = [
-    ['Check the pages that still need review', 'Review the pages of {course} that still need checking.'],
-    ['Change how this course is taught', 'In {course},'],
-    ['Turn a past exam into practice', 'In {course}, turn this past exam into practice in its style:'],
-    ['Add a section the course is missing', 'In {course}, add a section on'],
-    ['Fill in derivations the notes skip', 'In {course}, fill in the derivations my materials skip in chapter'],
-    ['Add Python exercises to a chapter', 'In {course}, add Python exercises I can run to chapter'],
-    ['Make a one-page cheat sheet', 'Make a one-page cheat sheet of {course} as a PDF, covering'],
-    ['Make Anki cards of what I find hard', 'Make Anki cards from the difficulties in {course}.'],
-    ['Teach this course in another language', 'From now on, teach {course} in'],
-  ];
-  const drawn = IDEAS.map((_, i) => i);
+  // What Studio suggests in an empty chat (`lib/starts.ts`); each fills the box rather than sending. In a course,
+  // adding files always shows and three more are drawn from the rest each time Studio opens, so the learner sees its
+  // range over time; on the library page Studio is how a course begins.
+  const drawn = COURSE_IDEAS.map((_, i) => i);
   for (let i = drawn.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [drawn[i], drawn[j]] = [drawn[j], drawn[i]];
   }
-  const shown: [MessageKey, MessageKey][] = [
-    ['Add files to this course', 'Add these files to {course}:'],
-    ...drawn.slice(0, 3).sort((a, b) => a - b).map((i) => IDEAS[i]),
-  ];
-  // On the library page Studio is mostly how a course begins.
-  const LIBRARY_IDEAS: [MessageKey, MessageKey][] = [
-    ['Make a course from these files', 'Make a course from these files. I want to learn'],
-    ['Make a course from a folder', 'Make a course from the files in the folder'],
-    ['Make a course for an exam', 'Make a course for my exam on'],
-  ];
+  const shown = [ADD_FILES, ...drawn.slice(0, 3).sort((a, b) => a - b).map((i) => COURSE_IDEAS[i])];
   // A request that ends in a full stop is complete; the others leave the caret after a space for the learner to finish.
-  const examples = $derived((library ? LIBRARY_IDEAS : shown).map(([label, text]) => {
-    const request = t(text, { course });
-    return { label: t(label), text: `$throughline ${request}${/[.。]$/.test(request) ? '' : ' '}` };
+  const examples = $derived((library ? COURSE_STARTS : shown).map((idea) => {
+    const request = t(idea.request, { course });
+    return { label: t(idea.label), icon: idea.icon, text: `$throughline ${request}${/[.。]$/.test(request) ? '' : ' '}` };
   }));
 
   const atWordStart = (context: CompletionContext, from: number) => from === 0 || /\s/.test(context.state.sliceDoc(from - 1, from));
@@ -218,6 +208,28 @@
     return sent[sent.length - recalled];
   }
 
+  // An empty chat has its box under the question; the first message, or a chat opened, puts it at the frame's foot.
+  // The box travels there rather than jumping: where it was is measured before the page changes and where it is after.
+  let box = $state<HTMLElement>();
+  let boxWas: DOMRect | undefined;
+  // Only a change the learner sees both sides of: Studio settling into its first layout is not one.
+  let placedBefore = false;
+  $effect.pre(() => {
+    void [studio.starting, studio.placed];
+    boxWas = placedBefore ? box?.getBoundingClientRect() : undefined;
+  });
+  $effect(() => {
+    void studio.starting;
+    const was = boxWas;
+    boxWas = undefined;
+    placedBefore = studio.placed;
+    if (!was || !box || prefersReducedMotion.current) return;
+    const now = box.getBoundingClientRect();
+    const [dx, dy] = [was.left - now.left, was.top - now.top];
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    box.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' });
+  });
+
   function fill(text: string) {
     app.drafts.set(draftKey, text);
     requestAnimationFrame(() => view?.focus());
@@ -282,7 +294,7 @@
 
 </script>
 
-<section class="panel-view studio" aria-labelledby="studio-title">
+<section class="panel-view studio" class:starting={studio.starting} class:unplaced={!studio.placed} class:from-elsewhere={!!studio.origin} aria-labelledby="studio-title">
   <header class="panel-head pinned">
     <div class="panel-bar">
       <h2 id="studio-title">{t("Studio")}</h2>
@@ -317,22 +329,17 @@
         <p>{studio.error || t("Studio could not start Codex.")}</p>
         <CodexLink chat prompt={`$throughline ${course ? t('Open {course}', { course }) : ''}`} class="btn btn-small">{t("Open a Codex chat instead")}</CodexLink>
       </div>
-    {:else if studio.available === null && studio.loading}
+    {:else if studio.available === null && studio.loading && !studio.starting}
       <p class="panel-empty" role="status">{t("Starting Codex…")}</p>
     {:else if !studio.turns.length}
       <div class="welcome">
         {#if library}
           <h3 class="welcome-title">{t("What would you like to learn?")}</h3>
-          <p class="panel-empty">{t("Drop your PDFs, slides or notes here, or name the folder they are in, and say what you want to learn. Codex reads them, asks you a few questions and builds the course.")}</p>
+          <p class="panel-empty">{t("Bring your PDFs, slides or notes. Codex reads every page, asks you a few questions and builds the course.")}</p>
         {:else}
           <h3 class="welcome-title">{t("What would you like to change in this course?")}</h3>
           <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
         {/if}
-        <ul class="examples">
-          {#each examples as example (example.label)}
-            <li><button class="btn btn-quiet btn-small" onclick={() => fill(example.text)}>{example.label}</button></li>
-          {/each}
-        </ul>
       </div>
     {:else}
       {#each studio.turns as turn, i (turn.id)}
@@ -358,15 +365,17 @@
     </span>
   {/snippet}
   {#snippet tools()}
-    <StudioControls />
+    <StudioControls part="access" />
     {#if studio.context !== null}
       <span class="context" title={t("Share of the model's context this chat uses")}>{t("{percent}% context", { percent: Math.round(studio.context * 100) })}</span>
     {/if}
     {#if attaching}<span class="context" role="status">{t("Attaching…")}</span>{/if}
   {/snippet}
-  <!-- Stop sits beside Send, where Codex puts it. -->
+  <!-- The model beside Send, as in Codex. While Codex works, one button stands there: Stop, until something is
+       written to add to what it is doing. -->
   {#snippet actions()}
-    {#if studio.running}
+    <StudioControls part="model" />
+    {#if stopping}
       <button type="button" class="btn btn-small stop" onclick={() => void studio.stop()} title={t("Stop Codex")}>
         <span class="square" aria-hidden="true"></span>{t("Stop")}
       </button>
@@ -380,13 +389,15 @@
       </div>
     {/each}
     {#if studio.available !== false}
+      <div class="box" bind:this={box}>
       <Composer
         id="studio-input"
         value={draft}
         onvalue={(value) => app.drafts.set(draftKey, value)}
         label={t("Message to Codex")}
-        placeholder={studio.running ? t("Add to what Codex is doing…") : t("Ask Codex for course work · $ for skills, @ for files")}
+        placeholder={studio.running ? t("Add to what Codex is doing…") : library && !studio.turns.length ? t("Say what you want to learn, and drop your files here…") : t("Ask Codex for course work · $ for skills, @ for files")}
         submitLabel={studio.running ? t("Add") : t("Send")}
+        submit={!stopping}
         disabled={busy || attaching > 0}
         onsubmit={send}
         header={target}
@@ -402,6 +413,21 @@
         {tools}
         {actions}
       />
+      </div>
+      {#if studio.starting}
+        <!-- Suggestions under the box: each begins a request in it. They are chips, like nothing else on the page. -->
+        <ul class="starts" class:long={!library}>
+          {#each examples as example (example.label)}
+            <li>
+              <button onclick={() => fill(example.text)}>
+                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d={example.icon} /></svg>
+                {example.label}
+              </button>
+            </li>
+          {/each}
+        </ul>
+        {@render after?.()}
+      {/if}
     {/if}
   </div>
 </section>
@@ -456,31 +482,156 @@
     color: var(--ink);
   }
 
-  .welcome .examples {
+  /* An empty chat (ADR 0027): the question, the writing box under it and the suggestions under that, gathered in the
+     middle of the frame. The first message, or a chat opened, makes it the chat, with the box at the frame's foot. */
+  .studio.starting {
     justify-content: center;
+    padding-bottom: 6vh;
   }
 
-  .examples {
+  .studio {
+    position: relative;
+  }
+
+  /* For the moment before the host has said whether there is a chat to open, Studio shows neither layout, so the
+     box is first seen where it will stay. It still takes the caret. */
+  .studio.unplaced > * {
+    opacity: 0;
+  }
+
+  /* The chat picker, when there are chats to pick, keeps to the frame's top, out of what is gathered in the middle. */
+  .starting > .pinned {
+    position: absolute;
+    inset: 0 0 auto;
+    margin: 0;
+    padding-top: 0;
+    background: none;
+  }
+
+  .starting > .pinned::after {
+    content: none;
+  }
+
+  .starting > .transcript {
+    flex: 0 0 auto;
+  }
+
+  .starting .welcome {
+    gap: 0.6rem;
+    margin: 0 auto;
+    padding: 0 0 1.25rem;
+  }
+
+  .starting .welcome-title {
+    font-size: var(--studio-question, var(--step-3));
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+
+  .starting .welcome :global(.panel-empty) {
+    max-width: 34rem;
+    font-size: var(--step-0);
+    text-wrap: pretty;
+  }
+
+  .starting > .panel-foot {
+    position: static;
+    gap: 1.1rem;
+    margin-top: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .starting > .panel-foot::before {
+    content: none;
+  }
+
+  .starting .box :global(.composer) {
+    box-shadow: var(--shadow);
+  }
+
+  /* The box names its chat and where a request came from; a new chat with neither needs no heading. */
+  .starting:not(.from-elsewhere) .box :global(.composer .head) {
+    display: none;
+  }
+
+  /* Each part arrives a moment after the one above it. */
+  .starting .welcome,
+  .starting .box,
+  .starting .starts {
+    animation: enter-rise 320ms var(--ease-out) backwards;
+  }
+
+  .starting .box {
+    animation-delay: 50ms;
+  }
+
+  .starting .starts {
+    animation-delay: 110ms;
+  }
+
+  .starts {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    justify-content: center;
+    gap: 0.5rem;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .examples .btn {
-    border: 1px solid var(--rule-strong);
-    border-radius: 999px;
-    background: var(--raised);
-    color: var(--ink);
-    font-weight: 500;
+  /* A course's suggestions are longer: two to a row, each pair the same width, so their edges line up. */
+  .starts.long {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
   }
 
-  .examples .btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+  .starts.long button {
+    width: 100%;
   }
+
+  @container (max-width: 34rem) {
+    .starts.long {
+      grid-template-columns: minmax(0, max-content);
+    }
+  }
+
+  .starts button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.8rem 0.35rem 0.65rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: 999px;
+    background: var(--sheet);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--step--1);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, translate 0.15s ease;
+  }
+
+  .starts button:hover,
+  .starts button:focus-visible {
+    border-color: var(--pencil);
+    background: var(--raised);
+  }
+
+  .starts button:active {
+    translate: 0 1px;
+  }
+
+  .starts svg {
+    flex: none;
+    fill: none;
+    stroke: var(--pencil);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
 
   .unavailable {
     display: grid;

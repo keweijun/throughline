@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 
 async function openCourse(page: Page, title: string) {
   await page.locator('#open-courses').click();
-  await page.locator('.courses > li').filter({ hasText: title }).getByRole('button', { name: 'Open' }).click();
+  await page.locator('.courses > li').filter({ hasText: title }).getByRole('heading').getByRole('button').click();
   await expect(page.locator('.topbar .course')).toHaveText(title);
 }
 

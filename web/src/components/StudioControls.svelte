@@ -8,6 +8,8 @@
    * How Studio runs, chosen where it is used, as in Codex (ADR 0016): its model and reasoning effort, the teacher's
    * until the learner picks Studio's own, and its access. Each opens a small menu above the writing box.
    */
+  // `part` shows one of the two: the access with what goes into a message, the model beside Send, as in Codex.
+  let { part = 'both' }: { part?: 'model' | 'access' | 'both' } = $props();
   let open = $state<'model' | 'access' | null>(null);
   let root = $state<HTMLElement>();
   let saving = $state(false);
@@ -37,7 +39,7 @@
 
   // The chip names the model, so the list is asked for as soon as Codex can run Studio, not when the menu opens.
   $effect(() => {
-    if (studio.available) studio.loadModels().catch(() => {});
+    if (studio.available && part !== 'access') studio.loadModels().catch(() => {});
   });
 
   async function toggle(menu: 'model' | 'access') {
@@ -96,7 +98,8 @@
   });
 </script>
 
-<span class="controls" bind:this={root}>
+<span class="controls" class:by-send={part === 'model'} bind:this={root}>
+  {#if part !== 'access'}
   <button
     type="button"
     class="chip"
@@ -106,6 +109,8 @@
     title={t("Studio's model and reasoning effort")}
     onclick={() => void toggle('model')}
   >{modelName(model)} · {effortLabel}</button>
+  {/if}
+  {#if part !== 'model'}
   <button
     type="button"
     class="chip"
@@ -121,6 +126,7 @@
       : t("Codex writes only inside your Throughline folder and asks before anything else.")}
     onclick={() => void toggle('access')}
   >{studio.access?.full_access ? t('Full access') : t('Library access')}</button>
+  {/if}
 
   {#if open === 'model'}
     <!-- Effort first: it is switched more often than the model, and stays in view above a long list of models. -->
@@ -239,6 +245,12 @@
     background: var(--sheet);
     box-shadow: var(--shadow);
     user-select: none;
+  }
+
+  /* Beside Send, the menu opens from the right edge, where its chip is. */
+  .by-send .menu {
+    right: 0;
+    left: auto;
   }
 
   .label {

@@ -9,6 +9,7 @@
   import StudioChats from './StudioChats.svelte';
   import TeachingPreferences from './TeachingPreferences.svelte';
   import CourseShare from './CourseShare.svelte';
+  import CourseCover from './CourseCover.svelte';
 
   // The course's Studio place, the first of its three places (ADR 0017): Codex working on the course, as tall as the
   // window and no wider than a chat needs, with the course and its chats in a column beside it, as Codex lists its
@@ -92,6 +93,25 @@
          and Studio's own chats menu comes back. -->
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
+        <!-- The course's cover, as on its card in the library (ADR 0027), with the course's own actions on its corner.
+             The cover names the course here and the top bar gives its title, so the title is not written a third
+             time; a course whose cover has no name yet shows its title under it. -->
+        {#if course}
+          <div class="cover">
+            <CourseCover {course} />
+            <button
+              class="btn btn-quiet btn-small more"
+              bind:this={more}
+              data-course-actions
+              aria-haspopup="menu"
+              aria-expanded={opened === 'menu'}
+              aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}
+              onclick={() => (opened === 'menu' ? (opened = null) : open('menu'))}
+            >
+              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
+            </button>
+          </div>
+        {/if}
         {#if renaming}
           <form class="rename" onsubmit={(event) => (event.preventDefault(), void rename())}>
             <textarea
@@ -111,22 +131,7 @@
             </div>
           </form>
         {:else}
-          <div class="title-row">
-            <h1 id="course-title">{app.state?.course.title}</h1>
-            {#if course}
-              <button
-                class="btn btn-quiet btn-small more"
-                bind:this={more}
-                data-course-actions
-                aria-haspopup="menu"
-                aria-expanded={opened === 'menu'}
-                aria-label={t('More actions for {course}', { course: app.state?.course.title ?? '' })}
-                onclick={() => (opened === 'menu' ? (opened = null) : open('menu'))}
-              >
-                <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
-              </button>
-            {/if}
-          </div>
+          <h1 id="course-title" class:visually-hidden={!!course?.cover?.name}>{app.state?.course.title}</h1>
         {/if}
         {#if course?.goal}<p class="goal" title={course.goal}>{course.goal}</p>{/if}
         {#if imported}
@@ -144,7 +149,7 @@
         {/if}
 
         <!-- The whole route at a glance; a segment opens its chapter. -->
-        <ol class="strip" aria-label={t('Chapters')}>
+        <ol class="strip" class:many={strip.length > 12} class:crowded={strip.length > 24} aria-label={t('Chapters')}>
           {#each strip as segment (segment.id || 'all')}
             <li style:flex-grow={Math.max(segment.total, 1)}>
               <button
@@ -191,8 +196,13 @@
       </section>
     {:else}
       <!-- Studio scrolls inside its own frame, so its writing box stays in view. -->
-      <div class="frame studio-frame" data-scroller>
-        <Studio active={app.courseOpen} />
+      <!-- An empty chat has no sheet: the question and the box stand on the page (ADR 0027). The sheet comes with the
+           chat, opening out from the middle as the box goes to its foot. -->
+      <div class="sheet" class:starting={studio.starting} class:unplaced={!studio.placed}>
+        <div class="paper" aria-hidden="true"></div>
+        <div class="frame studio-frame" data-scroller>
+          <Studio active={app.courseOpen} />
+        </div>
       </div>
     {/if}
   </div>
@@ -227,6 +237,9 @@
 
   .studio-aside {
     display: grid;
+    /* One column no wider than the aside: nothing in it can widen it, and it scrolls only up and down. */
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
     gap: 1.75rem;
     align-content: start;
     min-width: 0;
@@ -239,6 +252,7 @@
 
   .head {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.6rem;
   }
 
@@ -249,16 +263,24 @@
     line-height: 1.25;
   }
 
-  .title-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 0.25rem;
+
+  /* On the cover's corner, quiet until the cover is pointed at. */
+  .more {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.3rem;
+    padding: 0.25rem 0.35rem;
+    color: var(--pencil);
+    opacity: 0.55;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
   }
 
-  .more {
-    margin-top: 0.15rem;
-    padding: 0.25rem 0.35rem;
+  .cover:hover .more,
+  .more:focus-visible,
+  .more[aria-expanded='true'] {
+    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    color: var(--ink);
+    opacity: 1;
   }
 
   .rename {
@@ -359,9 +381,12 @@
     align-items: baseline;
   }
 
+  /* Always one line as wide as the column, however many chapters: the segments and the gaps between them give way,
+     so a long course never widens the column or makes it scroll sideways. */
   .strip {
     display: flex;
     gap: 0.25rem;
+    min-width: 0;
     margin: 0.15rem 0 0;
     padding: 0;
     list-style: none;
@@ -369,7 +394,28 @@
 
   .strip li {
     flex-basis: 0;
-    min-width: 0.75rem;
+    min-width: 0.5rem;
+  }
+
+  .strip.many {
+    gap: 2px;
+  }
+
+  .strip.many li {
+    min-width: 3px;
+  }
+
+  .strip.crowded {
+    gap: 1px;
+  }
+
+  .strip.crowded li {
+    min-width: 1px;
+  }
+
+  /* Thin segments are bars, not pills, so a part-studied one still reads as part filled. */
+  .strip.many .segment {
+    border-radius: 2px;
   }
 
   .segment {
@@ -422,7 +468,40 @@
   /* Studio is built for the side panel: the same surface and padding here keep its raised writing box and its pinned
      strip (.panel-foot, painted in --sheet) on one ground. Its frame keeps one height, which Studio fills with its box
      at the bottom, so content loading inside it never moves the box from under the learner's pointer. */
+  .sheet {
+    position: relative;
+    min-width: 0;
+    /* The frame inside scrolls, so the sheet is never taller than the place however long the chat is. */
+    min-height: 0;
+    height: 100%;
+    /* Inside the sheet's edge, so what is pinned in the frame never paints over it. */
+    padding: 1px;
+  }
+
+  /* The sheet itself, under the frame that scrolls: with an empty chat it is folded away below the question, and it
+     rises to the frame's top as the chat begins. Its foot never moves, so the box always lands on it. */
+  .paper {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    transition: inset 320ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 200ms ease;
+  }
+
+  .starting .paper {
+    inset: 40% 0 0;
+    opacity: 0;
+  }
+
+  /* Until it is known whether there is a chat to open, no sheet, and none arriving in motion. */
+  .unplaced .paper {
+    opacity: 0;
+    transition: none;
+  }
+
   .frame {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -431,9 +510,6 @@
     /* Scrolling past the transcript's ends never carries on into the page. */
     overscroll-behavior: contain;
     padding: 1.1rem 1.1rem 0;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--sheet);
   }
 
   /* The place names Studio and lists its chats beside it, so Studio's own heading and chats menu step aside. */
@@ -485,9 +561,29 @@
     }
   }
 
+  /* The course's cover tops its column. */
+  .cover {
+    position: relative;
+    height: 5.5rem;
+    margin-bottom: 0.2rem;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+  }
+
+  .cover :global(.name) {
+    font-size: 1.5rem;
+  }
+
+  /* Beside its list of chats the box need not name the chat again; it still says where a request came from. */
+  .frame :global(.studio:not(.from-elsewhere) .composer .head) {
+    display: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .segment,
-    .fill {
+    .fill,
+    .paper {
       transition: none;
     }
   }

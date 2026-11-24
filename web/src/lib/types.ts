@@ -566,6 +566,10 @@ export type LibraryCourse = {
   error?: string;
   /** Left out of the library's list, under Archived courses (ADR 0022). */
   archived?: boolean;
+  /** The subject's short name and the pattern behind it, once Codex has chosen them (ADR 0027). */
+  cover?: { name: string; pattern: string } | null;
+  /** What Studio is doing in the course, as far as this host saw. */
+  studio?: 'working' | 'waiting' | null;
 };
 
 /** A course waiting in the library's trash (ADR 0022). */

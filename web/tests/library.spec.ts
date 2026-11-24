@@ -15,18 +15,21 @@ test('the library lists courses, opens one and switches back', async ({ page, co
   await expect(courses.filter({ hasText: 'Thermodynamics' })).toContainText('Route not built yet');
   await expect(page.getByRole('button', { name: 'Questions', exact: true })).toHaveCount(0);
 
-  await courses.filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
+  await courses.filter({ hasText: 'Linear Algebra' }).getByRole('heading').getByRole('button').click();
   await expect(page.getByRole('heading', { name: 'Eigenvectors' }).first()).toBeVisible();
   await expect(page.locator('.topbar .course')).toHaveText('Linear Algebra');
 
   await page.locator('#open-courses').click();
   await expect(courses.filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Continue' })).toBeVisible();
-  await courses.filter({ hasText: 'Quantum' }).getByRole('button', { name: 'Open' }).click();
+  await courses.filter({ hasText: 'Quantum' }).getByRole('heading').getByRole('button').click();
   await expect(page.locator('.topbar .course')).toHaveText('Introductory Quantum Mechanics');
   await expect(page.getByRole('heading', { name: 'Superposition' }).first()).toBeVisible();
 
+  // The open course leads the list, and its Continue is the way back into it.
   await page.locator('#open-courses').click();
-  await page.getByRole('button', { name: 'Back to Introductory Quantum Mechanics' }).click();
+  await expect(courses.first()).toContainText('Introductory Quantum Mechanics');
+  await expect(page.getByRole('button', { name: /^Back to/ })).toHaveCount(0);
+  await courses.first().getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Superposition' }).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -41,7 +44,10 @@ test('Codex actions copy their request, and an open course links to Studio with 
   const { base, errors } = await course('library_browser_fixture');
   const library = await (await page.request.get(base + '/api/library')).json();
 
+  // Add files waits in the card's menu, with what else is rarely needed.
+  await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('button', { name: /^More actions for/ }).click();
   const link = page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('link', { name: 'Add files in Codex' });
+  await page.getByRole('menu').evaluate((menu) => Promise.all(menu.getAnimations().map((animation) => animation.finished)));  // the menu grows into place
   const width = (await link.boundingBox())?.width;
   await link.click();
   expect(await page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(['$throughline add these files to the course quantum-v1:']);
@@ -51,7 +57,7 @@ test('Codex actions copy their request, and an open course links to Studio with 
   await expect(copied.getByRole('status')).toHaveText('Request copied');
   expect((await copied.boundingBox())?.width).toBe(width);
 
-  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
+  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('heading').getByRole('button').click();
   const rail = page.getByRole('navigation', { name: 'Course route' });
   // In a course the link opens Studio; its address stays the Codex chat it falls back to where Studio cannot run.
   const add = new URL(await rail.getByRole('link', { name: 'Add files in Studio' }).getAttribute('href') ?? '');
@@ -80,6 +86,7 @@ test('course actions open Codex with a $throughline request, and new courses app
   const { base } = await course('library_browser_fixture');
   const library = await (await page.request.get(base + '/api/library')).json();
   const quantum = page.locator('.courses > li').filter({ hasText: 'Quantum' });
+  await quantum.getByRole('button', { name: /^More actions for/ }).click();
   const add = new URL(await quantum.getByRole('link', { name: 'Add files in Codex' }).getAttribute('href') ?? '');
   expect(add.protocol).toBe('codex:');
   expect(add.searchParams.get('path')).toBe(library.root);
@@ -90,6 +97,48 @@ test('course actions open Codex with a $throughline request, and new courses app
   execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "course.init", "title": "Organic Chemistry"})',
     path.join(library.root, 'organic')], { cwd: root });
   await expect(page.locator('.courses > li').filter({ hasText: 'Organic Chemistry' })).toBeVisible({ timeout: 8000 });
+});
+
+test('a card is a cover, a title and one line, and the whole card opens the course', async ({ page, course }) => {
+  const { base, errors } = await course('library_browser_fixture');
+  const library = await (await page.request.get(base + '/api/library')).json();
+  const quantum = page.locator('.courses > li').filter({ hasText: 'Quantum' });
+  // No folder name, counts, dates or goal: they made the page hard to read.
+  await expect(quantum).not.toContainText('quantum-v1');
+  await expect(quantum).not.toContainText(/Sources|Sections|Updated|Goal/);
+  // A course Codex has not given a cover shows a pattern alone.
+  await expect(quantum.locator('.cover svg path').first()).toBeAttached();
+  await expect(quantum.locator('.cover .name')).toHaveCount(0);
+
+  // Codex chooses the cover (cover.save), and the card shows it without a reload.
+  execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "cover.save", "name": "QM", "pattern": "orbits"})',
+    path.join(library.root, 'quantum-v1')], { cwd: root });
+  await expect(quantum.locator('.cover .name')).toHaveText('QM', { timeout: 8000 });
+  const drawn = await quantum.locator('.cover svg path').count();
+  expect(drawn).toBeGreaterThan(10);
+  // The cover is decoration: the title names the course to a screen reader.
+  await expect(quantum.locator('.cover')).toHaveAttribute('aria-hidden', 'true');
+
+  // Clicking anywhere on the card, its cover too, opens the course: the title's button reaches over the card.
+  const cover = (await quantum.locator('.cover').boundingBox())!;
+  await page.mouse.click(cover.x + cover.width / 2, cover.y + cover.height / 2);
+  await expect(page.locator('.topbar .course')).toHaveText('Introductory Quantum Mechanics');
+  expect(errors).toEqual([]);
+});
+
+test('a card says what Studio is doing in its course', async ({ page, course }) => {
+  await page.route('**/api/library', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const body = await response.json();
+    for (const item of body.courses) item.studio = item.name === 'quantum-v1' ? 'waiting' : item.name === 'linear-algebra' ? 'working' : null;
+    await route.fulfill({ response, json: body });
+  });
+  await course('library_browser_fixture');
+  const courses = page.locator('.courses > li');
+  await expect(courses.filter({ hasText: 'Quantum' }).locator('.status')).toHaveText('Studio needs your answer');
+  await expect(courses.filter({ hasText: 'Linear Algebra' }).locator('.status')).toHaveText('Studio is working on it');
+  await expect(courses.filter({ hasText: 'Thermodynamics' }).locator('.status')).toContainText('Route not built yet');
 });
 
 test('About in Settings shows the version and credits and checks for updates', async ({ page, course }) => {
@@ -232,7 +281,7 @@ test('a note from a page whose course was switched elsewhere is not saved into t
   // The switch happens in another tab; this page misses the event that would reload it, so its next request is stale.
   await page.route('**/api/events', (route) => route.abort());
   const { base, errors } = await course('library_browser_fixture');
-  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('button', { name: 'Open' }).click();
+  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('heading').getByRole('button').click();
   await expect(page.locator('.topbar .course')).toHaveText('Linear Algebra');
   expect((await page.request.post(base + '/api/library/open', { data: { name: 'quantum-v1' } })).ok()).toBe(true);
 

@@ -534,11 +534,13 @@ class Studio:
         return server
 
     def activity(self, course):
-        """The course's threads Codex is working in or waiting on, from what this host saw; never starts Codex, so
-        every page can ask."""
+        """The course's threads Codex is working in or waiting on, from what this host saw, and how many chats the
+        course has (`chats`), which says before Codex has started whether Studio opens on a chat or on an empty one;
+        never starts Codex, so every page can ask."""
         ids = set(self._ids(course))
         return {'running': [t for t in self.active if t in ids],
-                'waiting': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') in ids]}
+                'waiting': [entry for _, entry in self.pending.values() if entry['params'].get('threadId') in ids],
+                'chats': len(ids)}
 
     def threads(self, course):
         self.settle()

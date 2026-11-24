@@ -102,13 +102,41 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await page.keyboard.press('d');
   const box = page.locator('#studio-input');
   await expect(box).toBeFocused(); // `d` puts the caret in the box, even before Studio has loaded
-  const before = await box.boundingBox();
+  // The host has said the course has no chat yet, so the box is already under the question, where it will stay.
+  const settled = () => box.evaluate((node) => Promise.all(node.closest('.box')!.getAnimations().map((a) => a.finished)));
+  const question = page.locator('#course-studio').getByRole('heading', { name: 'What would you like to change in this course?' });
+  await expect(question).toBeVisible();
+  await settled();
+  const before = (await box.boundingBox())!;
   await page.keyboard.type('wait for me');
+  expect((await box.boundingBox())!.y).toBe(before.y);
   await page.keyboard.press('Control+Enter'); // sent while Codex is still starting: it waits, it is not dropped
   release();
   await expect(page.locator('#course-studio').getByRole('button', { name: 'Stop' })).toBeVisible();
   await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
-  expect((await box.boundingBox())?.y).toBe(before?.y);
+  // Sending is what begins the chat: the box goes to the frame's foot, and Codex arriving moves nothing more.
+  await settled();
+  const foot = (await box.boundingBox())!;
+  expect(foot.y).toBeGreaterThan(before.y + 100);
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+  // With a chat to open, the box is at the foot from the first moment, and stays there when Codex has loaded the chat.
+  let open = () => {};
+  const held = new Promise<void>((resolve) => (open = resolve));
+  await page.route('**/api/studio', async (route) => {
+    const response = await route.fetch();
+    await held;
+    await route.fulfill({ response });
+  });
+  await page.reload();
+  await page.keyboard.press('d');
+  await expect(box).toBeFocused();
+  await expect(question).toHaveCount(0);
+  const waiting = (await box.boundingBox())!;
+  open();
+  await expect(page.locator('#course-studio .user .said')).toHaveText('wait for me');
+  await settled();
+  expect((await box.boundingBox())!.y).toBe(waiting.y);
   await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
@@ -124,9 +152,15 @@ test('Studio is as tall as the window beside the course column, and writing move
 
   // The course's column stands beside Studio, which starts level with the title and is no wider than a chat needs.
   const title = page.locator('#course-title');
-  expect(Math.abs((await frame.boundingBox())!.y - (await title.boundingBox())!.y)).toBeLessThan(16);
+  // The column opens with the course's cover, level with Studio's frame, and its title under it.
+  const cover = page.locator('#course-studio .studio-aside .cover').first();
+  expect(Math.abs((await frame.boundingBox())!.y - (await cover.boundingBox())!.y)).toBeLessThan(16);
+  expect((await title.boundingBox())!.y).toBeGreaterThan((await cover.boundingBox())!.y);
+  // An empty chat has no sheet; it comes when the chat begins (checked below).
+  await expect(page.locator('#course-studio .sheet .paper')).toHaveCSS('opacity', '0');
   expect((await frame.boundingBox())!.width).toBeLessThan(46 * 16 + 1);
   const box = page.locator('#studio-input');
+  await box.evaluate((node) => Promise.all(node.closest('.box')!.getAnimations().map((a) => a.finished)));  // it arrives with a small rise
   const before = (await box.boundingBox())!;
   const height = (await frame.boundingBox())!.height;
   await box.click();
@@ -139,6 +173,74 @@ test('Studio is as tall as the window beside the course column, and writing move
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
   expect(await page.locator('#stage').evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThan(2);
+
+  // The sheet comes with the chat, as tall as the frame, and stays for a chat that has begun.
+  await box.click();
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('#course-studio .said-by-codex')).toHaveText('done');
+  const paper = page.locator('#course-studio .sheet .paper');
+  await expect(paper).toHaveCSS('opacity', '1');
+  await paper.evaluate((node) => Promise.all(node.getAnimations().map((a) => a.finished)));
+  expect((await paper.boundingBox())!.height).toBeCloseTo((await frame.boundingBox())!.height, -1);
+  // A new chat folds it away again.
+  await page.getByRole('region', { name: 'Chats' }).getByRole('button', { name: 'New chat' }).click();
+  await expect(paper).toHaveCSS('opacity', '0');
+});
+
+test('the course is named once in the bar and once on its cover, and the switcher marks the open course and offers a new one', async ({ page, course }) => {
+  const { base, errors } = await course('studio_browser_fixture');
+  const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
+  await page.locator('#open-course').click();
+  const column = page.locator('#course-studio .studio-aside');
+  const title = column.locator('#course-title');
+  // A course whose cover has no name yet shows its title under the cover.
+  await expect(title).toBeVisible();
+  await expect(title).not.toHaveClass(/visually-hidden/);
+  courseOperation(waves, { op: 'cover.save', name: 'Waves', pattern: 'waves' });
+  await page.reload();
+  await page.locator('#open-course').click();
+  // Once the cover names it, the title is not written a third time; it still names the page to a screen reader.
+  await expect(column.locator('.cover .name')).toHaveText('Waves');
+  await expect(title).toHaveClass(/visually-hidden/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Waves' })).toBeAttached();
+  // The course's own actions are on the cover's corner.
+  await column.locator('.cover').getByRole('button', { name: 'More actions for Waves' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // The switcher: each course by its title, the open one marked, then the ways out. No cover patterns here: they are
+  // decoration for a cover, not marks to tell courses apart by.
+  await page.locator('#course-switcher').click();
+  const menu = page.getByRole('menu', { name: 'Switch course' });
+  const open = menu.getByRole('menuitem', { name: /Waves/ });
+  await expect(open).toHaveAttribute('aria-current', 'true');
+  await expect(menu.locator('svg.pattern, .cover')).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'All courses' })).toBeVisible();
+  await menu.getByRole('menuitem', { name: 'New course' }).click();
+  await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
+  await expect(page.locator('#studio-input')).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test('a course of many chapters keeps its chapter strip inside the column, which never scrolls sideways', async ({ page, course }) => {
+  const { base } = await course('studio_browser_fixture');
+  const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
+  // The course's own section stays, as the first of forty chapters' sections.
+  const ids = ['wave', ...Array.from({ length: 39 }, (_, i) => `c${i + 1}`)];
+  const chapters = ids.map((id, i) => ({ id: `ch${i}`, title: `Chapter ${i + 1}`, summary: 'A chapter', concept_ids: [id] }));
+  const concepts = ids.map((id, i) => ({ id, title: i ? `Section ${i + 1}` : 'Wave superposition' }));
+  courseOperation(waves, { op: 'curriculum.save', concepts, route: concepts.map((c) => c.id), coverage: [], chapters, reorder_confirmed: true });
+  await page.reload();
+  await page.locator('#open-course').click();
+  const aside = page.locator('#course-studio .studio-aside');
+  const segments = aside.locator('.strip .segment');
+  await expect(segments).toHaveCount(40);
+  expect(await aside.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+  const column = (await aside.boundingBox())!;
+  const last = (await segments.last().boundingBox())!;
+  expect(last.x + last.width).toBeLessThanOrEqual(column.x + column.width);
+  expect(last.width, 'every chapter keeps a segment to click').toBeGreaterThanOrEqual(1);
 });
 
 test('a long list of how the learner is taught scrolls beside Studio rather than past the window', async ({ page, course }) => {
@@ -168,9 +270,12 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await expect(box).toBeFocused();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
+  // While Codex works one button stands by the box: Stop, until something is written to add to what it is doing.
   await expect(panel.getByRole('button', { name: 'Stop' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
   await box.pressSequentially('also add the solutions');
+  await expect(panel.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Stop' })).toHaveCount(0);
   await page.keyboard.press('Control+Enter');
   await expect(panel.locator('.said-by-codex').last()).toHaveText('steered: also add the solutions');
 
@@ -180,6 +285,7 @@ test('a message while Codex works steers it, and Stop interrupts', async ({ page
   await page.keyboard.press('Control+Enter');
   await panel.getByRole('button', { name: 'Stop' }).click();
   await expect(panel.locator('.ended')).toHaveText('Stopped');
+  await expect(panel.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
 });
 
 test('Stop restarts a Codex that stopped answering, and says so', async ({ page, course }) => {
@@ -231,7 +337,7 @@ test('an empty chat suggests a range of course work that fills the box without s
   const panel = page.locator('#course-studio');
   await expect(panel).toContainText('This is Codex itself, working on this course.');
   // Adding files always shows; three more are drawn from the rest.
-  const suggestions = panel.locator('.examples button');
+  const suggestions = panel.locator('.starts button');
   await expect(suggestions).toHaveCount(4);
   await expect(suggestions.first()).toHaveText('Add files to this course');
   await suggestions.nth(1).click();
@@ -271,7 +377,7 @@ test("a hand-off goes to the course's Studio even when Studio was last open on t
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
   await page.getByRole('button', { name: '← All courses' }).click();
-  await page.getByRole('button', { name: /^Back to / }).click();
+  await page.locator('.courses > li').first().getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
   await suggestion.getByRole('button', { name: 'Change it in Studio' }).click();
@@ -413,7 +519,8 @@ test("the library page has its own Studio for new courses; a course card's actio
   await expect(page.getByRole('heading', { name: 'Courses are built in Codex' })).toHaveCount(0);
 
   // A course card's action is work on that course: it opens the course's own Studio, filled in.
-  await page.getByRole('button', { name: 'Add files', exact: true }).click();
+  await page.getByRole('button', { name: /^More actions for/ }).first().click();
+  await page.getByRole('menuitem', { name: 'Add files' }).click();
   const box = page.locator('#studio-input');
   await expect(page.locator('#course-studio')).toBeVisible();
   await expect(box).toBeFocused();
@@ -424,8 +531,37 @@ test("the library page has its own Studio for new courses; a course card's actio
   await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'New course', level: 1 })).toBeVisible();
-  await expect(library.getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
-  // Studio takes the page: wider than the list of courses, its frame reaching just above the window's foot.
+  // Before anything is said, the page is the question, the writing box under it and ways to begin under that.
+  const question = library.getByRole('heading', { name: 'What would you like to learn?' });
+  await expect(question).toBeVisible();
+  const exam = library.getByRole('button', { name: 'Prepare for an exam' });
+  const top = async (locator: typeof question) => (await locator.boundingBox())!.y;
+  expect(await top(box)).toBeGreaterThan(await top(question));
+  expect(await top(exam)).toBeGreaterThan(await top(box));
+  expect(await top(exam), 'gathered in the window, not at its foot').toBeLessThan(700);
+  await expect(box).toBeFocused();
+  // A way to begin starts the request, and the caret waits after it.
+  await exam.click();
+  await expect(box).toBeFocused();
+  await page.keyboard.type('15 January');
+  await expect(box).toContainText('$throughline Make a course for my exam on 15 January');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  // A file let go anywhere on the page goes to the box, as the page asks for files.
+  await page.locator('section.library').evaluate((section) => {
+    const data = new DataTransfer();
+    data.items.add(new File(['%PDF-1.4'], 'lecture 1.pdf', { type: 'application/pdf' }));
+    section.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }));
+  });
+  await expect(box).toContainText('lecture 1.pdf');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await box.pressSequentially('hello');
+  await page.keyboard.press('Control+Enter');
+  await expect(library.locator('.said-by-codex')).toHaveText('done');
+  // Once the chat has begun, Studio takes the page: wider than the list of courses, its frame reaching just above
+  // the window's foot.
+  await expect(question).toHaveCount(0);
   const frame = page.locator('.studio-part .frame');
   expect((await frame.boundingBox())!.width).toBeGreaterThan(1000);
   const foot = () => page.evaluate(() => document.getElementById('stage')!.getBoundingClientRect().bottom - document.querySelector('.studio-part .frame')!.getBoundingClientRect().bottom);
@@ -435,10 +571,6 @@ test("the library page has its own Studio for new courses; a course card's actio
   await expect.poll(foot).toBeLessThan(32);
   expect(await foot()).toBeGreaterThan(8);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(box).toBeFocused();
-  await box.pressSequentially('hello');
-  await page.keyboard.press('Control+Enter');
-  await expect(library.locator('.said-by-codex')).toHaveText('done');
   expect((await (await page.request.get(base + '/api/studio?scope=library')).json()).threads).toHaveLength(1);
   expect((await (await page.request.get(base + '/api/studio')).json()).threads).toHaveLength(0);
 
@@ -585,11 +717,14 @@ test('chats are listed beside Studio on a wide page, and pinned above the transc
   await frame.evaluate((f) => (f.scrollTop = f.scrollHeight));
   const top = (await frame.boundingBox())!.y;
   await expect.poll(async () => (await picker.boundingBox())!.y - top).toBeLessThan(30);
-  // Stop sits at the end of the row, beside the send button, as in Codex.
+  // Stop stands where Send does, at the end of the row, with the model beside it and the access by the attachments,
+  // as in Codex.
   const stop = panel.getByRole('button', { name: 'Stop' });
-  const send = panel.getByRole('button', { name: 'Add' });
-  expect((await stop.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
-  expect((await stop.boundingBox())!.x).toBeLessThan((await send.boundingBox())!.x);
+  const model = panel.locator('#studio-model');
+  const access = panel.locator('#studio-access');
+  expect((await model.boundingBox())!.x).toBeGreaterThan((await panel.locator('.keys').boundingBox())!.x);
+  expect((await stop.boundingBox())!.x).toBeGreaterThan((await model.boundingBox())!.x);
+  expect((await access.boundingBox())!.x).toBeLessThan((await panel.locator('.keys').boundingBox())!.x);
   await stop.click();
   expect(errors).toEqual([]);
 });

@@ -1,5 +1,5 @@
 import uuid
-from . import readings
+from . import covers, readings
 from .store import OperationError
 
 DEPTHS = ('overview', 'standard', 'rigorous')
@@ -8,8 +8,11 @@ LEVELS = ('none', 'some', 'solid')
 
 def status(store, request):
     """The course, position, sources and learner profile; a course imported from someone else (ADR 0020) adds
-    `imported` and `built_for`, what the sender's profile said the course was built for."""
+    `imported` and `built_for`, what the sender's profile said the course was built for, and a course with a cover
+    (ADR 0027) adds `cover`."""
     shared = {key: store.get('course', key) for key in ('imported', 'built_for') if store.get('course', key)}
+    if covers.cover(store):
+        shared['cover'] = covers.cover(store)
     return {'course': store.get('course', 'metadata'), 'position': store.get('course', 'position'), 'sources': readings.annotate(store, store.list('sources')),
             'profile': store.get('course', 'profile'), **shared}
 

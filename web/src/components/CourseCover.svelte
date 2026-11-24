@@ -4,9 +4,14 @@
 
   /**
    * A course's cover on its library card (ADR 0027): the subject's short name, chosen by Codex, over the pattern of
-   * thin lines it chose with it. A course Codex has not given a cover yet shows a pattern alone.
+   * thin lines it chose with it. A course Codex has not given a cover yet shows its title over a pattern, so no cover
+   * is ever a blank: a short title as a name would be, a long one on two smaller lines.
    */
   let { course, large = false }: { course: LibraryCourse; large?: boolean } = $props();
+
+  const title = $derived(course.title ?? course.name);
+  // A title longer than a cover name may be (covers.NAME_LENGTH) wraps rather than shrinking to fit one line.
+  const long = $derived(!course.cover?.name && title.length > 16);
 
   const marks = $derived(coverPattern(course.cover?.pattern, course.name));
 
@@ -27,12 +32,16 @@
   }
 </script>
 
-<div class="cover" class:large aria-hidden="true">
+<div class="cover" class:large class:long aria-hidden="true">
   <svg viewBox="0 0 {WIDTH} {HEIGHT}" preserveAspectRatio="xMaxYMid slice">
     {#each marks as mark}<path d={mark.d} class={mark.tone} class:dot={mark.dot} class:wide={mark.wide} />{/each}
   </svg>
   {#if course.cover?.name}
     {#key course.cover.name}<span class="name" use:fit>{course.cover.name}</span>{/key}
+  {:else if long}
+    <span class="name wrap">{title}</span>
+  {:else}
+    {#key title}<span class="name" use:fit>{title}</span>{/key}
   {/if}
 </div>
 
@@ -105,6 +114,27 @@
     font: 600 1.85rem/1.15 var(--serif);
     letter-spacing: 0.03em;
     white-space: nowrap;
+  }
+
+  /* A long title is set on two lines and the pattern clears the left part of the cover for it. */
+  .long {
+    --name: 58%;
+  }
+
+  .name.wrap {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    max-width: 62%;
+    font-size: 1.35rem;
+    letter-spacing: 0.01em;
+    white-space: normal;
+  }
+
+  .large .name.wrap {
+    font-size: 1.9rem;
   }
 
   .large .name {

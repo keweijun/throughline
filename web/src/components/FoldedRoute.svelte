@@ -17,7 +17,7 @@
   // The section looked at away from the current one, if any.
   const viewing = $derived(app.viewingChapter || app.pageOpen || app.viewingId === app.currentId ? null : app.viewingId);
 
-  const name = (chapter: Chapter, index: number) => t('Chapter {number}', { number: index + 1 }) + ' · ' + chapter.title;
+  const name = (chapter: Chapter, index: number) => app.chapterName(chapter, index);
   const studiedIn = (ids: string[]) => ids.filter((id) => app.studied(id)).length;
   const progress = (chapter: Chapter) =>
     chapter.concept_ids.length

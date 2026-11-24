@@ -249,10 +249,8 @@
           {#if item.id === 'about' && app.update?.available}<span class="tag">{t("Update")}</span>{/if}
         </button>
       {/each}
-      {#if pane !== 'about'}
-        <p class="scope">
-          {pane === 'teacher' ? t("Saved for your user account, for every course.") : t("Saved in this browser.")}
-        </p>
+      {#if pane === 'teacher'}
+        <p class="scope">{t("Saved for your user account, for every course.")}</p>
       {/if}
     </nav>
 
@@ -261,6 +259,9 @@
         <h3>{t("Teacher")}</h3>
         <p class="lead">{t("Lessons are taught by Codex on this computer, with your Codex sign-in.")}</p>
         {#if settings}
+          <!-- The teacher's model and the small model are set alike: a model, then its reasoning effort under it. -->
+          <h4>{t("Lessons and answers")}</h4>
+          <p class="lead">{t("Lessons, side answers and feedback on your answers.")}</p>
           <div class="setting">
             <div class="text">
               <label class="title" for="teacher-model">{t("Model")}</label>
@@ -279,12 +280,12 @@
               <input id="teacher-model" type="text" bind:value={model} onchange={saveTeacher} placeholder={t("Codex default")} autocomplete="off" />
             {/if}
           </div>
-          <div class="setting">
+          <div class="setting stacked">
             <div class="text">
-              <span class="title">{t("Reasoning effort")}</span>
+              <span class="title" id="effort-title">{t("Reasoning effort")}</span>
               <p>{t("More effort gives more careful answers, and takes longer.")}</p>
             </div>
-            <div class="segmented" role="radiogroup" aria-label={t("Reasoning effort")}>
+            <div class="segmented" role="radiogroup" aria-labelledby="effort-title">
               {#each teacherEfforts as option (option.id)}
                 <label><input type="radio" name="effort" value={option.id} bind:group={effort} onchange={saveTeacher} />{t(option.label)}</label>
               {/each}
@@ -310,9 +311,6 @@
             </div>
           {/if}
 
-          <h4>{t("Studio")}</h4>
-          <p class="lead">{t("Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.")}</p>
-
           <h4>{t("Background work")}</h4>
           <p class="lead">{t("The small model prepares upcoming sections, consolidates notes in the background, and runs the quick teacher of drills in Review.")}</p>
           <div class="setting">
@@ -330,15 +328,18 @@
               <input id="small-model" type="text" bind:value={smallModel} onchange={saveTeacher} placeholder={t("Default: gpt-6.1-terra")} autocomplete="off" />
             {/if}
           </div>
-          <div class="setting">
-            <div class="text"><label class="title" for="small-effort">{t("Small model reasoning effort")}</label></div>
-            <select id="small-effort" bind:value={smallEffort} onchange={saveTeacher}>
-              <option value="">{t("Same as the teacher")}</option>
+          <div class="setting stacked">
+            <div class="text"><span class="title">{t("Reasoning effort")}</span></div>
+            <!-- Empty follows the teacher's effort. -->
+            <div class="segmented" role="radiogroup" aria-label={t("Small model reasoning effort")}>
+              <label><input type="radio" name="small-effort" value="" bind:group={smallEffort} onchange={saveTeacher} />{t("Same as the teacher")}</label>
               {#each smallEfforts as option (option.id)}
-                <option value={option.id}>{t(option.label)}</option>
+                <label><input type="radio" name="small-effort" value={option.id} bind:group={smallEffort} onchange={saveTeacher} />{t(option.label)}</label>
               {/each}
-            </select>
+            </div>
           </div>
+
+          <p class="studio-note">{t("Studio is where Codex creates and changes your courses. Choose its model and access in its writing box, as in Codex; until you do, it uses the teacher's model.")}</p>
 
           <div class="foot">
             {#if savingTeacher}
@@ -421,14 +422,14 @@
             <span class="title">{t("Language")}</span>
             <p>
               {app.state
-                ? t("The interface and new teaching content, saved in this course. Sources and saved lessons keep their language.")
+                ? t("The interface, and new teaching in this course. Sources and saved lessons keep their language.")
                 : t("For this page. Each course keeps its own language once it is open.")}
             </p>
           </div>
           {@render languageChoice()}
         </div>
         <div class="setting stacked">
-          <div class="text"><span class="title">{t("Theme")}</span></div>
+          <div class="text"><span class="title">{t("Theme")}</span><p>{t("Saved in this browser.")}</p></div>
           <div class="themes" role="radiogroup" aria-label={t("Theme")}>
             {#each [['system', 'Match the system'], ['light', 'Light'], ['dark', 'Dark']] as const as [id, label] (id)}
               <label class="theme">
@@ -539,7 +540,7 @@
     border-radius: 999px;
     background: var(--accent-wash);
     color: var(--accent);
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     font-weight: 600;
   }
 
@@ -637,7 +638,12 @@
 
   .setting.stacked {
     grid-template-columns: 1fr;
-    border-bottom: 0;
+  }
+
+  .studio-note {
+    margin-top: 1.5rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
   }
 
   .update-actions {

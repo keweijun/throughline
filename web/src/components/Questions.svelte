@@ -7,7 +7,7 @@
   import { panelCoversLesson } from '../lib/media';
   import { stageScroll } from '../lib/stage';
   import { questionTurnIds } from '../lib/format';
-  import { groupBySection, scopeCounts, type PanelScope as Scope } from '../lib/panel';
+  import { groupBySection, narrows, scopeCounts, type PanelScope as Scope } from '../lib/panel';
 
   import Composer from './Composer.svelte';
   import PanelGroups from './PanelGroups.svelte';
@@ -161,9 +161,12 @@
 
 <section id="branch-panel" class="panel-view" aria-labelledby="questions-title">
   <header class="panel-head">
-    <div class="panel-bar"><h2 id="questions-title">{t("Your questions")}</h2></div>
-    <p class="panel-intro">{t("Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
-    {#if questions.length}
+    <div class="panel-bar"><h2 id="questions-title">{t("Questions")}</h2></div>
+    <!-- How to ask is said until there is a question; the filter shows once it would change the list. -->
+    {#if !questions.length}
+      <p class="panel-intro">{t("Select a sentence or formula in a lesson, an exercise or the source reader to ask about it. The lesson keeps going unless you pause it.")}</p>
+    {/if}
+    {#if narrows(counts)}
       <PanelScope bind:scope {counts} label={t("Show questions from")} onchoose={() => (scopeChosen = true)} />
     {/if}
     {#if questions.length > 4}

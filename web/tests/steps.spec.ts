@@ -11,7 +11,6 @@ test('a lesson is taught in steps: continue, an added step, pause and regenerate
   const next = first.getByRole('group', { name: 'Next step' });
   await expect(next.locator('li').first()).toContainText('Complex numbers refresher');
   await expect(next.locator('li').first()).toContainText('Added step');
-  await expect(page.locator('#next-step')).toHaveText('Continue with the next step when you are ready.');
   await expect(page.getByRole('button', { name: 'Teach again' }), 'Continue is the way on while steps remain').toHaveCount(0);
   await expect(page.locator('#practice article')).toHaveCount(0);
 
@@ -21,7 +20,6 @@ test('a lesson is taught in steps: continue, an added step, pause and regenerate
   await expect(second.locator('.meta')).toContainText('Added step');
   await expect(first.getByRole('group', { name: 'Next step' })).toHaveCount(0);
   await second.getByRole('button', { name: 'Pause' }).click();
-  await expect(page.locator('#next-step')).toHaveText('Regenerate the unfinished step to go on.');
   await second.getByRole('button', { name: 'Regenerate step' }).click();
   // Step 2 merged the last two planned steps into one, so the lesson now has three.
   const revised = page.getByRole('region', { name: 'Step 2 of 3' });
@@ -34,8 +32,10 @@ test('a lesson is taught in steps: continue, an added step, pause and regenerate
   await expect(third).toContainText('then square');
   await expect(third.getByRole('group', { name: 'Next step' })).toHaveCount(0);
   await expect(page.locator('#practice article').first(), 'the last step leads to grouped practice').toContainText('Find');
-  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
-  // Over a taught section the request is another pass by default, or a New lesson that replaces this one (ADR 0023).
+  await expect(page.getByRole('button', { name: 'Teach again…' })).toBeVisible();
+  // Over a taught section the request waits behind Teach again…: another pass by default, or a New lesson that
+  // replaces this one (ADR 0023).
+  await page.getByRole('button', { name: 'Teach again…' }).click();
   const kinds = page.getByRole('radiogroup', { name: 'What to ask for' });
   await expect(kinds.getByRole('radio', { name: 'Another pass' })).toBeChecked();
   await kinds.getByText('New lesson').click();
@@ -158,9 +158,10 @@ test('an earlier section can be studied again, and its earlier lesson stays', as
   await expect(page.getByText("You're previewing this section")).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Classical waves');
   await expect(page.getByText('A long lesson saved as one reply.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again…' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Go back' })).toContainText('Wave superposition');
   // A New lesson teaches it again in steps; the lesson saved as one reply folds above it (ADR 0023).
+  await page.getByRole('button', { name: 'Teach again…' }).click();
   await page.getByRole('radiogroup', { name: 'What to ask for' }).getByText('New lesson').click();
   await page.getByRole('button', { name: 'Start new lesson' }).click();
   await expect(page.getByRole('region', { name: 'Step 1 of 4' })).toContainText('Each path carries a complex amplitude.');
@@ -192,7 +193,6 @@ test('a new lesson restarts an unfinished one, which stays folded to read', asyn
   await expect(replaced.getByRole('group', { name: 'Next step' })).toHaveCount(0);
   await expect(replaced.getByRole('button', { name: 'Regenerate step' })).toHaveCount(0);
   await expect(replaced.getByRole('group', { name: 'Check question' }), 'an unanswered check of a replaced lesson is closed').toHaveCount(0);
-  await expect(page.locator('#next-step')).toHaveText('Continue with the next step when you are ready.');
 
   await page.reload();
   await expect(page.locator('details.replaced')).toHaveCount(1);

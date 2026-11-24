@@ -11,6 +11,7 @@
   import SuggestedMemory from './SuggestedMemory.svelte';
   import Composer from './Composer.svelte';
   import Hint from './Hint.svelte';
+  import { pop } from '../lib/motion';
 
   let { task, number, showSection = false }: { task: Task; number?: number; showSection?: boolean } = $props();
 
@@ -37,6 +38,20 @@
   // A solved exercise folds its answer box away until the learner chooses to answer again; a draft keeps it open.
   let reopened = $state(false);
   let confirmSkip = $state(false);
+  // Setting the exercise aside (another like it, later, skip) is rarer than help, so it waits in a menu in the header.
+  let moreOpen = $state(false);
+  let more = $state<HTMLElement>();
+  $effect(() => {
+    if (!moreOpen) return;
+    const away = (event: Event) => more && !more.contains(event.target as Node) && (moreOpen = false);
+    const escape = (event: KeyboardEvent) => event.key === 'Escape' && (moreOpen = false);
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+      document.removeEventListener('keydown', escape);
+    };
+  });
   const inputId = $derived(`exercise-input-${task.id}`);
 
   function toggleAsking() {
@@ -77,6 +92,7 @@
   const writingExercises = $derived(
     (app.state?.practice.jobs ?? []).some((j) => j.concept_id === task.concept_id && j.action === 'generate' && !j.purpose && app.isRunning(j.id)),
   );
+  const deferrable = $derived(task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz');
   const skipReasons: Record<SkipReason, MessageKey> = { too_easy: 'Too easy', too_tedious: 'Too tedious', not_relevant: 'Not relevant' };
   // A part split from a homework question shows the question and where its other parts are taught (ADR 0012).
   const homework = $derived(task.exercise ? app.concept(task.concept_id)?.exercises?.find((e) => e.question === task.exercise && e.part_of) : undefined);
@@ -172,6 +188,33 @@
       </button>
     {/if}
     {#if status}<span class="chip chip-{status.tone}">{status.label}</span>{/if}
+    {#if composing && !working && (variantable || deferrable || skippable)}
+      <span class="more" bind:this={more}>
+        <button
+          class="btn btn-quiet btn-small more-button"
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          aria-label={t("More actions")}
+          title={t("More actions")}
+          onclick={() => (moreOpen = !moreOpen)}
+        >
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor" /><circle cx="10" cy="10" r="1.5" fill="currentColor" /><circle cx="15.5" cy="10" r="1.5" fill="currentColor" /></svg>
+        </button>
+        {#if moreOpen}
+          <ul class="menu" role="menu" aria-label={t("More actions")} transition:pop={{ from: 'above' }}>
+            {#if variantable}
+              <li role="none"><button role="menuitem" disabled={busy || writingExercises} onclick={() => ((moreOpen = false), act('variant'))}>{t("Another like this")}</button></li>
+            {/if}
+            {#if deferrable}
+              <li role="none"><button role="menuitem" disabled={busy} onclick={() => ((moreOpen = false), act('defer'))}>{t("Do later")}</button></li>
+            {/if}
+            {#if skippable}
+              <li role="none"><button role="menuitem" disabled={busy} onclick={() => ((moreOpen = false), (confirmSkip = true), (confirmSolution = false))}>{t("Skip")}</button></li>
+            {/if}
+          </ul>
+        {/if}
+      </span>
+    {/if}
   </header>
 
   <div class="prose question" data-exercise={task.id} data-section={task.concept_id} use:highlights={{ passages, text: task.question }} use:markdown={{ language: locale.language, text: task.question, breaks: true, refs: task.source_refs, onSource: (r) => app.openSource(r) }}></div>
@@ -284,18 +327,20 @@
         {/if}
       </div>
     {:else}
-    {#snippet answering()}{t("Your answer · checked by the teacher")}{/snippet}
     {#snippet askingAbout()}{t("Question about this exercise · never graded")}{/snippet}
+    <!-- An answer is worked over several lines and recorded once checked, so Enter stays a line break there and
+         Ctrl+Enter checks it; a question about the exercise sends with Enter, as every other question does. -->
     <Composer
       id={inputId}
+      enterSends={asking}
       value={asking ? question : answer}
       onvalue={(value) => app.drafts.set(asking ? askKey : draftKey, value)}
       label={asking ? t("Question about this exercise") : t("Exercise answer")}
-      placeholder={asking ? t("What does this exercise or one of its parts mean?") : t("Write your reasoning and answer, or paste or drop images of your work. Use $…$ for math.")}
+      placeholder={asking ? t("What does this exercise or one of its parts mean?") : t("Your answer, or a photo of your work. $…$ for math")}
       submitLabel={asking ? t("Ask") : t("Check answer")}
       disabled={busy}
       onsubmit={() => (asking ? ask() : act('assess'))}
-      header={asking ? askingAbout : answering}
+      header={asking ? askingAbout : undefined}
       onclose={asking ? () => (asking = false) : undefined}
       closeLabel={t("Back to answering")}
       imagesKey={asking ? askKey : draftKey}
@@ -304,7 +349,7 @@
     />
     {#if composing}
     <Hint id="recorded-help">{t('Hints, key steps and the full solution are always here. Using one is recorded, so a correct answer after it counts as solved with help.')}</Hint>
-    <!-- Help toward an answer comes first; setting the exercise aside is a different choice, so it sits apart. -->
+    <!-- Help toward an answer sits under the box; setting the exercise aside is a different choice, in the header's menu. -->
     <div class="help-row">
       <span class="help" role="group" aria-label={t("Help with this exercise")}>
         <span class="stuck">{t("Stuck?")}</span>
@@ -312,19 +357,8 @@
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => (app.markSeen('hint-recorded-help'), act('steps'))}>{t("Key steps")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSolution = true), (confirmSkip = false))}>{t("Full solution")}</button>
         <button class="btn btn-quiet btn-small" disabled={busy} aria-pressed={asking} onclick={toggleAsking}>{t("Ask about this")}</button>
-      </span>
-      <span class="aside">
         {#if missed}
           <button class="btn btn-quiet btn-small" onclick={() => app.revisit(task)}>{t("Revisit")}</button>
-        {/if}
-        {#if variantable}
-          <button class="btn btn-quiet btn-small" disabled={busy || writingExercises} onclick={() => act('variant')}>{t("Another like this")}</button>
-        {/if}
-        {#if task.status !== 'deferred' && task.origin !== 'review' && task.origin !== 'chapter_quiz'}
-          <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => act('defer')}>{t("Do later")}</button>
-        {/if}
-        {#if skippable}
-          <button class="btn btn-quiet btn-small" disabled={busy} onclick={() => ((confirmSkip = true), (confirmSolution = false))}>{t("Skip")}</button>
         {/if}
       </span>
     </div>
@@ -514,7 +548,6 @@
   }
 
   .help,
-  .aside,
   .solved-row {
     display: flex;
     flex-wrap: wrap;
@@ -528,13 +561,58 @@
     color: var(--pencil);
   }
 
-  .aside .btn {
+  .more {
+    position: relative;
+    display: inline-flex;
+  }
+
+  /* The status chip and the menu sit together at the right of the header. */
+  header:has(.more) .chip {
+    margin-left: auto;
+  }
+
+  .more-button {
+    padding-inline: 0.35rem;
     color: var(--pencil);
   }
 
-  /* Wrapped under the help, setting the exercise aside stays on the right, as it is on one line. */
-  .aside {
-    margin-left: auto;
+  .menu {
+    position: absolute;
+    top: calc(100% + 0.3rem);
+    right: 0;
+    z-index: 50;
+    display: grid;
+    min-width: 11rem;
+    margin: 0;
+    padding: 0.3rem;
+    list-style: none;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--sheet);
+    box-shadow: var(--shadow);
+  }
+
+  .menu button {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--step--1);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .menu button:hover:not(:disabled),
+  .menu button:focus-visible {
+    background: var(--accent-wash);
+  }
+
+  .menu button:disabled {
+    color: var(--pencil);
+    cursor: default;
   }
 
   .solved-row {

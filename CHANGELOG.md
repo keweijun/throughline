@@ -2,6 +2,13 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.64.1
+
+- **Studio asks more calmly.** When Codex has a question for you, it comes on raised paper with a blue edge instead of a warning-coloured card.
+- **An empty Studio chat says less**: one line under the question, since the suggestions show what Studio can do. A suggestion now names the course by its title.
+- **A course reopens where you were.** Reloading the page, or coming back to a course, opens Studio, Learn or Review, whichever you were in.
+- **Narrow windows fit better.** With a document open beside Studio, its writing box keeps the access and model buttons whole; below a wide window, the top bar shows **Update available** and **Studio working…** as a small icon, so they no longer run into Studio · Learn · Review.
+
 ## 0.64.0
 
 - **See when you studied.** **Settings → Activity** shows the last six months as a calendar, each day shaded by how long you studied, across all your courses. Choose a day to see what you did in each course: lesson steps, answers, questions, notes and drill messages. Below that, each course shows when you last studied it and roughly how long you have spent on it. Your history is already there, worked out from what your courses recorded; time is an estimate. There are no streaks or goals to keep up.

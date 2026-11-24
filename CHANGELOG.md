@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.62.2
+
+- **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Lessons and answers** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.
+
 ## 0.62.1
 
 - **Exercises are calmer.** Under the answer box are only the ways to get help: Hint, Key steps, Full solution and Ask about this. **Another like this**, **Do later** and **Skip** are in the ⋯ at the top right of the exercise. The answer box has a shorter prompt.
@@ -16,6 +20,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **Enter sends.** In Studio, questions, notes and the other writing boxes, Enter sends and Shift+Enter starts a new line, as in Codex. An exercise or review answer is the exception: Enter starts a new line there, and Ctrl+Enter (⌘ Enter on a Mac) checks it, so a half-written answer is never checked by accident.
 - **All courses says more with less.** The course to carry on with shows how far along it is ("Section 3 of 12"), and a course Codex has not given a cover yet shows its title on the cover instead of a blank pattern.
 - **A course card's ⋯ menu opens above the card's links**, so its first item is no longer covered. New course drops its extra "← All courses"; All courses in the top bar goes back.
+
 ## 0.62.0
 
 - **All courses is redesigned.**

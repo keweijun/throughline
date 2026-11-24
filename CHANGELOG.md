@@ -13,6 +13,8 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **The side panel explains itself less.** Questions and Notes say how to start only until you have one, and offer Section, Chapter and All only when that would change the list.
 - **The course switcher marks the open course with a tinted row** instead of a tick.
 - **Studio's column reads more easily.** The ⋯ on the cover is always visible, a course without chapters says how many sections you have studied, How you're taught explains itself only while it is empty, and a chat started a moment ago is "just now".
+- **Enter sends.** In Studio, questions, notes and the other writing boxes, Enter sends and Shift+Enter starts a new line, as in Codex. An exercise or review answer is the exception: Enter starts a new line there, and Ctrl+Enter (⌘ Enter on a Mac) checks it, so a half-written answer is never checked by accident.
+- **All courses says more with less.** The course to carry on with shows how far along it is ("Section 3 of 12"), and a course Codex has not given a cover yet shows its title on the cover instead of a blank pattern.
 - **A course card's ⋯ menu opens above the card's links**, so its first item is no longer covered. New course drops its extra "← All courses"; All courses in the top bar goes back.
 ## 0.62.0
 

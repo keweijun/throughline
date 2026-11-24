@@ -99,9 +99,9 @@ test('a card is a cover, a title and one line, and the whole card opens the cour
   // No folder name, counts, dates or goal: they made the page hard to read.
   await expect(quantum).not.toContainText('quantum-v1');
   await expect(quantum).not.toContainText(/Sources|Sections|Updated|Goal/);
-  // A course Codex has not given a cover shows a pattern alone.
+  // A course Codex has not given a cover shows its title over a pattern, so no cover is blank.
   await expect(quantum.locator('.cover svg path').first()).toBeAttached();
-  await expect(quantum.locator('.cover .name')).toHaveCount(0);
+  await expect(quantum.locator('.cover .name')).toHaveText('Introductory Quantum Mechanics');
 
   // Codex chooses the cover (cover.save), and the card shows it without a reload.
   execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "cover.save", "name": "QM", "pattern": "orbits"})',

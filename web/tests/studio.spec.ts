@@ -152,10 +152,11 @@ test('Studio is as tall as the window beside the course column, and writing move
 
   // The course's column stands beside Studio, which starts level with the title and is no wider than a chat needs.
   const title = page.locator('#course-title');
-  // The column opens with the course's cover, level with Studio's frame, and its title under it.
+  // The column opens with the course's cover, level with Studio's frame; the cover names the course.
   const cover = page.locator('#course-studio .studio-aside .cover').first();
   expect(Math.abs((await frame.boundingBox())!.y - (await cover.boundingBox())!.y)).toBeLessThan(16);
-  expect((await title.boundingBox())!.y).toBeGreaterThan((await cover.boundingBox())!.y);
+  await expect(cover.locator('.name')).toHaveText('Waves');
+  await expect(title).toHaveClass(/visually-hidden/);
   // An empty chat has no sheet; it comes when the chat begins (checked below).
   await expect(page.locator('#course-studio .sheet .paper')).toHaveCSS('opacity', '0');
   expect((await frame.boundingBox())!.width).toBeLessThan(46 * 16 + 1);
@@ -164,7 +165,7 @@ test('Studio is as tall as the window beside the course column, and writing move
   const before = (await box.boundingBox())!;
   const height = (await frame.boundingBox())!.height;
   await box.click();
-  await expect(title).toBeInViewport();
+  await expect(cover).toBeInViewport();
   expect((await frame.boundingBox())!.height).toBeCloseTo(height, 0);
   expect((await box.boundingBox())!.y).toBeCloseTo(before.y, 0);
 
@@ -194,9 +195,9 @@ test('the course is named once in the bar and once on its cover, and the switche
   await page.locator('#open-course').click();
   const column = page.locator('#course-studio .studio-aside');
   const title = column.locator('#course-title');
-  // A course whose cover has no name yet shows its title under the cover.
-  await expect(title).toBeVisible();
-  await expect(title).not.toHaveClass(/visually-hidden/);
+  // A course whose cover has no name yet shows its title on the cover, so the title is not written under it too.
+  await expect(column.locator('.cover .name')).toHaveText('Waves');
+  await expect(title).toHaveClass(/visually-hidden/);
   courseOperation(waves, { op: 'cover.save', name: 'Waves', pattern: 'waves' });
   await page.reload();
   await page.locator('#open-course').click();
@@ -497,7 +498,7 @@ test('opening Studio on the course page leaves the page at its top and names the
   await expect(page.locator('#course-studio .welcome')).toBeVisible();
   await page.waitForTimeout(300);
   expect(await page.locator('#stage').evaluate((stage) => stage.scrollTop)).toBe(0);
-  await expect(page.locator('#course-title')).toBeInViewport();
+  await expect(page.locator('#course-studio .studio-aside .cover').first()).toBeInViewport();
   // The folder is "waves"; the learner sees the course's title.
   await expect(page.locator('#course-studio .target').first()).toContainText('New chat · Waves');
 });

@@ -295,3 +295,25 @@ test('another like this adds one exercise right after the one it is like', async
   await expect(exercises.nth(2)).toContainText('Second exercise');
   expect(errors).toEqual([]);
 });
+
+test('Enter sends a question but starts a new line in an answer', async ({ page, course }) => {
+  const { errors } = await course('practice_continuity_browser_fixture');
+  const exercise = page.locator('#practice > article').first();
+  const answer = exercise.getByRole('textbox', { name: 'Exercise answer' });
+  await answer.click();
+  await page.keyboard.type('x = 1');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('so y = 2');
+  // An answer is worked over several lines and recorded once checked: Enter is a line break there.
+  await expect.poll(() => editorText(answer)).toBe('x = 1\nso y = 2');
+  await expect(exercise.getByRole('region', { name: 'Submitted answer' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Questions', exact: true }).click();
+  const question = page.getByRole('textbox', { name: 'Side question', exact: true });
+  await question.click();
+  await page.keyboard.type('Why is the rule true?');
+  await page.keyboard.press('Enter');
+  // A question sends with Enter, as in a chat.
+  await expect(page.locator('#branch-panel article').first()).toContainText('Why is the rule true?');
+  expect(errors).toEqual([]);
+});

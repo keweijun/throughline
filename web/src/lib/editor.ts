@@ -1,7 +1,7 @@
 import katex from 'katex';
 import { Compartment, EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, keymap, placeholder as hint, type DecorationSet } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, insertNewlineAndIndent } from '@codemirror/commands';
 import {
   acceptCompletion,
   autocompletion,
@@ -206,6 +206,9 @@ export type EditorOptions = {
   rows?: number;
   onchange: (value: string) => void;
   onsend: () => void;
+  /** Enter sends and Shift+Enter starts a new line, as in Codex and chat apps; false where Enter must stay a line break,
+   * as in an exercise answer, worked over several lines and recorded once checked. Ctrl+Enter sends either way. */
+  enterSends?: boolean;
   oncancel?: () => void;
   /** Pasted content; return true when it was taken, such as images being attached. */
   onpaste?: (event: ClipboardEvent) => boolean;
@@ -304,6 +307,10 @@ function extensions(options: () => EditorOptions, placeholder: Compartment): Ext
     Prec.highest(
       keymap.of([
         { key: 'Mod-Enter', run: () => (options().onsend(), true) },
+        // Set after the completion list's own keys, so Enter on an open list still takes a suggestion; an input method
+        // that is composing (Chinese, say) keeps its Enter too.
+        { key: 'Enter', run: (view) => (options().enterSends && !view.composing ? (options().onsend(), true) : false) },
+        { key: 'Shift-Enter', run: insertNewlineAndIndent },
         { key: 'Tab', run: acceptCompletion },
       ]),
     ),

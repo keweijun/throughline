@@ -94,8 +94,8 @@
     <aside class="studio-aside" aria-label={t('This course')}>
       <header class="head">
         <!-- The course's cover, as on its card in the library (ADR 0027), with the course's own actions on its corner.
-             The cover names the course here and the top bar gives its title, so the title is not written a third
-             time; a course whose cover has no name yet shows its title under it. -->
+             The cover names the course here (its title, until Codex gives it a name) and the top bar gives its title,
+             so the title is not written a third time. -->
         {#if course}
           <div class="cover">
             <CourseCover {course} />
@@ -131,7 +131,7 @@
             </div>
           </form>
         {:else}
-          <h1 id="course-title" class:visually-hidden={!!course?.cover?.name}>{app.state?.course.title}</h1>
+          <h1 id="course-title" class:visually-hidden={!!course}>{app.state?.course.title}</h1>
         {/if}
         {#if course?.goal}<p class="goal" title={course.goal}>{course.goal}</p>{/if}
         {#if imported}

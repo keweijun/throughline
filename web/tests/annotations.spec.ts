@@ -53,10 +53,11 @@ test('highlight and note a lesson passage, bookmark the section, and find them i
 
   // Enter breaks the line and Ctrl+Enter sends, as in every writing box.
   const sectionNote = page.getByRole('textbox', { name: 'Add a note to this section' });
+  // Shift+Enter starts a new line; Enter sends.
   await sectionNote.fill('Overall:');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Shift+Enter');
   await sectionNote.pressSequentially('revisit');
-  await sectionNote.press('Enter');
+  await sectionNote.press('Shift+Enter');
   await sectionNote.pressSequentially('interference');
   await expect.poll(() => editorText(sectionNote)).toBe('Overall:\nrevisit\ninterference');
   await sectionNote.press('Control+Enter');

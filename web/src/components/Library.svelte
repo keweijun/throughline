@@ -468,6 +468,13 @@
           {:else if course.current}
             <p class="status">{course.current}</p>
           {/if}
+          {#if leading && ready && course.position && course.concepts}
+            <!-- How far along the course to carry on with is, by where its current section sits on the route. -->
+            <div class="where-now">
+              <span>{t('Section {number} of {total}', { number: course.position, total: course.concepts })}</span>
+              <span class="track" aria-hidden="true"><span style:width="{(course.position / course.concepts) * 100}%"></span></span>
+            </div>
+          {/if}
           {#if leading && ready}
             <button class="btn btn-primary continue" disabled={opening !== null} onclick={go}>{opening === course.name ? t('Opening…') : t('Continue')}</button>
           {/if}
@@ -1199,6 +1206,28 @@
 
   .leading .status {
     font-size: var(--step-0);
+  }
+
+  .where-now {
+    display: grid;
+    gap: 0.35rem;
+    max-width: 18rem;
+    margin-top: 0.4rem;
+    font-size: var(--step--1);
+    color: var(--pencil);
+  }
+
+  .where-now .track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--rule);
+    overflow: hidden;
+  }
+
+  .where-now .track span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
   }
 
   .continue {

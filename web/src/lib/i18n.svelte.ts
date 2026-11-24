@@ -11,6 +11,7 @@ const messages = {
   "Codex is making it.": "Codex 正在建课。",
   "Open the chat": "打开对话",
   "How you're taught": "教学方式",
+  "Enter to send, Shift+Enter for a new line": "Enter 发送，Shift+Enter 换行",
   "Teach again…": "再讲一次…",
   "just now": "刚刚",
   "All sections": "全部小节",

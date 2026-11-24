@@ -328,8 +328,11 @@
       </div>
     {:else}
     {#snippet askingAbout()}{t("Question about this exercise · never graded")}{/snippet}
+    <!-- An answer is worked over several lines and recorded once checked, so Enter stays a line break there and
+         Ctrl+Enter checks it; a question about the exercise sends with Enter, as every other question does. -->
     <Composer
       id={inputId}
+      enterSends={asking}
       value={asking ? question : answer}
       onvalue={(value) => app.drafts.set(asking ? askKey : draftKey, value)}
       label={asking ? t("Question about this exercise") : t("Exercise answer")}

@@ -561,6 +561,8 @@ export type LibraryCourse = {
   concepts?: number;
   needs_review?: number;
   current?: string | null;
+  /** The current section's place on the route, from 1. */
+  position?: number | null;
   goal?: string | null;
   updated?: number;
   error?: string;

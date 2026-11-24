@@ -2,6 +2,21 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.64.0
+
+- **See when you studied.** **Settings → Activity** shows the last six months as a calendar, each day shaded by how long you studied, across all your courses. Choose a day to see what you did in each course: lesson steps, answers, questions, notes and drill messages. Below that, each course shows when you last studied it and roughly how long you have spent on it. Your history is already there, worked out from what your courses recorded; time is an estimate. There are no streaks or goals to keep up.
+
+## 0.63.0
+
+- **Studio can tell you when it's done.** Turn on **Settings → Teacher → Studio → Notifications**, and while you're in another tab or app Throughline notifies you when Studio finishes or needs your answer. Click the notification to go straight to that chat.
+- **Choose a text size for reading.** **Settings → Appearance → Text size** makes lessons, exercises, key points and notes smaller or larger without zooming the whole window.
+- **Find your courses on disk.** **Settings → About** shows your Throughline folder, with **Open folder**.
+- Each category in Settings now opens at its top, rather than scrolled to where the last one was.
+
+## 0.62.2
+
+- **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Lessons and answers** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.
+
 ## 0.62.1
 
 - **Exercises are calmer.** Under the answer box are only the ways to get help: Hint, Key steps, Full solution and Ask about this. **Another like this**, **Do later** and **Skip** are in the ⋯ at the top right of the exercise. The answer box has a shorter prompt.
@@ -16,6 +31,7 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **Enter sends.** In Studio, questions, notes and the other writing boxes, Enter sends and Shift+Enter starts a new line, as in Codex. An exercise or review answer is the exception: Enter starts a new line there, and Ctrl+Enter (⌘ Enter on a Mac) checks it, so a half-written answer is never checked by accident.
 - **All courses says more with less.** The course to carry on with shows how far along it is ("Section 3 of 12"), and a course Codex has not given a cover yet shows its title on the cover instead of a blank pattern.
 - **A course card's ⋯ menu opens above the card's links**, so its first item is no longer covered. New course drops its extra "← All courses"; All courses in the top bar goes back.
+
 ## 0.62.0
 
 - **All courses is redesigned.**

@@ -403,6 +403,10 @@ test('teacher settings offer the models Codex lists, a small model and fast mode
   await expect(smallEffort.locator('label')).toHaveText(['Same as the teacher', 'Low']);
   await expect(smallEffort.getByRole('radio', { name: 'Same as the teacher' })).toBeChecked();
   await smallEffort.getByRole('radio', { name: 'Low' }).check();
+  // Saved shows beside the group that was changed, not at the foot of the pane.
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('region', { name: 'Background work' }).getByRole('status')).toHaveText('Saved');
+  await expect(dialog.getByRole('region', { name: 'Lessons and answers' }).getByRole('status')).toHaveCount(0);
   await expect.poll(async () => {
     const settings = await (await page.request.get(base + '/api/settings')).json();
     return [settings.model, settings.small_model, settings.small_effort, settings.service_tier];
@@ -416,7 +420,7 @@ test('Settings hold only what applies to every course; Studio holds the course',
   await course('demo_course_fixture');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const categories = page.getByRole('navigation', { name: 'Settings' }).getByRole('button');
-  await expect(categories).toHaveText(['Appearance', 'Teacher', 'About']);
+  await expect(categories).toHaveText(['Appearance', 'Teacher', 'Activity', 'About']);
   await expect(page.getByRole('spinbutton', { name: 'Daily reviews' })).toHaveCount(0);
   // Language also sets the interface, so it stays in Settings, first, even though the course keeps it.
   await expect(page.getByRole('radiogroup', { name: 'Language' })).toBeVisible();

@@ -147,7 +147,7 @@
         {/if}
 
         <!-- The whole route at a glance; a segment opens its chapter. -->
-        <ol class="strip" aria-label={t('Chapters')}>
+        <ol class="strip" class:many={strip.length > 12} class:crowded={strip.length > 24} aria-label={t('Chapters')}>
           {#each strip as segment (segment.id || 'all')}
             <li style:flex-grow={Math.max(segment.total, 1)}>
               <button
@@ -235,6 +235,9 @@
 
   .studio-aside {
     display: grid;
+    /* One column no wider than the aside: nothing in it can widen it, and it scrolls only up and down. */
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
     gap: 1.75rem;
     align-content: start;
     min-width: 0;
@@ -247,6 +250,7 @@
 
   .head {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.6rem;
   }
 
@@ -367,9 +371,12 @@
     align-items: baseline;
   }
 
+  /* Always one line as wide as the column, however many chapters: the segments and the gaps between them give way,
+     so a long course never widens the column or makes it scroll sideways. */
   .strip {
     display: flex;
     gap: 0.25rem;
+    min-width: 0;
     margin: 0.15rem 0 0;
     padding: 0;
     list-style: none;
@@ -377,7 +384,28 @@
 
   .strip li {
     flex-basis: 0;
-    min-width: 0.75rem;
+    min-width: 0.5rem;
+  }
+
+  .strip.many {
+    gap: 2px;
+  }
+
+  .strip.many li {
+    min-width: 3px;
+  }
+
+  .strip.crowded {
+    gap: 1px;
+  }
+
+  .strip.crowded li {
+    min-width: 1px;
+  }
+
+  /* Thin segments are bars, not pills, so a part-studied one still reads as part filled. */
+  .strip.many .segment {
+    border-radius: 2px;
   }
 
   .segment {

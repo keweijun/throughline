@@ -188,6 +188,26 @@ test('Studio is as tall as the window beside the course column, and writing move
   await expect(paper).toHaveCSS('opacity', '0');
 });
 
+test('a course of many chapters keeps its chapter strip inside the column, which never scrolls sideways', async ({ page, course }) => {
+  const { base } = await course('studio_browser_fixture');
+  const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
+  // The course's own section stays, as the first of forty chapters' sections.
+  const ids = ['wave', ...Array.from({ length: 39 }, (_, i) => `c${i + 1}`)];
+  const chapters = ids.map((id, i) => ({ id: `ch${i}`, title: `Chapter ${i + 1}`, summary: 'A chapter', concept_ids: [id] }));
+  const concepts = ids.map((id, i) => ({ id, title: i ? `Section ${i + 1}` : 'Wave superposition' }));
+  courseOperation(waves, { op: 'curriculum.save', concepts, route: concepts.map((c) => c.id), coverage: [], chapters, reorder_confirmed: true });
+  await page.reload();
+  await page.locator('#open-course').click();
+  const aside = page.locator('#course-studio .studio-aside');
+  const segments = aside.locator('.strip .segment');
+  await expect(segments).toHaveCount(40);
+  expect(await aside.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+  const column = (await aside.boundingBox())!;
+  const last = (await segments.last().boundingBox())!;
+  expect(last.x + last.width).toBeLessThanOrEqual(column.x + column.width);
+  expect(last.width, 'every chapter keeps a segment to click').toBeGreaterThanOrEqual(1);
+});
+
 test('a long list of how the learner is taught scrolls beside Studio rather than past the window', async ({ page, course }) => {
   const { base } = await course('studio_browser_fixture');
   // Twenty confirmed preferences, as a long-studied course gathers.

@@ -1,4 +1,5 @@
 <script lang="ts">
+
   import { t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { questionId, replyText, studio, type AsyncQuestion } from '../lib/studio.svelte';
@@ -81,9 +82,12 @@
       background-color var(--settle) ease;
   }
 
+  /* Waiting for the learner: raised paper with an accent edge, noticed without the colour of a warning. */
   .questions.open {
-    border-color: var(--caution);
-    background: var(--caution-wash);
+    border-color: var(--rule);
+    border-left: 3px solid var(--accent);
+    background: var(--raised);
+    box-shadow: var(--shadow);
   }
 
   fieldset {

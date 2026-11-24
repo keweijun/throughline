@@ -336,7 +336,7 @@ test('an empty chat suggests a range of course work that fills the box without s
   await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
-  await expect(panel).toContainText('This is Codex itself, working on this course.');
+  await expect(panel).toContainText('Codex itself, working on this course');
   // Adding files always shows; three more are drawn from the rest.
   const suggestions = panel.locator('.starts button');
   await expect(suggestions).toHaveCount(4);

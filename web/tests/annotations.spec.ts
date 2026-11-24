@@ -217,7 +217,8 @@ test('a highlight running across a citation chip is still painted, without the c
   await page.getByRole('button', { name: 'Highlight', exact: true }).click();
   await expect.poll(() => page.evaluate(() => CSS.highlights.get('mine')?.size ?? 0)).toBe(1);
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
-  await page.locator('#panel-notes').getByRole('radio', { name: /^All/ }).check();
+  // With one highlight, Section, Chapter and All would list the same, so no choice is offered.
+  await expect(page.locator('#panel-notes').getByRole('radio', { name: /^All/ })).toHaveCount(0);
   await expect(page.locator('#panel-notes .item.highlight')).toContainText('probability amplitudes');
   await expect(page.locator('#panel-notes .item.highlight')).not.toContainText('p. 2');
   expect(errors).toEqual([]);

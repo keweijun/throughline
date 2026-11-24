@@ -7,6 +7,8 @@
   let { value, onchange }: { value: ReviewScope; onchange: (value: ReviewScope) => void } = $props();
 
   const chapters = $derived(app.chapters.filter((c) => c.concept_ids.some(studied)));
+  // A course without chapters is one chapter named after the course: Everything studied already covers it.
+  const chips = $derived(app.wholeCourse ? [] : chapters);
   const everything = $derived(!value.chapter_ids.length && !value.concept_ids.length);
   let choosing = $state(false);
 
@@ -24,7 +26,7 @@
 
 <div class="scope" role="group" aria-label={t("What to review")}>
   <button class="chip-toggle" aria-pressed={everything} onclick={() => onchange({ chapter_ids: [], concept_ids: [] })}>{t("Everything studied")}</button>
-  {#each chapters as item (item.id)}
+  {#each chips as item (item.id)}
     <button class="chip-toggle" aria-pressed={value.chapter_ids.includes(item.id)} onclick={() => chapter(item.id)}>{item.title}</button>
   {/each}
   <button class="chip-toggle choose" aria-expanded={choosing} onclick={() => (choosing = !choosing)}>{t("Choose sections")} <span aria-hidden="true">{choosing ? '▴' : '▾'}</span></button>
@@ -33,7 +35,7 @@
   <div class="sections">
     {#each chapters as item (item.id)}
       <fieldset>
-        <legend>{item.title}</legend>
+        {#if !app.wholeCourse}<legend>{item.title}</legend>{/if}
         {#each item.concept_ids.filter(studied) as id (id)}
           <label>
             <input type="checkbox" checked={value.chapter_ids.includes(item.id) || value.concept_ids.includes(id)} disabled={value.chapter_ids.includes(item.id)} onchange={() => section(id)} />

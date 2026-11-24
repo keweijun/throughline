@@ -299,7 +299,7 @@
           </header>
           <div class="warm-offer">
             <p>{t("This section builds on {sections}, which you have not practised for a while.", { sections: warmUp.map((id) => app.concept(id)?.title ?? id).join(', ') })}</p>
-            <button class="btn btn-small btn-primary" onclick={() => app.startDrill({ kind: 'warm_up', concept_id: conceptId! }, true)}>{t("Warm up on what this builds on")}</button>
+            <button class="btn btn-small" onclick={() => app.startDrill({ kind: 'warm_up', concept_id: conceptId! }, true)}>{t("Warm up on what this builds on")}</button>
           </div>
         </aside>
       {/if}

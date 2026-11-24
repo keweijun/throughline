@@ -376,7 +376,7 @@ test("a hand-off goes to the course's Studio even when Studio was last open on t
   await page.locator('#open-courses').click();
   await page.getByRole('button', { name: 'New course', exact: true }).click();
   await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();
-  await page.getByRole('button', { name: '← All courses' }).click();
+  await page.locator('#open-courses').click();
   await page.locator('.courses > li').first().getByRole('button', { name: 'Continue' }).click();
   await page.getByRole('button', { name: 'Start lesson' }).click();
   const suggestion = page.locator('.lesson').getByRole('group', { name: 'Suggested course change' });
@@ -400,22 +400,18 @@ test('the first course opened introduces Studio once, with examples from the cou
   await expect(page.getByRole('complementary', { name: 'Codex works on this course with you' }), 'once per learner').toHaveCount(0);
 });
 
-test('course hand-offs open Studio with the request and where it came from, and attached files become chips', async ({ page, course }) => {
+test("Studio's suggestions fill in the request, and attached files become chips", async ({ page, course }) => {
   await course('studio_browser_fixture');
-  await page.getByRole('link', { name: 'Add files in Studio' }).click();
+  await page.locator('#open-course').click();
+  await page.getByRole('button', { name: 'Add files to this course' }).click();
   const box = page.locator('#studio-input');
   await expect(box).toBeVisible();
-  expect(await editorText(box)).toContain('$throughline add these files to the course waves');
-  const panel = page.locator('#course-studio');
-  await expect(panel.locator('form .origin')).toContainText('Section: Wave superposition');
+  expect(await editorText(box)).toContain('Add these files to');
 
   await page.locator('#course-studio input[type=file]:not([accept])').setInputFiles({ name: 'problem set.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await expect(box.locator('.cm-chip-mention')).toHaveText('@inputs/problem set.pdf');
-
-  // The context goes with the message, shown under it, and the chip is gone from the box.
   await page.keyboard.press('Control+Enter');
-  await expect(panel.locator('.user .origin')).toHaveText('section "Wave superposition" (wave)');
-  await expect(panel.locator('form .origin')).toHaveCount(0);
+  await expect(page.locator('#course-studio .user')).toContainText('problem set.pdf');
 });
 
 test('the top bar shows that Studio is working or needs the learner, and leads back to it', async ({ page, course }) => {

@@ -4,7 +4,7 @@
   import AttachedImages from './AttachedImages.svelte';
   import PanelGroups from './PanelGroups.svelte';
   import PanelScope from './PanelScope.svelte';
-  import { groupBySection, scopeCounts, type PanelScope as Scope } from '../lib/panel';
+  import { groupBySection, narrows, scopeCounts, type PanelScope as Scope } from '../lib/panel';
   import { markdown } from '../lib/markdown';
   import { locale, t } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
@@ -123,8 +123,11 @@
 <section class="notes-panel panel-view" aria-labelledby="notes-title">
   <header class="panel-head">
     <div class="panel-bar"><h2 id="notes-title">{t("Notes")}</h2></div>
-    <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
-    {#if total}
+    <!-- How to make notes is said until there is one; the filter shows once it would change the list. -->
+    {#if !total}
+      <p class="panel-intro">{t("Select text in a lesson or source to highlight it or add a note. Only you see these; the teacher does not.")}</p>
+    {/if}
+    {#if narrows(counts)}
       <PanelScope bind:scope {counts} label={t("Show notes from")} onchoose={() => (scopeChosen = true)} />
     {/if}
     {#if total > 4}

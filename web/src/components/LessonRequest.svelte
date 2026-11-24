@@ -13,10 +13,10 @@
   const setPrompt = (value: string) => app.drafts.set(draftKey, value);
   let busy = $state(false);
   const running = $derived(app.runningLesson);
-  // Before the first lesson the request is optional, so the card leads with starting and opens the box only on request
-  // (or when a draft is waiting in it). Mid-lesson, starting over is a quiet offer until chosen.
+  // The box opens only when asked for (or when a draft is waiting in it): before the first lesson the card leads with
+  // starting; under a finished lesson, teaching it again is one quiet offer; mid-lesson, so is starting over.
   let focusing = $state(false);
-  const writing = $derived((hasLesson && !open) || focusing || prompt.trim() !== '');
+  const writing = $derived(focusing || prompt.trim() !== '');
   // Over a taught section: another pass adds one reply to the lesson there; a New lesson replaces it (ADR 0023).
   let chosen = $state<LessonKind>('pass');
   $effect(() => {
@@ -74,6 +74,10 @@
       <div class="row instead">
         <button class="btn btn-quiet btn-small" disabled={busy || !!running} onclick={chooseFocus}>{t("Start a new lesson instead")}</button>
       </div>
+    {:else if hasLesson && !writing}
+      <div class="row instead">
+        <button class="btn btn-quiet btn-small" disabled={busy || !!running} onclick={chooseFocus}>{t("Teach again…")}</button>
+      </div>
     {:else if !writing}
       <div class="row">
         <button class="btn btn-primary" disabled={busy || !!running} onclick={start}>{t("Start lesson")}</button>
@@ -93,8 +97,8 @@
       allowEmpty
       onsubmit={start}
       header={target}
-      onclose={open ? dropFocus : hasLesson ? undefined : dropFocus}
-      closeLabel={open ? t("Keep this lesson") : t("Start without a focus")}
+      onclose={dropFocus}
+      closeLabel={open || hasLesson ? t("Keep this lesson") : t("Start without a focus")}
     />
     {#if kind === 'new'}
       <p class="hint">{open ? t("The steps you have read stay above, folded; the rest of this lesson's plan is dropped.") : t("The lesson you have read stays above, folded, with your answers and notes.")}</p>

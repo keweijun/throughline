@@ -24,7 +24,10 @@
 
 <section class="preferences" id="course-preferences" aria-labelledby="preferences-title">
   <h2 id="preferences-title">{t("How you're taught")}</h2>
-  <p class="intro">{t('The teacher follows these in every lesson. To add or change one, tell Studio, or confirm one the teacher suggests during a lesson.')}</p>
+  <!-- Once there are preferences they explain themselves; the way to add one is said while there are none. -->
+  {#if !preferences.length}
+    <p class="intro">{t('None yet. Tell Studio how you like to be taught, or confirm a preference the teacher suggests in a lesson.')}</p>
+  {/if}
   {#if preferences.length}
     <ul>
       {#each preferences as entry (entry.id)}

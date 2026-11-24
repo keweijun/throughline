@@ -202,9 +202,6 @@
                   <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15.5v-11M5.5 9 10 4.5 14.5 9" /></svg>
                 </span>
               </div>
-              <ol class="ticks">
-                {#each examples as _, i (i)}<li class:on={i === shown}></li>{/each}
-              </ol>
             </div>
           {:else if s === 'launcher'}
             <div class="dock">
@@ -499,24 +496,6 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
-  .ticks {
-    display: flex;
-    justify-content: center;
-    gap: 0.3rem;
-    margin: 0.2rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .ticks li {
-    width: 0.9rem;
-    height: 3px;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
-    transition: background var(--quick, 120ms) ease;
-  }
-  .ticks li.on {
-    background: var(--accent);
-  }
 
   /* The launcher: Throughline in a dock. */
   .dock {
@@ -605,7 +584,7 @@
     border-radius: 50%;
     background: var(--accent);
     color: var(--on-accent);
-    font-size: 0.72rem;
+    font-size: var(--step--2);
   }
   .stages p {
     font-size: var(--step--1);

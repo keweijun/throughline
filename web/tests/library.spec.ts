@@ -41,8 +41,7 @@ test('Codex actions copy their request, and an open course links to Studio with 
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text: string) => void (window as unknown as { copied: string[] }).copied.push(text) } });
     document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
   });
-  const { base, errors } = await course('library_browser_fixture');
-  const library = await (await page.request.get(base + '/api/library')).json();
+  const { errors } = await course('library_browser_fixture');
 
   // Add files waits in the card's menu, with what else is rarely needed.
   await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('button', { name: /^More actions for/ }).click();
@@ -57,12 +56,6 @@ test('Codex actions copy their request, and an open course links to Studio with 
   await expect(copied.getByRole('status')).toHaveText('Request copied');
   expect((await copied.boundingBox())?.width).toBe(width);
 
-  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('heading').getByRole('button').click();
-  const rail = page.getByRole('navigation', { name: 'Course route' });
-  // In a course the link opens Studio; its address stays the Codex chat it falls back to where Studio cannot run.
-  const add = new URL(await rail.getByRole('link', { name: 'Add files in Studio' }).getAttribute('href') ?? '');
-  expect(add.searchParams.get('prompt')).toBe('$throughline add these files to the course linear-algebra: ');
-  expect(add.searchParams.get('path')).toBe(library.root);
   expect(errors).toEqual([]);
 });
 

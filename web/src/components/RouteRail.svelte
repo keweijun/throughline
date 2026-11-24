@@ -3,12 +3,9 @@
   import { t, diagnostic } from '../lib/i18n.svelte';
   import { app } from '../lib/store.svelte';
   import { solved } from '../lib/format';
-  import CodexLink from './CodexLink.svelte';
   import FoldedRoute from './FoldedRoute.svelte';
 
   const route = $derived(app.state?.curriculum.route ?? []);
-  // The section on the page, which Add files names as where the request came from.
-  const viewedSection = $derived(app.viewingId ? app.concept(app.viewingId) : undefined);
   const currentIndex = $derived(app.routeIndex(app.currentId));
   const saved = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -52,7 +49,6 @@
 
   const label = { current: 'Current section', visited: 'Visited', upcoming: 'Not started' };
 
-  const course = $derived(app.libraryCourse);
   const chapters = $derived(app.chapters);
   const currentChapter = $derived(app.chapterOf(app.currentId)?.id);
 
@@ -190,7 +186,7 @@
                 aria-expanded={total ? open : undefined}
                 aria-controls={total ? `chapter-${chapter.id}` : undefined}
                 aria-label={open ? t("Collapse chapter") : t("Expand chapter")}
-                title={t("Chapter {number}", { number: number + 1 }) + ' · ' + chapter.title}
+                title={app.chapterName(chapter, number)}
                 disabled={!total}
                 onclick={() => app.toggleChapter(chapter.id)}
               ><span aria-hidden="true">{number + 1}</span></button>
@@ -200,7 +196,7 @@
                 aria-current={app.viewingChapter === chapter.id && !app.pageOpen ? 'page' : undefined}
                 onclick={() => app.viewChapter(chapter.id)}
               >
-                <span class="name">{t("Chapter {number}", { number: number + 1 })} · {chapter.title}</span>
+                <span class="name">{app.chapterName(chapter, number)}</span>
                 <span class="meta">
                   {#if total}
                     <span>{t("{studied}/{total} sections studied", { studied: done, total })}</span>
@@ -228,17 +224,6 @@
           {@render section(id)}
         {/each}
       </ol>
-    {/if}
-    {#if course}
-      <section class="codex" aria-labelledby="codex-title">
-        <h3 id="codex-title">{t('Change this course in Studio')}</h3>
-        <CodexLink prompt={t('$throughline add these files to the course {course}: ', { course: course.name })} origin={viewedSection ? { label: t('Section: {section}', { section: viewedSection.title }), text: `section "${viewedSection.title}" (${viewedSection.id})` } : null}>{t('Add files in Studio')}</CodexLink>
-        {#if course.needs_review}
-          <CodexLink prompt={t('$throughline review the pages that still need review in the course {course}', { course: course.name })}>
-            {t('Check {count} source locations in Studio', { count: course.needs_review })}
-          </CodexLink>
-        {/if}
-      </section>
     {/if}
   </div>
 </nav>
@@ -488,21 +473,6 @@
 
   .chapter.here .chapter-name .name {
     color: var(--ink);
-  }
-
-  .codex {
-    display: grid;
-    justify-items: start;
-    gap: 0.3rem;
-    margin: 1.75rem 0 0 var(--gutter);
-    font-size: var(--step--1);
-  }
-
-  .codex h3 {
-    font-family: var(--sans);
-    font-size: var(--step--1);
-    font-weight: 600;
-    color: var(--pencil);
   }
 
   .star {

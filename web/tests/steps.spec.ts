@@ -34,8 +34,10 @@ test('a lesson is taught in steps: continue, an added step, pause and regenerate
   await expect(third).toContainText('then square');
   await expect(third.getByRole('group', { name: 'Next step' })).toHaveCount(0);
   await expect(page.locator('#practice article').first(), 'the last step leads to grouped practice').toContainText('Find');
-  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
-  // Over a taught section the request is another pass by default, or a New lesson that replaces this one (ADR 0023).
+  await expect(page.getByRole('button', { name: 'Teach again…' })).toBeVisible();
+  // Over a taught section the request waits behind Teach again…: another pass by default, or a New lesson that
+  // replaces this one (ADR 0023).
+  await page.getByRole('button', { name: 'Teach again…' }).click();
   const kinds = page.getByRole('radiogroup', { name: 'What to ask for' });
   await expect(kinds.getByRole('radio', { name: 'Another pass' })).toBeChecked();
   await kinds.getByText('New lesson').click();
@@ -158,9 +160,10 @@ test('an earlier section can be studied again, and its earlier lesson stays', as
   await expect(page.getByText("You're previewing this section")).toHaveCount(0);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Classical waves');
   await expect(page.getByText('A long lesson saved as one reply.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Teach again' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Teach again…' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Go back' })).toContainText('Wave superposition');
   // A New lesson teaches it again in steps; the lesson saved as one reply folds above it (ADR 0023).
+  await page.getByRole('button', { name: 'Teach again…' }).click();
   await page.getByRole('radiogroup', { name: 'What to ask for' }).getByText('New lesson').click();
   await page.getByRole('button', { name: 'Start new lesson' }).click();
   await expect(page.getByRole('region', { name: 'Step 1 of 4' })).toContainText('Each path carries a complex amplitude.');

@@ -316,9 +316,7 @@
   <header>
     {#if making}
       <div>
-        {#if library?.courses.length}
-          <button class="btn btn-quiet btn-small btn-flush back" onclick={() => (app.libraryView = 'list')}>← {t('All courses')}</button>
-        {/if}
+        <!-- The way back to the list is All courses in the top bar. -->
         <h1 id="library-title" class:visually-hidden={starting}>{t('New course')}</h1>
       </div>
       {#if library?.root && !starting}
@@ -638,10 +636,6 @@
   .studio-part :global(.studio > .panel-head > .panel-bar),
   .studio-part :global(.studio > .panel-head > .panel-intro) {
     display: none;
-  }
-
-  .back {
-    margin-bottom: 0.4rem;
   }
 
   /* Before anything is said, New course is Studio's question, box and ways to begin (ADR 0027) over a contour map:
@@ -1104,7 +1098,9 @@
     z-index: 1;
   }
 
+  /* Its menu opens over the card's own links. */
   .more {
+    z-index: 2;
     margin-top: -0.15rem;
     opacity: 0;
     transition: opacity 0.15s ease;

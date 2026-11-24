@@ -228,7 +228,7 @@
     border-radius: 4px;
     background: var(--raised);
     font-family: var(--mono);
-    font-size: 0.75rem;
+    font-size: var(--step--2);
     font-weight: 400;
     text-align: center;
   }

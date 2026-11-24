@@ -9,6 +9,11 @@ What changed for learners in each release of Throughline, newest first. Each rel
 - **The side panel's headings match the top bar:** Questions, Notes and Sources.
 - **Settings → Teacher sets both models the same way.** The teacher's model and the small model each have a model and a reasoning effort under it, chosen with the same buttons; the small model's starts at **Same as the teacher**.
 - **The welcome no longer changes size from step to step**, so Next and Back stay where they are.
+- **Fewer things compete for attention while you study.** Under a finished lesson, **Teach again…** opens the request box when you want it. The route no longer carries Studio links; Studio's suggestions and the ⋯ on a course's card do that. A course without chapters lists its sections under **All sections**, not under a chapter named after the course, and Review stops offering that chapter as a choice. Tips are quieter, and a warm-up no longer outranks **Start lesson**.
+- **The side panel explains itself less.** Questions and Notes say how to start only until you have one, and offer Section, Chapter and All only when that would change the list.
+- **The course switcher marks the open course with a tinted row** instead of a tick.
+- **Studio's column reads more easily.** The ⋯ on the cover is always visible, a course without chapters says how many sections you have studied, How you're taught explains itself only while it is empty, and a chat started a moment ago is "just now".
+- **A course card's ⋯ menu opens above the card's links**, so its first item is no longer covered. New course drops its extra "← All courses"; All courses in the top bar goes back.
 ## 0.62.0
 
 - **All courses is redesigned.**

@@ -540,7 +540,7 @@
     border-radius: 999px;
     background: var(--accent-wash);
     color: var(--accent);
-    font-size: 0.72rem;
+    font-size: var(--step--2);
     font-weight: 600;
   }
 

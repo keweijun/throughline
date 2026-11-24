@@ -498,7 +498,6 @@
     opacity: 0;
   }
 
-
   /* Until it is known whether there is a chat to open, no sheet, and none arriving in motion. */
   .unplaced .paper {
     opacity: 0;

@@ -4,7 +4,6 @@
   import { studio } from '../lib/studio.svelte';
   import type { LibraryCourse } from '../lib/types';
   import { pop } from '../lib/motion';
-  import CourseCover from './CourseCover.svelte';
 
   const studying = $derived(!!app.state && !app.libraryOpen);
   // Whether Codex is already busy in this course's Studio, say in a chat left running before a reload; asking does not
@@ -109,13 +108,12 @@
           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M5.5 8l4.5 4.5L14.5 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         {#if menuOpen}
-          <!-- Each course by its cover's pattern and its title, the open one marked; then the ways out of the list. -->
+          <!-- Each course by its title and where the learner is in it, the open one marked; then the ways out of the list. -->
           <ul class="course-menu" role="menu" transition:pop={{ from: 'above' }} aria-label={t("Switch course")}>
             {#each others as course (course.path)}
               {@const open = course.path === app.library?.active}
               <li role="none">
                 <button role="menuitem" class="course-item" class:active={open} aria-current={open ? 'true' : undefined} onclick={() => switchTo(course)}>
-                  <span class="swatch"><CourseCover {course} swatch /></span>
                   <span class="text">
                     <span class="title">{course.title ?? course.name}</span>
                     {#if course.current}<span class="meta">{course.current}</span>{/if}
@@ -352,7 +350,7 @@
     left: 0;
     z-index: 50;
     display: grid;
-    width: 21rem;
+    width: 19rem;
     max-width: calc(100vw - 2rem);
     max-height: 70vh;
     margin: 0;
@@ -370,7 +368,7 @@
     align-items: center;
     gap: 0.65rem;
     width: 100%;
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem 0.6rem;
     border: 0;
     border-radius: var(--radius);
     background: transparent;
@@ -383,16 +381,6 @@
   .course-menu button:hover,
   .course-menu button:focus-visible {
     background: var(--accent-wash);
-  }
-
-  /* A course: its cover's pattern as a small swatch, its title and where the learner is in it. */
-  .course-menu .swatch {
-    flex: none;
-    width: 2.75rem;
-    height: 1.9rem;
-    overflow: hidden;
-    border: 1px solid var(--rule);
-    border-radius: 5px;
   }
 
   .course-menu .text {

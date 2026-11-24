@@ -6,8 +6,7 @@
    * A course's cover on its library card (ADR 0027): the subject's short name, chosen by Codex, over the pattern of
    * thin lines it chose with it. A course Codex has not given a cover yet shows a pattern alone.
    */
-  // `swatch`: a small mark of the cover for a list, the pattern alone, since the title stands beside it.
-  let { course, large = false, swatch = false }: { course: LibraryCourse; large?: boolean; swatch?: boolean } = $props();
+  let { course, large = false }: { course: LibraryCourse; large?: boolean } = $props();
 
   const marks = $derived(coverPattern(course.cover?.pattern, course.name));
 
@@ -28,11 +27,11 @@
   }
 </script>
 
-<div class="cover" class:large class:swatch aria-hidden="true">
+<div class="cover" class:large aria-hidden="true">
   <svg viewBox="0 0 {WIDTH} {HEIGHT}" preserveAspectRatio="xMaxYMid slice">
     {#each marks as mark}<path d={mark.d} class={mark.tone} class:dot={mark.dot} class:wide={mark.wide} />{/each}
   </svg>
-  {#if course.cover?.name && !swatch}
+  {#if course.cover?.name}
     {#key course.cover.name}<span class="name" use:fit>{course.cover.name}</span>{/key}
   {/if}
 </div>
@@ -96,20 +95,6 @@
 
   path.dot.marked {
     fill: var(--marker);
-  }
-
-  /* A swatch shows the pattern's densest part, whole. */
-  .swatch svg {
-    mask-image: none;
-  }
-
-  /* Finer lines at this size, so the pattern stays a pattern. */
-  .swatch path {
-    stroke-width: 0.7;
-  }
-
-  .swatch path.marked {
-    stroke-width: 1.1;
   }
 
   .name {

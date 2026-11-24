@@ -188,7 +188,7 @@ test('Studio is as tall as the window beside the course column, and writing move
   await expect(paper).toHaveCSS('opacity', '0');
 });
 
-test('the course is named once in the bar and once on its cover, and the switcher lists courses by their covers', async ({ page, course }) => {
+test('the course is named once in the bar and once on its cover, and the switcher marks the open course and offers a new one', async ({ page, course }) => {
   const { base, errors } = await course('studio_browser_fixture');
   const waves = `${(await (await page.request.get(base + '/api/library')).json()).root}/waves`;
   await page.locator('#open-course').click();
@@ -209,12 +209,13 @@ test('the course is named once in the bar and once on its cover, and the switche
   await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // The switcher: each course by its cover's pattern and its title, the open one marked, then the ways out.
+  // The switcher: each course by its title, the open one marked, then the ways out. No cover patterns here: they are
+  // decoration for a cover, not marks to tell courses apart by.
   await page.locator('#course-switcher').click();
   const menu = page.getByRole('menu', { name: 'Switch course' });
   const open = menu.getByRole('menuitem', { name: /Waves/ });
   await expect(open).toHaveAttribute('aria-current', 'true');
-  await expect(open.locator('.swatch svg path').first()).toBeAttached();
+  await expect(menu.locator('svg.pattern, .cover')).toHaveCount(0);
   await expect(menu.getByRole('menuitem', { name: 'All courses' })).toBeVisible();
   await menu.getByRole('menuitem', { name: 'New course' }).click();
   await expect(page.locator('.studio-part').getByRole('heading', { name: 'What would you like to learn?' })).toBeVisible();

@@ -56,10 +56,10 @@
   const others = $derived(entries.filter((e) => !here.includes(e) && !inChapter.includes(e)));
 </script>
 
-<section class="source-list" aria-labelledby={page ? undefined : 'sources-title'} aria-label={page ? t("Course sources") : undefined}>
+<section class="source-list" aria-labelledby={page ? undefined : 'sources-title'} aria-label={page ? t("Sources") : undefined}>
   {#if !page}
     <header class="panel-head">
-      <div class="panel-bar"><h2 id="sources-title">{t("Course sources")}</h2></div>
+      <div class="panel-bar"><h2 id="sources-title">{t("Sources")}</h2></div>
     </header>
   {/if}
   {#if app.source && !page}

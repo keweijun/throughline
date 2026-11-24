@@ -141,7 +141,7 @@
     padding: 0.45rem 0.6rem;
     border-radius: var(--radius);
     background: var(--raised);
-    font-size: 0.75rem;
+    font-size: var(--step--2);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

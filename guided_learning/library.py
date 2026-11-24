@@ -206,6 +206,8 @@ def _summary(path):
             'concepts': len(curriculum['route']),
             'needs_review': sum(1 for unit in coverage['units'] if unit['disposition'] in ('needs_review', 'unmapped')),
             'current': concepts.get(current, {}).get('title'),
+            # Where the current section is on the route, counted from 1, for "Section 3 of 12".
+            'position': curriculum['route'].index(current) + 1 if current in curriculum['route'] else None,
             'goal': (status.get('profile') or {}).get('goal'),
             'cover': status.get('cover'),
             'updated': (path / 'course.sqlite3').stat().st_mtime}

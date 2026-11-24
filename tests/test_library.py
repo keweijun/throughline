@@ -228,6 +228,17 @@ class CourseLibrary(unittest.TestCase):
             execute(path, {'op': 'curriculum.save', 'concepts': [{'id': 'state', 'title': 'States'}, {'id': 'more', 'title': 'More'}], 'route': ['state', 'more'], 'coverage': []})
             self.assertEqual(library.summary(path)['concepts'], 2)
 
+    def test_a_course_summary_says_where_the_current_section_is_on_the_route(self):
+        """The course to carry on with in the library shows "Section 2 of 3"; a course not started has no place yet."""
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / 'alpha'
+            execute(path, {'op': 'course.init', 'title': 'Alpha'})
+            execute(path, {'op': 'curriculum.save', 'concepts': [{'id': i, 'title': i} for i in ('a', 'b', 'c')], 'route': ['a', 'b', 'c'], 'coverage': []})
+            self.assertIsNone(library.summary(path)['position'])
+            execute(path, {'op': 'mainline.enter', 'request_id': 'e', 'concept_id': 'b', 'goal': 'b', 'next_step': 'Start'})
+            written_ago(path, 10)  # a fresh stamp, so the cached summary is read again
+            self.assertEqual((library.summary(path)['position'], library.summary(path)['concepts']), (2, 3))
+
     def test_a_commit_that_leaves_the_files_stamp_as_it_was_is_still_seen(self):
         # Within one tick of the file system's clock, and once the write-ahead log has wrapped, a commit can leave the
         # database files' modification times and sizes as they were; a course written that recently is read again.

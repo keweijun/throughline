@@ -44,6 +44,7 @@
     onview,
     onfiles,
     imageScope = '',
+    enterSends = true,
   }: {
     id?: string;
     value: string;
@@ -89,6 +90,8 @@
     imageScope?: string;
     /** Takes files that are not images, dropped, pasted or chosen; without it the box takes images only. */
     onfiles?: (files: File[]) => void;
+    /** Enter sends (Shift+Enter for a new line); false keeps Enter a line break and sends with Ctrl+Enter only. */
+    enterSends?: boolean;
   } = $props();
 
   const IMAGE_TYPES = 'image/png,image/jpeg,image/gif,image/webp';
@@ -210,7 +213,7 @@
   {/if}
   <div
     class="field"
-    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, onchange: onvalue, onsend: send, oncancel, onpaste: paste, completions, onchips, onrecall, onview }}
+    use:editor={{ value, id, label, placeholder, rows, describedBy: hintId, enterSends, onchange: onvalue, onsend: send, oncancel, onpaste: paste, completions, onchips, onrecall, onview }}
   ></div>
   {#if math && showPreview && rendered}
     <section class="preview" aria-label={t("Preview")}>
@@ -289,7 +292,7 @@
       >∑</button>
     {/if}
     {@render tools?.()}
-    <span class="keys" id={hintId}>{t("{keys} to send", { keys: sendKeys })}</span>
+    <span class="keys" id={hintId}>{enterSends ? t("Enter to send, Shift+Enter for a new line") : t("{keys} to send", { keys: sendKeys })}</span>
     {@render actions?.()}
     {#if submit}<button class="btn btn-small btn-primary send" type="submit" disabled={!ready}>{submitLabel}</button>{/if}
   </div>

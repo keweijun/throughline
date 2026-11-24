@@ -41,8 +41,7 @@ test('Codex actions copy their request, and an open course links to Studio with 
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text: string) => void (window as unknown as { copied: string[] }).copied.push(text) } });
     document.addEventListener('click', (event) => (event.target as Element).closest('a[href^="codex:"]') && event.preventDefault(), true);
   });
-  const { base, errors } = await course('library_browser_fixture');
-  const library = await (await page.request.get(base + '/api/library')).json();
+  const { errors } = await course('library_browser_fixture');
 
   // Add files waits in the card's menu, with what else is rarely needed.
   await page.locator('.courses > li').filter({ hasText: 'Quantum' }).getByRole('button', { name: /^More actions for/ }).click();
@@ -57,12 +56,6 @@ test('Codex actions copy their request, and an open course links to Studio with 
   await expect(copied.getByRole('status')).toHaveText('Request copied');
   expect((await copied.boundingBox())?.width).toBe(width);
 
-  await page.locator('.courses > li').filter({ hasText: 'Linear Algebra' }).getByRole('heading').getByRole('button').click();
-  const rail = page.getByRole('navigation', { name: 'Course route' });
-  // In a course the link opens Studio; its address stays the Codex chat it falls back to where Studio cannot run.
-  const add = new URL(await rail.getByRole('link', { name: 'Add files in Studio' }).getAttribute('href') ?? '');
-  expect(add.searchParams.get('prompt')).toBe('$throughline add these files to the course linear-algebra: ');
-  expect(add.searchParams.get('path')).toBe(library.root);
   expect(errors).toEqual([]);
 });
 
@@ -106,9 +99,9 @@ test('a card is a cover, a title and one line, and the whole card opens the cour
   // No folder name, counts, dates or goal: they made the page hard to read.
   await expect(quantum).not.toContainText('quantum-v1');
   await expect(quantum).not.toContainText(/Sources|Sections|Updated|Goal/);
-  // A course Codex has not given a cover shows a pattern alone.
+  // A course Codex has not given a cover shows its title over a pattern, so no cover is blank.
   await expect(quantum.locator('.cover svg path').first()).toBeAttached();
-  await expect(quantum.locator('.cover .name')).toHaveCount(0);
+  await expect(quantum.locator('.cover .name')).toHaveText('Introductory Quantum Mechanics');
 
   // Codex chooses the cover (cover.save), and the card shows it without a reload.
   execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "cover.save", "name": "QM", "pattern": "orbits"})',

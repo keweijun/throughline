@@ -8,7 +8,9 @@ test('streamed text stays whole when the state reloads mid-stream', async ({ pag
     await new Promise((resolve) => setTimeout(resolve, 450));
     await route.fulfill({ response });
   });
-  await page.getByRole('button', { name: 'Teach again' }).click();
+  // Teach again… opens the request box; its own Teach again sends it.
+  await page.getByRole('button', { name: 'Teach again…' }).click();
+  await page.getByRole('button', { name: 'Teach again', exact: true }).click();
   const lesson = page.locator('.lesson').last();
   await expect(lesson).toContainText('Streaming paragraph 0');
 

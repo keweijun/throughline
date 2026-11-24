@@ -2,9 +2,24 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.62.2
+
+- **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Lessons and answers** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.
+
 ## 0.62.1
 
-- **Settings is easier to scan.** Each category opens with its title, and its choices sit in labelled groups: on Teacher, **Teaching** (model, reasoning effort, Fast mode) and **Background work** (the small model and its effort). **Saved** now appears beside the group you changed, and About keeps updates, opening Throughline next time and credits apart.
+- **Exercises are calmer.** Under the answer box are only the ways to get help: Hint, Key steps, Full solution and Ask about this. **Another like this**, **Do later** and **Skip** are in the ⋯ at the top right of the exercise. The answer box has a shorter prompt.
+- **A section opens with one card under its title**: the question the section answers, and **About this section**, which opens to its goal, steps, connections and sources. The separate Goal and Next step lines are gone; what to do next is where you do it (the lesson's Continue, Practice and Up next).
+- **The side panel's headings match the top bar:** Questions, Notes and Sources.
+- **Settings → Teacher sets both models the same way.** The teacher's model and the small model each have a model and a reasoning effort under it, chosen with the same buttons; the small model's starts at **Same as the teacher**.
+- **The welcome no longer changes size from step to step**, so Next and Back stay where they are.
+- **Fewer things compete for attention while you study.** Under a finished lesson, **Teach again…** opens the request box when you want it. The route no longer carries Studio links; Studio's suggestions and the ⋯ on a course's card do that. A course without chapters lists its sections under **All sections**, not under a chapter named after the course, and Review stops offering that chapter as a choice. Tips are quieter, and a warm-up no longer outranks **Start lesson**.
+- **The side panel explains itself less.** Questions and Notes say how to start only until you have one, and offer Section, Chapter and All only when that would change the list.
+- **The course switcher marks the open course with a tinted row** instead of a tick.
+- **Studio's column reads more easily.** The ⋯ on the cover is always visible, a course without chapters says how many sections you have studied, How you're taught explains itself while it is empty and keeps the explanation behind a **?** once it lists preferences, and a chat started a moment ago is "just now".
+- **Enter sends.** In Studio, questions, notes and the other writing boxes, Enter sends and Shift+Enter starts a new line, as in Codex. An exercise or review answer is the exception: Enter starts a new line there, and Ctrl+Enter (⌘ Enter on a Mac) checks it, so a half-written answer is never checked by accident.
+- **All courses says more with less.** The course to carry on with shows how far along it is ("Section 3 of 12"), and a course Codex has not given a cover yet shows its title on the cover instead of a blank pattern.
+- **A course card's ⋯ menu opens above the card's links**, so its first item is no longer covered. New course drops its extra "← All courses"; All courses in the top bar goes back.
 
 ## 0.62.0
 

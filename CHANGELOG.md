@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.66.2
+
+- **In Chinese, Review's line under the drill box now names 课程工坊** (或者让课程工坊做) instead of the English "Studio", as everywhere else in the app.
+
 ## 0.66.1
 
 - **A drill question in parts now shows its parts.** When a Review drill asked a written question in parts, only its setup appeared, so you were asked to answer (a) and (b) without seeing them. New drill questions show each part under the setup. Questions already in your sessions stay as they were; ask for more questions to get new ones.

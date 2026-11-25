@@ -26,7 +26,7 @@ test('a course that could not be loaded says why and opens on Try again', async 
 test('a browser without the host key is told how to open Throughline, and the launcher address signs it in', async ({ page, course }) => {
   const { base, errors } = await course('signed_browser_fixture');
   const screen = page.getByRole('alert').filter({ has: page.getByRole('heading', { name: 'Open Throughline from its launcher' }) });
-  await expect(screen).toContainText('guided-learning open');
+  await expect(screen).toContainText('throughline open');
   await expect(screen.getByRole('button')).toHaveCount(0);
 
   // The address the launcher opens carries a one-time code; the host then drops it from the address bar.

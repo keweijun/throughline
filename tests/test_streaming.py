@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from guided_learning.api import execute
+from throughline.api import execute
 
 class StreamingCourse(unittest.TestCase):
     def setUp(self):
@@ -88,7 +88,7 @@ class StreamingCourse(unittest.TestCase):
         self.assertEqual(self.call('interaction.read',id='stream:lecture')['interaction']['text'],'Recovered whole lesson.')
 
     def test_host_restart_exposes_incomplete_stream_and_out_of_order_is_rejected(self):
-        from guided_learning.store import OperationError
+        from throughline.store import OperationError
         self.call('stream.start', id='lecture', concept_id='state', prompt='Explain states')
         with self.assertRaises(OperationError):
             self.call('stream.event', id='lecture', attempt=1, sequence=2, kind='delta', text='gap')
@@ -99,7 +99,7 @@ class StreamingCourse(unittest.TestCase):
 
     def test_source_snapshot_stays_bound_to_prompt_and_record_after_revision_change(self):
         from pathlib import Path
-        from guided_learning.server import Host
+        from throughline.server import Host
         path=Path(self.workspace)/'lesson.md'
         path.write_text('OLD_SOURCE_FACT',encoding='utf-8')
         old=self.call('source.register',path=str(path))['source']

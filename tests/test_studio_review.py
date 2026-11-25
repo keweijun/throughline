@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline.api import execute
+from throughline.store import OperationError
 
 APPLY = {'kind': 'apply', 'question': 'Push 1, 2, 3 and pop twice: what is left?', 'parts': ['(a) the stack', '(b) why'], 'tests_concept_ids': ['stack'], 'marks': 6}
 RECALL = {'kind': 'recall', 'question': 'Which end does pop use?', 'idea': 'LIFO', 'correct': 0, 'tests_concept_ids': ['stack'],

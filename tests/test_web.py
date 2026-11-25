@@ -2,9 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
-from guided_learning.server import Host
-from guided_learning.store import OperationError
+from throughline.api import execute
+from throughline.server import Host
+from throughline.store import OperationError
 from support import host_client
 
 
@@ -145,7 +145,7 @@ class WebLearning(unittest.TestCase):
             self.assertEqual(seen[0]['turn']['status'], 'running')
 
     def test_teacher_settings_apply_to_the_next_codex_request(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)
             client, host = host_client(tmp, runner=BlockingRunner())
@@ -186,14 +186,14 @@ class WebLearning(unittest.TestCase):
             client, host = host_client(tmp, runner=BlockingRunner())
             with client:
                 listed = [{'id': 'gpt-6-luna', 'name': 'GPT-6-Luna', 'description': '', 'default': False, 'efforts': ['low'], 'tiers': []}]
-                with patch('guided_learning.server.settings.list_models', return_value=listed):
+                with patch('throughline.server.settings.list_models', return_value=listed):
                     self.assertEqual(client.get('/api/models').json(), {'models': listed})
-                with patch('guided_learning.server.settings.list_models', side_effect=RuntimeError('Codex CLI not found')):
+                with patch('throughline.server.settings.list_models', side_effect=RuntimeError('Codex CLI not found')):
                     failed = client.get('/api/models')
                 self.assertEqual((failed.status_code, failed.json()['error']), (502, 'Codex CLI not found'))
 
     def test_command_line_choice_is_not_saved(self):
-        from guided_learning.server.settings import TeacherSettings
+        from throughline.server.settings import TeacherSettings
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'settings.json'
             TeacherSettings(path).save('saved-model', 'low')

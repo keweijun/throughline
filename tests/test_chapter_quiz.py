@@ -1,7 +1,7 @@
 """Which earlier exercises a chapter quiz asks again (ADR 0008)."""
 import unittest
 
-from guided_learning import practice
+from throughline import practice
 from test_review import MemoryStore
 
 CHAPTER = {'id': 'one', 'concept_ids': ['a', 'b', 'c', 'd']}

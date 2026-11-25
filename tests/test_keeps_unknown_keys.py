@@ -4,9 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
-from guided_learning.server.settings import Seen, TeacherSettings, write_json
-from guided_learning.server.studio import Studio
+from throughline.api import execute
+from throughline.server.settings import Seen, TeacherSettings, write_json
+from throughline.server.studio import Studio
 
 
 class KeepsUnknownKeys(unittest.TestCase):
@@ -52,7 +52,7 @@ class KeepsUnknownKeys(unittest.TestCase):
         course = self.tmp / 'course'
         execute(course, {'op': 'course.init', 'title': 'Waves'})
         execute(course, {'op': 'preferences.save', 'language': 'en'})
-        from guided_learning.store import Store
+        from throughline.store import Store
         store = Store(course)
         try:
             store.put('course', 'preferences', {'language': 'en', 'from_a_newer_version': 'kept'})

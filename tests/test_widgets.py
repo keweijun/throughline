@@ -1,8 +1,8 @@
 import tempfile
 import unittest
 
-from guided_learning.api import execute
-from guided_learning.server import Host
+from throughline.api import execute
+from throughline.server import Host
 from support import call_cli, settle
 
 

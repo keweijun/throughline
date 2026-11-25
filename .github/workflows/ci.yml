@@ -50,11 +50,11 @@ jobs:
       - run: npm run check
       - run: npm run licenses
       - run: npm run build
-      - name: The committed guided_learning/web_dist is the build of web/src
+      - name: The committed throughline/web_dist is the build of web/src
         run: |
-          if [ -n "$(git status --porcelain -- ../guided_learning/web_dist)" ]; then
-            git status --short -- ../guided_learning/web_dist
-            echo "::error::guided_learning/web_dist is out of date: run npm run build in web/ and commit it."
+          if [ -n "$(git status --porcelain -- ../throughline/web_dist)" ]; then
+            git status --short -- ../throughline/web_dist
+            echo "::error::throughline/web_dist is out of date: run npm run build in web/ and commit it."
             exit 1
           fi
 

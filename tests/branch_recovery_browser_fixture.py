@@ -1,9 +1,9 @@
 """Saved course after a host crash, with two selectable lectures and a partial supplement."""
 from pathlib import Path
 import tempfile
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Recovery regression'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Older lesson'},{'id':'b','title':'Current lesson'}],'route':['a','b'],'coverage':[]})

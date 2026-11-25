@@ -14,11 +14,11 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from guided_learning import background, library
-from guided_learning.api import execute
-from guided_learning.server import Host, create_app
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.store import OperationError
+from throughline import background, library
+from throughline.api import execute
+from throughline.server import Host, create_app
+from throughline.server.settings import TeacherSettings
+from throughline.store import OperationError
 from support import call_cli, host_client, taught
 
 
@@ -52,7 +52,7 @@ class TurnFailures(unittest.TestCase):
 
     def failing_first_stream_write(self):
         """The first write of streamed events fails, as when the database stays locked."""
-        from guided_learning.server import host as host_module
+        from throughline.server import host as host_module
         real = host_module.execute
         failed = []
 
@@ -116,7 +116,7 @@ class TurnFailures(unittest.TestCase):
             seen = []
             with mock.patch.object(host.questions, 'on_complete', side_effect=RuntimeError('hook bug')), \
                     mock.patch.object(host.practice, 'on_complete', side_effect=seen.append), \
-                    self.assertLogs('guided_learning.server.host', 'ERROR'):
+                    self.assertLogs('throughline.server.host', 'ERROR'):
                 turn = host.start_lesson({'id': 'one'})['turn']
                 host.wait(turn['id'], 3)
                 self.assertTrue(wait_until(lambda: seen))
@@ -135,8 +135,8 @@ class PreparationLoop(unittest.TestCase):
                 if len(calls) == 1:
                     raise RuntimeError('scheduler bug')
                 return {'scheduled': False}
-            with mock.patch('guided_learning.server.features.Preparation.schedule', side_effect=schedule), \
-                    self.assertLogs('guided_learning.server.features', 'ERROR'):
+            with mock.patch('throughline.server.features.Preparation.schedule', side_effect=schedule), \
+                    self.assertLogs('throughline.server.features', 'ERROR'):
                 host = Host(path, runner=Lesson())
                 try:
                     self.assertTrue(wait_until(lambda: calls))
@@ -171,7 +171,7 @@ class PreparationLoop(unittest.TestCase):
 
 class TurnListing(unittest.TestCase):
     def test_summaries_match_full_turns_without_snapshots(self):
-        from guided_learning.server.host import turn_summary
+        from throughline.server.host import turn_summary
         with tempfile.TemporaryDirectory() as path:
             course(path)
             execute(path, {'op': 'stream.start', 'id': 't', 'concept_id': 'a', 'prompt': 'Teach', 'channel': 'mainline'})
@@ -229,12 +229,12 @@ class CourseCreation(unittest.TestCase):
             self.assertEqual(call_cli(self, missing, 'course.status')['course']['title'], 'Real')
 
     def test_cli_reports_unexpected_errors_as_json(self):
-        from guided_learning.__main__ import main
+        from throughline.__main__ import main
         with tempfile.TemporaryDirectory() as root, tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as request:
             request.write('{"op": "course.status"}')
         self.addCleanup(os.unlink, request.name)
         output = io.StringIO()
-        with mock.patch('guided_learning.__main__.execute', side_effect=KeyError('job')), redirect_stdout(output), \
+        with mock.patch('throughline.__main__.execute', side_effect=KeyError('job')), redirect_stdout(output), \
                 mock.patch('sys.stderr', io.StringIO()):
             code = main(['--workspace', root, '--request', request.name])
         self.assertEqual(code, 1)
@@ -306,7 +306,7 @@ class HttpErrors(unittest.TestCase):
         self.assertEqual((missing.status_code, missing.json()['code']), (404, 'unknown_turn'))
         self.assertEqual(self.client.get('/api/concepts/zzz/preview').status_code, 404)
         with mock.patch.object(self.host.navigation, 'preview', side_effect=KeyError('concept')), \
-                self.assertLogs('guided_learning.server.app', 'ERROR'):
+                self.assertLogs('throughline.server.app', 'ERROR'):
             broken = self.client.get('/api/concepts/a/preview')
         self.assertEqual((broken.status_code, broken.json()['code']), (500, 'internal_error'))
 
@@ -325,8 +325,8 @@ class HttpErrors(unittest.TestCase):
 
 class HostCommands(unittest.TestCase):
     def test_stop_and_open_handle_a_host_that_no_longer_answers(self):
-        from guided_learning import commands
-        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home}):
+        from throughline import commands
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {'THROUGHLINE_HOME': home}):
             with socket.socket() as probe:
                 probe.bind(('127.0.0.1', 0))
                 port = probe.getsockname()[1]
@@ -347,14 +347,14 @@ class CodexErrors(unittest.TestCase):
         return [sys.executable, str(path)]
 
     def test_codex_error_text_reaches_the_learner(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             command = self.script(tmp, ' if m=="thread/start": print(json.dumps({"id":i,"error":{"code":1,"message":"model gpt-x does not exist"}}),flush=True)\n')
             with self.assertRaisesRegex(RuntimeError, 'model gpt-x does not exist'):
                 CodexRunner(command=command).run('teach', tmp, lambda e: None, threading.Event())
 
     def test_silence_times_out_but_steady_output_does_not(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             silent = self.script(tmp, ' if m=="thread/start": time.sleep(30)\n')
             started = time.monotonic()

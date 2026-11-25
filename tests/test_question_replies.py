@@ -1,8 +1,8 @@
 """Follow-ups retain one durable branch and a frozen, complete conversation."""
 import tempfile
 import unittest
-from guided_learning.api import execute
-from guided_learning.store import Store
+from throughline.api import execute
+from throughline.store import Store
 from tests.support import host_client
 
 

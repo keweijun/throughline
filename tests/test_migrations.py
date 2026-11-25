@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import library, migrations
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline import library, migrations
+from throughline.api import execute
+from throughline.store import OperationError
 
 
 class Migrations(unittest.TestCase):
@@ -65,7 +65,7 @@ class Migrations(unittest.TestCase):
 
     def test_assessments_made_before_the_review_schedule_are_dated_by_their_practice_turn(self):
         import json
-        from guided_learning.store import Store
+        from throughline.store import Store
         self.put('course', 'schema', {'version': 3})
         practice = {'id': 'practice-evidence:practice-1', 'concept_id': 'a', 'kind': 'independent', 'outcome': 'passed', 'assessment_id': 'practice-feedback:practice-1'}
         chat = {'id': 'assessment-7a', 'concept_id': 'a', 'kind': 'independent', 'outcome': 'passed', 'assessment_id': 'teacher-feedback-7a'}
@@ -90,7 +90,7 @@ class Migrations(unittest.TestCase):
 
     def test_recaps_and_their_questions_move_to_the_chapter_from_a_version_4_course(self):
         import json
-        from guided_learning.store import Store
+        from throughline.store import Store
         execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
         execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
         self.put('course', 'schema', {'version': 4})
@@ -138,7 +138,7 @@ class Migrations(unittest.TestCase):
     def test_scheduled_reviews_and_quizzes_become_review_sets_from_a_version_5_course(self):
         import json
         from datetime import datetime
-        from guided_learning.store import Store
+        from throughline.store import Store
         execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
         execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
         self.put('course', 'schema', {'version': 5})
@@ -186,7 +186,7 @@ class Migrations(unittest.TestCase):
 
     def test_snapshots_and_prepared_material_move_apart_from_a_version_6_course(self):
         import json
-        from guided_learning.store import Store
+        from throughline.store import Store
         execute(self.workspace, {'op': 'curriculum.outline', 'chapters': [{'id': 'one', 'title': 'States'}]})
         execute(self.workspace, {'op': 'curriculum.chapter.save', 'chapter_id': 'one', 'concepts': [{'id': 'a', 'title': 'A'}, {'id': 'b', 'title': 'B'}]})
         execute(self.workspace, {'op': 'mainline.enter', 'request_id': 'enter', 'concept_id': 'a', 'goal': 'Learn A', 'next_step': 'Start'})
@@ -201,7 +201,7 @@ class Migrations(unittest.TestCase):
         self.put('streams', 'bare', bare)
         store = Store(self.workspace)
         try:
-            from guided_learning.preparation import capture
+            from throughline.preparation import capture
             prepared = capture(store, 'b')
         finally:
             store.db.close()

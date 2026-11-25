@@ -5,11 +5,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from guided_learning.api import execute
-from guided_learning.files import Opener
-from guided_learning.launcher import Launcher
-from guided_learning.server import serve, studio
-from guided_learning.server.settings import TeacherSettings
+from throughline.api import execute
+from throughline.files import Opener
+from throughline.launcher import Launcher
+from throughline.server import serve, studio
+from throughline.server.settings import TeacherSettings
 
 scratch = tempfile.TemporaryDirectory()
 library = Path(scratch.name) / 'library'

@@ -1,11 +1,11 @@
 import tempfile
 import unittest
-from guided_learning.api import execute
+from throughline.api import execute
 from support import taught
 
 class PreparationState(unittest.TestCase):
     def test_the_next_section_is_prepared_once_a_lesson_starts_and_its_use_is_recorded(self):
-        from guided_learning.store import OperationError
+        from throughline.store import OperationError
         with tempfile.TemporaryDirectory() as path:
             def op(**kw): return execute(path,kw)
             op(op='course.init',title='Physics')
@@ -81,7 +81,7 @@ class PreparationState(unittest.TestCase):
     def test_idle_pipeline_preempted_by_foreground_and_ready_is_injected(self):
         import threading
         import time
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             entered=threading.Event();release=threading.Event();cancelled=threading.Event()
             prompts=[]
@@ -121,7 +121,7 @@ class PreparationState(unittest.TestCase):
 
     def test_failed_preparation_falls_back_and_shutdown_does_not_schedule(self):
         import time
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             prompts=[]
             def run(self,prompt,cwd,emit,cancel):
@@ -150,7 +150,7 @@ class PreparationState(unittest.TestCase):
             self.assertFalse(app.preparation.schedule()['scheduled'])
 
     def test_orphaned_preparation_recovers_as_failed(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         with tempfile.TemporaryDirectory() as path:
             def op(**kw):return execute(path,kw)
             op(op='course.init',title='Physics');op(op='curriculum.save',concepts=[{'id':'a','title':'A'},{'id':'b','title':'B'}],route=['a','b'],coverage=[])

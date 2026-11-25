@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import commands, logs
-from guided_learning.codex import NOT_FOUND, CodexRunner, list_models
+from throughline import commands, logs
+from throughline.codex import NOT_FOUND, CodexRunner, list_models
 
 FAILING = '''import sys, json
 sys.stderr.write("codex: error loading config.toml: invalid key\\n")
@@ -46,9 +46,9 @@ class HostLog(unittest.TestCase):
         handler = logs.configure(path)
         self.assertEqual([h for h in self.root.handlers if getattr(h, 'throughline', False)], [handler])
         self.assertEqual((handler.maxBytes, handler.backupCount), (logs.MAX_BYTES, logs.BACKUPS))
-        logging.getLogger('guided_learning.test').warning('Something to look at')
+        logging.getLogger('throughline.test').warning('Something to look at')
         handler.flush()
-        self.assertIn('WARNING guided_learning.test: Something to look at', path.read_text(encoding='utf-8'))
+        self.assertIn('WARNING throughline.test: Something to look at', path.read_text(encoding='utf-8'))
 
     def test_a_failed_teaching_turn_logs_what_codex_wrote_and_says_what_to_do(self):
         logs.configure(self.tmp / 'host.log')
@@ -91,10 +91,10 @@ class HostLog(unittest.TestCase):
 
 class Doctor(unittest.TestCase):
     def test_doctor_names_the_system_python_and_host_log(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': tmp}), \
-                mock.patch('guided_learning.checks.codex_checks', return_value=[]), \
-                mock.patch('guided_learning.checks.codex_answers', return_value={'ok': True, 'label': 'Codex answers', 'model': 'm', 'seconds': 1, 'fix': ''}), \
-                mock.patch('guided_learning.checks.probe_model', return_value=None), \
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {'THROUGHLINE_HOME': tmp}), \
+                mock.patch('throughline.checks.codex_checks', return_value=[]), \
+                mock.patch('throughline.checks.codex_answers', return_value={'ok': True, 'label': 'Codex answers', 'model': 'm', 'seconds': 1, 'fix': ''}), \
+                mock.patch('throughline.checks.probe_model', return_value=None), \
                 mock.patch('sys.stdout', new_callable=lambda: __import__('io').StringIO()) as out:
             commands.doctor(None)
         printed = out.getvalue()

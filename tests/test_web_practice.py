@@ -1,11 +1,11 @@
 import json
 import tempfile
 import unittest
-from guided_learning.api import execute
-from guided_learning import practice
-from guided_learning.server import Host
-from guided_learning.server.state import build
-from guided_learning.store import OperationError
+from throughline.api import execute
+from throughline import practice
+from throughline.server import Host
+from throughline.server.state import build
+from throughline.store import OperationError
 
 
 def practice_call(app,endpoint,body):
@@ -153,7 +153,7 @@ class PracticeFlow(unittest.TestCase):
 
 
     def test_closed_host_rejects_new_model_work(self):
-        from guided_learning.store import OperationError
+        from throughline.store import OperationError
         class Runner:
             def run(self,*args):raise AssertionError('closed host must never call model')
         with tempfile.TemporaryDirectory() as path:
@@ -167,7 +167,7 @@ class PracticeFlow(unittest.TestCase):
 
 class AskFlow(unittest.TestCase):
     def test_asking_about_a_solved_exercise_records_no_assessment(self):
-        from guided_learning.store import OperationError
+        from throughline.store import OperationError
         class Runner:
             reply='';prompts=[]
             def run(self,prompt,cwd,emit,cancel):
@@ -223,7 +223,7 @@ class AskFlow(unittest.TestCase):
             app.close()
 
     def test_an_ask_job_needs_a_question(self):
-        from guided_learning.store import OperationError
+        from throughline.store import OperationError
         with tempfile.TemporaryDirectory() as path:
             execute(path,{'op':'course.init','title':'Physics'})
             execute(path,{'op':'curriculum.save','concepts':[{'id':'a','title':'A'}],'route':['a'],'coverage':[]})
@@ -302,7 +302,7 @@ class PartsFlow(unittest.TestCase):
     def test_an_exercise_from_before_parts_is_assessed_by_its_numbered_subquestions(self):
         task=self.run_job(lambda:self.app.practice.generate('a'),json.dumps({'questions':[{'question':'Setup.\n（1）State it.\n（2）Apply it.\n（3）Check it.','origin':'self_created','source_refs':[]}]}))['tasks'][0]
         self.assertNotIn('parts',task,'generated as an old exercise would have been')
-        from guided_learning.store import Store
+        from throughline.store import Store
         store=Store(self.path)  # saved before parts: no parts, and an earlier answer assessed as a whole
         with store.db:
             saved=store.get('practice_tasks',task['id'])
@@ -336,7 +336,7 @@ class PartsFlow(unittest.TestCase):
         self.assertEqual((last['parts'],last['outcome']),(['correct'],'passed'),'an outcome alone still assesses a single part')
 
     def test_an_assessment_from_before_parts_counts_as_its_one_part(self):
-        from guided_learning import practice
+        from throughline import practice
         old=lambda outcome:{'history':[{'action':'assess','outcome':outcome,'kind':'independent'},{'action':'hint','feedback':'.'}]}
         self.assertEqual((practice.part_statuses(old('passed')),practice.part_statuses(old('needs_work'))),(['correct'],['not_yet']))
         self.assertEqual(practice.part_statuses({'parts':['x','y'],'history':[]}),['not_attempted']*2)

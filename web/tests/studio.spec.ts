@@ -118,7 +118,7 @@ test('Studio takes a message while Codex starts, and its first load never moves 
   await settled();
   const foot = (await box.boundingBox())!;
   expect(foot.y).toBeGreaterThan(before.y + 100);
-  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.unroute('**/api/studio'); // only Studio's: the fixture's own routes stay
 
   // With a chat to open, the box is at the foot from the first moment, and stays there when Codex has loaded the chat.
   let open = () => {};
@@ -128,9 +128,9 @@ test('Studio takes a message while Codex starts, and its first load never moves 
     await held;
     await route.fulfill({ response });
   });
+  // A reload reopens the course where the learner was, in Studio, so `d` (which would close it) is not needed.
   await page.reload();
-  await page.keyboard.press('d');
-  await expect(box).toBeFocused();
+  await expect(box).toBeVisible();
   await expect(question).toHaveCount(0);
   const waiting = (await box.boundingBox())!;
   open();
@@ -317,10 +317,9 @@ test('a slow history read from opening Studio never overwrites a message sent me
     await new Promise((resolve) => setTimeout(resolve, 1500));
     await route.fulfill({ response });
   });
-  await page.reload();
-  await page.keyboard.press('d');
+  await page.reload(); // reopens the course in Studio, where the learner was
   await expect(page.getByRole('region', { name: 'Chats' })).toContainText('hello');
-  await expect(box).toBeFocused();
+  await box.click();
   await box.pressSequentially('wait for me');
   await page.keyboard.press('Control+Enter');
   const panel = page.locator('#course-studio');

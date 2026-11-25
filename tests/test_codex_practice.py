@@ -3,10 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
-from guided_learning.server import Host
-from guided_learning.server.state import build
-from guided_learning.store import OperationError
+from throughline.api import execute
+from throughline.server import Host
+from throughline.server.state import build
+from throughline.store import OperationError
 
 
 class CodexPractice(unittest.TestCase):

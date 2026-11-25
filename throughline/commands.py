@@ -1,0 +1,653 @@
+"""Learner-facing commands that Codex runs on the learner's behalf: setup, open, stop, courses, doctor, export and import."""
+import argparse
+import json
+import os
+import platform as host_platform
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import webbrowser
+import uuid
+from importlib.metadata import PackageNotFoundError, version as package_version
+from pathlib import Path
+
+from . import library, logs, moving
+from .codex import find_codex, remember_codex
+from .store import OperationError
+
+SKILL = Path(__file__).resolve().parent / 'skill'
+ICONS = Path(__file__).resolve().parent / 'icons'
+LIBRARY_MARKER = '<!-- Written by throughline setup; rerunning setup replaces this file. -->'
+# The marker before 0.66, when the command was guided-learning: setup still replaces a file it wrote then.
+OUR_MARKERS = (LIBRARY_MARKER, '<!-- Written by guided-learning setup; rerunning setup replaces this file. -->')
+LANGUAGES = ('en', 'zh-CN')
+LAUNCHER_HINTS = {
+    'nt': {'en': 'search for "Throughline" in the Start menu', 'zh-CN': '在开始菜单中搜索“Throughline”'},
+    'darwin': {'en': 'open Throughline from Launchpad, Spotlight or the Applications folder', 'zh-CN': '从启动台、聚焦搜索或“应用程序”文件夹打开 Throughline'},
+    'darwin-home': {'en': 'open Throughline from Launchpad, Spotlight, or Applications in your home folder', 'zh-CN': '从启动台、聚焦搜索或个人文件夹中的“应用程序”打开 Throughline'},
+    'linux': {'en': 'open Throughline from your app menu', 'zh-CN': '从应用菜单中打开 Throughline'},
+    None: {'en': 'run `throughline` in a terminal, or ask Codex "$throughline open"', 'zh-CN': '在终端运行 `throughline`，或在 Codex 中输入“$throughline 打开”'},
+}
+# Where a macOS launcher goes when the shared Applications folder is writable; tests point it elsewhere.
+APPLICATIONS = Path('/Applications')
+BUNDLE_ID = 'io.github.keweijun.throughline'
+# How long setup waits for a host started from an old library location to let go of its courses; Host.close can
+# wait twelve seconds for the teacher's work to stop.
+SHUTDOWN_WAIT = 20
+
+
+def platform():
+    return 'nt' if os.name == 'nt' else 'darwin' if sys.platform == 'darwin' else 'linux'
+
+
+def launcher_hint(launcher, language):
+    """How to open Throughline next time, in the words of this platform."""
+    kind = platform() if launcher else None
+    if kind == 'darwin' and Path(launcher).parent != APPLICATIONS:
+        kind = 'darwin-home'
+    return LAUNCHER_HINTS[kind][language]
+
+
+def welcome(root, launcher, language, opened=False):
+    """The short guide setup prints for Codex to show the learner; the app explains the rest itself."""
+    hint = launcher_hint(launcher, language)
+    # "New course" names the library's button both before and after Studio (#109 settles the final wording).
+    if language == 'zh-CN':
+        first = ('贯学已在浏览器中打开：在课程库中点 **新建课程**（New course），建你的第一门课。' if opened
+                 else '现在打开贯学，在课程库中点 **新建课程**（New course），建你的第一门课。')
+        return f"""## 贯学（Throughline）{version()} 已安装
+
+- 贯学文件夹：`{root}`，每门课程是其中的一个子文件夹。
+- 以后打开贯学：{hint}。
+
+{first}"""
+    first = ('Throughline is open in your browser: make your first course from the library with **New course**.' if opened
+             else 'Open Throughline now and make your first course from the library with **New course**.')
+    return f"""## Throughline {version()} is installed
+
+- Your Throughline folder: `{root}`. Each course is a folder inside it.
+- To open Throughline next time, {hint}.
+
+{first}"""
+
+
+LIBRARY_AGENTS = LIBRARY_MARKER + '''
+# Throughline course library
+
+This folder is the learner's Throughline course library. Each subfolder containing `course.sqlite3` is one course.
+
+- Use the `$throughline` skill for all course work: creating a course, adding files, rebuilding a route, reviewing pages.
+- Copy a course's source files into `<course>/inputs/` before registering them. Never edit `course.sqlite3`, `sources/`, `backups/` or `.throughline/` by hand.
+- Courses the learner deleted wait in `.throughline/trash/` until they restore them in the app; they are not courses, so never list, open or change them.
+- When course work is done, run `throughline open <course>` so the learner can study it in the Throughline app.
+- Studying happens in the app. If the learner asks to be taught in this chat, open the course in the app instead.
+
+## When the learner has not said what to do
+
+New learners often start with a bare request such as "help me create my first course". Reply briefly, in the learner's language:
+
+1. Throughline turns their own documents (PDFs, Markdown notes, problem sets) into a guided course; Codex builds it here, and they study it in the Throughline app.
+2. To create a course, attach the files to this chat or give the folder they are in, and say in a sentence what they want to learn (for example "quantum mechanics up to perturbation theory, for my exam").
+3. Codex reads the files and says what it found, then asks a few quick questions with options and a recommendation (goal and deadline, how well they know each prerequisite, with an optional quick check, how much detail, what to emphasize or skip, how they like to learn); "ok" takes the recommendations. It proposes a course name and route that fit the answers, shows what still needs checking, and opens the course in the app.
+
+If they are unsure what to learn, suggest goals that fit their files. Then wait for the files and the goal before building, and follow the `$throughline` skill's intake once both are clear.
+'''
+COMMANDS = ('setup', 'open', 'stop', 'courses', 'doctor', 'export', 'import')
+
+
+def version():
+    # Before 0.5.1 the package was named codex-guided-learning.
+    for name in ('throughline', 'codex-guided-learning'):
+        try:
+            return package_version(name)
+        except PackageNotFoundError:
+            pass
+    return 'development'
+
+
+def skills_dir():
+    return Path(os.environ.get('THROUGHLINE_SKILLS_DIR') or Path.home() / '.agents' / 'skills')
+
+
+def host_record():
+    return library.state_dir() / 'host.json'
+
+
+def windowless_python():
+    """pythonw.exe on Windows, so neither the host nor the launcher opens a console window."""
+    if os.name == 'nt':
+        gui = Path(sys.executable).with_name('pythonw.exe')
+        if gui.is_file():
+            return str(gui)
+    return sys.executable
+
+
+def write_library_agents(root):
+    target = root / 'AGENTS.md'
+    if target.exists() and not target.read_text(encoding='utf-8').startswith(OUR_MARKERS):
+        return False
+    target.write_text(LIBRARY_AGENTS, encoding='utf-8')
+    return True
+
+
+def mac_applications():
+    """The shared Applications folder when this user can write to it, otherwise Applications in the home folder."""
+    return APPLICATIONS if os.access(APPLICATIONS, os.W_OK) else Path.home() / 'Applications'
+
+
+def launcher_path():
+    """Where this platform's launcher is, or would be once setup adds it."""
+    kind = platform()
+    if kind == 'nt':
+        return Path(os.environ.get('APPDATA', Path.home())) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Throughline.lnk'
+    if kind == 'darwin':
+        for folder in (APPLICATIONS, Path.home() / 'Applications'):
+            if (folder / 'Throughline.app').is_dir():
+                return folder / 'Throughline.app'
+        return mac_applications() / 'Throughline.app'
+    return Path(os.environ.get('XDG_DATA_HOME') or Path.home() / '.local' / 'share') / 'applications' / 'throughline.desktop'
+
+
+def _ours_on_mac(app):
+    try:
+        return BUNDLE_ID in (app / 'Contents' / 'Info.plist').read_text(encoding='utf-8')
+    except OSError:
+        return False
+
+
+def install_launcher():
+    """An app-menu entry that runs `throughline open`; returns where it was put, or None."""
+    if platform() == 'nt':
+        executable = windowless_python()
+        target = launcher_path()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:TL_LNK);"
+                  "$s.TargetPath=$env:TL_EXE;$s.Arguments='-m throughline open';$s.Description='Throughline';"
+                  "$s.IconLocation=$env:TL_ICON+',0';$s.Save()")
+        result = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True,
+                                env={**os.environ, 'TL_LNK': str(target), 'TL_EXE': executable, 'TL_ICON': str(ICONS / 'throughline.ico')},
+                                creationflags=subprocess.CREATE_NO_WINDOW)
+        return target if result.returncode == 0 else None
+    command = f'"{sys.executable}" -m throughline open'
+    if platform() == 'darwin':
+        bundle = mac_applications() / 'Throughline.app'
+        for other in (APPLICATIONS / 'Throughline.app', Path.home() / 'Applications' / 'Throughline.app'):
+            if other != bundle and _ours_on_mac(other):  # one launcher only, so Spotlight finds one Throughline
+                shutil.rmtree(other, ignore_errors=True)
+        app = bundle / 'Contents'
+        (app / 'MacOS').mkdir(parents=True, exist_ok=True)
+        (app / 'Info.plist').write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>Throughline</string>
+<key>CFBundleIdentifier</key><string>{BUNDLE_ID}</string>
+<key>CFBundleExecutable</key><string>Throughline</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleIconFile</key><string>throughline</string>
+</dict></plist>
+''', encoding='utf-8')
+        (app / 'Resources').mkdir(exist_ok=True)
+        shutil.copyfile(ICONS / 'throughline.icns', app / 'Resources' / 'throughline.icns')
+        launcher = app / 'MacOS' / 'Throughline'
+        launcher.write_text(f'#!/bin/sh\nexec {command}\n', encoding='utf-8')
+        launcher.chmod(0o755)
+        return bundle
+    target = launcher_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    icon = ICONS / 'throughline.png'
+    target.write_text(f'[Desktop Entry]\nType=Application\nName=Throughline\nComment=Study your courses\n'
+                      f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Education;\n', encoding='utf-8')
+    return target
+
+
+def migrate(root):
+    """Move courses from earlier default locations into `root`; returns (moved, skipped) course names."""
+    moved, skipped = [], []
+    for old in library.legacy_roots():
+        if not old.is_dir() or old.resolve() == root.resolve():
+            continue
+        try:  # a host started from the old location still holds its courses
+            record = json.loads((old / '.throughline' / 'host.json').read_text(encoding='utf-8'))
+            _call(record['port'], 'POST', '/api/shutdown', {})
+        except (OSError, ValueError, KeyError, urllib.error.URLError):
+            pass
+        deadline = time.monotonic() + SHUTDOWN_WAIT
+        left = False
+        here = []  # moved from this old library, whose archive list is the one that names them
+        for course in sorted(p for p in old.iterdir() if p.is_dir() and library.is_course(p)):
+            target = root / course.name
+            if target.exists() or not _free(course, deadline):
+                skipped.append(str(course))
+                left = True
+                continue
+            try:  # with nothing written meanwhile, as when deleting a course (ADR 0022)
+                moving.move_course(course, target, 'The course could not be moved')
+            except OperationError:  # in use: Windows will not move a folder with an open file
+                skipped.append(str(course))
+                left = True
+                continue
+            (target / moving.MOVING).unlink(missing_ok=True)
+            here.append(course.name)
+        moved += here
+        for name in library.archived(old) & set(here):
+            library.set_archived(root, name, True)
+        if not _move_trash(old, root):
+            left = True
+        if left:
+            continue  # the old library still has courses, and may have a host whose record setup must not forget
+        agents = old / 'AGENTS.md'
+        if agents.is_file() and agents.read_text(encoding='utf-8').startswith(OUR_MARKERS):
+            agents.unlink()
+        _tidy_own_dir(old)
+        try:
+            old.rmdir()
+        except OSError:
+            pass
+    return moved, skipped
+
+
+# What an old library's own folder may hold that setup can delete once its courses and trash have moved: host
+# bookkeeping, logs, imports that never finished and the archive list. Anything else stays, and so does the folder.
+DISPOSABLE = ('host.json', 'host.log', 'host-output.log', 'library.json', 'library.json.lock', 'imports', 'host-key',
+              'host.key', 'moving')
+
+
+def _move_trash(old, root):
+    """Move the deleted courses waiting in an old library's trash into this library's; False if any stayed behind."""
+    source = library.trash_dir(old)
+    if not source.is_dir():
+        return True
+    target = library.trash_dir(root)
+    kept = True
+    for entry in sorted(source.iterdir()):
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            if (target / entry.name).exists():
+                kept = False
+                continue
+            shutil.move(str(entry), str(target / entry.name))
+        except OSError:
+            kept = False
+    if kept:
+        try:
+            source.rmdir()
+        except OSError:
+            pass
+    return kept
+
+
+def _tidy_own_dir(old):
+    own = library.own_dir(old)
+    if not own.is_dir():
+        return
+    for path in own.iterdir():
+        if path.name in DISPOSABLE or path.name.startswith('host.log.'):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
+    try:
+        own.rmdir()  # only when nothing else is left in it
+    except OSError:
+        pass
+
+
+def _free(course, deadline):
+    """Whether no host holds the course, waiting until `deadline` for one that is shutting down to let it go."""
+    while True:
+        try:
+            library.acquire_lease(course).close()  # released before the move, which Windows refuses for an open file
+            return True
+        except OSError:  # a course setup cannot open stays where it is, like one in use
+            return False
+        except OperationError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.2)
+
+
+def ours(folder, name):
+    marker = folder / 'SKILL.md'
+    return marker.is_file() and f'name: {name}' in marker.read_text(encoding='utf-8')
+
+
+def setup(args):
+    target = skills_dir() / 'throughline'
+    if target.exists() and not ours(target, 'throughline'):
+        print(f'Refusing to replace {target}: it is not the Throughline skill.', file=sys.stderr)
+        return 1
+    previous = skills_dir() / 'guided-learning'  # the skill's name before 0.5
+    if previous.exists() and ours(previous, 'guided-learning'):
+        shutil.rmtree(previous, ignore_errors=True)
+    staging = target.with_name('.throughline.tmp')
+    shutil.rmtree(staging, ignore_errors=True)
+    shutil.copytree(SKILL, staging, ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.rmtree(target, ignore_errors=True)
+    staging.rename(target)
+    root = library.default_root()
+    root.mkdir(parents=True, exist_ok=True)
+    wrote_agents = write_library_agents(root)
+    migrated, kept = migrate(root)
+    launcher = None if args.no_launcher else install_launcher()
+    print(f'Throughline {version()} is ready.')
+    print(f'Codex skill: {target}')
+    print(f'Course library: {root}')
+    if migrated:
+        print(f'Moved {len(migrated)} course(s) into {root}: {", ".join(migrated)}')
+    for path in kept:
+        print(f'Left {path} where it is: a course with that name exists in {root}, or it is in use.')
+    if not wrote_agents:
+        print(f'Kept your own {root / "AGENTS.md"}; add a note that course work uses the $throughline skill.')
+    if launcher:
+        print(f'Launcher: {launcher}')
+    elif not args.no_launcher:
+        print('Warning: the launcher could not be created; open Throughline with "throughline open".')
+    remember_codex()  # the launcher starts the host without this shell's PATH
+    if not find_codex():
+        print('Warning: Codex was not found (neither the codex command nor the Codex app); lessons in the interface need it. Set CODEX_CLI_PATH if it is installed somewhere else.')
+    try:
+        import pypdf  # noqa: F401
+    except ImportError:
+        print('Warning: PDF support is missing; install the package with the [pdf] extra to read PDFs.')
+    opened = False if args.no_open else open_app(args.language)
+    print()
+    print('Show the learner this welcome guide as written:')
+    print()
+    print(welcome(root, launcher, args.language, opened))
+    return 0
+
+
+def open_app(language=None):
+    """Start the host and open the library in the browser, as setup's last step, in the `language` setup was run in.
+    Never fails setup."""
+    try:
+        record = current() or _spawn(8765) or _spawn(0)
+        if not record:
+            print(f'Throughline did not start; see {logs.output_path()} and {logs.log_path()}.')
+            return False
+        url = app_url(record['port'], language)
+        print(f'Throughline is open at {url}')
+        # With no display, webbrowser would pick a console browser and take over the terminal Codex is reading.
+        if platform() == 'linux' and not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+            return False
+        return bool(webbrowser.open(url))
+    except Exception as exc:  # setup has done its work; opening the app is a convenience
+        print(f'Throughline could not be opened ({exc}); open it with the launcher.')
+        return False
+
+
+def app_url(port, language=None):
+    """The address that opens the library and signs the browser in, with a one-time code from the host, and with
+    `language` for the page to start in (the host keeps it when it takes the code out of the address)."""
+    try:
+        code = _call(port, 'POST', '/api/sign-in', {})['code']
+    except (OSError, ValueError, KeyError, TypeError):
+        code = None  # a host from before codes: the page says to open Throughline from its launcher
+    query = '&'.join([*([f'code={code}'] if code else []), *([f'language={language}'] if language else [])])
+    return f'http://127.0.0.1:{port}/' + (f'?{query}' if query else '')
+
+
+def _call(port, method, path, body=None, timeout=2, key=None):
+    data = None if body is None else json.dumps(body).encode()
+    headers = {'X-Throughline-Key': key or library.host_key(), **({'Content-Type': 'application/json'} if data else {})}
+    request = urllib.request.Request(f'http://127.0.0.1:{port}{path}', data=data, method=method, headers=headers)
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read() or b'{}')
+
+
+def running():
+    """The host started by `open`, if it still answers on its recorded port."""
+    try:
+        record = json.loads(host_record().read_text(encoding='utf-8'))
+        try:
+            health = _call(record['port'], 'GET', '/api/health')
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            _call(record['port'], 'GET', '/api/library')  # a host from before /api/health existed
+            return record
+        return record if health.get('pid') == record.get('pid') else None
+    except (OSError, ValueError, KeyError, urllib.error.URLError):
+        return None
+
+
+def current():
+    """The recorded host, if it is one this version can use. A host from before sign-in codes, or one holding a key
+    this computer no longer has (an update with the old host still running, or host.key deleted), turns the current
+    key away, so it is stopped another way and None returned for a current host to start in its place."""
+    record = running()
+    if record and not _accepts_key(record):
+        _stop_other(record)
+        record = running()
+        if record and not _accepts_key(record):
+            raise OperationError('host_running', f'An older learning host still runs (process {record.get("pid")}) and would not stop; '
+                                                 'end it, or restart the computer, and open Throughline again.')
+    library.forget_legacy_host_key()  # no host of the versions that kept it runs now
+    return record
+
+
+def _accepts_key(record):
+    """Whether the host gives this key a sign-in code. A busy host that does not answer in time is taken as current."""
+    try:
+        _call(record['port'], 'POST', '/api/sign-in', {})['code']
+        return True
+    except urllib.error.HTTPError as exc:
+        return exc.code not in (401, 403, 404, 405)
+    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError):
+        return True
+
+
+def _stop_other(record):
+    """Stop a host that turns the current key away: by request with the key its version kept, else by ending its process."""
+    def gone(seconds):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if running() != record:
+                return True
+            time.sleep(0.2)
+        return False
+    try:
+        _call(record['port'], 'POST', '/api/shutdown', {}, key=library.legacy_host_key() or library.host_key())
+        refused = False
+    except urllib.error.HTTPError:
+        refused = True
+    except (OSError, urllib.error.URLError):
+        refused = False
+    if gone(0.2 if refused else 10):
+        return
+    try:
+        health = _call(record['port'], 'GET', '/api/health')
+    except (OSError, ValueError, urllib.error.URLError):
+        return
+    if isinstance(record.get('pid'), int) and health.get('pid') == record['pid']:  # never end a process we cannot tell is that host
+        try:
+            os.kill(record['pid'], signal.SIGTERM)  # TerminateProcess on Windows
+        except OSError:
+            return
+        gone(10)
+
+
+def _error_text(exc):
+    """What the host said went wrong with a request, or that it did not answer."""
+    if isinstance(exc, urllib.error.HTTPError):
+        try:
+            return json.loads(exc.read() or b'{}').get('error') or str(exc)
+        except ValueError:
+            return str(exc)
+    return f'The learning host did not answer ({getattr(exc, "reason", exc)}).'
+
+
+def detached():
+    """Popen options for a windowless process that outlives the one starting it."""
+    options = {'stdin': subprocess.DEVNULL, 'stderr': subprocess.STDOUT}
+    if os.name == 'nt':
+        # Not DETACHED_PROCESS: a venv's python.exe is a launcher, and a detached launcher's child gets a visible console.
+        options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+    else:
+        options['start_new_session'] = True
+    return options
+
+
+def _spawn(port):
+    # What the host prints before its own log starts, a crash on import say; each launch starts it afresh.
+    log = logs.output_path()
+    log.parent.mkdir(parents=True, exist_ok=True)
+    command = [windowless_python(), '-m', 'throughline.web', '--port', str(port), '--record']
+    launch_id = str(uuid.uuid4())
+    options = {**detached(), 'env': {**os.environ, 'THROUGHLINE_LAUNCH_ID': launch_id}}
+    # Only this user reads it: it holds what the host printed, and paths of courses.
+    with os.fdopen(os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'wb') as output:
+        library.keep_private(log)  # also one an earlier version made, or made on Windows without a user-only ACL
+        process = subprocess.Popen(command, stdout=output, **options)
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        record = running()
+        if record and record.get('launch_id') == launch_id:
+            return record
+        if process.poll() is not None:
+            return None
+        time.sleep(0.2)
+    process.terminate()
+    return None
+
+
+def open_course(args):
+    try:
+        record = current() or _spawn(args.port) or _spawn(0)
+    except OperationError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if not record:
+        print(f'The learning host did not start; see {logs.output_path()} and {logs.log_path()}.', file=sys.stderr)
+        return 1
+    if args.course:
+        try:
+            _call(record['port'], 'POST', '/api/library/open', {'name': args.course}, timeout=30)
+        except (urllib.error.URLError, OSError) as exc:
+            print(_error_text(exc), file=sys.stderr)
+            return 1
+    url = app_url(record['port'])
+    print(f'Throughline is open at {url}')
+    if not args.no_browser:
+        try:
+            webbrowser.open(url)
+        except webbrowser.Error:
+            pass
+    return 0
+
+
+def stop(args):
+    record = running()
+    if record and not _accepts_key(record):
+        _stop_other(record)  # one from before an update, which the current key cannot stop
+        if running():
+            print(f'An older learning host still runs (process {record.get("pid")}) and would not stop; end it, or restart the computer.', file=sys.stderr)
+            return 1
+        library.forget_legacy_host_key()
+        print('The learning host has stopped.')
+        return 0
+    if not record:
+        library.forget_legacy_host_key()
+        print('No learning host is running.')
+        return 0
+    try:
+        _call(record['port'], 'POST', '/api/shutdown', {})
+    except urllib.error.HTTPError as exc:
+        print(_error_text(exc), file=sys.stderr)
+        return 1
+    except (urllib.error.URLError, OSError):
+        print('No learning host is running.')  # it stopped between the check and the request
+        return 0
+    print('The learning host is stopping.')
+    return 0
+
+
+def courses(args):
+    root = library.default_root()
+    print(json.dumps({'ok': True, 'result': {'root': str(root), 'courses': library.list_courses(root)}}, ensure_ascii=True))
+    return 0
+
+
+def _answer(work):
+    """Print a result or an error in the JSON shape of course operations."""
+    from .store import OperationError
+    try:
+        print(json.dumps({'ok': True, 'result': work()}, ensure_ascii=True))
+        return 0
+    except OperationError as exc:
+        print(json.dumps({'ok': False, 'error': {'code': exc.code, 'message': str(exc)}}, ensure_ascii=True))
+        return 1
+
+
+def export_course(args):
+    from . import packages
+    out = Path(args.out) if args.out else Path.cwd() / (args.course + packages.SUFFIX)
+    return _answer(lambda: packages.export(library.course_path(library.default_root(), args.course), out, args.level))
+
+
+def import_course(args):
+    from . import packages
+    mode = 'fresh-with-notes' if args.keep_notes else 'fresh' if args.fresh else None
+    return _answer(lambda: packages.import_package(args.package, library.default_root(), args.name, mode))
+
+
+def doctor(args):
+    """A readable check of the install, for the learner or Codex; exits 1 when something needs fixing."""
+    from . import checks
+    root = library.default_root()
+    launcher = launcher_path()
+    host = running()
+    print(f'Throughline {version()}')
+    print(f'  {host_platform.platform()}, Python {host_platform.python_version()} ({sys.executable})')
+    print(f'  Host log: {logs.log_path()}')
+    found = checks.codex_checks()
+    rows = [(check['ok'], check['label'], check['detail'] or ('found' if check['ok'] else 'not found'), check['fix'])
+            for check in found]
+    if all(check['ok'] for check in found):
+        from .server.settings import TeacherSettings
+        print('  Asking Codex for a one-word reply...', flush=True)
+        answer = checks.codex_answers(checks.probe_model(TeacherSettings()))
+        said = f"{answer['model']} replied in {answer['seconds']} s" if answer['ok'] else f"{answer['detail']} ({answer['model']}, {answer['seconds']} s)"
+        rows.append((answer['ok'], answer['label'], said, answer['fix']))
+    rows += [(root.is_dir(), 'Course library', str(root), 'Run `throughline setup`'),
+             (launcher.exists(), 'Launcher', str(launcher), 'Run `throughline setup`'),
+             (None, 'Throughline', f"running at http://127.0.0.1:{host['port']}/" if host else 'not running', '')]
+    for ok, label, detail, fix in rows:
+        print(f"  {'ok  ' if ok else '--  ' if ok is None else 'FAIL'}  {label}: {detail}")
+        if ok is False and fix:
+            print(f'        {fix}')
+    return 1 if any(ok is False for ok, *_ in rows) else 0
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog='throughline')
+    commands = parser.add_subparsers(dest='command', required=True)
+    setup_parser = commands.add_parser('setup', help='Install or update the Codex skill, the course library and the launcher')
+    setup_parser.add_argument('--no-launcher', action='store_true')
+    setup_parser.add_argument('--no-open', action='store_true', help='Do not open Throughline when setup is done')
+    setup_parser.add_argument('--language', choices=LANGUAGES, default='en', help='Language of the welcome guide')
+    opener = commands.add_parser('open', help='Start the learning interface in the background and open it')
+    opener.add_argument('course', nargs='?', help='Course name in the library')
+    opener.add_argument('--port', type=int, default=8765)
+    opener.add_argument('--no-browser', action='store_true')
+    commands.add_parser('stop', help='Stop the background learning interface')
+    commands.add_parser('courses', help='List the courses in the library as JSON')
+    commands.add_parser('doctor', help='Check that Throughline and Codex are ready')
+    exporter = commands.add_parser('export', help='Write a course and its sources to one .throughline package')
+    exporter.add_argument('course', help='Course name in the library')
+    exporter.add_argument('--out', help='Package file; defaults to <course>.throughline in the current folder')
+    exporter.add_argument('--level', choices=('route', 'lessons', 'everything'), default='everything',
+                          help='How much to share: the route, the route and lessons, or everything (the default)')
+    importer = commands.add_parser('import', help='Make a new course in the library from a .throughline package')
+    importer.add_argument('package', help='The .throughline file')
+    importer.add_argument('--name', help="Course name; defaults to the package's, made unique")
+    importer.add_argument('--fresh', action='store_true', help='Start fresh instead of continuing where the course was left')
+    importer.add_argument('--keep-notes', action='store_true', help="Start fresh, keeping the sender's notes and questions to read")
+    args = parser.parse_args(argv)
+    return {'setup': setup, 'open': open_course, 'stop': stop, 'courses': courses, 'doctor': doctor,
+            'export': export_course, 'import': import_course}[args.command](args)

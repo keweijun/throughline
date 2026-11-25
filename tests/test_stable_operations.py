@@ -6,7 +6,7 @@ import unittest
 from importlib import import_module
 from pathlib import Path
 
-from guided_learning import api
+from throughline import api
 
 SKILL = Path(api.__file__).resolve().parent / 'skill'
 
@@ -31,7 +31,7 @@ NOT_OPERATIONS = {'converted_from.revision', 'course.position.concept_id', 'posi
 def registered():
     operations = {}
     for name in api.MODULES:
-        operations.update(import_module(f'guided_learning.{name}').OPERATIONS)
+        operations.update(import_module(f'throughline.{name}').OPERATIONS)
     return operations
 
 

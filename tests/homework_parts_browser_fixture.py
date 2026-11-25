@@ -1,9 +1,9 @@
 """Exercises from a homework question split across sections, and one from an unsplit question (ADR 0012)."""
 import json,tempfile
 from pathlib import Path
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Homework parts'})
 file=root/'homework.md';file.write_text('PS02-Q4 (1) Normalize. (2) Measure. (3) Evolve.\nPS02-Q5 Measure again.',encoding='utf-8')

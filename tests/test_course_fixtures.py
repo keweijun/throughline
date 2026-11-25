@@ -17,10 +17,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from guided_learning import migrations
-from guided_learning.api import execute
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline import migrations
+from throughline.api import execute
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
 from tests.fixtures.make_course import NOTES
 
 FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'courses'

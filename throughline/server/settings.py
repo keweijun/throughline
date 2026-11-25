@@ -1,0 +1,132 @@
+"""Per-user Codex teacher settings, stored outside every course workspace."""
+import json
+import os
+import shutil
+import threading
+from pathlib import Path
+
+from ..background import small_model
+from ..codex import CodexRunner, list_models
+from ..store import OperationError
+from ..userfiles import locked, write_json
+
+# The reasoning efforts Throughline offers, lowest first; each model offers its own subset (`model/list`). Codex's
+# `ultra` is left out on purpose.
+EFFORTS = ('minimal', 'low', 'medium', 'high', 'xhigh', 'max')
+
+
+def config_dir():
+    """The per-user folder for settings, Studio's access and chats, and dismissed tips.
+
+    Before 0.66 it was named guided-learning, after the command then. The first run without this folder copies that one
+    here and leaves it in place, so going back a version still finds its files.
+    """
+    if os.name == 'nt' and os.environ.get('APPDATA'):
+        base = Path(os.environ['APPDATA'])
+    else:
+        base = Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')
+    folder, previous = base / 'throughline', base / 'guided-learning'
+    if not folder.exists() and previous.is_dir():
+        staging = base / f'.throughline.{os.getpid()}.copying'
+        try:
+            shutil.copytree(previous, staging, ignore=shutil.ignore_patterns('*.lock', '*.tmp'))
+            staging.rename(folder)
+        except OSError:  # another first run got there first, or the copy failed: carry on with what is there
+            shutil.rmtree(staging, ignore_errors=True)
+    return folder
+
+
+def default_path():
+    if os.environ.get('THROUGHLINE_CONFIG'):
+        return Path(os.environ['THROUGHLINE_CONFIG'])
+    return config_dir() / 'settings.json'
+
+
+def _clean(model, effort, small_model='', service_tier='', small_effort=''):
+    model, effort = str(model or '').strip(), str(effort or 'medium').strip()
+    small_effort = str(small_effort or '').strip()
+    if effort not in EFFORTS or small_effort not in ('', *EFFORTS):
+        raise OperationError('invalid_settings', f"Reasoning effort must be one of {', '.join(EFFORTS)}")
+    return {'model': model, 'small_model': str(small_model or '').strip(), 'effort': effort,
+            'small_effort': small_effort, 'service_tier': str(service_tier or '').strip()}
+
+
+class TeacherSettings:
+    """The Codex teacher model, the small model for section preparation and note consolidation, and reasoning effort.
+
+    The service tier (for example Codex's "priority" tier, shown as Fast) applies to teacher turns only.
+    Command-line values apply to one run without being saved. An empty model or service tier means the
+    Codex default; an empty small model means Throughline's default small model (`background.small_model`), and
+    `teacher` the teacher's; an empty small effort means the teacher's, or low for Review's fast teacher.
+    """
+
+    def __init__(self, path=None, override=None):
+        self.path = Path(path) if path else default_path()
+        self.lock = threading.Lock()
+        self.override = {k: v for k, v in (override or {}).items() if v}
+        if self.override:
+            _clean(self.override.get('model'), self.override.get('effort'), self.override.get('small_model'),
+                   self.override.get('service_tier'), self.override.get('small_effort'))
+
+    def _saved(self):
+        try:
+            data = json.loads(self.path.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            return _clean('', 'medium')
+        except (OSError, ValueError) as exc:
+            raise OperationError('invalid_settings', f'Could not read teacher settings at {self.path}') from exc
+        return _clean(data.get('model'), data.get('effort'), data.get('small_model'), data.get('service_tier'),
+                      data.get('small_effort'))
+
+    def current(self):
+        with self.lock:
+            return {**self._saved(), **self.override}
+
+    def public(self):
+        return {**self.current(), 'overridden': bool(self.override), 'path': str(self.path)}
+
+    def save(self, model, effort, small_model='', service_tier='', small_effort=''):
+        data = _clean(model, effort, small_model, service_tier, small_effort)
+        with self.lock:
+            write_json(self.path, data)
+            self.override = {}
+        return self.public()
+
+    def runner(self, small=False, fast=False):
+        """A runner for a teacher turn, or with `small` for background work; `fast` is Review's fast teacher, which
+        runs at low effort unless the learner set the small model's effort."""
+        settings = self.current()
+        model = small_model(settings) if small else settings['model']
+        effort = (small and settings['small_effort']) or ('low' if fast else settings['effort'])
+        tier = None if small else settings['service_tier'] or None
+        return CodexRunner(model=model or None, effort=effort, service_tier=tier)
+
+    def models(self):
+        return {'models': list_models()}
+
+
+class Seen:
+    """What this learner has dismissed for good, such as the library's launcher card; saved per user beside the settings."""
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.lock = threading.Lock()
+
+    def _saved(self):
+        try:
+            data = json.loads(self.path.read_text(encoding='utf-8'))
+            return [str(item) for item in data.get('seen', [])]
+        except (OSError, ValueError, AttributeError, TypeError):
+            return []  # unreadable means nothing dismissed yet: the card shows again, which is harmless
+
+    def all(self):
+        with self.lock:
+            return self._saved()
+
+    def add(self, item):
+        with self.lock, locked(self.path):
+            seen = self._saved()
+            if item not in seen:
+                seen.append(item)
+                write_json(self.path, {'seen': seen})
+            return seen

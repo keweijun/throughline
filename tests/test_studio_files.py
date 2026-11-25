@@ -6,9 +6,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import call_cli
-from guided_learning.files import Opener
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline.files import Opener
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
 
 
 class StudioFiles(unittest.TestCase):

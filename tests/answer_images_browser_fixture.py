@@ -1,9 +1,9 @@
 """One exercise, and a teacher that reports the images it was sent with an answer or a question."""
 import json,tempfile
 from pathlib import Path
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Handwritten answers'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Integrals'}],'route':['a'],'coverage':[]})

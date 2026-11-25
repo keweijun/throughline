@@ -9,10 +9,10 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from guided_learning import checks as codex_checks
-from guided_learning.launcher import Launcher
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline import checks as codex_checks
+from throughline.launcher import Launcher
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
 
 
 class Idle:
@@ -101,7 +101,7 @@ class LauncherCard(unittest.TestCase):
                 return favourites[-1]
             favourites.append(command[-1])
             return ''
-        with mock.patch('guided_learning.launcher.shutil.which', return_value='/usr/bin/gsettings'):
+        with mock.patch('throughline.launcher.shutil.which', return_value='/usr/bin/gsettings'):
             client, _ = self.client(output=gsettings)
             self.assertEqual(client.get('/api/launcher').json()['dock'], True)
             self.assertFalse(client.get('/api/launcher').json()['docked'])
@@ -138,7 +138,7 @@ class LauncherCard(unittest.TestCase):
         for action in ('desktop', 'dock', 'show'):
             refused = client.post(f'/api/launcher/{action}')
             self.assertEqual((refused.status_code, refused.json()['code']), (409, 'launcher_missing'))
-            self.assertIn('guided-learning setup', refused.json()['error'])
+            self.assertIn('throughline setup', refused.json()['error'])
         self.assertEqual(self.started, [])
 
     def test_checks_never_wait_for_the_probe_and_run_it_once(self):

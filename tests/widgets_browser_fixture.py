@@ -3,9 +3,9 @@ from pathlib import Path
 import tempfile
 import time
 
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 
 LESSON = r'''Water forms from hydrogen and oxygen: $\ce{2H2 + O2 -> 2H2O}$.
 

@@ -4,10 +4,10 @@ from pathlib import Path
 import unittest
 from unittest import mock
 
-from guided_learning.api import execute
-from guided_learning.server import Host
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.store import Store
+from throughline.api import execute
+from throughline.server import Host
+from throughline.server.settings import TeacherSettings
+from throughline.store import Store
 from support import host_client, settle
 
 LESSON = ('A plane wave is $e^{ikx}$.\n<course-memory>{"entries":[{"kind":"taught_term","text":"plane wave"},'
@@ -160,7 +160,7 @@ class CrashRecovery(unittest.TestCase):
     def crashed(self, path, settings=None, runner=None, work=None):
         app = Host(path, runner=runner, settings=settings)
         try:
-            with mock.patch('guided_learning.server.features.Memory.on_complete'):
+            with mock.patch('throughline.server.features.Memory.on_complete'):
                 work(app)
                 settle(app)
         finally:
@@ -352,7 +352,7 @@ class SectionEndConsolidation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as path:
             ids = remembered(path)
             self.run_consolidation(path, {'merge': [{'into': ids['term'], 'entries': [ids['deleted']]}]})
-            with mock.patch('guided_learning.server.features.Memory.on_complete') as completed:
+            with mock.patch('throughline.server.features.Memory.on_complete') as completed:
                 Host(path, settings=Consolidating({})).close()
             self.assertNotIn('consolidation', [turn['channel'] for (turn,), _ in completed.call_args_list])
 

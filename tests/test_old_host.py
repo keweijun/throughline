@@ -12,7 +12,7 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import commands, library
+from throughline import commands, library
 
 FAKE = Path(__file__).with_name('fake_old_host.py')
 LEGACY = 'c' * 64
@@ -22,7 +22,7 @@ class OldHost(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        patcher = mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': self.tmp.name})
+        patcher = mock.patch.dict(os.environ, {'THROUGHLINE_HOME': self.tmp.name})
         patcher.start()
         self.addCleanup(patcher.stop)
         library.state_dir().mkdir(parents=True)

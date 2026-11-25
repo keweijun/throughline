@@ -274,7 +274,7 @@ class ExercisePlacement(CurriculumCLI):
 
     def plant(self, model):
         """Store a model as an earlier version would have, without validation."""
-        from guided_learning.store import Store
+        from throughline.store import Store
         store = Store(self.workspace)
         with store.db:
             store.put('curriculum', 'model', model)

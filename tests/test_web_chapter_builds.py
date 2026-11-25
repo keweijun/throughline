@@ -4,7 +4,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from guided_learning.api import execute
+from throughline.api import execute
 from support import host_client
 
 
@@ -172,7 +172,7 @@ class ChapterBuilds(unittest.TestCase):
         self.assertIn('"evolution"', second)
 
     def test_a_course_with_misplaced_exercises_still_opens_teaches_and_builds(self):
-        from guided_learning.store import Store
+        from throughline.store import Store
         store = Store(self.root)
         with store.db:
             model = store.get('curriculum', 'model')

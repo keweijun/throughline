@@ -6,7 +6,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from guided_learning.api import execute
+from throughline.api import execute
 from support import host_client, settle
 
 OVERVIEW = {'core_problem': 'Why do paths cancel?', 'steps': ['Amplitudes', 'Adding amplitudes', 'Probability'],

@@ -31,7 +31,7 @@ A course package (ADR 0020) below Everything leaves replaced lessons out, as it 
 ## Consequences
 
 - A section can have several stepped lessons. `lesson.begin` already allows this. The host has to stop treating "has a taught turn" as "continue the lesson": only the explicit choice opens a new one. A lesson gains a replaced mark, and "studied" moves from the open lesson to whether any lesson is finished.
-- The skill's [chapters the learner has studied](../../guided_learning/skill/references/curriculum.md#chapters-the-learner-has-studied) changes from "Study this, then come back" to choosing New lesson, alongside study-out-of-route-order where the section is ahead of the learner.
+- The skill's [chapters the learner has studied](../../throughline/skill/references/curriculum.md#chapters-the-learner-has-studied) changes from "Study this, then come back" to choosing New lesson, alongside study-out-of-route-order where the section is ahead of the learner.
 - An unfinished lesson no longer needs to be "completed" to move on: New lesson replaces its remaining plan, and the route already lets the learner study any section.
 - ADR 0020: a package below Everything leaves replaced lessons out.
 - This does not fix a bad build. Sections sized to a sitting, pages read and problems mapped are what keep the audit from being needed. A new lesson is how a course that was built badly, or whose sources changed, gets taught properly afterwards.

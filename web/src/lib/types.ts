@@ -38,7 +38,7 @@ export type Position = {
 
 export type TurnStatus = 'running' | 'completed' | 'paused' | 'interrupted' | 'failed';
 
-/** A turn's channel, as `CHANNELS` in guided_learning/streaming.py: the learner's own requests, then background work. */
+/** A turn's channel, as `CHANNELS` in throughline/streaming.py: the learner's own requests, then background work. */
 export type Channel = 'mainline' | 'sidequestion' | 'practice' | 'prepared_step' | 'preparation' | 'build' | 'consolidation' | 'memory';
 
 /** Why an exercise was skipped, as practice.SKIP_REASONS (ADR 0011). */

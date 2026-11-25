@@ -30,7 +30,7 @@ const DEFAULT_PANEL = 400;
 /** Parts of the state the host loads alone (`state.ALONE`), and the change scopes that need only that part. */
 type StatePart = 'preparation' | 'settings' | 'builds' | 'memory';
 const ALONE: Partial<Record<ChangeScope, StatePart>> = { preparation: 'preparation', settings: 'settings', builds: 'builds', memory: 'memory' };
-/** Channels of work the host does on its own, as BACKGROUND in guided_learning/streaming.py. */
+/** Channels of work the host does on its own, as BACKGROUND in throughline/streaming.py. */
 const BACKGROUND: Channel[] = ['preparation', 'build', 'consolidation'];
 
 /** Each course owns its language; the last one used also labels the library before a course opens. */

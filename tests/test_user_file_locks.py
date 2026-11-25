@@ -1,5 +1,5 @@
 """Two Throughline processes changing one per-user file at once keep both changes: each read, change and write holds
-the file's lock (`guided_learning/userfiles.py`), so the later writer never replaces the file with a copy read before
+the file's lock (`throughline/userfiles.py`), so the later writer never replaces the file with a copy read before
 the other's change."""
 import json
 import os
@@ -11,10 +11,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import library
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server.studio import Studio
+from throughline import library
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server.studio import Studio
 
 ROOT = Path(__file__).resolve().parents[1]
 REAL_REPLACE = os.replace
@@ -50,7 +50,7 @@ class Interleaved(unittest.TestCase):
         path = self.tmp / 'settings.json'
         path.write_text(json.dumps({'model': 'old', 'effort': 'low'}), encoding='utf-8')
         patch, started = self.between_read_and_write(f"""
-            from guided_learning.userfiles import write_json
+            from throughline.userfiles import write_json
             write_json({str(path)!r}, {{'from_a_newer_version': 'kept'}})
         """)
         with patch:
@@ -64,8 +64,8 @@ class Interleaved(unittest.TestCase):
         path = self.tmp / 'studio.json'
         path.write_text(json.dumps({'courses': {'waves': ['t1']}}), encoding='utf-8')
         patch, started = self.between_read_and_write(f"""
-            from guided_learning.server.settings import TeacherSettings
-            from guided_learning.server.studio import Studio
+            from throughline.server.settings import TeacherSettings
+            from throughline.server.studio import Studio
             studio = Studio({str(self.tmp)!r}, events=None, settings=TeacherSettings({str(self.tmp / 's.json')!r}),
                             path={str(path)!r})
             studio._record('optics', 't2')
@@ -82,7 +82,7 @@ class Interleaved(unittest.TestCase):
         for name in ('waves', 'optics'):
             execute(root / name, {'op': 'course.init', 'title': name.title()})
         patch, started = self.between_read_and_write(f"""
-            from guided_learning import library
+            from throughline import library
             library.set_archived({str(root)!r}, 'optics', True)
         """)
         with patch:

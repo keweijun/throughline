@@ -1,8 +1,8 @@
 import tempfile
 import unittest
 
-from guided_learning.api import execute
-from guided_learning.store import OperationError, Store
+from throughline.api import execute
+from throughline.store import OperationError, Store
 from support import host_client
 
 

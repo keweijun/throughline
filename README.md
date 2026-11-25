@@ -39,7 +39,7 @@ Either way the app is installed (no Node.js needed), the `$throughline` skill is
 
 When a user asks you to install or update Throughline, run these steps yourself, outside the sandbox (they need the network and write outside the workspace). The user should not have to type anything.
 
-1. If `guided-learning --version` already works, run `guided-learning stop` first. On Windows a running Throughline locks its own files and the upgrade would fail.
+1. If `throughline --version` already works, run `throughline stop` first. On Windows a running Throughline locks its own files and the upgrade would fail.
 
    Then remove the package's pre-0.5.1 name, which installs the same command, with the tool that installed it: `uv tool uninstall codex-guided-learning`, `pipx uninstall codex-guided-learning`, or `python -m pip uninstall -y codex-guided-learning`. An error that it is not installed is fine. Courses are kept.
 2. Install the latest release from GitHub, using the first tool that is available:
@@ -49,9 +49,9 @@ When a user asks you to install or update Throughline, run these steps yourself,
 
    If none of them is available (or Python 3.10 or newer is missing), install uv with its [official installer](https://docs.astral.sh/uv/getting-started/installation/) and use the first line.
 
-   If `guided-learning` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
-3. Run `guided-learning setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher, never touches existing courses, and opens Throughline in the browser when it is done.
-4. Show the user the welcome guide that setup prints, as written. After an update, just say which version is installed (`guided-learning --version`).
+   If `throughline` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
+3. Run `throughline setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher, never touches existing courses, and opens Throughline in the browser when it is done.
+4. Show the user the welcome guide that setup prints, as written. After an update, just say which version is installed (`throughline --version`).
 
 `install.sh` and `install.ps1` run these same steps with uv; keep them in step with this list.
 
@@ -60,16 +60,16 @@ When a user asks you to install or update Throughline, run these steps yourself,
 With [uv](https://docs.astral.sh/uv/) (recommended):
 
 ```sh
-guided-learning stop                 # when updating; skip on a first install
+throughline stop                 # when updating; skip on a first install
 uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"
-guided-learning setup                # add --language zh-CN for the Chinese welcome guide
+throughline setup                # add --language zh-CN for the Chinese welcome guide
 ```
 
-With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`. Both forms fetch the latest release, so the same three lines install and update. `stable` always points at the latest release; each release is also tagged, with its changes in [CHANGELOG.md](CHANGELOG.md), so `@v0.45.0` in place of `@stable` installs that version. Going back to an older version can leave courses that a newer one has already updated unreadable to it. Run `guided-learning --version` to see what you have, and `guided-learning doctor` to check that Codex is found and answers (it sends one tiny message to a small model).
+With pipx, replace the second line with `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`. Both forms fetch the latest release, so the same three lines install and update. `stable` always points at the latest release; each release is also tagged, with its changes in [CHANGELOG.md](CHANGELOG.md), so `@v0.45.0` in place of `@stable` installs that version. Going back to an older version can leave courses that a newer one has already updated unreadable to it. Run `throughline --version` to see what you have, and `throughline doctor` to check that Codex is found and answers (it sends one tiny message to a small model).
 
-Updating from a version before 0.5.1, when the package was named `codex-guided-learning`: run `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`) after `guided-learning stop`, then continue as above.
+Updating from a version before 0.5.1, when the package was named `codex-guided-learning`: run `uv tool uninstall codex-guided-learning` (or `pipx uninstall codex-guided-learning`) after `throughline stop`, then continue as above.
 
-To uninstall, run `guided-learning stop`, then `uv tool uninstall throughline` (or `pipx uninstall throughline`), and delete `~/.agents/skills/throughline` and the launcher. Your courses stay in your Throughline folder until you delete it.
+To uninstall, run `throughline stop`, then `uv tool uninstall throughline` (or `pipx uninstall throughline`), and delete `~/.agents/skills/throughline` and the launcher. Your courses stay in your Throughline folder until you delete it.
 
 ## Create your first course
 
@@ -119,24 +119,24 @@ The interface and new teaching default to English; switch to Simplified Chinese 
 
 ## Where things live
 
-- **Courses:** your Throughline folder, `~/Throughline` (`C:\Users\<you>\Throughline` on Windows). It is deliberately outside Documents, which OneDrive and iCloud often sync: a course's database can be corrupted by sync. To use another folder, set `GUIDED_LEARNING_HOME`; if you point it at a synced folder, open each course on only one computer at a time. It holds an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence, and in `backups/` a copy of the course from before each update of its format; to move a course, stop the app and copy its folder.
-- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, and fast mode; the model lists come from your Codex sign-in. Studio's own model and its access (Library or Full) are chosen in its writing box, as in Codex. They are saved per user in `~/.config/guided-learning/settings.json` (`%APPDATA%\guided-learning\settings.json` on Windows), never in a course.
+- **Courses:** your Throughline folder, `~/Throughline` (`C:\Users\<you>\Throughline` on Windows). It is deliberately outside Documents, which OneDrive and iCloud often sync: a course's database can be corrupted by sync. To use another folder, set `THROUGHLINE_HOME`; if you point it at a synced folder, open each course on only one computer at a time. It holds an `AGENTS.md` that tells Codex how to work there. Each course is one subfolder holding its source files (`inputs/`), snapshots, route, position and learning evidence, and in `backups/` a copy of the course from before each update of its format; to move a course, stop the app and copy its folder.
+- **Teacher settings:** open **Settings** (the gear in the top bar) to pick the teacher model, a small model for background preparation and note consolidation, reasoning effort for each, and fast mode; the model lists come from your Codex sign-in. Studio's own model and its access (Library or Full) are chosen in its writing box, as in Codex. They are saved per user in `~/.config/throughline/settings.json` (`%APPDATA%\throughline\settings.json` on Windows), never in a course.
 
 Extracted text does not verify formulas, images or coverage, so the library and reader show what still needs review. See [creating and reviewing a course](docs/course-import.md).
 
 ## Commands behind the prompts
 
 ```sh
-guided-learning setup                 # install or update the Codex skill
-guided-learning open [course] [--no-browser] [--port 8765]
-guided-learning stop
-guided-learning courses               # the library as JSON
-guided-learning export quantum [--level route|lessons|everything]   # quantum.throughline, with its sources
-guided-learning import quantum.throughline [--name copy] [--fresh | --keep-notes]
-echo '{"op":"course.status"}' | guided-learning --course quantum
+throughline setup                 # install or update the Codex skill
+throughline open [course] [--no-browser] [--port 8765]
+throughline stop
+throughline courses               # the library as JSON
+throughline export quantum [--level route|lessons|everything]   # quantum.throughline, with its sources
+throughline import quantum.throughline [--name copy] [--fresh | --keep-notes]
+echo '{"op":"course.status"}' | throughline --course quantum
 ```
 
-The last form is the operation entry point the skill uses; it reads one JSON request from standard input or `--request file.json` and returns `{ok, result}` or `{ok:false, error}`. `--workspace <folder>` addresses a course outside the library, and `guided-learning-web --workspace <folder>` serves one in the foreground. The skill and its operation references are in [guided_learning/skill/](guided_learning/skill/SKILL.md).
+The last form is the operation entry point the skill uses; it reads one JSON request from standard input or `--request file.json` and returns `{ok, result}` or `{ok:false, error}`. `--workspace <folder>` addresses a course outside the library, and `throughline-web --workspace <folder>` serves one in the foreground. The skill and its operation references are in [throughline/skill/](throughline/skill/SKILL.md).
 
 ## Development
 
@@ -144,14 +144,14 @@ The last form is the operation entry point the skill uses; it reads one JSON req
 python -m venv .venv
 .venv/bin/python -m pip install -e ".[pdf,dev]"    # Windows: .venv\Scripts\python.exe
 .venv/bin/python -m unittest discover -s tests
-.venv/bin/guided-learning setup                     # copy this checkout's skill to Codex; rerun after editing it
+.venv/bin/throughline setup                     # copy this checkout's skill to Codex; rerun after editing it
 
 cd web && npm install
 GL_HOST=http://127.0.0.1:8765 npm run dev          # hot-reloading UI against a running host
-npm run check && npm run build                     # type check, then write guided_learning/web_dist (commit it)
+npm run check && npm run build                     # type check, then write throughline/web_dist (commit it)
 npx playwright test                                # browser tests against disposable fixture courses
 ```
 
 Read [architecture](docs/architecture.md), the [glossary](GLOSSARY.md) and the [decisions](docs/adr/) before larger changes; agent instructions are in [AGENTS.md](AGENTS.md). Tasks live in GitHub Issues. CI runs all of the above on every pull request; a version bump merged to `main` is tagged, released with its [CHANGELOG.md](CHANGELOG.md) entry and becomes what learners install ([ADR 0021](docs/adr/0021-releases-are-tagged-from-main.md)).
 
-Throughline is licensed under [MIT](LICENSE); bundled dependencies keep the licenses listed in [third-party notices](THIRD_PARTY_LICENSES.md). The Python package is named `throughline` (`codex-guided-learning` before 0.5.1) and the command `guided-learning`.
+Throughline is licensed under [MIT](LICENSE); bundled dependencies keep the licenses listed in [third-party notices](THIRD_PARTY_LICENSES.md). The Python package is named `throughline` (`codex-guided-learning` before 0.5.1) and the command `throughline`.

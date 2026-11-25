@@ -8,9 +8,9 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from guided_learning.api import execute
-from guided_learning.server import Host, create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline.api import execute
+from throughline.server import Host, create_app
+from throughline.server.settings import TeacherSettings
 
 
 class Idle:

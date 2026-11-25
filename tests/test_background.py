@@ -13,7 +13,7 @@ class BackgroundCLI(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.workspace = Path(self.temp.name) / 'course'
         self.settings = Path(self.temp.name) / 'settings.json'
-        environment = patch.dict(os.environ, {'GUIDED_LEARNING_CONFIG': str(self.settings)})
+        environment = patch.dict(os.environ, {'THROUGHLINE_CONFIG': str(self.settings)})
         environment.start()
         self.addCleanup(environment.stop)
         self.call('course.init', title='Quantum')

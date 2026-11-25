@@ -3,8 +3,8 @@ import subprocess
 import unittest
 from unittest import mock
 
-from guided_learning import checks
-from guided_learning.store import OperationError
+from throughline import checks
+from throughline.store import OperationError
 
 
 def fake_version(command):

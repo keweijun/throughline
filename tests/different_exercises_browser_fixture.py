@@ -1,9 +1,9 @@
 """A section with three exercises the teacher wrote, one of them attempted; the teacher writes different ones on request."""
 import json,tempfile
 from pathlib import Path
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Different exercises'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Original section'},{'id':'b','title':'Next section'}],'route':['a','b'],'coverage':[]})

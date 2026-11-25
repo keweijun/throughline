@@ -31,7 +31,7 @@ const dagreForElk = {
 export default defineConfig({
   plugins: [woff2Only, dagreForElk, svelte()],
   build: {
-    outDir: '../guided_learning/web_dist',
+    outDir: '../throughline/web_dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 900,
   },

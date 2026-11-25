@@ -2,8 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning import covers, library
-from guided_learning.api import execute
+from throughline import covers, library
+from throughline.api import execute
 from support import call_cli
 
 

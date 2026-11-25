@@ -1,10 +1,10 @@
 """A two-part exercise the teacher assesses part by part, and an exercise assessed before exercises had parts (ADR 0011)."""
 import json,tempfile
 from pathlib import Path
-from guided_learning.api import execute
-from guided_learning.store import Store
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.store import Store
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory();root=Path(scratch.name)
 execute(root,{'op':'course.init','title':'Exercise parts'})
 execute(root,{'op':'curriculum.save','concepts':[{'id':'a','title':'Rules'},{'id':'b','title':'Next section'}],'route':['a','b'],'coverage':[]})

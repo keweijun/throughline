@@ -87,7 +87,8 @@
   {/if}
 {/snippet}
 
-<div class="handoff {variant}" role="group" aria-label={t("Studio: {label}", { label })}>
+<!-- The variant's class is prefixed: a bare `chip` would take the global chip badge's look. -->
+<div class="handoff as-{variant}" role="group" aria-label={t("Studio: {label}", { label })}>
   {#if variant === 'offer'}
     <p class="what"><span class="badge">{t("Studio")}</span> {label}</p>
   {/if}
@@ -122,7 +123,7 @@
 <style>
   /* One row: what Studio will do on the left, the action or how it is going on the right; the confirmation and any
      problem take a row of their own below. */
-  .handoff.offer {
+  .handoff.as-offer {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -134,9 +135,9 @@
     background: var(--accent-wash);
   }
 
-  .handoff.link,
-  .handoff.button,
-  .handoff.chip {
+  .handoff.as-link,
+  .handoff.as-button,
+  .handoff.as-chip {
     display: grid;
     justify-items: start;
     gap: 0.3rem;
@@ -163,13 +164,13 @@
     font-size: var(--step-0);
   }
 
-  .offer .actions {
+  .as-offer .actions {
     flex: none;
     margin-left: auto;
   }
 
-  .offer :global(.inline-confirm),
-  .offer .problem {
+  .as-offer :global(.inline-confirm),
+  .as-offer .problem {
     flex-basis: 100%;
   }
 

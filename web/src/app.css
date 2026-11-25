@@ -1321,4 +1321,11 @@ dialog[open]::backdrop {
   body[data-print] [data-sheet] header .actions {
     display: none;
   }
+
+  /* On paper the sheet needs no card of its own. */
+  body[data-print] [data-sheet] .body {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
 }

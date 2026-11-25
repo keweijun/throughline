@@ -54,7 +54,7 @@ Studio works best from what the learner actually got wrong, and what it makes fo
   - **Errors:** an invalid question refuses the whole session, since Codex can correct it.
 - **`sheet.save`: a sheet**, such as a cheat sheet, a formula sheet or the learner's mistakes on one page.
   - **Format:** Markdown with LaTeX, with a `scope` of chapters or sections.
-  - **Where it shows:** under **Sheets**, a third tab in Review that appears when a sheet touches the scope, and as links on the chapter page of a chapter it covers. It can be printed alone (`body[data-print]`).
+  - **Where it shows:** under **Read** on Review's home and in the Review place's column, each sheet by its title, and as links on the chapter page of a chapter it covers. It can be printed alone (`body[data-print]`).
   - **Changes:** saving under the same id replaces it, which is how Codex changes it when asked. The learner can remove a sheet; Codex can write it again.
 - **`handoff_id` on `drill.write`, `sheet.save` and `practice.add`.** A hand-off's context gives Codex its id, and Codex passes it when it saves what it made. The hand-off then records the result (`handoffs.record_result`), and the card that sent it reads **Done: <title> · Open it**: open the session, open the sheet, or go to the section given the exercises. A result saved before the app recorded its hand-off waits for it.
 

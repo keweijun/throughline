@@ -202,11 +202,14 @@ class AppStore {
   viewingChapter = $state<string | null>(null);
   /** The review page replaces the reading column (ADR 0008). */
   reviewOpen = $state(false);
-  /** The drill session open in the Review place, if any (ADR 0025). */
+  /** The drill session open in the Review place, if any (ADR 0025); it takes the place's main column. */
   drillOpen = $state<string | null>(null);
-  /** The Review place's tab, and the sheet open in Sheets. */
-  reviewTab = $state<'points' | 'mistakes' | 'sheets'>('points');
+  /** What the Review place shows when no session is open: its home, key points, mistakes, a sheet (`sheetOpen`), or the
+   * review sets written before drill sessions. */
+  reviewTab = $state<'home' | 'points' | 'mistakes' | 'sheets' | 'sets'>('home');
   sheetOpen = $state<string | null>(null);
+  /** The course those belong to: another course's Review opens on its home. */
+  reviewFor = $state<string | null>(null);
   /** The course's Studio place replaces the reading column (ADR 0017): Codex working on the course, beside the course
    * and its chats. Of the side panel only Source shows there; Questions and Notes come back as they were in Learn. */
   courseOpen = $state(false);
@@ -846,7 +849,7 @@ class AppStore {
   returnTo(question: Question) {
     const task = question.selected_task_id ? this.state?.practice.tasks.find((t) => t.id === question.selected_task_id) : undefined;
     if (task && question.selection) {
-      if (task.origin === 'review') this.showReview();
+      if (task.origin === 'review') this.showReviewTask(task.id);
       else if (task.chapter_id) this.viewChapter(task.chapter_id);
       else this.view(task.concept_id);
       return this.#scrollToTask(task.id, question.selection, { flash: true });
@@ -1039,7 +1042,7 @@ class AppStore {
     } else if (target.kind === 'note') this.showAnnotation(target.id);
     else if (target.kind === 'source') await this.openSource(target.ref);
     else {
-      this.showReview();
+      this.showReviewTask(target.task_id);
       await tick();
       requestAnimationFrame(() => document.getElementById(`exercise-${target.task_id}`)?.scrollIntoView({ block: 'center', behavior: 'instant' }));
     }
@@ -1175,14 +1178,29 @@ class AppStore {
     }
   }
 
+  /** Opens the Review place on what was open there last in this course: its home the first time. */
   showReview() {
-    // Review opens on its key points; what Studio made for the learner opens on its own tab (showResult).
-    this.reviewTab = 'points';
-    this.sheetOpen = null;
+    this.reviewFor = this.state?.course.id ?? null;
     this.reviewOpen = true;
     this.courseOpen = false;
     this.libraryOpen = false;
     this.routeOpen = false;
+    scrollStage(0);
+  }
+
+  /** Opens a review question where it was asked: its drill session, or the review sets from before. */
+  showReviewTask(taskId: string) {
+    const task = this.state?.review.tasks.find((t) => t.id === taskId);
+    this.drillOpen = task?.session_id ?? null;
+    if (!this.drillOpen) this.reviewTab = 'sets';
+    this.showReview();
+  }
+
+  /** Shows one of the Review place's views, closing the session that was open. */
+  showReviewView(tab: AppStore['reviewTab'], sheet: string | null = null) {
+    this.drillOpen = null;
+    this.reviewTab = tab;
+    this.sheetOpen = sheet;
     scrollStage(0);
   }
 
@@ -1214,8 +1232,7 @@ class AppStore {
       this.showReview();
     } else if (result.kind === 'sheet' && result.id) {
       this.showReview();
-      this.reviewTab = 'sheets';
-      this.sheetOpen = result.id;
+      this.showReviewView('sheets', result.id);
     } else if (result.kind === 'exercises' && result.concept_id) {
       this.view(result.concept_id);
     }

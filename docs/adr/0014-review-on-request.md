@@ -64,12 +64,21 @@ The chapter quiz becomes a review set scoped to the chapter, whose id is the qui
 
 Added with the review rework (issue #219). Review is a place with several ways of reviewing over one **scope**, since learners prefer different ones and none of them is a preference to set:
 
-- **Scope.** Everything studied (the default), or chapters or sections chosen in a picker. It is remembered per course in the learner's browser. A section counts as studied for review when it has a lesson, key points or practice of its own (`review.warm_ups` lists them as `sections`).
-- **Key points**, which the Review place opens on, so it is never empty once something is studied. For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** starts a drill session on that point in its section.
+- **Scope.** Everything studied (the default), or whole chapters and single sections chosen in a picker that opens from one **Covering** button over the page. It is remembered per course in the learner's browser. A section counts as studied for review when it has a lesson, key points or practice of its own (`review.warm_ups` lists them as `sections`).
+- **Key points.** For each chapter in scope, its sheet's paragraph is shown when two or more of its sections are in scope, followed by the points of each studied section (ADR 0024). A point's **Test me on this** starts a drill session on that point in its section.
 - **Mistakes**: the mistakes book (below), narrowed to the scope. A mistake's **Try it again** starts a drill session on that idea, asked again in a new situation.
-- **Drill**: drill sessions over the scope (ADR 0025), beside the other two when the page is wide enough and below them otherwise.
+- **Drill**: drill sessions over the scope (ADR 0025), begun from Review's home.
 
-Like Studio, the Review place takes the page's width and the route rail steps aside: the scope picker says what it covers.
+**Review opens on its home**, a page of its own with nothing beside it, so it is never empty once something is studied and never a list to work through:
+
+- **What to go over.** A question, *What shall we go over?*, the Covering button under it, and one box. How the drill asks is chosen inside the box (quick questions, explain it back, oral quiz, telling confusable ideas apart; **way to review**), so every way can take a request: sent empty, the teacher picks; with words, the learner says what to drill. What Studio would make instead (a mock exam, a formula sheet, the learner's mistakes on one page) is one line of links under the box, since it leaves Review (ADR 0026).
+- **Read**: a way into the key points, the mistakes book and each sheet, side by side. Each shows a glimpse of what it opens, quieter than its name: two points from the section whose points are newest, the latest miss, the top of the sheet. They follow the scope.
+- **Sessions**: the three latest drill sessions, with when each was last used and how many questions it has, and the rest on request.
+- **The course's lines** behind the question, as its cover carries them (ADR 0027), fading out on every side, with the marker's stroke under *go over*. The home is the start of something, as New course is, and is decorated as that page is.
+
+What the home opens takes the page at reading width, laid out as the Studio place is (ADR 0017), so moving between the course's places never moves it: the route rail steps aside, and a column beside a 46rem page lists what there is, as Codex lists its threads. At its top is **Review home**; under **Read**, Key points, Mistakes and each sheet (ADR 0026); under **Sessions**, each drill session, newest first. Each is named at the top of the page, with the Covering button beside the name where the scope applies; a drill session takes the whole page while it is open, its box kept at the window's foot. Review comes back to what was open when the learner returns to it in the same course; another course's Review opens on its home. With no room for the column (a side panel open on a narrow window), it goes above the page. The place has no title of its own: the top bar names it.
+
+**The Covering picker** opens over the page, so choosing never moves what is under it. In a course with more than fourteen studied sections its chapters start folded, each with how many sections it has (or how many of them are chosen), a chapter opens to choose single sections, and a box finds a chapter or section by name. The button names at most two choices, in the course's order, and counts the rest.
 
 Reading key points and mistakes needs no model turn. Questions come from drill sessions with a fast teacher (ADR 0025).
 

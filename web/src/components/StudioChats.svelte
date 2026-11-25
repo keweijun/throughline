@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { locale, t } from '../lib/i18n.svelte';
+  import { t } from '../lib/i18n.svelte';
+  import { ago } from '../lib/format';
   import { studio } from '../lib/studio.svelte';
 
   /**
@@ -12,16 +13,7 @@
     return () => clearInterval(clock);
   });
 
-  function when(seconds: number | null) {
-    if (!seconds) return '';
-    const minutes = Math.round((seconds * 1000 - now) / 60_000);
-    const format = new Intl.RelativeTimeFormat(locale.language, { numeric: 'auto', style: 'narrow' });
-    // "this minute" reads oddly in a list; under a minute is just now.
-    if (minutes > -1) return t('just now');
-    if (Math.abs(minutes) < 60) return format.format(minutes, 'minute');
-    if (Math.abs(minutes) < 60 * 24) return format.format(Math.round(minutes / 60), 'hour');
-    return format.format(Math.round(minutes / (60 * 24)), 'day');
-  }
+  const when = (seconds: number | null) => ago(seconds, now);
 
   // A chat just begun is listed before the list knows it.
   const listed = $derived(

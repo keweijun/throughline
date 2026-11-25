@@ -1,4 +1,11 @@
 import { test, expect, dragSelect, editorText } from './fixture';
+import type { Page } from '@playwright/test';
+
+/** A drill from Review's home, which it opens on, sent empty, so the teacher picks what to ask. */
+async function drillMe(page: Page) {
+  await expect(page.getByRole('heading', { name: 'What shall we go over?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Drill me' }).click();
+}
 
 test('drill me asks recall and apply questions across sections, goes on as long as wanted, and is kept to reopen', async ({ page, course }) => {
   const { errors } = await course('review_browser_fixture');
@@ -6,7 +13,7 @@ test('drill me asks recall and apply questions across sections, goes on as long 
   await expect(open.locator('.count'), 'nothing comes due').toHaveCount(0);
   await open.click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Review');
-  await page.getByRole('button', { name: 'Drill me' }).click();
+  await drillMe(page);
 
   const session = page.getByRole('region', { name: 'Drill session' });
   await expect(session).toContainText('Two quick ones.');
@@ -29,12 +36,17 @@ test('drill me asks recall and apply questions across sections, goes on as long 
   await session.getByRole('button', { name: 'More questions' }).click();
   await expect(session).toContainText('Two more.');
   await expect(session.getByRole('group', { name: /Question 3/ })).toContainText('Same probabilities?');
-  await page.getByRole('button', { name: '← All sessions' }).click();
-  const earlier = page.getByRole('region', { name: 'Earlier sessions' });
-  await expect(earlier).toContainText('Everything studied');
-  await expect(earlier).toContainText('4 questions');
+  await expect(page.locator('.view-head')).toContainText('4 questions');
+  // Listed beside the page while it is open, and still there to reopen after reading something else.
+  const earlier = page.getByRole('region', { name: 'Sessions' });
+  await expect(earlier.getByRole('button', { name: /Drill · Everything studied/ })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: 'Key points', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Drill session' })).toHaveCount(0);
   await earlier.getByRole('button', { name: /Everything studied/ }).click();
   await expect(page.getByRole('region', { name: 'Drill session' }).getByRole('article', { name: 'Question 2' })).toContainText('Remembered on your own');
+  // Review's home lists it too, with how many questions it has.
+  await page.getByRole('button', { name: 'Review home' }).click();
+  await expect(page.getByRole('region', { name: 'Sessions' }).getByRole('button', { name: /Drill · Everything studied/ })).toContainText('4 questions');
 
   // Drill questions are not a section's exercises.
   await page.locator('#open-study').click();
@@ -46,7 +58,7 @@ test('drill me asks recall and apply questions across sections, goes on as long 
 test('a wrong answer offers Revisit and goes into the mistakes book', async ({ page, course }) => {
   const { errors } = await course('review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  await page.getByRole('button', { name: 'Drill me' }).click();
+  await drillMe(page);
   const recall = page.getByRole('group', { name: /Question 1/ });
   await recall.getByRole('button', { name: 'Yes, they all flip sign' }).click();
   await expect(recall).toContainText('Not quite.');
@@ -55,7 +67,7 @@ test('a wrong answer offers Revisit and goes into the mistakes book', async ({ p
   await expect(panel).toContainText('multiplied by');
   expect(await editorText(panel.getByRole('textbox').last())).toContain('I missed this in review');
 
-  await page.getByRole('tab', { name: 'Mistakes' }).click();
+  await page.getByRole('button', { name: 'Mistakes', exact: true }).click();
   const entry = page.getByRole('region', { name: 'Mistakes' }).getByRole('listitem').first();
   await expect(entry).toContainText('Review question');
   await expect(entry).toContainText('Yes, they all flip sign');
@@ -65,7 +77,7 @@ test('a wrong answer offers Revisit and goes into the mistakes book', async ({ p
 test('a passage in a recall question or its explanation can be asked about, with the question', async ({ page, course }) => {
   const { errors } = await course('review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  await page.getByRole('button', { name: 'Drill me' }).click();
+  await drillMe(page);
   const recall = page.getByRole('group', { name: /Question 1/ });
   await recall.getByRole('button', { name: 'Yes, they all flip sign' }).click();
   await expect(recall).toContainText('Not quite.');
@@ -132,24 +144,34 @@ test('before anything is studied the review page says so', async ({ page, course
   expect(errors).toEqual([]);
 });
 
-test('the Review place opens on the key points of what it covers, remembers its scope, and drills one point', async ({ page, course }) => {
+test('Review opens on its home, which follows the scope it covers and remembers it, and a key point drills itself', async ({ page, course }) => {
   const { base, errors } = await course('review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  await expect(page.getByRole('tab', { name: 'Key points' })).toHaveAttribute('aria-selected', 'true');
-  const points = page.getByRole('tabpanel');
-  await expect(points).toContainText('changes no probability');
-  await expect(page.getByRole('button', { name: 'Everything studied' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('heading', { name: 'What shall we go over?' })).toBeVisible();
+  const home = page.locator('.home');
+  const keyPoints = home.getByRole('button', { name: /^Key points/ });
+  await expect(keyPoints, 'the way in shows a glimpse of what it opens').toContainText('changes no probability');
+  const covering = page.getByRole('button', { name: /^Covering/ });
+  await expect(covering).toContainText('Everything studied');
 
   // Narrowed to a section without key points, and still narrowed after a reload.
-  await page.getByRole('button', { name: 'Choose sections' }).click();
+  await covering.click();
   await page.getByRole('checkbox', { name: 'Superposition' }).check();
-  await expect(points).toContainText("Key points appear here once you finish a section's lesson.");
+  await page.keyboard.press('Escape');
+  await expect(covering).toContainText('Superposition');
+  await expect(keyPoints).toContainText('Once you finish a lesson');
   await page.reload();
-  await page.getByRole('button', { name: /^Review/ }).click();
-  await expect(page.getByRole('button', { name: 'Everything studied' })).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('tabpanel')).not.toContainText('changes no probability');
-  await page.getByRole('button', { name: 'Everything studied' }).click();
-  await expect(page.getByRole('tabpanel')).toContainText('changes no probability');
+  if (!(await covering.isVisible())) await page.getByRole('button', { name: /^Review/ }).click();
+  await expect(covering).toContainText('Superposition');
+  await covering.click();
+  await page.getByRole('radio', { name: 'Everything studied' }).check();
+  await page.keyboard.press('Escape');
+  await expect(keyPoints).toContainText('changes no probability');
+
+  // The key points take the page, with the column beside them to move about and back home.
+  await keyPoints.click();
+  await expect(page.getByRole('navigation', { name: 'Ways to review' }).getByRole('button', { name: 'Key points', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.main')).toContainText('changes no probability');
 
   // A point starts a session on itself, in its section.
   await page.getByRole('button', { name: 'Test me on this' }).click();
@@ -167,7 +189,7 @@ test('a reply offers Studio what a drill cannot do, asks once without full acces
   await page.route(/\/api\/studio\/access/, (route) => route.fulfill({ json: { full_access: false, saved: true, sandbox_missing: false, setting_up: false, setup_error: null } }));
   const { errors } = await course('review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  await page.getByRole('button', { name: 'Drill me' }).click();
+  await drillMe(page);
   const session = page.getByRole('region', { name: 'Drill session' });
   await expect(session.getByRole('group', { name: /Question 1/ })).toBeVisible();
   await session.getByRole('textbox', { name: 'Message to the teacher' }).fill('Can you make me a cheat sheet?');
@@ -182,17 +204,19 @@ test('a reply offers Studio what a drill cannot do, asks once without full acces
   expect(errors).toEqual([]);
 });
 
-test('other ways to review start their own sessions, and Studio ways are one click away', async ({ page, course }) => {
+test('the other ways to review are chosen in the box and start their own sessions, and Studio ways are one click away', async ({ page, course }) => {
   const { errors } = await course('review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  const ways = page.getByRole('group', { name: 'Other ways to review' });
-  await expect(ways.getByRole('button')).toHaveText(['Explain it back', 'Oral quiz', 'Tell confusable ideas apart']);
-  await expect(page.getByRole('group', { name: 'With Studio' }).getByRole('button')).toHaveText(['↗ Mock exam', '↗ Formula sheet', '↗ My mistakes on one page']);
-  await ways.getByRole('button', { name: 'Explain it back' }).click();
+  // How to drill is chosen in the box, with quick questions first.
+  const ways = page.getByRole('radiogroup', { name: 'How to drill' });
+  await expect(ways.getByRole('radio')).toHaveText(['Quick questions', 'Explain it back', 'Oral quiz', 'Tell confusable ideas apart']);
+  await expect(ways.getByRole('radio', { name: 'Quick questions' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('list', { name: 'With Studio' }).getByRole('button')).toHaveText(['a mock exam', 'a formula sheet', 'my mistakes on one page']);
+  await ways.getByRole('radio', { name: 'Explain it back' }).click();
+  await page.getByRole('button', { name: 'Drill me' }).click();
   const session = page.getByRole('region', { name: 'Drill session' });
   await expect(session.getByRole('article', { name: 'Question 1' })).toContainText('Explain in your own words');
-  await page.getByRole('button', { name: '← All sessions' }).click();
-  await expect(page.getByRole('region', { name: 'Earlier sessions' })).toContainText('Explain it back · Everything studied');
+  await expect(page.getByRole('region', { name: 'Sessions' })).toContainText('Explain it back · Everything studied');
   expect(errors).toEqual([]);
 });
 
@@ -201,7 +225,7 @@ test('what Studio made for a hand-off opens from its card: a mock exam to answer
   await page.route(/\/api\/studio\/activity/, (route) => route.fulfill({ json: { running: [], waiting: [] } }));
   const { base, errors } = await course('studio_review_browser_fixture');
   await page.getByRole('button', { name: /^Review/ }).click();
-  await page.getByRole('region', { name: 'Earlier sessions' }).getByRole('button', { name: /Everything studied/ }).click();
+  await page.getByRole('region', { name: 'Sessions' }).getByRole('button', { name: /Everything studied/ }).click();
   const card = page.getByRole('group', { name: 'Studio: A mock exam on States' });
   await expect(card).toContainText('Done: Mock exam: States');
   await card.getByRole('button', { name: 'Open it' }).click();
@@ -213,19 +237,42 @@ test('what Studio made for a hand-off opens from its card: a mock exam to answer
   await expect(session.getByRole('article', { name: 'Question 1' })).toContainText('6 marks');
   await expect(session.getByRole('group', { name: /Question 2 · 2 marks/ })).toBeVisible();
 
-  // The sheet is a tab of its own in Review, and the chapter page links to it.
-  await page.getByRole('tab', { name: /Sheets/ }).click();
+  // The sheet is listed to read in Review, and the chapter page links to it.
+  const listed = page.getByRole('navigation', { name: 'Ways to review' }).getByRole('button', { name: 'Formula sheet: States' });
+  await listed.click();
   const sheet = page.getByRole('article', { name: 'Formula sheet: States' });
   await expect(sheet).toContainText('Probabilities');
   await expect(sheet).toContainText('States ·');
   await page.locator('#open-study').click();
   await page.locator('#route').getByRole('button', { name: /Chapter 1 · States|^States/ }).first().click();
   await page.getByRole('button', { name: 'Formula sheet: States' }).click();
-  await expect(page.getByRole('tab', { name: /Sheets/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(listed).toHaveAttribute('aria-current', 'page');
   await sheet.getByRole('button', { name: 'Remove' }).click();
   await sheet.getByRole('group').getByRole('button', { name: 'Remove' }).click();
-  await expect(page.getByRole('tab', { name: /Sheets/ })).toHaveCount(0);
+  await expect(listed).toHaveCount(0);
   const state = await (await page.request.get(base + '/api/state')).json();
   expect(state.sheets).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('in a long course the scope picker folds its chapters, finds a section by name, and the button stays short', async ({ page, course }) => {
+  const { errors } = await course('long_course_browser_fixture');
+  await page.getByRole('button', { name: /^Review/ }).click();
+  const covering = page.getByRole('button', { name: /^Covering/ });
+  await covering.click();
+  const picker = page.getByRole('group', { name: 'What to review' });
+  await expect(picker.getByRole('checkbox', { name: 'Complex numbers', exact: true })).toBeVisible();
+  await expect(picker.getByRole('checkbox', { name: 'Complex numbers 3' }), 'chapters start folded').toHaveCount(0);
+
+  await picker.getByRole('button', { name: 'Sections of Complex numbers' }).click();
+  await picker.getByRole('checkbox', { name: 'Complex numbers 3' }).check();
+  await picker.getByRole('checkbox', { name: 'Complex numbers 5' }).check();
+  await expect(picker.getByRole('button', { name: 'Sections of Complex numbers' })).toContainText('2 of 9');
+  await picker.getByRole('checkbox', { name: 'Vectors', exact: true }).check();
+  // Two names, in the course's order, and the rest counted.
+  await expect(covering).toContainText('Vectors, Complex numbers 3 and 1 more');
+
+  await picker.getByRole('searchbox', { name: 'Find a chapter or section' }).fill('matrices 2');
+  await expect(picker.locator('label')).toHaveText(['Everything studied', 'Matrices', 'Matrices 2']);
   expect(errors).toEqual([]);
 });

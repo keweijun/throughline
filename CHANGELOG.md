@@ -2,6 +2,14 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.65.0
+
+- **Review has a home.** It opens on one page: what to go over, with the drill box at the top; under it, your key points, mistakes and sheets, each showing a glimpse of what is inside; then your drill sessions. It carries the course's own lines, as its cover does.
+- **Choose how to drill inside the box**: Quick questions, Explain it back, Oral quiz or Tell confusable ideas apart. Whichever you choose, you can say what to drill, or leave it empty and the teacher picks. If you'd rather have Studio make a mock exam, a formula sheet or your mistakes on one page, the links are just below.
+- **Reading and drilling get the whole page.** Key points, mistakes, a sheet or a drill session open at reading width, with a column beside them to move between them and back to **Review home**. A drill session's message box stays at the bottom of the window.
+- **What Review covers is one button**, **Covering: Everything studied**. It opens over the page, so nothing moves. In a long course its chapters start folded, a chapter opens to pick single sections, and a box finds a chapter or section by name.
+- Drill sessions are named by how they ask and what they cover, for example **Drill · Superposition**.
+
 ## 0.64.1
 
 - **Studio asks more calmly.** When Codex has a question for you, it comes on raised paper with a blue edge instead of a warning-coloured card.

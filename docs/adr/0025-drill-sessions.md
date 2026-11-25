@@ -6,7 +6,7 @@ The Review place (ADR 0014, issue #219) now offers key points (ADR 0024) and a m
 
 ## Decision
 
-A **drill session** is a conversation with a **fast teacher** over the Review place's scope. The learner presses **Drill me**, or says what to drill, and the teacher replies briefly with a few questions. The learner answers them in place, then asks for **More questions**, asks about an answer, or says what to drill next. A session is never finished, closed or due. There is no Done button and no progress count. It is kept, listed under **Earlier sessions** by date and scope, and can be reopened and continued.
+A **drill session** is a conversation with a **fast teacher** over the Review place's scope. The learner presses **Drill me** on Review's home, or says what to drill, and the teacher replies briefly with a few questions. The learner answers them in place, then asks for **More questions**, asks about an answer, or says what to drill next. A session is never finished, closed or due. There is no Done button and no progress count. It is kept, listed under **Sessions** on Review's home and beside the Review place's page, by how it asks, what it covers and when it was last used, and can be reopened and continued.
 
 ### The fast teacher
 

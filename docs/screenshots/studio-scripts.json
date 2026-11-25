@@ -1,0 +1,70 @@
+{
+  "formula sheet": {
+    "message": "Make me a one-page formula sheet for Chapters 1 and 2 before Friday's quiz. Put what I keep getting wrong at the top.",
+    "title": "Formula sheet for Chapters 1–2",
+    "items": [
+      {
+        "type": "think",
+        "text": "Planning a one-page sheet from the key points and the mistakes book"
+      },
+      {
+        "type": "say",
+        "text": "I'll read the key points of Chapters 1 and 2 and your mistakes book first."
+      },
+      {
+        "type": "run",
+        "command": "throughline --course quantum <<< '{\"op\":\"key_points.view\"}'",
+        "output": "{\"ok\": true, \"result\": {\"key_points\": {\"sections\": 4, \"points\": 14}}}"
+      },
+      {
+        "type": "run",
+        "command": "throughline --course quantum <<< '{\"op\":\"mistakes.list\"}'",
+        "output": "{\"ok\": true, \"result\": {\"entries\": 1}}"
+      },
+      {
+        "type": "say",
+        "text": "One mistake stands out: in Problem 1(a) you wrote $A = 30/L^5$, which is $A^2$. I'll box the normalization step at the top."
+      },
+      {
+        "type": "run",
+        "command": "throughline --course quantum < sheet.json",
+        "output": "{\"ok\": true, \"result\": {\"sheet\": {\"id\": \"formula-sheet-ch1-2\"}}}"
+      }
+    ],
+    "answer": "Your sheet is in **Review → Sheets**: *Formula sheet · Chapters 1–2*. It fits on one printed page.\n\n- **Boxed at the top:** to normalize $\\psi = Af$, compute $I = \\int |f|^2\\,dx$ and take $|A| = 1/\\sqrt{I}$. In Problem 1(a) you stopped at $A^2 = 30/L^5$.\n- **Chapter 1:** the Born rule, normalization, and $\\langle x\\rangle$, $\\langle p\\rangle$ and $\\sigma_x$, each with when it holds.\n- **Chapter 2:** adding amplitudes, the interference term $2\\,\\mathrm{Re}(\\psi_1^*\\psi_2)$, and what a which-path record does to it.\n\nThe double slit and phases aren't on it yet, since you haven't studied them. Want me to add them once you have, or put three quick problems on the back?"
+  },
+  "公式页": {
+    "message": "周五小测前帮我做一页第 1、2 章的公式页，把我老出错的地方放在最上面。",
+    "title": "第 1–2 章公式页",
+    "items": [
+      {
+        "type": "think",
+        "text": "根据要点和错题本规划一页公式页"
+      },
+      {
+        "type": "say",
+        "text": "我先读一下第 1、2 章的要点和你的错题本。"
+      },
+      {
+        "type": "run",
+        "command": "throughline --course liangzi <<< '{\"op\":\"key_points.view\"}'",
+        "output": "{\"ok\": true, \"result\": {\"key_points\": {\"sections\": 4, \"points\": 14}}}"
+      },
+      {
+        "type": "run",
+        "command": "throughline --course liangzi <<< '{\"op\":\"mistakes.list\"}'",
+        "output": "{\"ok\": true, \"result\": {\"entries\": 1}}"
+      },
+      {
+        "type": "say",
+        "text": "有一个错误很典型：第 1(a) 题你写了 $A = 30/L^5$，那其实是 $A^2$。我把归一化这一步框出来放在最上面。"
+      },
+      {
+        "type": "run",
+        "command": "throughline --course liangzi < sheet.json",
+        "output": "{\"ok\": true, \"result\": {\"sheet\": {\"id\": \"formula-sheet-ch1-2\"}}}"
+      }
+    ],
+    "answer": "公式页已放进 **复习 → 复习页**：*公式页 · 第 1–2 章*，打印出来正好一页。\n\n- **最上面的方框：** 归一化 $\\psi = Af$ 时，先算 $I = \\int |f|^2\\,dx$，再取 $|A| = 1/\\sqrt{I}$。第 1(a) 题你停在了 $A^2 = 30/L^5$。\n- **第 1 章：** 玻恩规则、归一化，以及 $\\langle x\\rangle$、$\\langle p\\rangle$ 和 $\\sigma_x$，每条都注明成立条件。\n- **第 2 章：** 概率幅相加、干涉项 $2\\,\\mathrm{Re}(\\psi_1^*\\psi_2)$，以及路径记录对它的影响。\n\n双缝和相位还没学，所以暂时没放。要等你学完再补上，还是在背面加三道小题？"
+  }
+}

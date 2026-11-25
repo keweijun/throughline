@@ -1,0 +1,14 @@
+@page { size: A4; margin: 22mm 20mm 20mm 20mm; }
+body { font-family: "Latin Modern Roman", "Times New Roman", "Noto Serif CJK SC", "WenQuanYi Zen Hei", serif; font-size: 11.5pt; line-height: 1.5; color: #111; }
+h1 { font-size: 17pt; margin: 0 0 4pt; }
+.sub { color: #555; margin-bottom: 14pt; font-size: 10.5pt; }
+h2 { font-size: 13.5pt; margin: 16pt 0 6pt; border-bottom: 0.6pt solid #888; padding-bottom: 2pt; }
+h3 { font-size: 11.5pt; margin: 12pt 0 4pt; }
+.page { page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+.box { border: 0.6pt solid #555; padding: 6pt 9pt; margin: 8pt 0; }
+.ex { margin: 6pt 0 10pt; }
+.foot { position: fixed; bottom: -12mm; left: 0; right: 0; text-align: center; font-size: 9pt; color: #666; }
+figure { text-align: center; margin: 8pt 0; }
+figcaption { font-size: 9.5pt; color: #444; }
+.katex{font-size:1.05em}

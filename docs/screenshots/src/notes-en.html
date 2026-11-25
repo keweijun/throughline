@@ -1,0 +1,111 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../web/node_modules/katex/dist/katex.min.css"><link rel="stylesheet" href="style.css"><title>Quantum Mechanics I — Lecture notes</title></head>
+<body>
+<div class="page">
+<h1>Quantum Mechanics I — Lecture notes</h1>
+<div class="sub">Weeks 1–4 · Wavefunctions, superposition, observables and the Schrödinger equation</div>
+<h2>Lecture 1. The wavefunction</h2>
+<h3>1.1 The state of a particle</h3>
+<p>In classical mechanics a particle has a definite position $x(t)$ at every instant. In quantum mechanics the state of a particle moving in one dimension is described by a complex-valued <b>wavefunction</b> $\psi(x,t)$. The wavefunction itself is not observable; what we measure are its consequences.</p>
+<h3>1.2 The Born rule</h3>
+<p>The statistical interpretation (Born, 1926) says that $|\psi(x,t)|^2$ is a <b>probability density</b>:</p>
+<div class="box">$$P(a \le x \le b,\ t) = \int_a^b |\psi(x,t)|^2\,dx .$$</div>
+<p>The wavefunction gives no prediction for where the particle <i>is</i> before a measurement, only for the probability of each outcome. Repeated measurements on identically prepared systems reproduce the distribution $|\psi|^2$.</p>
+<h3>1.3 Normalization</h3>
+<p>Since the particle must be found somewhere, the total probability is one:</p>
+$$\int_{-\infty}^{\infty} |\psi(x,t)|^2\,dx = 1 .$$
+<p>If $\psi$ solves the Schrödinger equation then so does $A\psi$ for any constant $A$; we choose $|A|$ to satisfy this condition. The Schrödinger equation preserves normalization in time, so it is enough to normalize at $t=0$. Functions that are not square-integrable (for example $\psi = $ const on the whole line) cannot represent physical states.</p>
+<p><b>Example 1.1.</b> Normalize $\psi(x) = A\,e^{-|x|/a}$ with $a&gt;0$. We need $|A|^2 \int_{-\infty}^{\infty} e^{-2|x|/a}\,dx = |A|^2\,a = 1$, so $A = 1/\sqrt{a}$ (choosing $A$ real and positive; the overall phase is arbitrary).</p>
+</div>
+
+<div class="page">
+<h3>1.4 Expectation values</h3>
+<p>The <b>expectation value</b> of $x$ is the average of many measurements on identically prepared particles, not the most likely value:</p>
+$$\langle x \rangle = \int_{-\infty}^{\infty} x\,|\psi(x,t)|^2\,dx .$$
+<p>For momentum we cannot write $p\,|\psi|^2$, since $|\psi|^2$ is a density in $x$. Instead</p>
+<div class="box">$$\langle p \rangle = \int_{-\infty}^{\infty} \psi^*\left(-i\hbar\frac{\partial}{\partial x}\right)\psi\,dx ,$$</div>
+<p>and more generally $\langle Q \rangle = \int \psi^*\,\hat Q\,\psi\,dx$ for any observable with operator $\hat Q$ (Lecture 3).</p>
+<h3>1.5 Spread</h3>
+<p>The standard deviation measures the spread of results: $\sigma_x^2 = \langle x^2\rangle - \langle x\rangle^2$. A sharply peaked $|\psi|^2$ has small $\sigma_x$.</p>
+<p><b>Example 1.2.</b> For $\psi(x) = e^{-|x|/a}/\sqrt{a}$, $\langle x\rangle = 0$ by symmetry, and $\langle x^2\rangle = \tfrac{1}{a}\int x^2 e^{-2|x|/a}dx = a^2/2$, so $\sigma_x = a/\sqrt2$.</p>
+<p><i>Common pitfall.</i> $\langle x\rangle$ need not be a value the particle can ever be found at: for a density with two separated peaks it can lie in the gap between them.</p>
+</div>
+
+<div class="page">
+<h2>Lecture 2. Superposition and interference</h2>
+<h3>2.1 Adding amplitudes</h3>
+<p>Suppose a particle can reach a detector by two paths. Each path alone gives an amplitude, $\psi_1$ or $\psi_2$, and the probability with only that path open is $|\psi_1|^2$ or $|\psi_2|^2$. With both paths open, the <b>amplitudes add</b>:</p>
+<div class="box">$$\psi = \psi_1 + \psi_2, \qquad P = |\psi_1 + \psi_2|^2 = |\psi_1|^2 + |\psi_2|^2 + 2\,\mathrm{Re}\!\left(\psi_1^*\psi_2\right).$$</div>
+<p>The last term is the <b>interference term</b>. It has no classical counterpart for particles: classically, probabilities of exclusive alternatives add, $P = P_1 + P_2$.</p>
+<p>Write $\psi_1 = |\psi_1|e^{i\alpha}$ and $\psi_2 = |\psi_2|e^{i\beta}$. Then $2\,\mathrm{Re}(\psi_1^*\psi_2) = 2|\psi_1||\psi_2|\cos(\beta-\alpha)$, so only the <b>phase difference</b> $\phi = \beta - \alpha$ matters.</p>
+<ul>
+<li>$\phi = 0$: constructive, $P = (|\psi_1|+|\psi_2|)^2$.</li>
+<li>$\phi = \pi$: destructive, $P = (|\psi_1|-|\psi_2|)^2$, which is zero for equal magnitudes.</li>
+</ul>
+<p><b>Example 2.1.</b> Equal amplitudes $\psi_1 = \tfrac12$, $\psi_2 = \tfrac12 e^{i\phi}$ give $P(\phi) = \tfrac12(1+\cos\phi) = \cos^2(\phi/2)$. Each path alone gives $\tfrac14$, yet with both open the detector is dark at $\phi=\pi$.</p>
+<h3>2.2 Which-path information</h3>
+<p>If the experiment records which path the particle took, the two alternatives become distinguishable and the probabilities, not the amplitudes, add. The interference term vanishes. Interference requires that the alternatives be indistinguishable in principle.</p>
+</div>
+
+<div class="page">
+<h3>2.3 The double slit</h3>
+<p>Two slits a distance $d$ apart are lit by particles of de Broglie wavelength $\lambda = h/p$. On a distant screen at angle $\theta$, the path difference is $d\sin\theta$, so the phase difference is</p>
+$$\phi(\theta) = \frac{2\pi d \sin\theta}{\lambda}.$$
+<figure>
+<svg width="360" height="150" viewBox="0 0 360 150" xmlns="http://www.w3.org/2000/svg" font-family="serif" font-size="12">
+<line x1="60" y1="10" x2="60" y2="58" stroke="#000" stroke-width="3"/><line x1="60" y1="66" x2="60" y2="84" stroke="#000" stroke-width="3"/><line x1="60" y1="92" x2="60" y2="140" stroke="#000" stroke-width="3"/>
+<line x1="300" y1="10" x2="300" y2="140" stroke="#000" stroke-width="1.5"/>
+<line x1="60" y1="62" x2="300" y2="40" stroke="#444" stroke-dasharray="4 3"/><line x1="60" y1="88" x2="300" y2="40" stroke="#444" stroke-dasharray="4 3"/>
+<text x="38" y="80">d</text><text x="306" y="44">θ</text><text x="270" y="150">screen</text>
+<path d="M300 20 Q330 25 300 30 Q345 40 300 50 Q330 55 300 60 Q360 75 300 90 Q330 95 300 100 Q345 110 300 120 Q330 125 300 130" fill="none" stroke="#000"/>
+</svg>
+<figcaption>Figure 2.1. Two slits and the intensity on the screen.</figcaption>
+</figure>
+<p>With equal amplitudes from both slits the intensity is</p>
+<div class="box">$$I(\theta) = 4I_0 \cos^2\!\left(\frac{\pi d\sin\theta}{\lambda}\right),$$</div>
+<p>with bright fringes at $d\sin\theta = m\lambda$ and dark fringes at $d\sin\theta = (m+\tfrac12)\lambda$. For small angles the fringe spacing on a screen at distance $L$ is $\Delta y = \lambda L/d$. The pattern builds up one particle at a time: each particle lands at a single point, and the fringes appear only in the statistics.</p>
+<h3>2.4 Global and relative phase</h3>
+<p>Multiplying the whole state by $e^{i\gamma}$ changes no probability: $|e^{i\gamma}\psi|^2 = |\psi|^2$. This <b>global phase</b> is unobservable. A <b>relative phase</b> between terms of a superposition, as in $\psi_1 + e^{i\phi}\psi_2$, changes the interference term and is observable.</p>
+</div>
+
+<div class="page">
+<h2>Lecture 3. Observables and operators</h2>
+<h3>3.1 Operators</h3>
+<p>Each observable $Q$ corresponds to a linear operator $\hat Q$: position $\hat x = x$, momentum $\hat p = -i\hbar\,\partial/\partial x$, energy $\hat H = \hat p^2/2m + V(x)$. Observables are represented by <b>Hermitian</b> operators, $\langle f|\hat Q g\rangle = \langle \hat Q f| g\rangle$, so that every expectation value is real.</p>
+<h3>3.2 Eigenstates and measurement</h3>
+<p>A state with $\hat Q\psi = q\,\psi$ is an <b>eigenstate</b>: measuring $Q$ gives $q$ with certainty. For a Hermitian operator the eigenvalues are real and eigenfunctions with different eigenvalues are orthogonal. A general state is a superposition $\psi = \sum_n c_n \psi_n$ of eigenstates; a measurement gives $q_n$ with probability $|c_n|^2$, and immediately afterwards the state is $\psi_n$.</p>
+<h3>3.3 Commutators</h3>
+<p>The commutator of two operators is $[\hat A,\hat B] = \hat A\hat B - \hat B\hat A$. Acting on a test function $f$,</p>
+$$[\hat x,\hat p]f = x(-i\hbar f') - (-i\hbar)(xf)' = i\hbar f, \qquad\text{so}\qquad [\hat x,\hat p] = i\hbar .$$
+<p>Operators that commute share a complete set of eigenstates, so the two observables can have definite values at once. Position and momentum do not commute.</p>
+</div>
+
+<div class="page">
+<h3>3.4 The uncertainty principle</h3>
+<p>For any two observables, the spreads satisfy the generalized uncertainty relation</p>
+<div class="box">$$\sigma_A\,\sigma_B \;\ge\; \left|\frac{1}{2i}\langle[\hat A,\hat B]\rangle\right| .$$</div>
+<p>With $[\hat x,\hat p]=i\hbar$ this gives Heisenberg's relation $\sigma_x\sigma_p \ge \hbar/2$. It is a statement about the spreads of results on identically prepared systems, not about a disturbance caused by a clumsy measurement.</p>
+<p><b>Example 3.1.</b> The Gaussian $\psi(x) = (2a/\pi)^{1/4}e^{-ax^2}$ has $\sigma_x = 1/(2\sqrt a)$ and $\sigma_p = \hbar\sqrt a$, so $\sigma_x\sigma_p = \hbar/2$: it saturates the bound.</p>
+<p><i>Common pitfall.</i> The relation constrains the product of the spreads. Neither spread alone has a lower bound: a state can be as sharply localized as we like, at the cost of a large $\sigma_p$.</p>
+</div>
+
+<div class="page">
+<h2>Lecture 4. The Schrödinger equation</h2>
+<h3>4.1 Stationary states</h3>
+<p>The wavefunction evolves by the Schrödinger equation, $i\hbar\,\partial_t\psi = \hat H\psi$. For a potential $V(x)$ that does not depend on time, try $\psi(x,t) = \varphi(x)\,T(t)$. Separating variables gives $T(t) = e^{-iEt/\hbar}$ and the <b>time-independent Schrödinger equation</b></p>
+<div class="box">$$-\frac{\hbar^2}{2m}\frac{d^2\varphi}{dx^2} + V(x)\varphi = E\varphi .$$</div>
+<p>Separable solutions are <b>stationary states</b>: $|\psi(x,t)|^2 = |\varphi(x)|^2$ does not change in time, and they have definite energy $E$. The general solution is a superposition $\psi(x,t) = \sum_n c_n\varphi_n(x)e^{-iE_nt/\hbar}$, which is not stationary when two or more energies appear, because the relative phases between terms change in time.</p>
+</div>
+
+<div class="page">
+<h3>4.2 The infinite square well</h3>
+<p>Let $V = 0$ for $0 &lt; x &lt; L$ and $V = \infty$ elsewhere. Inside, $\varphi'' = -k^2\varphi$ with $k = \sqrt{2mE}/\hbar$; continuity at the walls requires $\varphi(0) = \varphi(L) = 0$. Hence</p>
+<div class="box">$$\varphi_n(x) = \sqrt{\frac{2}{L}}\,\sin\frac{n\pi x}{L}, \qquad E_n = \frac{n^2\pi^2\hbar^2}{2mL^2}, \qquad n = 1,2,3,\dots$$</div>
+<p>The energies are quantized by the boundary conditions. The ground state $E_1$ is not zero, as the uncertainty principle requires of a particle confined to a length $L$. The states are orthonormal, $\int_0^L \varphi_m\varphi_n\,dx = \delta_{mn}$, and complete.</p>
+<h3>4.3 Spectra</h3>
+<p>A transition from level $n$ to $m &lt; n$ emits a photon of energy $E_n - E_m = (n^2 - m^2)E_1$. The spacing between neighbouring levels grows as $(2n+1)E_1$, and shrinks as $1/L^2$ for a wider well.</p>
+</div>
+<script src="../../../web/node_modules/katex/dist/katex.min.js"></script>
+<script src="../../../web/node_modules/katex/dist/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});</script>
+</body></html>

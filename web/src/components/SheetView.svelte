@@ -49,30 +49,31 @@
 </article>
 
 <style>
+  /* Named at the top as every view of the Review place is; the sheet itself is the paper under it. */
   .sheet-view {
     display: grid;
-    gap: 1rem;
-    padding: 1.1rem 1.3rem 1.3rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--raised);
+    gap: 1.5rem;
   }
 
   header {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.5rem 1rem;
+    gap: 0.5rem 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--rule);
   }
 
   h2 {
-    font-size: var(--step-1);
+    font-family: var(--serif);
+    font-size: var(--step-2);
     font-weight: 600;
+    line-height: 1.2;
   }
 
   .meta {
-    margin-top: 0.2rem;
+    margin-top: 0.3rem;
     font-size: var(--step--1);
     color: var(--pencil);
   }
@@ -84,6 +85,10 @@
   }
 
   .body {
+    padding: 1.3rem 1.5rem 1.5rem;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--raised);
     font-size: var(--step-0);
     line-height: 1.6;
   }

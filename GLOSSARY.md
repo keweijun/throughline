@@ -85,6 +85,9 @@ _Avoid_: Streak, goal, progress (where the learner stands in a course), time tra
 **Review scope**: What the Review place covers: everything studied, or the chapters and sections the learner chose. Key points, the mistakes book and the questions asked there all follow it, and the course remembers the last choice in the learner's browser (ADR 0014).
 _Avoid_: A review set's own scope (what one request asked about), a filter on the route.
 
+**Review home**: The page the Review place opens on: what to go over (the drill box, with how to drill chosen inside it), then a way into the key points, the mistakes book and each sheet, and the latest drill sessions. What it opens takes the page, with a column beside it to move about and come back (ADR 0014).
+_Avoid_: Dashboard, a landing page to get past, a list of what is due.
+
 **Mistakes book**: The learner's misses, collected on the Review page from what the course records: missed exercise, chapter-quiz and review parts, wrong recall answers, and ideas whose check questions were missed more than once. An entry the learner later gets right stays, marked with when; nothing is counted or cleared (ADR 0014).
 _Avoid_: Error log, to-do list, a single missed check question (a slip, not yet a mistake).
 
@@ -94,10 +97,10 @@ _Avoid_: Using it for a drill session.
 **Hand-off**: A request a fast view (a lesson, a drill, the Review place) cannot serve, sent to Studio as a new chat with where it came from; the learner stays put and the card that sent it follows the chat (ADR 0026).
 _Avoid_: Escalation (internal), redirect, a link that only opens Studio.
 
-**Way to review**: How a drill session asks, chosen in the Review place: quick questions, explain it back, oral quiz or telling confusable ideas apart; Studio ways (a mock exam, a sheet) are hand-offs (ADR 0026).
+**Way to review**: How a drill session asks, chosen in the box on Review's home: quick questions, explain it back, oral quiz or telling confusable ideas apart; Studio ways (a mock exam, a sheet) are hand-offs (ADR 0026).
 _Avoid_: Mode, game, a separate page.
 
-**Sheet**: A page Codex wrote in Studio for review, such as a cheat sheet, a formula sheet or the learner's mistakes on one page. It covers chapters or sections, is read and printed in Review's Sheets, and is linked from the chapter page (ADR 0026).
+**Sheet**: A page Codex wrote in Studio for review, such as a cheat sheet, a formula sheet or the learner's mistakes on one page. It covers chapters or sections, is read and printed in Review, listed under Read, and is linked from the chapter page (ADR 0026).
 _Avoid_: Chapter sheet (the chapter's key points), key points, a source.
 
 **Drill session**: A conversation with the fast teacher over a review scope, in the Review place: it asks a few review questions at a time, the learner answers them in place, asks for more or says what to drill next. It is kept and reopened at will and never finished or due; a chapter's drill and a warm-up are sessions with a fixed scope (ADR 0025).

@@ -1,4 +1,4 @@
-import { t, type MessageKey } from './i18n.svelte';
+import { locale, t, type MessageKey } from './i18n.svelte';
 import type { EvidenceKind, PartStatus, PracticeAction, Question, Task, TurnStatus } from './types';
 
 type Tone = 'good' | 'caution' | 'danger' | 'accent' | 'plain';
@@ -59,3 +59,15 @@ export const open = (task: Task) => task.status !== 'skipped' && !solved(task);
 /** Every turn that answers a side question: the answer, a foundation supplement and follow-up replies. */
 export const questionTurnIds = (question: Question) =>
   [question.turn_id, question.supplement_turn_id, ...(question.replies ?? []).map((r) => r.turn_id)].filter((id): id is string => !!id);
+
+/** How long ago a time in seconds was, as a list of chats or sessions says it: "5 min. ago", "yesterday", "3 days ago". */
+export function ago(seconds: number | null | undefined, now = Date.now()) {
+  if (!seconds) return '';
+  const minutes = Math.round((seconds * 1000 - now) / 60_000);
+  const format = new Intl.RelativeTimeFormat(locale.language, { numeric: 'auto', style: 'narrow' });
+  // "this minute" reads oddly in a list; under a minute is just now.
+  if (minutes > -1) return t('just now');
+  if (Math.abs(minutes) < 60) return format.format(minutes, 'minute');
+  if (Math.abs(minutes) < 60 * 24) return format.format(Math.round(minutes / 60), 'hour');
+  return format.format(Math.round(minutes / (60 * 24)), 'day');
+}

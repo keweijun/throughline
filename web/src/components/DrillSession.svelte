@@ -177,8 +177,12 @@
     color: var(--danger, var(--accent));
   }
 
+  /* The box stays at the foot of the window however long the session is, as Studio's does. */
   .next {
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--rule);
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 0.75rem 0 1.25rem;
+    background: linear-gradient(to bottom, transparent, var(--ground) 1rem);
   }
 </style>

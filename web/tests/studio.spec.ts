@@ -336,14 +336,15 @@ test('an empty chat suggests a range of course work that fills the box without s
   await course('studio_browser_fixture');
   await page.locator('#open-course').click();
   const panel = page.locator('#course-studio');
-  await expect(panel).toContainText('This is Codex itself, working on this course.');
+  await expect(panel).toContainText('Codex itself, working on this course');
   // Adding files always shows; three more are drawn from the rest.
   const suggestions = panel.locator('.starts button');
   await expect(suggestions).toHaveCount(4);
   await expect(suggestions.first()).toHaveText('Add files to this course');
   await suggestions.nth(1).click();
   const box = page.locator('#studio-input');
-  expect(await editorText(box)).toMatch(/^\$throughline .*waves/);
+  // The request names the course by its title, as the learner knows it; the chat's instructions give Codex the folder.
+  expect(await editorText(box)).toMatch(/^\$throughline .*Waves/);
   await expect(panel.locator('.user')).toHaveCount(0);
 });
 
@@ -777,5 +778,20 @@ test("the course's ⋯ beside its title in Studio shares and renames it, as its 
   await field.press('Enter');
   await expect(page.locator('#course-title')).toHaveText('Waves and interference');
   await expect(page.locator('#course-switcher')).toContainText('Waves and interference');
+  expect(errors).toEqual([]);
+});
+
+test('a reload reopens the course where the learner was: Studio, Review or Learn', async ({ page, course }) => {
+  const { errors } = await course('studio_browser_fixture');
+  await page.locator('#open-course').click();
+  await expect(page.locator('#course-studio')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#course-studio'), 'Studio, as it was').toBeVisible();
+  await page.locator('#open-review').click();
+  await page.reload();
+  await expect(page.locator('#open-review')).toHaveAttribute('aria-current', /page|true/);
+  await page.locator('#open-study').click();
+  await page.reload();
+  await expect(page.locator('#concept-title')).toBeVisible();
   expect(errors).toEqual([]);
 });

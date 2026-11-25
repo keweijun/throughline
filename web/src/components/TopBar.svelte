@@ -73,7 +73,7 @@
   }
 </script>
 
-<header class="topbar">
+<header class="topbar" class:studying>
   <div class="start">
   {#if studying}
   <button
@@ -186,7 +186,7 @@
         title={studio.waiting.length ? t("Codex is waiting for your answer in Studio") : t("Codex is working on your course in Studio")}
       >
         <span class="pulse" aria-hidden="true"></span>
-        <span>{studio.waiting.length ? t("Studio needs you") : t("Studio working…")}</span>
+        <span class="notice-label">{studio.waiting.length ? t("Studio needs you") : t("Studio working…")}</span>
       </button>
     {/if}
     {#if app.updating && !app.updating.failed}
@@ -211,9 +211,10 @@
           app.settingsOpen = true;
         }}
         title={t("Version {latest} is available. Open About to update.", { latest: app.update.latest })}
+        aria-label={t("Update available")}
       >
         <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        <span class="wide-only">{t("Update available")}</span>
+        <span class="wide-only update-label">{t("Update available")}</span>
       </button>
     {/if}
     {#if studying}
@@ -537,6 +538,15 @@
     background: var(--accent-wash);
     color: var(--accent);
     font-weight: 600;
+  }
+
+  /* In a course the bar also carries the three places in its middle; below a wide window the pill keeps only its arrow,
+     so it never runs into them (its title and name still say what it is). */
+  @media (max-width: 85rem) {
+    .topbar.studying .update-label,
+    .topbar.studying .notice-label {
+      display: none;
+    }
   }
 
   .update:hover {

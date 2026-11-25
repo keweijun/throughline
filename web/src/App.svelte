@@ -52,6 +52,35 @@
   const place = $derived(
     app.libraryOpen ? 'library' : app.courseOpen ? 'studio' : app.reviewOpen ? 'review' : `learn:${app.viewingChapter ?? app.viewing ?? app.currentId}`,
   );
+  // A reload reopens a course at the place the learner was in (Studio, Learn or Review), remembered in this browser per
+  // course. Restoring comes first, so the first save after a load is the restored place, not Learn.
+  let restoredFor = '';
+  $effect(() => {
+    const id = app.state?.course.id;
+    if (!id || app.libraryOpen || restoredFor === id) return;
+    restoredFor = id;
+    untrack(() => {
+      let saved = '';
+      try {
+        saved = localStorage.getItem(`place:${id}`) ?? '';
+      } catch {
+        // Without storage a reload opens Learn, as before.
+      }
+      if (app.courseOpen || app.reviewOpen) return;
+      if (saved === 'studio') app.showCourse();
+      else if (saved === 'review') app.showReview();
+    });
+  });
+  $effect(() => {
+    const id = app.state?.course.id;
+    if (!id || app.libraryOpen || restoredFor !== id) return;
+    const where = app.courseOpen ? 'studio' : app.reviewOpen ? 'review' : 'learn';
+    try {
+      localStorage.setItem(`place:${id}`, where);
+    } catch {
+      // The place is a convenience; nothing is lost without it.
+    }
+  });
   let scrolled = { place: '', top: 0 };
   let left: { place: string; top: number } | null = null;
   let shown = '';

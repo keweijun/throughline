@@ -54,7 +54,7 @@
   });
   const library = $derived(scope === 'library');
 
-  // Requests name the course by its folder, as the skill addresses courses; the learner sees its title.
+  // `course` is the folder, as the skill addresses courses; what the learner reads (suggestions, the box) uses the title.
   const course = $derived(library ? '' : (app.libraryCourse?.name ?? app.state?.course?.title ?? ''));
   const title = $derived(library ? '' : (app.state?.course?.title ?? course));
   const draftKey = $derived(`studio:${library ? 'library:' : ''}${studio.threadId ?? 'new'}`);
@@ -74,7 +74,9 @@
   const shown = [ADD_FILES, ...drawn.slice(0, 3).sort((a, b) => a - b).map((i) => COURSE_IDEAS[i])];
   // A request that ends in a full stop is complete; the others leave the caret after a space for the learner to finish.
   const examples = $derived((library ? COURSE_STARTS : shown).map((idea) => {
-    const request = t(idea.request, { course });
+    // The suggestion names the course by its title, as the learner knows it; the chat's own instructions already say
+    // which folder the course is in, so Codex is never unsure which course is meant.
+    const request = t(idea.request, { course: title || course });
     return { label: t(idea.label), icon: idea.icon, text: `$throughline ${request}${/[.。]$/.test(request) ? '' : ' '}` };
   }));
 
@@ -338,7 +340,8 @@
           <p class="panel-empty">{t("Bring your PDFs, slides or notes. Codex reads every page, asks you a few questions and builds the course.")}</p>
         {:else}
           <h3 class="welcome-title">{t("What would you like to change in this course?")}</h3>
-          <p class="panel-empty">{t("This is Codex itself, working on this course. Ask for any change you can describe: new sections or exercises, files to add, a different way of teaching, something to take away. Questions about the material go to Questions.")}</p>
+          <!-- One line: the suggestions under the box show the range of what Studio does. -->
+          <p class="panel-empty">{t("Codex itself, working on this course: ask for any change you can describe.")}</p>
         {/if}
       </div>
     {:else}

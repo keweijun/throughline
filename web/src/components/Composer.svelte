@@ -449,6 +449,7 @@
   }
 
   .bar {
+    container: composer-bar / inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -491,6 +492,18 @@
     color: var(--pencil);
     opacity: 0;
     transition: opacity var(--quick) ease;
+  }
+
+  /* A narrow box (Studio with a document beside it) needs its room for the chips and Send, so the hint goes first. */
+  @container composer-bar (max-width: 40rem) {
+    .keys {
+      display: none;
+    }
+
+    /* What stood after the hint keeps to the right, as it did. */
+    .keys + :global(*) {
+      margin-left: auto;
+    }
   }
 
   /* The keys matter while writing; at rest the bar shows only what can be done. */

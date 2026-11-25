@@ -10,12 +10,12 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
-from guided_learning import api
-from guided_learning.api import execute
-from guided_learning.server import Host
-from guided_learning.server import host as host_module
-from guided_learning.server.builds import ChapterBuilds
-from guided_learning.server.features import Preparation
+from throughline import api
+from throughline.api import execute
+from throughline.server import Host
+from throughline.server import host as host_module
+from throughline.server.builds import ChapterBuilds
+from throughline.server.features import Preparation
 from support import ROOT, call_cli
 
 

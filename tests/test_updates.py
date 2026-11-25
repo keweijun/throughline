@@ -7,13 +7,13 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import library, updates
-from guided_learning.store import OperationError
+from throughline import library, updates
+from throughline.store import OperationError
 from support import host_client
 
 
 def course(path):
-    from guided_learning.api import execute
+    from throughline.api import execute
     execute(path, {'op': 'course.init', 'title': 'Quantum'})
 
 
@@ -32,9 +32,9 @@ class UpdateCheck(unittest.TestCase):
             remote.write_text('[project]\nname = "throughline"\nversion = "9.0.0"\n', encoding='utf-8')
             course(Path(tmp) / 'course')
             client, _ = host_client(Path(tmp) / 'course')
-            with client, mock.patch.dict(os.environ, {'GUIDED_LEARNING_UPDATE_URL': remote.as_uri()}), \
+            with client, mock.patch.dict(os.environ, {'THROUGHLINE_UPDATE_URL': remote.as_uri()}), \
                     mock.patch.object(updates, 'version', return_value='0.5.1'), \
-                    mock.patch('guided_learning.server.app.version', return_value='0.5.1'):
+                    mock.patch('throughline.server.app.version', return_value='0.5.1'):
                 self.assertEqual(client.get('/api/about').json(), {'version': '0.5.1'})
                 result = client.get('/api/update').json()
                 self.assertEqual(result, {'version': '0.5.1', 'latest': '9.0.0', 'available': True})
@@ -106,8 +106,8 @@ class BackgroundUpdate(unittest.TestCase):
         self.assertEqual(schema['required'], ['ok', 'version', 'message'])
         request = args[-1]
         self.assertTrue(request.startswith('Update https://github.com/keweijun/throughline'), 'the same request as the chat hand-off')
-        self.assertIn('guided-learning setup --no-open', request)
-        self.assertIn('guided-learning open quantum-v1 --no-browser --port 8770', request)
+        self.assertIn('throughline setup --no-open', request)
+        self.assertIn('throughline open quantum-v1 --no-browser --port 8770', request)
         self.assertIn('Simplified Chinese', request)
         self.assertEqual(updates.progress(self.folder)['state'], 'failed', 'a failure stays until the next attempt')
 
@@ -150,8 +150,8 @@ class BackgroundUpdate(unittest.TestCase):
         library_root = Path(self.tmp.name) / 'library'
         course(library_root / 'quantum-v1')
         from fastapi.testclient import TestClient
-        from guided_learning.server import create_app
-        from guided_learning.server.settings import TeacherSettings
+        from throughline.server import create_app
+        from throughline.server.settings import TeacherSettings
         app = create_app(library_root / 'quantum-v1', settings=TeacherSettings(Path(self.tmp.name) / 'settings.json'),
                          library_root=library_root)
         with TestClient(app, base_url='http://127.0.0.1:8765') as client, mock.patch.object(library, 'state_dir', return_value=self.folder), \
@@ -167,7 +167,7 @@ class BackgroundUpdate(unittest.TestCase):
             settle(self.folder)
             self.assertEqual(client.get('/api/update/install').json()['update']['message'], 'No network.')
         request = json.loads((Path(self.tmp.name) / 'args.json').read_text())[-1]
-        self.assertIn('guided-learning open quantum-v1 --no-browser', request)
+        self.assertIn('throughline open quantum-v1 --no-browser', request)
 
 
 if __name__ == '__main__':

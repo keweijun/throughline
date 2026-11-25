@@ -13,9 +13,9 @@ import zipfile
 from unittest import mock
 from pathlib import Path
 
-from guided_learning import images, migrations, packages
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline import images, migrations, packages
+from throughline.api import execute
+from throughline.store import OperationError
 from support import ROOT
 from tests.sample_pdf import write_pdf
 
@@ -153,7 +153,7 @@ class CoursePackages(unittest.TestCase):
                 connect.done = True  # just before the export takes its snapshot
                 execute(self.course, {'op': 'source.register', 'path': str(later)})
             return real(database, *args, **kwargs)
-        with mock.patch('guided_learning.packages.sqlite3.connect', connect):
+        with mock.patch('throughline.packages.sqlite3.connect', connect):
             exported = packages.export(self.course, self.package)
         self.assertEqual(exported['sources'], 2)
         course = Path(packages.import_package(self.package, self.recipient)['path'])
@@ -223,7 +223,7 @@ class CoursePackages(unittest.TestCase):
                 everything_packing.set()
                 route_done.wait(10)
             return real(file, mode, *args, **kwargs)
-        with mock.patch('guided_learning.packages.zipfile.ZipFile', opening):
+        with mock.patch('throughline.packages.zipfile.ZipFile', opening):
             route = packages.export(self.course, self.package, 'route')
             with real(self.package) as archive:
                 shared = archive.read('course.sqlite3')
@@ -314,8 +314,8 @@ class CoursePackages(unittest.TestCase):
         self.assertEqual(refused.exception.code, 'invalid_package')
 
     def test_the_commands_export_and_import_by_course_name(self):
-        env = {**os.environ, 'GUIDED_LEARNING_HOME': str(self.sender)}
-        run = lambda *args: subprocess.run([sys.executable, '-m', 'guided_learning', *args], capture_output=True, text=True, encoding='utf-8',
+        env = {**os.environ, 'THROUGHLINE_HOME': str(self.sender)}
+        run = lambda *args: subprocess.run([sys.executable, '-m', 'throughline', *args], capture_output=True, text=True, encoding='utf-8',
                                            cwd=ROOT, env=env, timeout=60)
         exported = run('export', 'quantum-v1', '--out', str(self.package))
         self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
@@ -329,8 +329,8 @@ class CoursePackages(unittest.TestCase):
 
     def test_the_app_exports_a_download_and_imports_an_upload_as_chosen(self):
         from fastapi.testclient import TestClient
-        from guided_learning.server import create_app
-        from guided_learning.server.settings import TeacherSettings
+        from throughline.server import create_app
+        from throughline.server.settings import TeacherSettings
         settings = TeacherSettings(self.home / 'settings.json')
         app = create_app(self.course, runner=None, settings=settings, library_root=self.sender, watch_interval=60)
         with TestClient(app, base_url='http://127.0.0.1:8765') as client:
@@ -420,7 +420,7 @@ STORE_METHODS = {'get', 'put', 'list', 'matching', 'delete', 'shared', 'digest'}
 def used_namespaces():
     """Every namespace the package's code reads or writes through a store, with the course namespace's keys."""
     namespaces, course_keys = set(), set()
-    for path in (ROOT / 'guided_learning').rglob('*.py'):
+    for path in (ROOT / 'throughline').rglob('*.py'):
         tree = ast.parse(path.read_text(encoding='utf-8'))
         constants = {node.targets[0].id: node.value.value for node in tree.body
                      if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)

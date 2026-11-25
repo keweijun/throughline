@@ -17,4 +17,4 @@ The MIT license at the repository root covers this project's own code. The built
 
 Mermaid's optional ELK layout (`elkjs`, EPL-2.0) is not shipped: the build replaces it with Mermaid's default layout (`web/vite.config.ts`).
 
-When frontend dependencies change, update the versions and copied notices alongside the rebuilt `guided_learning/web_dist` assets; `npm run licenses` in `web/` (run by CI) fails while a bundled package has no notice. These files are shipped inside the installed package, beside `LICENSE`.
+When frontend dependencies change, update the versions and copied notices alongside the rebuilt `throughline/web_dist` assets; `npm run licenses` in `web/` (run by CI) fails while a bundled package has no notice. These files are shipped inside the installed package, beside `LICENSE`.

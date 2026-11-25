@@ -2,8 +2,8 @@
 import tempfile
 import unittest
 
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline.api import execute
+from throughline.store import OperationError
 from support import host_client, settle
 
 DECISION = ('<teaching-decision>{"depth":"short","category":"prerequisite","rationale":"needs Fourier series","suggest_supplement":false,'

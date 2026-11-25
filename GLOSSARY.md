@@ -1,11 +1,11 @@
-# Personal cross-document guided learning
+# Throughline glossary
 
 Concepts for organizing multiple materials around one learning goal and preserving teaching continuity through interaction.
 
 ## Language
 
-**Cross-document guided learning**: Organizing and advancing one learning goal using knowledge connections and prerequisites across multiple sources.
-_Avoid_: Calling multi-file question answering or file selection alone cross-document guided learning.
+**Cross-document learning**: Organizing and advancing one learning goal using knowledge connections and prerequisites across multiple sources.
+_Avoid_: Calling multi-file question answering or file selection alone cross-document learning; "guided learning", the project's name before Throughline.
 
 **Deferred item**: Content the learner chooses to skip temporarily that remains in scope for later learning or review.
 _Avoid_: Mastered, completed, permanently excluded.

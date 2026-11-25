@@ -1,11 +1,11 @@
 from pathlib import Path
 import tempfile, threading
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch=tempfile.TemporaryDirectory()
 root=Path(scratch.name)
-execute(root,{'op':'course.init','title':'Quantum Guided Learning · Navigation acceptance'})
+execute(root,{'op':'course.init','title':'Quantum mechanics · Navigation acceptance'})
 p=root/'source.md';p.write_text('# Probability\nNormalization condition',encoding='utf-8')
 s=execute(root,{'op':'source.register','path':str(p)})['source'];ref={'source_id':s['id'],'revision':s['revision'],'unit_id':'line-2'}
 execute(root,{'op':'curriculum.save','concepts':[{'id':'wave','title':'Wave superposition','links':[ref]},{'id':'state','title':'Quantum states and measurement','prerequisites':['wave']}],'route':['wave','state'],'coverage':[]})

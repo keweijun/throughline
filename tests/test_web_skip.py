@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
+from throughline.api import execute
 from support import host_client, settle
 from test_web_drills import Runner
 

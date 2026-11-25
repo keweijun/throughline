@@ -4,7 +4,7 @@ import time
 import unittest
 from pathlib import Path
 
-from guided_learning.api import execute
+from throughline.api import execute
 from sample_pdf import write_pdf
 from support import host_client
 from test_readings import has_pdf_extra

@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import checks, codex, commands
+from throughline import checks, codex, commands
 
 
 def setup_args(**options):
@@ -20,8 +20,8 @@ def setup_args(**options):
 
 class SetupOpensTheApp(unittest.TestCase):
     def run_setup(self, home, **options):
-        env = {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
-               'GUIDED_LEARNING_CONFIG': str(Path(home) / 'settings.json')}
+        env = {'THROUGHLINE_HOME': home, 'THROUGHLINE_SKILLS_DIR': str(Path(home) / '.skills'),
+               'THROUGHLINE_CONFIG': str(Path(home) / 'settings.json')}
         output = io.StringIO()
         with mock.patch.dict(os.environ, env), redirect_stdout(output):
             code = commands.setup(setup_args(**options))
@@ -82,8 +82,8 @@ class SetupRemembersCodex(unittest.TestCase):
             cli.parent.mkdir(parents=True)
             cli.write_text('')
             cli.chmod(0o755)
-            env = {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
-                   'GUIDED_LEARNING_CONFIG': str(Path(home) / 'settings.json'), 'PATH': str(cli.parent),
+            env = {'THROUGHLINE_HOME': home, 'THROUGHLINE_SKILLS_DIR': str(Path(home) / '.skills'),
+                   'THROUGHLINE_CONFIG': str(Path(home) / 'settings.json'), 'PATH': str(cli.parent),
                    'LOCALAPPDATA': str(Path(home) / 'no-app')}
             with mock.patch.dict(os.environ, env), mock.patch.object(commands, 'open_app', return_value=False), \
                     redirect_stdout(io.StringIO()) as output:
@@ -153,18 +153,19 @@ class MacLauncher(unittest.TestCase):
 
 
 class Commands(unittest.TestCase):
-    def test_both_commands_are_installed(self):
+    def test_the_commands_are_installed_with_the_old_name_for_older_updaters(self):
         try:
             import tomllib
         except ImportError:
             self.skipTest('tomllib needs Python 3.11')
         root = Path(__file__).resolve().parent.parent
         scripts = tomllib.loads((root / 'pyproject.toml').read_text(encoding='utf-8'))['project']['scripts']
-        self.assertEqual(scripts['guided-learning'], 'guided_learning.__main__:main')
-        self.assertEqual(scripts['throughline'], 'guided_learning.__main__:throughline')
+        self.assertEqual(scripts['throughline'], 'throughline.__main__:throughline')
+        self.assertEqual(scripts['guided-learning'], 'throughline.__main__:main', 'the name before 0.66, which older updaters run')
+        self.assertEqual(scripts['throughline-web'], 'throughline.web:main')
 
-    def test_throughline_alone_opens_the_app_and_otherwise_is_guided_learning(self):
-        from guided_learning import __main__ as entry
+    def test_throughline_alone_opens_the_app_and_otherwise_runs_the_command(self):
+        from throughline import __main__ as entry
         with mock.patch.object(commands, 'main', return_value=0) as run:
             self.assertEqual(entry.throughline([]), 0)
             run.assert_called_once_with(['open'])
@@ -301,7 +302,7 @@ class Doctor(unittest.TestCase):
 
     def doctor(self, home, found, answer=None):
         output = io.StringIO()
-        with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home, 'GUIDED_LEARNING_CONFIG': str(Path(home) / 's.json')}), \
+        with mock.patch.dict(os.environ, {'THROUGHLINE_HOME': home, 'THROUGHLINE_CONFIG': str(Path(home) / 's.json')}), \
                 mock.patch.object(checks, 'codex_checks', return_value=found), \
                 mock.patch.object(checks, 'probe_model', return_value='gpt-6-luna'), \
                 mock.patch.object(checks, 'codex_answers', return_value=answer) as asked, \

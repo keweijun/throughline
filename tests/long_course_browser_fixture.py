@@ -6,9 +6,9 @@ first 40 sections have completed lessons and the learner is at section 41.
 import sys
 import tempfile
 from pathlib import Path
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 
 scratch = tempfile.TemporaryDirectory()
 root = Path(scratch.name)

@@ -17,8 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from guided_learning import migrations
-from guided_learning.api import execute
+from throughline import migrations
+from throughline.api import execute
 from tests.support import host_client, settle
 
 PLACEHOLDER = '@COURSE@'

@@ -2,6 +2,12 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.66.0
+
+- **The command is now `throughline`** everywhere: in the app's messages, the Codex skill and the README (`throughline open`, `throughline setup`, `throughline stop`). The old `guided-learning` still works, so nothing you have written or scripted breaks.
+- **Settings moved to a folder named after Throughline**: `~/.config/throughline` (`%APPDATA%\throughline` on Windows). The first time this version runs, it copies your settings, Studio's access and chats, and dismissed tips from the old `guided-learning` folder, and leaves that folder as it was.
+- **To use another course folder, set `THROUGHLINE_HOME`.** `GUIDED_LEARNING_HOME` is still read when it isn't set.
+
 ## 0.65.0
 
 - **Review has a home.** It opens on one page: what to go over, with the drill box at the top; under it, your key points, mistakes and sheets, each showing a glimpse of what is inside; then your drill sessions. It carries the course's own lines, as its cover does.

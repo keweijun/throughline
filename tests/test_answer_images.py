@@ -5,8 +5,8 @@ import threading
 import unittest
 from pathlib import Path
 
-from guided_learning import images as attached
-from guided_learning.api import execute
+from throughline import images as attached
+from throughline.api import execute
 from support import host_client
 
 PNG = b'\x89PNG\r\n\x1a\n' + b'\0' * (3 * 1024 * 1024)
@@ -169,7 +169,7 @@ class AttachedImages(unittest.TestCase):
 
 class RunnerInput(unittest.TestCase):
     def test_codex_runner_sends_images_as_local_image_inputs(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             script, seen = Path(tmp) / 'server.py', Path(tmp) / 'turn.json'
             script.write_text('''import sys,json

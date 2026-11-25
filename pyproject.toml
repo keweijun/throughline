@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "throughline"
-version = "0.65.0"
-description = "Throughline: guided learning across your documents, taught by Codex"
+version = "0.66.0"
+description = "Throughline: one course through all your documents, taught by Codex"
 readme = "README.md"
 license = "MIT"
 # The built interface bundles third-party code, whose notices ship beside the package's own license.
@@ -36,12 +36,13 @@ pdf = ["pypdf>=6,<7", "pypdfium2>=5,<6", "Pillow>=11,<13"]
 dev = ["httpx2>=2,<3"]
 
 [project.scripts]
-guided-learning = "guided_learning.__main__:main"
-throughline = "guided_learning.__main__:throughline"
-guided-learning-web = "guided_learning.web:main"
+throughline = "throughline.__main__:throughline"
+# The command's name before 0.66. Kept so every older Throughline's updater, which runs it, can finish (docs/stability.md).
+guided-learning = "throughline.__main__:main"
+throughline-web = "throughline.web:main"
 
 [tool.setuptools.packages.find]
-include = ["guided_learning*"]
+include = ["throughline*"]
 
 [tool.setuptools.package-data]
-guided_learning = ["web_dist/*", "web_dist/assets/*", "skill/*.md", "skill/references/*.md", "skill/agents/*.yaml", "icons/*"]
+throughline = ["web_dist/*", "web_dist/assets/*", "skill/*.md", "skill/references/*.md", "skill/agents/*.yaml", "icons/*"]

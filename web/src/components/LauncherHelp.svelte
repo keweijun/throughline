@@ -88,7 +88,7 @@
     </section>
   </div>
 {:else}
-  <p class="where">{t('This computer has no Throughline launcher yet. To add one, run this in a terminal:')} <code>guided-learning setup</code></p>
+  <p class="where">{t('This computer has no Throughline launcher yet. To add one, run this in a terminal:')} <code>throughline setup</code></p>
 {/if}
 
 <style>

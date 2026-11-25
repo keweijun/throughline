@@ -6,9 +6,9 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from guided_learning import packages
-from guided_learning.api import execute
-from guided_learning.streaming import PREPARED_STEP
+from throughline import packages
+from throughline.api import execute
+from throughline.streaming import PREPARED_STEP
 from support import host_client
 from test_web_lessons import CHECK, LessonHost, Runner, step_reply
 

@@ -39,7 +39,7 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
 用户请你安装或更新贯学时，请自己在沙箱外执行以下步骤（需要联网，并会写入工作区以外的位置），不要让用户手动输入命令。
 
-1. 如果 `guided-learning --version` 已经可以运行，先执行 `guided-learning stop`。在 Windows 上，正在运行的贯学会锁住自身文件，导致升级失败。
+1. 如果 `throughline --version` 已经可以运行，先执行 `throughline stop`。在 Windows 上，正在运行的贯学会锁住自身文件，导致升级失败。
 
    然后用当初安装它的工具卸载旧包名（0.5.1 之前的包名，会提供同一个命令）：`uv tool uninstall codex-guided-learning`、`pipx uninstall codex-guided-learning` 或 `python -m pip uninstall -y codex-guided-learning`。如果提示未安装，忽略即可。课程不受影响。
 2. 用第一个可用的工具从 GitHub 安装最新发布的版本：
@@ -49,9 +49,9 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 
    如果这些工具都没有（或者缺少 Python 3.10 或更高版本），用 uv 的[官方安装程序](https://docs.astral.sh/uv/getting-started/installation/)安装 uv，再用第一行。
 
-   如果之后找不到 `guided-learning` 命令，运行 `uv tool update-shell`（或 `pipx ensurepath`），并在下一步使用安装程序输出的完整路径。
-3. 运行 `guided-learning setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程，完成后会在浏览器中打开贯学。
-4. 把 setup 输出的欢迎指南原样展示给用户。如果是更新，只需告诉用户当前版本（`guided-learning --version`）。
+   如果之后找不到 `throughline` 命令，运行 `uv tool update-shell`（或 `pipx ensurepath`），并在下一步使用安装程序输出的完整路径。
+3. 运行 `throughline setup --language zh-CN`（用户用英文交流时去掉 `--language zh-CN`）。可以重复运行：它会更新技能和启动器，不会改动已有课程，完成后会在浏览器中打开贯学。
+4. 把 setup 输出的欢迎指南原样展示给用户。如果是更新，只需告诉用户当前版本（`throughline --version`）。
 
 `install.sh` 和 `install.ps1` 用 uv 执行同样的步骤；修改这里的步骤时请同步修改它们。
 
@@ -60,16 +60,16 @@ $env:THROUGHLINE_LANGUAGE = 'zh-CN'; irm https://raw.githubusercontent.com/kewei
 使用 [uv](https://docs.astral.sh/uv/)（推荐）：
 
 ```sh
-guided-learning stop                 # 更新时执行；首次安装可跳过
+throughline stop                 # 更新时执行；首次安装可跳过
 uv tool install --reinstall-package throughline "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"
-guided-learning setup --language zh-CN
+throughline setup --language zh-CN
 ```
 
-使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`。两种方式都会获取最新发布的版本，所以安装和更新用的是同样三行命令。`stable` 始终指向最新发布的版本；每个版本也都有标签，变更记录见 [CHANGELOG.md](CHANGELOG.md)，把 `@stable` 换成 `@v0.45.0` 即可安装该版本。退回旧版本后，已被新版本更新过的课程可能无法在旧版本中打开。运行 `guided-learning --version` 可查看当前版本，运行 `guided-learning doctor` 可检查是否找到 Codex 以及它能否回复（会向一个小模型发送一条很短的消息）。
+使用 pipx 时，把第二行换成 `pipx install --force "throughline[pdf] @ git+https://github.com/keweijun/throughline@stable"`。两种方式都会获取最新发布的版本，所以安装和更新用的是同样三行命令。`stable` 始终指向最新发布的版本；每个版本也都有标签，变更记录见 [CHANGELOG.md](CHANGELOG.md)，把 `@stable` 换成 `@v0.45.0` 即可安装该版本。退回旧版本后，已被新版本更新过的课程可能无法在旧版本中打开。运行 `throughline --version` 可查看当前版本，运行 `throughline doctor` 可检查是否找到 Codex 以及它能否回复（会向一个小模型发送一条很短的消息）。
 
-从 0.5.1 之前的版本（包名为 `codex-guided-learning`）更新时：在 `guided-learning stop` 之后运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），再按上面的步骤继续。
+从 0.5.1 之前的版本（包名为 `codex-guided-learning`）更新时：在 `throughline stop` 之后运行 `uv tool uninstall codex-guided-learning`（或 `pipx uninstall codex-guided-learning`），再按上面的步骤继续。
 
-卸载：先运行 `guided-learning stop`，再运行 `uv tool uninstall throughline`（或 `pipx uninstall throughline`），然后删除 `~/.agents/skills/throughline` 和启动器。课程会一直保留在贯学文件夹中，直到你手动删除。
+卸载：先运行 `throughline stop`，再运行 `uv tool uninstall throughline`（或 `pipx uninstall throughline`），然后删除 `~/.agents/skills/throughline` 和启动器。课程会一直保留在贯学文件夹中，直到你手动删除。
 
 ## 创建第一门课程
 
@@ -119,22 +119,22 @@ guided-learning setup --language zh-CN
 
 ## 文件在哪里
 
-- **课程**：你的贯学文件夹 `~/Throughline`（Windows 上是 `C:\Users\<你>\Throughline`）。它特意放在“文档”之外，因为“文档”常被 OneDrive 或 iCloud 同步，而同步可能损坏课程数据库。设置 `GUIDED_LEARNING_HOME` 可改用其他文件夹；如果指向同步文件夹，请每门课程同一时间只在一台电脑上打开。其中的 `AGENTS.md` 告诉 Codex 如何在这里工作。每门课程是一个子文件夹，包含源文件（`inputs/`）、资料快照、路线、进度和学习记录，`backups/` 中还保存着每次升级课程格式之前的副本；要迁移课程，先关闭应用，再复制整个文件夹。
-- **教师设置**：点击顶栏中的齿轮打开 **设置**，在教师一项中选择你的 Codex 账号提供的模型：教师模型、用于准备后续小节和整理笔记的小模型、各自的推理强度和快速模式。课程工坊自己的模型和访问权限（课程库访问或完全访问）在它的输入框里选择，和在 Codex 中一样。设置按用户保存在 `~/.config/guided-learning/settings.json`（Windows 上是 `%APPDATA%\guided-learning\settings.json`），不会写进任何课程。
+- **课程**：你的贯学文件夹 `~/Throughline`（Windows 上是 `C:\Users\<你>\Throughline`）。它特意放在“文档”之外，因为“文档”常被 OneDrive 或 iCloud 同步，而同步可能损坏课程数据库。设置 `THROUGHLINE_HOME` 可改用其他文件夹；如果指向同步文件夹，请每门课程同一时间只在一台电脑上打开。其中的 `AGENTS.md` 告诉 Codex 如何在这里工作。每门课程是一个子文件夹，包含源文件（`inputs/`）、资料快照、路线、进度和学习记录，`backups/` 中还保存着每次升级课程格式之前的副本；要迁移课程，先关闭应用，再复制整个文件夹。
+- **教师设置**：点击顶栏中的齿轮打开 **设置**，在教师一项中选择你的 Codex 账号提供的模型：教师模型、用于准备后续小节和整理笔记的小模型、各自的推理强度和快速模式。课程工坊自己的模型和访问权限（课程库访问或完全访问）在它的输入框里选择，和在 Codex 中一样。设置按用户保存在 `~/.config/throughline/settings.json`（Windows 上是 `%APPDATA%\throughline\settings.json`），不会写进任何课程。
 
 文字提取并不能保证公式、图片或覆盖范围正确，所以课程库和阅读器会标出仍需核对的内容。参见[创建与核对课程](docs/course-import.md)（英文）。
 
 ## 指令背后的命令
 
 ```sh
-guided-learning setup                 # 安装或更新 Codex 技能
-guided-learning open [课程名] [--no-browser] [--port 8765]
-guided-learning stop
-guided-learning courses               # 以 JSON 列出课程库
-echo '{"op":"course.status"}' | guided-learning --course quantum
+throughline setup                 # 安装或更新 Codex 技能
+throughline open [课程名] [--no-browser] [--port 8765]
+throughline stop
+throughline courses               # 以 JSON 列出课程库
+echo '{"op":"course.status"}' | throughline --course quantum
 ```
 
-最后一种写法是技能使用的操作入口：从标准输入或 `--request 文件.json` 读取一条 JSON 请求，返回 `{ok, result}` 或 `{ok:false, error}`。`--workspace <目录>` 可操作课程库之外的课程，`guided-learning-web --workspace <目录>` 则在前台为它启动界面。技能及其操作说明位于 [guided_learning/skill/](guided_learning/skill/SKILL.md)。
+最后一种写法是技能使用的操作入口：从标准输入或 `--request 文件.json` 读取一条 JSON 请求，返回 `{ok, result}` 或 `{ok:false, error}`。`--workspace <目录>` 可操作课程库之外的课程，`throughline-web --workspace <目录>` 则在前台为它启动界面。技能及其操作说明位于 [throughline/skill/](throughline/skill/SKILL.md)。
 
 ## 开发
 
@@ -142,14 +142,14 @@ echo '{"op":"course.status"}' | guided-learning --course quantum
 python -m venv .venv
 .venv/bin/python -m pip install -e ".[pdf,dev]"    # Windows: .venv\Scripts\python.exe
 .venv/bin/python -m unittest discover -s tests
-.venv/bin/guided-learning setup                     # 把当前检出的技能复制给 Codex；修改技能后需重新运行
+.venv/bin/throughline setup                     # 把当前检出的技能复制给 Codex；修改技能后需重新运行
 
 cd web && npm install
 GL_HOST=http://127.0.0.1:8765 npm run dev          # 连接运行中的服务，热更新界面
-npm run check && npm run build                     # 类型检查，然后生成 guided_learning/web_dist（需提交）
+npm run check && npm run build                     # 类型检查，然后生成 throughline/web_dist（需提交）
 npx playwright test                                # 用临时示例课程运行浏览器测试
 ```
 
 较大的改动前请先阅读[架构](docs/architecture.md)、[术语表](GLOSSARY.md)和[设计决策](docs/adr/)（均为英文）；面向智能体的说明在 [AGENTS.md](AGENTS.md)。任务通过 GitHub Issues 管理。CI 会在每个拉取请求上运行以上全部检查；合并到 `main` 的版本号更新会被打上标签，连同 [CHANGELOG.md](CHANGELOG.md) 中的条目一起发布，成为用户安装的版本（[ADR 0021](docs/adr/0021-releases-are-tagged-from-main.md)）。
 
-贯学采用 [MIT](LICENSE) 许可证；随附的第三方依赖保留各自的许可证，见[第三方许可声明](THIRD_PARTY_LICENSES.md)。Python 包名为 `throughline`（0.5.1 之前为 `codex-guided-learning`），命令名为 `guided-learning`。
+贯学采用 [MIT](LICENSE) 许可证；随附的第三方依赖保留各自的许可证，见[第三方许可声明](THIRD_PARTY_LICENSES.md)。Python 包名为 `throughline`（0.5.1 之前为 `codex-guided-learning`），命令名为 `throughline`。

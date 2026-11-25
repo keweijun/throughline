@@ -33,7 +33,7 @@ An empty Studio chat was a small question in the middle of a large empty frame, 
 
 A cover is **the subject's short name over a pattern of thin lines**: 物化 over nested ellipses, DS over a tree.
 
-- **Codex chooses both** (`cover.save`, `guided_learning/covers.py`), when it builds a course, when it next works on a course that has none, and when the learner asks for another. It has read the materials, so it knows that physical chemistry is 物化 to a student and that a course called "Midterm review: chapters 1–5" is data structures.
+- **Codex chooses both** (`cover.save`, `throughline/covers.py`), when it builds a course, when it next works on a course that has none, and when the learner asks for another. It has read the materials, so it knows that physical chemistry is 物化 to a student and that a course called "Midterm review: chapters 1–5" is data structures.
 - **The name** is what a student would call the subject to a classmate: the usual abbreviation, or the plain subject name without what this course adds. It is in the course's teaching language and short, since it is set large.
 - **The pattern** is one of a small library (`covers.PATTERNS`): contours, waves, lattice, grid, orbits, field, branches, scatter and ruled. Each says what it looks like and which subjects it suits, which is what Codex reads to choose (`cover.list`).
 - **The app draws the patterns** (`web/src/lib/covers.ts`), in the interface's own ink with a few strokes in marker yellow, varied by the course's folder name so two courses with one pattern differ. A cover is therefore two short strings, and every cover is in the same hand in both themes.

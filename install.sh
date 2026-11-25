@@ -40,11 +40,13 @@ main() {
   fi
 
   # 2.
-  if command -v guided-learning >/dev/null 2>&1; then
+  if command -v throughline >/dev/null 2>&1; then
+    throughline stop || true
+  elif command -v guided-learning >/dev/null 2>&1; then  # an older install may have only the old name
     guided-learning stop || true
   fi
 
-  # 3. A pipx install, of either name, would clash with uv's guided-learning command.
+  # 3. A pipx install, of either name, would clash with uv's throughline command.
   uv tool uninstall codex-guided-learning >/dev/null 2>&1 || true
   if command -v pipx >/dev/null 2>&1; then
     pipx uninstall codex-guided-learning >/dev/null 2>&1 || true
@@ -60,7 +62,7 @@ main() {
   set -- setup
   if [ "$language" = zh-CN ]; then set -- "$@" --language zh-CN; fi
   if [ "$open" = no ]; then set -- "$@" --no-open; fi
-  "$bin/guided-learning" "$@"
+  "$bin/throughline" "$@"
 
   if ! command -v codex >/dev/null 2>&1 && [ ! -d /Applications/Codex.app ] && [ ! -d "$HOME/Applications/Codex.app" ]; then
     echo

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def call_cli(case, workspace, op, error=None, **fields):
     if op in ('position.save', 'mainline.enter'):
         fields.setdefault('request_id', str(uuid.uuid4()))
-    process = subprocess.run([sys.executable, '-m', 'guided_learning', '--workspace', str(workspace)], input=json.dumps({'op':op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
+    process = subprocess.run([sys.executable, '-m', 'throughline', '--workspace', str(workspace)], input=json.dumps({'op':op, **fields}), text=True, encoding='utf-8', capture_output=True, cwd=ROOT)
     case.assertTrue(process.stdout.strip(), process.stderr)
     response = json.loads(process.stdout)
     if error:
@@ -26,7 +26,7 @@ def call_cli(case, workspace, op, error=None, **fields):
 
 def taught(workspace, concept_id):
     """A completed lesson turn in a section: preparing the next section waits for one (issue #176)."""
-    from guided_learning.api import execute
+    from throughline.api import execute
     identifier = 'lesson-' + concept_id
     execute(workspace, {'op': 'stream.start', 'id': identifier, 'concept_id': concept_id, 'prompt': 'Teach', 'channel': 'mainline'})
     execute(workspace, {'op': 'stream.event', 'id': identifier, 'attempt': 1, 'sequence': 1, 'kind': 'final', 'text': 'Lesson'})
@@ -37,8 +37,8 @@ def host_client(workspace, runner=None, settings=None, port=8765, key_points=Fal
     """A loopback-addressed client for the HTTP host; close it to release the course lease. The idle job writing missing
     key points stays off unless a test asks for it (`key_points`), so it never takes a reply another test expects."""
     from fastapi.testclient import TestClient
-    from guided_learning.server.settings import TeacherSettings
-    from guided_learning.server import create_app
+    from throughline.server.settings import TeacherSettings
+    from throughline.server import create_app
     settings = settings or TeacherSettings(Path(tempfile.mkdtemp()) / 'settings.json')
     app = create_app(workspace, port=port, runner=runner, settings=settings)
     app.state.host.key_points.ahead = key_points

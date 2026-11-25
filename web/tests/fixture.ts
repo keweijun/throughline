@@ -9,7 +9,7 @@ const python = process.env.TEST_PYTHON ?? path.join(root, '.venv', process.platf
 
 /** Runs one course operation on a course folder, as the skill does, for a test that stands in for Codex's work. */
 export function courseOperation(folder: string, request: Record<string, unknown>) {
-  const result = spawnSync(python, ['-m', 'guided_learning', '--workspace', folder], { cwd: root, input: JSON.stringify(request), encoding: 'utf-8' });
+  const result = spawnSync(python, ['-m', 'throughline', '--workspace', folder], { cwd: root, input: JSON.stringify(request), encoding: 'utf-8' });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout);
   return JSON.parse(result.stdout);
 }
@@ -25,7 +25,7 @@ export function samplePdf(pages: string[][]) {
 /** Starts a disposable course host from a Python fixture module and opens it. */
 async function open(page: Page, module: string, children: ChildProcess[], options: { intro?: boolean } = {}) {
   // The launch update check never reaches GitHub from a test; tests that need an answer route /api/update themselves.
-  const env = { ...process.env, GUIDED_LEARNING_UPDATE_URL: 'file:///nonexistent/pyproject.toml' };
+  const env = { ...process.env, THROUGHLINE_UPDATE_URL: 'file:///nonexistent/pyproject.toml' };
   const child = spawn(python, ['-m', `tests.${module}`], { cwd: root, env, stdio: ['ignore', 'pipe', 'inherit'] });
   children.push(child);
   const [out] = (await once(child.stdout!, 'data')) as [Buffer];

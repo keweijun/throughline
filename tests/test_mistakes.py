@@ -1,7 +1,7 @@
 """The mistakes book (issue #219): worked out from exercises, review answers and check answers, never stored."""
 import unittest
 
-from guided_learning import mistakes
+from throughline import mistakes
 from test_review import MemoryStore
 
 T0 = 1_800_000_000

@@ -1,8 +1,8 @@
 """Review on request (ADR 0014): the review context, recall answers and warm-ups, read from the course with an injected clock."""
 import unittest
 
-from guided_learning import review
-from guided_learning.store import OperationError
+from throughline import review
+from throughline.store import OperationError
 
 DAY = review.DAY
 T0 = 1_800_000_000

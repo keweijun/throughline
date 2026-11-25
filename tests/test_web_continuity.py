@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from guided_learning.api import execute
+from throughline.api import execute
 
 
 def course(tmp):
@@ -31,7 +31,7 @@ class Runner:
 
 class Continuity(unittest.TestCase):
     def test_pending_explanation_is_taught_and_resolved_in_its_target_section(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         runner = Runner()
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)
@@ -59,7 +59,7 @@ class Continuity(unittest.TestCase):
                 app.close()
 
     def test_a_stepped_lesson_resolves_pending_explanations_with_its_last_step(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         runner = Runner()
         runner.lessons = ['Step one.\n<lesson-step>{"remaining": [{"title": "Phase"}]}</lesson-step>', 'Step two.\n<lesson-step>{"remaining": []}</lesson-step>']
         with tempfile.TemporaryDirectory() as tmp:
@@ -81,7 +81,7 @@ class Continuity(unittest.TestCase):
                 app.close()
 
     def test_lesson_outside_target_section_does_not_resolve_explanation(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         runner = Runner()
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)
@@ -97,7 +97,7 @@ class Continuity(unittest.TestCase):
                 app.close()
 
     def test_unknown_target_section_keeps_route_note_without_scheduling(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         with tempfile.TemporaryDirectory() as tmp:
             course(tmp)
             app = Host(tmp, runner=Runner(target='nowhere'))
@@ -113,7 +113,7 @@ class Continuity(unittest.TestCase):
                 app.close()
 
     def test_preview_lists_set_aside_material_for_the_section(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         with tempfile.TemporaryDirectory() as tmp:
             execute(tmp, {'op': 'course.init', 'title': 'Q'})
             path = Path(tmp) / 'notes.md'

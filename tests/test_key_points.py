@@ -6,9 +6,9 @@ import time
 import unittest
 from pathlib import Path
 
-from guided_learning import packages
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline import packages
+from throughline.api import execute
+from throughline.store import OperationError
 from support import host_client, settle
 from test_web_lessons import LessonHost, Runner, step_reply
 

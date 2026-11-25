@@ -8,8 +8,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import call_cli
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
 
 FAKE = Path(__file__).resolve().parent / 'fake_studio_server.py'
 

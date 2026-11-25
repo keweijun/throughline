@@ -23,11 +23,13 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 }
 
 # 2.
-if (Get-Command guided-learning -ErrorAction SilentlyContinue) {
+if (Get-Command throughline -ErrorAction SilentlyContinue) {
+    throughline stop
+} elseif (Get-Command guided-learning -ErrorAction SilentlyContinue) {  # an older install may have only the old name
     guided-learning stop
 }
 
-# 3. A pipx install, of either name, would clash with uv's guided-learning command.
+# 3. A pipx install, of either name, would clash with uv's throughline command.
 uv tool uninstall codex-guided-learning *> $null
 if (Get-Command pipx -ErrorAction SilentlyContinue) {
     pipx uninstall codex-guided-learning *> $null
@@ -44,7 +46,7 @@ $Bin = (uv tool dir --bin).Trim()
 $SetupArgs = @('setup')
 if ($Language -eq 'zh-CN') { $SetupArgs += '--language', 'zh-CN' }
 if ($NoOpen) { $SetupArgs += '--no-open' }
-& (Join-Path $Bin 'guided-learning.exe') @SetupArgs
+& (Join-Path $Bin 'throughline.exe') @SetupArgs
 if ($LASTEXITCODE -ne 0) { throw 'Setup did not finish; see the messages above.' }
 
 $CodexApp = Join-Path $env:LOCALAPPDATA 'OpenAI\Codex\bin'

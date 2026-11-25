@@ -197,7 +197,7 @@
   {#if app.signedOut}
     <main id="main" class="loading" role="alert">
       <h1 class="signed-out">{t('Open Throughline from its launcher')}</h1>
-      <p>{t('This browser is not signed in to Throughline. Open it from the Throughline launcher, or run "guided-learning open" in a terminal, and this page opens signed in. This keeps other people on this computer out of your courses.')}</p>
+      <p>{t('This browser is not signed in to Throughline. Open it from the Throughline launcher, or run "throughline open" in a terminal, and this page opens signed in. This keeps other people on this computer out of your courses.')}</p>
     </main>
   {:else if app.libraryOpen}
     <Library />

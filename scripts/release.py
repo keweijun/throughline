@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VERSION = re.compile(r'^version\s*=\s*"([^"]+)"', re.MULTILINE)
 # What `pip install` takes from the repository: the package, its metadata and the license files it ships.
-SHIPPED = ('guided_learning/', 'licenses/', 'pyproject.toml', 'LICENSE', 'THIRD_PARTY_LICENSES.md')
+SHIPPED = ('throughline/', 'licenses/', 'pyproject.toml', 'LICENSE', 'THIRD_PARTY_LICENSES.md')
 
 
 def version(text):

@@ -3,7 +3,7 @@
 Studio (ADR 0016) moves course work into the app. That changes the first hour of using Throughline, and it adds a fifth kind of thing to an interface that had grown one feature at a time:
 
 - **Installing ended in Codex.** The learner pasted `Install …` into a Codex chat, setup printed a long welcome guide there, and the guide sent them to build a first course with `$throughline` in that same chat. With Studio, the first course is built in the app, so the guide points the wrong way, and it already described review at growing intervals after ADR 0014 removed them.
-- **The way back was hard to find.** Setup adds a launcher (a Start menu entry on Windows, `~/Applications/Throughline.app` on macOS, a `.desktop` entry on Linux), but only one line of the welcome guide says so, in a chat the learner will not scroll back to. The command is `guided-learning`, which nobody remembers for an app called Throughline. The app never says how to open it next time.
+- **The way back was hard to find.** Setup adds a launcher (a Start menu entry on Windows, `~/Applications/Throughline.app` on macOS, a `.desktop` entry on Linux), but only one line of the welcome guide says so, in a chat the learner will not scroll back to. The command is `throughline`, which nobody remembers for an app called Throughline. The app never says how to open it next time.
 - **The app explained nothing itself.** Selecting a passage to ask about it, clicking a citation, how help on an exercise is recorded and what Memory is were learned by stumbling on them or from the README.
 - **The top bar put unlike things side by side.** Courses, Review, then Questions, Source, Notes and Memory as equal side panel views, with Studio about to join them. Questions, Source and Notes are used while reading a section; Memory and Studio are about the course as a whole and are used now and then.
 
@@ -11,9 +11,9 @@ Studio (ADR 0016) moves course work into the app. That changes the first hour of
 
 The Codex prompt stays the main way to install, since every learner already has Codex. Beside it:
 
-- **An install script**, `install.sh` and `install.ps1` in the repository, run with one line (`curl … | sh`, `irm … | iex`). It installs uv when it is missing (uv brings its own Python, so Python stops being a prerequisite), removes the pre-0.5.1 package name, installs the package from `main` and runs `guided-learning setup`. It runs the same steps the README gives Codex, which the one-click update also follows (ADR 0016), so they are kept together. It checks that `codex` is on PATH and says how to get Codex if not; it does not install Codex.
+- **An install script**, `install.sh` and `install.ps1` in the repository, run with one line (`curl … | sh`, `irm … | iex`). It installs uv when it is missing (uv brings its own Python, so Python stops being a prerequisite), removes the pre-0.5.1 package name, installs the package from `main` and runs `throughline setup`. It runs the same steps the README gives Codex, which the one-click update also follows (ADR 0016), so they are kept together. It checks that `codex` is on PATH and says how to get Codex if not; it does not install Codex.
 - **Setup opens the app** on the library when it finishes (`--no-open` to skip; the one-click update passes it, since Codex then restarts the host on the port the open tab uses), in the language setup was run in (`--language`, which the Codex prompt passes when the learner writes in Chinese). The welcome guide shrinks to the installed version, the library folder, where the launcher is, and "Throughline is open in your browser: make your first course in Studio". What studying looks like is explained in the app, where it can stay current.
-- **A `throughline` command**, the same as `guided-learning`, which stays for scripts and the skill.
+- **A `throughline` command**, which on its own opens the app as the launcher does. (Until 0.66 the command was `guided-learning`, which stays installed as another name for it; ADR 0004.)
 - **On macOS the launcher goes to `/Applications`** when it is writable, and to `~/Applications` otherwise.
 
 A native installer (`.exe`, `.dmg`) is not built: see below.

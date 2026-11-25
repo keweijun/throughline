@@ -16,9 +16,9 @@ import unittest
 import uuid
 from pathlib import Path
 
-from guided_learning import migrations
-from guided_learning.api import execute
-from guided_learning.store import OperationError
+from throughline import migrations
+from throughline.api import execute
+from throughline.store import OperationError
 from tests.sample_pdf import write_pdf
 from tests.support import ROOT
 from tests.test_course_fixtures import FIXTURES, load
@@ -47,7 +47,7 @@ class Contract(unittest.TestCase):
 
     def environment(self):
         """The command's environment, with the library and every per-user folder inside the test's own folder."""
-        return {**os.environ, 'GUIDED_LEARNING_HOME': str(self.home / 'library'), 'GUIDED_LEARNING_SKILLS_DIR': str(self.home / '.skills'),
+        return {**os.environ, 'THROUGHLINE_HOME': str(self.home / 'library'), 'THROUGHLINE_SKILLS_DIR': str(self.home / '.skills'),
                 'XDG_DATA_HOME': str(self.home / '.xdg'), 'APPDATA': str(self.home / '.appdata')}
 
     def refused(self, code, op, course=None, **fields):
@@ -78,7 +78,7 @@ class Results(Contract):
         env = self.environment()
 
         def run(*args, request):
-            return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=json.dumps(request), text=True, encoding='utf-8',
+            return subprocess.run([sys.executable, '-m', 'throughline', *args], input=json.dumps(request), text=True, encoding='utf-8',
                                   capture_output=True, cwd=ROOT, env=env, timeout=60)
         for address in (('--workspace', str(self.course)), ('--course', 'quantum')):
             ok = run(*address, request={'op': 'course.status'})
@@ -493,7 +493,7 @@ class Commands(Contract):
 
     def command(self, *args):
         env = self.environment()
-        return subprocess.run([sys.executable, '-m', 'guided_learning', *args], text=True, encoding='utf-8', capture_output=True, cwd=ROOT, env=env, timeout=60)
+        return subprocess.run([sys.executable, '-m', 'throughline', *args], text=True, encoding='utf-8', capture_output=True, cwd=ROOT, env=env, timeout=60)
 
     def test_every_command_keeps_its_flags(self):
         import re

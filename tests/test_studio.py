@@ -10,9 +10,9 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from support import call_cli
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server.studio import Studio, StudioError, message_input
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
+from throughline.server.studio import Studio, StudioError, message_input
 
 FAKE = Path(__file__).resolve().parent / 'fake_studio_server.py'
 
@@ -65,7 +65,7 @@ class StudioTest(unittest.TestCase):
         started = self.received('thread/start')[0]
         self.assertEqual((started['sandbox'], started['approvalPolicy'], started['ephemeral']), ('workspace-write', 'on-request', False))
         self.assertIn('Throughline Studio', started['developerInstructions'])
-        self.assertIn('never run `guided-learning open`', started['developerInstructions'])
+        self.assertIn('never run `throughline open`', started['developerInstructions'])
         self.assertIs(started['config']['features.default_mode_request_user_input'], True)
         turn = self.received('turn/start')[0]
         self.assertEqual(turn['approvalPolicy'], 'on-request')
@@ -156,7 +156,7 @@ class StudioTest(unittest.TestCase):
         else:
             self.fail('The turn never started')
         hung = self.client.app.state.courses.studio.server.process
-        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 0.5):
+        with mock.patch('throughline.server.studio.STOP_TIMEOUT', 0.5):
             stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
         self.assertEqual(stopped.json(), {'thread': thread, 'restarted': True})
         self.assertIsNotNone(hung.poll(), 'the hung App Server was stopped')
@@ -168,7 +168,7 @@ class StudioTest(unittest.TestCase):
         thread = self.send('ignore stop')['thread']
         self.history(thread, lambda h: h['active_turn'])
         stuck = self.client.app.state.courses.studio.server.process
-        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 0.5):
+        with mock.patch('throughline.server.studio.STOP_TIMEOUT', 0.5):
             stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
         self.assertEqual(stopped.json(), {'thread': thread, 'restarted': True})
         self.assertEqual(len(self.received('turn/interrupt')), 1, 'Codex was asked to stop first')
@@ -181,7 +181,7 @@ class StudioTest(unittest.TestCase):
         thread = self.send('wait for it')['thread']
         self.history(thread, lambda h: h['active_turn'])
         running = self.client.app.state.courses.studio.server.process
-        with mock.patch('guided_learning.server.studio.STOP_TIMEOUT', 5):
+        with mock.patch('throughline.server.studio.STOP_TIMEOUT', 5):
             stopped = self.client.post(f'/api/studio/threads/{thread}/interrupt')
         self.assertEqual(stopped.json(), {'thread': thread})
         self.assertIsNone(running.poll(), 'a normal stop leaves Codex running')
@@ -349,7 +349,7 @@ class UploadTest(unittest.TestCase):
 
     def test_a_refused_upload_removes_only_its_own_file(self):
         course = Path(tempfile.mkdtemp())
-        with mock.patch('guided_learning.server.studio.MAX_UPLOAD', 3), self.assertRaises(StudioError):
+        with mock.patch('throughline.server.studio.MAX_UPLOAD', 3), self.assertRaises(StudioError):
             Studio.upload(course, 'big.pdf', [b'1234'])
         self.assertEqual(list((course / 'inputs').iterdir()), [])
 

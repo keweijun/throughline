@@ -6,11 +6,11 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from guided_learning import activity
-from guided_learning.api import execute
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.store import Store
+from throughline import activity
+from throughline.api import execute
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
+from throughline.store import Store
 
 DAY = 86400
 T = 1_790_000_000  # some time in 2026

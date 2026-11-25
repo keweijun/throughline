@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guided_learning import library
+from throughline import library
 
 
 def entries(path):
@@ -26,7 +26,7 @@ class WindowsPermissions(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        patcher = mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': self.tmp.name})
+        patcher = mock.patch.dict(os.environ, {'THROUGHLINE_HOME': self.tmp.name})
         patcher.start()
         self.addCleanup(patcher.stop)
         self.me = subprocess.run(['whoami'], capture_output=True, check=True).stdout.decode('utf-8', 'replace').strip().lower()

@@ -87,7 +87,7 @@ test('course actions open Codex with a $throughline request, and new courses app
   await expect(page.locator('.courses > li').filter({ hasText: 'Thermodynamics' }).getByRole('link', { name: 'Build the route in Codex' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'New course in Codex' })).toHaveAttribute('href', /^codex:\/\/new\?prompt=/);
 
-  execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "course.init", "title": "Organic Chemistry"})',
+  execFileSync(python, ['-c', 'import sys; from throughline.api import execute; execute(sys.argv[1], {"op": "course.init", "title": "Organic Chemistry"})',
     path.join(library.root, 'organic')], { cwd: root });
   await expect(page.locator('.courses > li').filter({ hasText: 'Organic Chemistry' })).toBeVisible({ timeout: 8000 });
 });
@@ -104,7 +104,7 @@ test('a card is a cover, a title and one line, and the whole card opens the cour
   await expect(quantum.locator('.cover .name')).toHaveText('Introductory Quantum Mechanics');
 
   // Codex chooses the cover (cover.save), and the card shows it without a reload.
-  execFileSync(python, ['-c', 'import sys; from guided_learning.api import execute; execute(sys.argv[1], {"op": "cover.save", "name": "QM", "pattern": "orbits"})',
+  execFileSync(python, ['-c', 'import sys; from throughline.api import execute; execute(sys.argv[1], {"op": "cover.save", "name": "QM", "pattern": "orbits"})',
     path.join(library.root, 'quantum-v1')], { cwd: root });
   await expect(quantum.locator('.cover .name')).toHaveText('QM', { timeout: 8000 });
   const drawn = await quantum.locator('.cover svg path').count();

@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 import tempfile
-from guided_learning.api import execute
-from guided_learning.server.settings import TeacherSettings
-from guided_learning.server import serve
+from throughline.api import execute
+from throughline.server.settings import TeacherSettings
+from throughline.server import serve
 scratch = tempfile.TemporaryDirectory()
 root = Path(scratch.name)
 execute(root, {'op': 'course.init', 'title': 'Quantum · Chapters acceptance'})

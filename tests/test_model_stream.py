@@ -9,7 +9,7 @@ from pathlib import Path
 
 class ModelStream(unittest.TestCase):
     def test_streams_final_phase_and_requires_successful_turn(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             script=Path(tmp)/'server.py'
             script.write_text('''import sys,json
@@ -36,7 +36,7 @@ for line in sys.stdin:
                                      {'kind':'complete','usage':{'inputTokens':220,'cachedInputTokens':160,'outputTokens':14,'reasoningOutputTokens':3,'totalTokens':234}}])
 
     def test_model_list_follows_pages_and_hides_hidden_models(self):
-        from guided_learning.codex import list_models
+        from throughline.codex import list_models
         with tempfile.TemporaryDirectory() as tmp:
             script=Path(tmp)/'server.py'
             script.write_text('''import sys,json
@@ -55,7 +55,7 @@ for line in sys.stdin:
                 {'id':'b','name':'b','description':'Small','default':False,'efforts':[],'tiers':[]}])
 
     def test_service_tier_is_sent_when_starting_the_thread(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         with tempfile.TemporaryDirectory() as tmp:
             script=Path(tmp)/'server.py'
             seen=Path(tmp)/'thread.json'
@@ -71,7 +71,7 @@ for line in sys.stdin:
             self.assertEqual(json.loads(seen.read_text())['serviceTier'],'priority')
 
     def test_commentary_only_and_connection_loss_never_complete_a_lesson(self):
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         for terminal in ('completed','disconnect'):
             with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as tmp:
                 script=Path(tmp)/'server.py'
@@ -93,7 +93,7 @@ for line in sys.stdin:
         import time
         from unittest.mock import patch
         import subprocess
-        from guided_learning.codex import CodexRunner
+        from throughline.codex import CodexRunner
         for stalled in ('initialize','thread/start','turn/start'):
             with self.subTest(stalled=stalled), tempfile.TemporaryDirectory() as tmp:
                 script=Path(tmp)/'server.py'
@@ -104,7 +104,7 @@ for line in sys.stdin:
                     process=real_popen(*args,**kwargs);owned.append(process);return process
                 started=time.monotonic()
                 try:
-                    with patch('guided_learning.codex.subprocess.Popen',side_effect=launch):
+                    with patch('throughline.codex.subprocess.Popen',side_effect=launch):
                         CodexRunner(command=[sys.executable,str(script)],timeout=2).run('teach',tmp,lambda e:None,cancel)
                     self.assertLess(time.monotonic()-started,1.5)
                     self.assertIsNotNone(owned[0].poll())
@@ -114,8 +114,8 @@ for line in sys.stdin:
 class FindCodex(unittest.TestCase):
     def test_explicit_path_then_path_then_desktop_app(self):
         from unittest import mock
-        from guided_learning import codex
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(codex.os.environ, {'GUIDED_LEARNING_CONFIG': str(Path(tmp) / 's.json')}):
+        from throughline import codex
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(codex.os.environ, {'THROUGHLINE_CONFIG': str(Path(tmp) / 's.json')}):
             bundled = Path(tmp) / 'OpenAI' / 'Codex' / 'bin' / 'codex.exe'
             bundled.parent.mkdir(parents=True)
             bundled.write_text('')
@@ -134,7 +134,7 @@ class SavedCodex(unittest.TestCase):
 
     def setUp(self):
         from unittest import mock
-        from guided_learning import codex
+        from throughline import codex
         self.codex = codex
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -149,7 +149,7 @@ class SavedCodex(unittest.TestCase):
         self.app = self.home / 'OpenAI' / 'Codex' / 'bin' / 'codex.exe'  # the desktop app's copy, the last resort
         self.app.parent.mkdir(parents=True)
         self.app.write_text('')
-        environment = mock.patch.dict(codex.os.environ, {'GUIDED_LEARNING_CONFIG': str(self.settings), 'LOCALAPPDATA': str(self.home),
+        environment = mock.patch.dict(codex.os.environ, {'THROUGHLINE_CONFIG': str(self.settings), 'LOCALAPPDATA': str(self.home),
                                                          'PATH': str(self.cli.parent)})
         environment.start()
         self.addCleanup(environment.stop)
@@ -183,7 +183,7 @@ class SavedCodex(unittest.TestCase):
         moved.parent.mkdir()
         moved.write_text('')
         moved.chmod(0o755)
-        from guided_learning.userfiles import write_json
+        from throughline.userfiles import write_json
         write_json(self.settings, {'codex_path': str(moved), 'codex_path_dirs': []})
         self.assertSamePath(self.codex.find_codex(), moved)
 
@@ -243,7 +243,7 @@ class SavedCodex(unittest.TestCase):
         self.assertSamePath(self.codex.find_codex(), moved)
 
     def test_teacher_settings_keep_the_saved_codex(self):
-        from guided_learning.server.settings import TeacherSettings
+        from throughline.server.settings import TeacherSettings
         self.codex.remember_codex()
         TeacherSettings(self.settings).save('gpt-6-sol', 'high')
         self.launcher_environment()
@@ -259,7 +259,7 @@ for line in sys.stdin:
  if m:
   n+=1; name=os.path.join(log,'%%d-%%d-%%06d'%%(time.time_ns(),os.getpid(),n)); open(name+'.tmp','w').write(json.dumps([m,p])); os.replace(name+'.tmp',name+'.json')
  if m=='initialize': out({'id':i,'result':{}})
- if m=='thread/list': out({'id':i,'result':{'data':[{'id':'old','originator':'guided_learning','createdAt':0}]*2 if p.get('archived') else []}})
+ if m=='thread/list': out({'id':i,'result':{'data':[{'id':'old','originator':'throughline','createdAt':0}]*2+[{'id':'older','originator':'guided_learning','createdAt':0},{'id':'theirs','originator':'codex_cli_rs','createdAt':0}] if p.get('archived') else []}})
  if m=='thread/archive': out({'id':i,'result':{}})
  if m=='thread/unarchive':
   out({'id':i,'error':{'code':-32600,'message':'no rollout'}} if mode=='lost' else {'id':i,'result':{}})
@@ -283,7 +283,7 @@ class SavedThreads(unittest.TestCase):
     is reused and idle threads stay out of the learner's Codex session list."""
 
     def setUp(self):
-        from guided_learning import codex
+        from throughline import codex
         self.codex = codex
         self.addCleanup(setattr, codex, 'THREADS', codex.THREADS)
         codex.THREADS = codex.SavedThreads()
@@ -313,7 +313,7 @@ class SavedThreads(unittest.TestCase):
         return [json.loads(f.read_text()) for f in sorted(folder.glob('*.json'))] if folder.is_dir() else []
 
     def teaching(self, request):
-        from guided_learning.server.prompts import Prompt
+        from throughline.server.prompts import Prompt
         return Prompt('Teacher instructions and route', request)
 
     def test_a_teaching_turn_is_reverted_and_the_next_one_resumes_its_thread(self):
@@ -359,3 +359,5 @@ class SavedThreads(unittest.TestCase):
             calls = self.turns(tmp, [self.teaching('one')])
             self.assertEqual([p.get('archived') for m, p in calls if m == 'thread/list'], [False, True])
             self.assertEqual(calls.count(['thread/delete', {'threadId': 'old'}]), 1)
+            self.assertIn(['thread/delete', {'threadId': 'older'}], calls, 'teaching threads from before 0.66, when the client was guided_learning')
+            self.assertNotIn(['thread/delete', {'threadId': 'theirs'}], calls, "the learner's own Codex threads")

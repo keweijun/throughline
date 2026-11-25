@@ -13,15 +13,15 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from guided_learning import api, library, sources
-from guided_learning.api import execute
-from guided_learning.store import OperationError, Store
-from guided_learning.files import Opener
-from guided_learning.server import Host, create_app
-from guided_learning.server import host as host_module
-from guided_learning.server.builds import ChapterBuilds
-from guided_learning.server.features import Preparation
-from guided_learning.server.settings import TeacherSettings
+from throughline import api, library, sources
+from throughline.api import execute
+from throughline.store import OperationError, Store
+from throughline.files import Opener
+from throughline.server import Host, create_app
+from throughline.server import host as host_module
+from throughline.server.builds import ChapterBuilds
+from throughline.server.features import Preparation
+from throughline.server.settings import TeacherSettings
 from support import ROOT
 
 
@@ -31,10 +31,10 @@ def course(path, title):
 
 
 def cli(home, *args, stdin='', **extra):
-    env = {**os.environ, **extra, 'GUIDED_LEARNING_HOME': str(home), 'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'),
+    env = {**os.environ, **extra, 'THROUGHLINE_HOME': str(home), 'THROUGHLINE_SKILLS_DIR': str(Path(home) / '.skills'),
            'XDG_DATA_HOME': str(Path(home) / '.xdg'), 'APPDATA': str(Path(home) / '.appdata'),
-           'GUIDED_LEARNING_CONFIG': str(Path(home) / '.config' / 'settings.json')}
-    return subprocess.run([sys.executable, '-m', 'guided_learning', *args], input=stdin, text=True, encoding='utf-8',
+           'THROUGHLINE_CONFIG': str(Path(home) / '.config' / 'settings.json')}
+    return subprocess.run([sys.executable, '-m', 'throughline', *args], input=stdin, text=True, encoding='utf-8',
                           capture_output=True, cwd=ROOT, env=env, timeout=60)
 
 
@@ -121,6 +121,16 @@ class CourseLibrary(unittest.TestCase):
             self.assertEqual(cli(home, 'setup', '--no-open').returncode, 1)
             self.assertIn('something-else', (skill / 'SKILL.md').read_text(encoding='utf-8'))
 
+    def test_setup_replaces_the_library_agents_file_an_older_setup_wrote(self):
+        with tempfile.TemporaryDirectory() as home:
+            agents = Path(home) / 'AGENTS.md'
+            agents.write_text('<!-- Written by guided-learning setup; rerunning setup replaces this file. -->\nOld.', encoding='utf-8')
+            self.assertEqual(cli(home, 'setup', '--no-open', '--no-launcher').returncode, 0)
+            self.assertIn('$throughline', agents.read_text(encoding='utf-8'))
+            agents.write_text('My own notes.', encoding='utf-8')
+            self.assertEqual(cli(home, 'setup', '--no-open', '--no-launcher').returncode, 0)
+            self.assertEqual(agents.read_text(encoding='utf-8'), 'My own notes.')
+
     def test_setup_prepares_the_library_launcher_and_welcome_guide(self):
         with tempfile.TemporaryDirectory() as home:
             result = cli(home, 'setup', '--no-open')
@@ -143,7 +153,7 @@ class CourseLibrary(unittest.TestCase):
                 self.assertTrue(launcher.is_file())
             elif sys.platform != 'darwin':
                 launcher = Path(home) / '.xdg' / 'applications' / 'throughline.desktop'
-                self.assertIn('-m guided_learning open', launcher.read_text(encoding='utf-8'))
+                self.assertIn('-m throughline open', launcher.read_text(encoding='utf-8'))
                 icon = next(l for l in launcher.read_text(encoding='utf-8').splitlines() if l.startswith('Icon='))[5:]
                 self.assertTrue(Path(icon).is_file(), icon)
             self.assertEqual(json.loads(cli(home, 'courses').stdout)['result']['courses'], [], 'library files are not courses')
@@ -218,7 +228,7 @@ class CourseLibrary(unittest.TestCase):
             self.assertIn({'type': 'changed', 'scope': 'state'}, events)
 
     def test_a_course_summary_is_read_again_only_after_the_course_changes(self):
-        from guided_learning import library
+        from throughline import library
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / 'alpha'
             course(path, 'Alpha')
@@ -243,7 +253,7 @@ class CourseLibrary(unittest.TestCase):
     def test_a_commit_that_leaves_the_files_stamp_as_it_was_is_still_seen(self):
         # Within one tick of the file system's clock, and once the write-ahead log has wrapped, a commit can leave the
         # database files' modification times and sizes as they were; a course written that recently is read again.
-        from guided_learning import library
+        from throughline import library
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / 'alpha'
             course(path, 'Alpha')
@@ -257,7 +267,7 @@ class CourseLibrary(unittest.TestCase):
             self.assertEqual(library.summary(path)['concepts'], 2)
 
     def test_one_broken_course_is_listed_with_its_error_beside_the_others(self):
-        from guided_learning import library, migrations
+        from throughline import library, migrations
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
             course(Path(root) / 'alpha', 'Alpha')
             course(Path(root) / 'beta', 'Beta')
@@ -271,7 +281,7 @@ class CourseLibrary(unittest.TestCase):
             failing = [*migrations.MIGRATIONS[:-1], mock.Mock(side_effect=KeyError('chapters'))]
             app = create_app(port=8765, runner=Idle(), settings=TeacherSettings(Path(config) / 's.json'), library_root=root)
             with TestClient(app, base_url='http://127.0.0.1:8765') as client, mock.patch.object(migrations, 'MIGRATIONS', failing), \
-                    self.assertLogs('guided_learning.library', 'ERROR') as logged:
+                    self.assertLogs('throughline.library', 'ERROR') as logged:
                 response = client.get('/api/library')
                 self.assertEqual(response.status_code, 200)
                 listed = {c['name']: c for c in response.json()['courses']}
@@ -285,7 +295,7 @@ class CourseLibrary(unittest.TestCase):
             self.assertEqual(library.summary(Path(root) / 'beta')['title'], 'Beta', 'the course reads once its migration works')
 
     def test_the_watcher_reads_only_courses_whose_files_changed(self):
-        from guided_learning import library
+        from throughline import library
         with tempfile.TemporaryDirectory() as root, watched(root, also=['beta']) as (app, events, polls):
             read = []
             real = library.fingerprint
@@ -319,7 +329,7 @@ class CourseLibrary(unittest.TestCase):
                 self.assertEqual(client.get('/api/state').json()['course']['title'], 'Beta')
 
     def test_switching_releases_the_previous_course_lease(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as config:
             course(Path(root) / 'alpha', 'Alpha')
             course(Path(root) / 'beta', 'Beta')
@@ -347,8 +357,8 @@ class CourseLibrary(unittest.TestCase):
                 self.assertNotIn(key, first.stdout + again.stdout + output.read_text(encoding='utf-8', errors='replace'))
                 if os.name != 'nt':
                     self.assertEqual(output.stat().st_mode & 0o777, 0o600)
-                with mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': home}):
-                    from guided_learning.commands import _call
+                with mock.patch.dict(os.environ, {'THROUGHLINE_HOME': home}):
+                    from throughline.commands import _call
                     self.assertTrue(_call(record['port'], 'GET', '/api/library')['active'].endswith('alpha'))
                 self.assertEqual(cli(home, 'stop').returncode, 0)
             finally:
@@ -378,9 +388,9 @@ class Migration(unittest.TestCase):
             course(old / 'alpha', 'Alpha')
             (old / 'AGENTS.md').write_text('<!-- Written by guided-learning setup; rerunning setup replaces this file. -->', encoding='utf-8')
             env = {**os.environ, 'HOME': home, 'USERPROFILE': home, 'XDG_DATA_HOME': str(Path(home) / '.xdg'),
-                   'GUIDED_LEARNING_SKILLS_DIR': str(Path(home) / '.skills'), 'GUIDED_LEARNING_CONFIG': str(Path(home) / 's.json')}
-            env.pop('GUIDED_LEARNING_HOME', None)
-            result = subprocess.run([sys.executable, '-m', 'guided_learning', 'setup', '--no-open', '--no-launcher'], text=True, capture_output=True,
+                   'THROUGHLINE_SKILLS_DIR': str(Path(home) / '.skills'), 'THROUGHLINE_CONFIG': str(Path(home) / 's.json')}
+            env.pop('THROUGHLINE_HOME', None)
+            result = subprocess.run([sys.executable, '-m', 'throughline', 'setup', '--no-open', '--no-launcher'], text=True, capture_output=True,
                                     cwd=ROOT, env=env, timeout=60)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('Moved 1 course(s)', result.stdout)
@@ -528,7 +538,7 @@ class LookingAfterCourses(unittest.TestCase):
         self.assertEqual(self.client.delete('/api/library/courses/alpha').status_code, 200, 'and it can be deleted')
 
     def test_a_course_being_moved_takes_no_writes_until_the_move_ends(self):
-        from guided_learning import moving
+        from throughline import moving
         lock_path = moving._move_lock(self.root / 'alpha')
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         lock = moving.try_lock(lock_path)  # a move running in another process
@@ -560,7 +570,7 @@ class LookingAfterCourses(unittest.TestCase):
 
     def test_the_trash_is_left_out_of_the_command_listing_and_imports(self):
         self.client.delete('/api/library/courses/alpha')
-        from guided_learning import library, packages
+        from throughline import library, packages
         self.assertEqual([c['name'] for c in library.list_courses(self.root)], ['beta'])
         self.assertEqual(packages.suggested_name(self.root, 'alpha'), 'alpha', 'a deleted course does not take its name')
 
@@ -624,5 +634,5 @@ class LookingAfterCourses(unittest.TestCase):
 
 
 def library_stamp(path):
-    from guided_learning import library
+    from throughline import library
     return library.stamp(path), (Path(path) / 'course.sqlite3').read_bytes()

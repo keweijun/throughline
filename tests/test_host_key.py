@@ -11,9 +11,9 @@ from unittest import mock
 
 from fastapi.testclient import TestClient
 
-from guided_learning import commands, library, web
-from guided_learning.server import create_app
-from guided_learning.server.settings import TeacherSettings
+from throughline import commands, library, web
+from throughline.server import create_app
+from throughline.server.settings import TeacherSettings
 
 KEY = 'a' * 64
 
@@ -73,7 +73,7 @@ class Signed(unittest.TestCase):
 
     def test_an_expired_code_signs_nothing_in(self):
         code = self.code()
-        with mock.patch('guided_learning.server.app.time.monotonic', return_value=time.monotonic() + 301):
+        with mock.patch('throughline.server.app.time.monotonic', return_value=time.monotonic() + 301):
             response = self.client.get(f'/?code={code}')
         self.assertNotIn('set-cookie', response.headers)
 
@@ -110,7 +110,7 @@ class Key(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        patcher = mock.patch.dict(os.environ, {'GUIDED_LEARNING_HOME': self.tmp.name})
+        patcher = mock.patch.dict(os.environ, {'THROUGHLINE_HOME': self.tmp.name})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -156,7 +156,7 @@ class Key(unittest.TestCase):
             on_ready(8765)
             printed.append(sign_in)
         with mock.patch.object(web, 'serve', serve), mock.patch.object(web, '_record'), mock.patch.object(web, '_forget'), \
-                mock.patch.object(sys, 'argv', ['guided-learning-web', '--port', '0', *flags]), \
+                mock.patch.object(sys, 'argv', ['throughline-web', '--port', '0', *flags]), \
                 mock.patch('builtins.print') as output:
             web.main()
         return printed[0], ' '.join(str(c.args) for c in output.call_args_list)

@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from guided_learning.api import execute
+from throughline.api import execute
 
 class Branches(unittest.TestCase):
     def test_question_survives_reopen_without_moving_mainline(self):
@@ -15,7 +15,7 @@ class Branches(unittest.TestCase):
 
     def test_teacher_suggestion_waits_for_consent_and_return_keeps_anchor(self):
         import threading
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 if 'Branch decision protocol' not in prompt:
@@ -56,7 +56,7 @@ class Branches(unittest.TestCase):
             self.assertEqual(execute(tmp, {'op':'branch.read','id':'q'})['branch']['status'],'unanswered')
 
     def test_declining_supplement_is_idempotent_and_does_not_pause_main(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 if 'Branch decision protocol' not in prompt:cancel.wait(3);return
@@ -110,7 +110,7 @@ class Branches(unittest.TestCase):
 
     def test_older_selected_lecture_freezes_context_and_attribution_separate_from_recovery(self):
         from pathlib import Path
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 emit({'kind':'final','text':'A saved explanation'});emit({'kind':'complete'})
@@ -150,8 +150,8 @@ class Branches(unittest.TestCase):
 
     def test_selected_exercise_freezes_its_question_and_feedback_for_the_answer(self):
         from pathlib import Path
-        from guided_learning.server import Host
-        from guided_learning.store import Store
+        from throughline.server import Host
+        from throughline.store import Store
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 emit({'kind':'final','text':'About the feedback'});emit({'kind':'complete'})
@@ -182,14 +182,14 @@ class Branches(unittest.TestCase):
                 self.assertIn('problem sheet text',prompt)
                 self.assertIn(ref,turn['source_refs'])
                 # The interface has the exercise already; it is not sent back in every question.
-                from guided_learning.server import state
+                from throughline.server import state
                 self.assertNotIn('selected_exercise',state.build(app)['questions'][0])
                 with self.assertRaises(ValueError):ask({'id':'bad','question':'?','selected_task_id':'missing'})
                 with self.assertRaises(ValueError):ask({'id':'q','question':'Which constant?','selection':'You dropped the constant'})
             finally:app.close()
 
     def test_interrupted_supplement_reopens_and_completes_once(self):
-        from guided_learning.server import Host
+        from throughline.server import Host
         class Runner:
             def run(self,prompt,cwd,emit,cancel):
                 emit({'kind':'final','text':'Recovered complete supplement'});emit({'kind':'complete'})

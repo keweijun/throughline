@@ -12,8 +12,8 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from guided_learning import migrations, packages
-from guided_learning.api import execute
+from throughline import migrations, packages
+from throughline.api import execute
 from tests.test_course_fixtures import FIXTURES, load
 
 PACKAGES = Path(__file__).resolve().parent / 'fixtures' / 'packages'

@@ -158,7 +158,7 @@ class PageReadings(unittest.TestCase):
         self.assertNotIn('readings', self.call('source.read', source_id=text_source['id']))
 
     def test_readings_saved_at_the_same_time_all_land(self):
-        processes = [subprocess.Popen([sys.executable, '-m', 'guided_learning', '--workspace', str(self.course)], stdin=subprocess.PIPE,
+        processes = [subprocess.Popen([sys.executable, '-m', 'throughline', '--workspace', str(self.course)], stdin=subprocess.PIPE,
                                       stdout=subprocess.PIPE, text=True, cwd=ROOT)
                      for _ in range(4)]
         for page, process in enumerate(processes, 1):

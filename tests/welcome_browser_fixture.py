@@ -4,10 +4,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-from guided_learning import checks
-from guided_learning.launcher import Launcher
-from guided_learning.server import serve
-from guided_learning.server.settings import TeacherSettings
+from throughline import checks
+from throughline.launcher import Launcher
+from throughline.server import serve
+from throughline.server.settings import TeacherSettings
 
 scratch = tempfile.TemporaryDirectory()
 root = Path(scratch.name)

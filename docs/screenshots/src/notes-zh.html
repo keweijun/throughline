@@ -1,0 +1,112 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="../../../web/node_modules/katex/dist/katex.min.css"><link rel="stylesheet" href="style.css"><title>量子力学讲义</title>
+<style>body{font-family:"Latin Modern Roman","Times New Roman","Noto Serif CJK SC","WenQuanYi Zen Hei",serif;}</style></head>
+<body>
+<div class="page">
+<h1>量子力学（上）讲义</h1>
+<div class="sub">第 1–4 周 · 波函数、叠加、可观测量与薛定谔方程</div>
+<h2>第 1 讲　波函数</h2>
+<h3>1.1 粒子的状态</h3>
+<p>在经典力学中，粒子在每一时刻都有确定的位置 $x(t)$。在量子力学中，一维运动粒子的状态由复值<b>波函数</b> $\psi(x,t)$ 描述。波函数本身不可观测，我们测量到的是它带来的结果。</p>
+<h3>1.2 玻恩规则</h3>
+<p>统计诠释（玻恩，1926）指出，$|\psi(x,t)|^2$ 是<b>概率密度</b>：</p>
+<div class="box">$$P(a \le x \le b,\ t) = \int_a^b |\psi(x,t)|^2\,dx .$$</div>
+<p>在测量之前，波函数并不告诉我们粒子“在哪里”，只给出每种结果出现的概率。对相同制备的系统反复测量，结果的分布就是 $|\psi|^2$。</p>
+<h3>1.3 归一化</h3>
+<p>粒子总要在某处被找到，因此总概率为一：</p>
+$$\int_{-\infty}^{\infty} |\psi(x,t)|^2\,dx = 1 .$$
+<p>若 $\psi$ 是薛定谔方程的解，则对任意常数 $A$，$A\psi$ 也是解；我们选取 $|A|$ 使上式成立。薛定谔方程保持归一化不随时间改变，所以只需在 $t=0$ 时归一化。不平方可积的函数（例如在整条直线上 $\psi=$ 常数）不能表示物理状态。</p>
+<p><b>例 1.1</b>　归一化 $\psi(x) = A\,e^{-|x|/a}$（$a&gt;0$）。需要 $|A|^2 \int_{-\infty}^{\infty} e^{-2|x|/a}\,dx = |A|^2\,a = 1$，故 $A = 1/\sqrt{a}$（取 $A$ 为正实数；整体相位可任意选取）。</p>
+</div>
+
+<div class="page">
+<h3>1.4 期望值</h3>
+<p>$x$ 的<b>期望值</b>是对大量相同制备的粒子测量结果的平均，而不是最可能的值：</p>
+$$\langle x \rangle = \int_{-\infty}^{\infty} x\,|\psi(x,t)|^2\,dx .$$
+<p>对动量不能写成 $p\,|\psi|^2$，因为 $|\psi|^2$ 是关于 $x$ 的密度。应当写成</p>
+<div class="box">$$\langle p \rangle = \int_{-\infty}^{\infty} \psi^*\left(-i\hbar\frac{\partial}{\partial x}\right)\psi\,dx ,$$</div>
+<p>一般地，对任何以算符 $\hat Q$ 表示的可观测量，$\langle Q \rangle = \int \psi^*\,\hat Q\,\psi\,dx$（见第 3 讲）。</p>
+<h3>1.5 弥散</h3>
+<p>标准差衡量结果的弥散程度：$\sigma_x^2 = \langle x^2\rangle - \langle x\rangle^2$。$|\psi|^2$ 越尖锐，$\sigma_x$ 越小。</p>
+<p><b>例 1.2</b>　对 $\psi(x) = e^{-|x|/a}/\sqrt{a}$，由对称性 $\langle x\rangle = 0$，而 $\langle x^2\rangle = \tfrac{1}{a}\int x^2 e^{-2|x|/a}dx = a^2/2$，故 $\sigma_x = a/\sqrt2$。</p>
+<p><i>常见错误</i>　$\langle x\rangle$ 不一定是粒子可能出现的位置：若密度有两个分开的峰，期望值可能落在两峰之间的空隙里。</p>
+</div>
+
+<div class="page">
+<h2>第 2 讲　叠加与干涉</h2>
+<h3>2.1 概率幅相加</h3>
+<p>设粒子可以经两条路径到达探测器。每条路径单独给出一个概率幅 $\psi_1$ 或 $\psi_2$，只开一条路径时概率为 $|\psi_1|^2$ 或 $|\psi_2|^2$。两条路径都开时，<b>概率幅相加</b>：</p>
+<div class="box">$$\psi = \psi_1 + \psi_2, \qquad P = |\psi_1 + \psi_2|^2 = |\psi_1|^2 + |\psi_2|^2 + 2\,\mathrm{Re}\!\left(\psi_1^*\psi_2\right).$$</div>
+<p>最后一项是<b>干涉项</b>。对粒子而言它没有经典对应：经典情形下互斥事件的概率直接相加，$P = P_1 + P_2$。</p>
+<p>记 $\psi_1 = |\psi_1|e^{i\alpha}$，$\psi_2 = |\psi_2|e^{i\beta}$，则 $2\,\mathrm{Re}(\psi_1^*\psi_2) = 2|\psi_1||\psi_2|\cos(\beta-\alpha)$，因此只有<b>相位差</b> $\phi = \beta - \alpha$ 起作用。</p>
+<ul>
+<li>$\phi = 0$：相长干涉，$P = (|\psi_1|+|\psi_2|)^2$。</li>
+<li>$\phi = \pi$：相消干涉，$P = (|\psi_1|-|\psi_2|)^2$，两幅值相等时为零。</li>
+</ul>
+<p><b>例 2.1</b>　等幅 $\psi_1 = \tfrac12$，$\psi_2 = \tfrac12 e^{i\phi}$ 给出 $P(\phi) = \tfrac12(1+\cos\phi) = \cos^2(\phi/2)$。每条路径单独给出 $\tfrac14$，但两条都开时，在 $\phi=\pi$ 处探测器完全没有计数。</p>
+<h3>2.2 路径信息</h3>
+<p>如果实验记录了粒子走哪条路径，两种可能就变得可以区分，此时相加的是概率而不是概率幅，干涉项消失。干涉要求这些可能性在原则上不可区分。</p>
+</div>
+
+<div class="page">
+<h3>2.3 双缝</h3>
+<p>间距为 $d$ 的两条狭缝被德布罗意波长 $\lambda = h/p$ 的粒子照射。在远处屏上角度 $\theta$ 处，程差为 $d\sin\theta$，相位差为</p>
+$$\phi(\theta) = \frac{2\pi d \sin\theta}{\lambda}.$$
+<figure>
+<svg width="360" height="150" viewBox="0 0 360 150" xmlns="http://www.w3.org/2000/svg" font-family="serif" font-size="12">
+<line x1="60" y1="10" x2="60" y2="58" stroke="#000" stroke-width="3"/><line x1="60" y1="66" x2="60" y2="84" stroke="#000" stroke-width="3"/><line x1="60" y1="92" x2="60" y2="140" stroke="#000" stroke-width="3"/>
+<line x1="300" y1="10" x2="300" y2="140" stroke="#000" stroke-width="1.5"/>
+<line x1="60" y1="62" x2="300" y2="40" stroke="#444" stroke-dasharray="4 3"/><line x1="60" y1="88" x2="300" y2="40" stroke="#444" stroke-dasharray="4 3"/>
+<text x="38" y="80">d</text><text x="306" y="44">θ</text><text x="280" y="150">屏</text>
+<path d="M300 20 Q330 25 300 30 Q345 40 300 50 Q330 55 300 60 Q360 75 300 90 Q330 95 300 100 Q345 110 300 120 Q330 125 300 130" fill="none" stroke="#000"/>
+</svg>
+<figcaption>图 2.1　双缝与屏上的强度分布</figcaption>
+</figure>
+<p>两缝概率幅相等时，强度为</p>
+<div class="box">$$I(\theta) = 4I_0 \cos^2\!\left(\frac{\pi d\sin\theta}{\lambda}\right),$$</div>
+<p>亮纹在 $d\sin\theta = m\lambda$，暗纹在 $d\sin\theta = (m+\tfrac12)\lambda$。小角度下，距离 $L$ 处屏上的条纹间距为 $\Delta y = \lambda L/d$。图样是一个粒子一个粒子积累起来的：每个粒子只落在一个点上，条纹只出现在统计中。</p>
+<h3>2.4 整体相位与相对相位</h3>
+<p>把整个态乘以 $e^{i\gamma}$ 不改变任何概率：$|e^{i\gamma}\psi|^2 = |\psi|^2$。这种<b>整体相位</b>不可观测。叠加中各项之间的<b>相对相位</b>，如 $\psi_1 + e^{i\phi}\psi_2$ 中的 $\phi$，会改变干涉项，是可观测的。</p>
+</div>
+
+<div class="page">
+<h2>第 3 讲　可观测量与算符</h2>
+<h3>3.1 算符</h3>
+<p>每个可观测量 $Q$ 对应一个线性算符 $\hat Q$：位置 $\hat x = x$，动量 $\hat p = -i\hbar\,\partial/\partial x$，能量 $\hat H = \hat p^2/2m + V(x)$。可观测量由<b>厄米</b>算符表示，$\langle f|\hat Q g\rangle = \langle \hat Q f| g\rangle$，从而期望值总是实数。</p>
+<h3>3.2 本征态与测量</h3>
+<p>满足 $\hat Q\psi = q\,\psi$ 的态是<b>本征态</b>：测量 $Q$ 必定得到 $q$。厄米算符的本征值为实数，不同本征值的本征函数相互正交。一般的态是本征态的叠加 $\psi = \sum_n c_n \psi_n$；测量以概率 $|c_n|^2$ 得到 $q_n$，测量后态立即变为 $\psi_n$。</p>
+<h3>3.3 对易子</h3>
+<p>两个算符的对易子为 $[\hat A,\hat B] = \hat A\hat B - \hat B\hat A$。作用在试探函数 $f$ 上，</p>
+$$[\hat x,\hat p]f = x(-i\hbar f') - (-i\hbar)(xf)' = i\hbar f, \qquad\text{故}\qquad [\hat x,\hat p] = i\hbar .$$
+<p>对易的算符有共同的完备本征态组，对应的两个可观测量可以同时取确定值。位置与动量不对易。</p>
+</div>
+
+<div class="page">
+<h3>3.4 不确定性原理</h3>
+<p>对任意两个可观测量，其弥散满足广义不确定关系</p>
+<div class="box">$$\sigma_A\,\sigma_B \;\ge\; \left|\frac{1}{2i}\langle[\hat A,\hat B]\rangle\right| .$$</div>
+<p>由 $[\hat x,\hat p]=i\hbar$ 得到海森堡关系 $\sigma_x\sigma_p \ge \hbar/2$。它说的是对相同制备的系统测量结果的弥散，而不是笨拙的测量造成的扰动。</p>
+<p><b>例 3.1</b>　高斯波包 $\psi(x) = (2a/\pi)^{1/4}e^{-ax^2}$ 有 $\sigma_x = 1/(2\sqrt a)$，$\sigma_p = \hbar\sqrt a$，故 $\sigma_x\sigma_p = \hbar/2$，恰好取到下限。</p>
+<p><i>常见错误</i>　该关系限制的是两个弥散的乘积。单独一个弥散没有下限：态可以任意集中，代价是 $\sigma_p$ 很大。</p>
+</div>
+
+<div class="page">
+<h2>第 4 讲　薛定谔方程</h2>
+<h3>4.1 定态</h3>
+<p>波函数按薛定谔方程演化：$i\hbar\,\partial_t\psi = \hat H\psi$。对不随时间变化的势 $V(x)$，试探 $\psi(x,t) = \varphi(x)\,T(t)$。分离变量得 $T(t) = e^{-iEt/\hbar}$ 以及<b>定态薛定谔方程</b></p>
+<div class="box">$$-\frac{\hbar^2}{2m}\frac{d^2\varphi}{dx^2} + V(x)\varphi = E\varphi .$$</div>
+<p>可分离的解称为<b>定态</b>：$|\psi(x,t)|^2 = |\varphi(x)|^2$ 不随时间变化，且能量确定为 $E$。通解是叠加 $\psi(x,t) = \sum_n c_n\varphi_n(x)e^{-iE_nt/\hbar}$；当其中出现两个或更多能量时它不是定态，因为各项之间的相对相位随时间变化。</p>
+</div>
+
+<div class="page">
+<h3>4.2 无限深方势阱</h3>
+<p>设 $0 &lt; x &lt; L$ 内 $V = 0$，其余处 $V = \infty$。阱内 $\varphi'' = -k^2\varphi$，$k = \sqrt{2mE}/\hbar$；在阱壁处连续要求 $\varphi(0) = \varphi(L) = 0$。于是</p>
+<div class="box">$$\varphi_n(x) = \sqrt{\frac{2}{L}}\,\sin\frac{n\pi x}{L}, \qquad E_n = \frac{n^2\pi^2\hbar^2}{2mL^2}, \qquad n = 1,2,3,\dots$$</div>
+<p>能量由边界条件量子化。基态能量 $E_1$ 不为零，这正是不确定性原理对限制在长度 $L$ 内的粒子的要求。这些态正交归一，$\int_0^L \varphi_m\varphi_n\,dx = \delta_{mn}$，并且完备。</p>
+<h3>4.3 能谱</h3>
+<p>从能级 $n$ 跃迁到 $m &lt; n$ 放出能量为 $E_n - E_m = (n^2 - m^2)E_1$ 的光子。相邻能级间距按 $(2n+1)E_1$ 增大，阱越宽则按 $1/L^2$ 减小。</p>
+</div>
+<script src="../../../web/node_modules/katex/dist/katex.min.js"></script>
+<script src="../../../web/node_modules/katex/dist/contrib/auto-render.min.js"></script>
+<script>renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});</script>
+</body></html>

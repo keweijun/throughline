@@ -125,6 +125,8 @@ class Drills(DrillCourse):
         prompt = self.drill_prompt()
         self.assertIn('"days_since_practised": 0', prompt, 'the review context reaches the teacher')
         self.assertIn('The learner now says:\nDrill me.', prompt)
+        # The app shows a question's text, not its parts, so a question in parts writes them in its text too.
+        self.assertIn('The learner sees only question, never parts', prompt)
         shown = next(t for t in self.state()['turns'] if t['id'] == turn)
         self.assertIn('Here are two quick ones.', shown['text'])
         tasks = {t['id']: t for t in self.state()['review']['tasks']}
@@ -253,6 +255,8 @@ class Drills(DrillCourse):
             session = self.drill({'way': way})['session']
             self.assertEqual(session['way'], way)
             self.assertIn(said, self.drill_prompt())
+            if way == 'explain':
+                self.assertIn('leave them out of question', self.drill_prompt(), "explaining back keeps its checklist out of sight")
         self.assertIn('Global and relative phase', self.drill_prompt(), 'difficulties reach the teacher')
         self.assertNotIn('way', self.drill({})['session'], 'quick questions is the default')
         self.post('/api/drills', {'way': 'sing'}, 400)

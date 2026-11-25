@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.66.1
+
+- **A drill question in parts now shows its parts.** When a Review drill asked a written question in parts, only its setup appeared, so you were asked to answer (a) and (b) without seeing them. New drill questions show each part under the setup. Questions already in your sessions stay as they were; ask for more questions to get new ones.
+
 ## 0.66.0
 
 - **The command is now `throughline`** everywhere: in the app's messages, the Codex skill and the README (`throughline open`, `throughline setup`, `throughline stop`). The old `guided-learning` still works, so nothing you have written or scripted breaks.

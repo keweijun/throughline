@@ -4,7 +4,7 @@
 # For the Chinese welcome guide, set THROUGHLINE_LANGUAGE=zh-CN or pass --language zh-CN (`| sh -s -- --language zh-CN`).
 # --no-open leaves the app closed when setup is done.
 #
-# The steps, the same as README "For Codex" and the one-click updater (#110); change them together:
+# The steps, the same as README "For Codex: updating Throughline" and the one-click updater (#110); change them together:
 #   1. install uv if it is missing (uv brings its own Python)
 #   2. stop a running Throughline, which keeps its files open
 #   3. remove the pre-0.5.1 package name, codex-guided-learning

@@ -2,6 +2,10 @@
 
 What changed for learners in each release of Throughline, newest first. Each release is tagged `v<version>` on GitHub, and the `stable` branch points at the latest one. Every pull request that bumps the version adds its entry here (AGENTS.md, Versions); CI publishes the entry as the release's notes.
 
+## 0.66.1
+
+- **In Chinese, Review's line under the drill box now names 课程工坊** (或者让课程工坊做) instead of the English "Studio", as everywhere else in the app.
+
 ## 0.66.0
 
 - **The command is now `throughline`** everywhere: in the app's messages, the Codex skill and the README (`throughline open`, `throughline setup`, `throughline stop`). The old `guided-learning` still works, so nothing you have written or scripted breaks.

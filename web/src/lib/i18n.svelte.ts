@@ -819,7 +819,7 @@ const messages = {
   "All {count}": "全部 {count} 个",
   "Quick questions": "快速小题",
   "What to drill, or leave it empty and the teacher picks": "想练什么？留空则由老师来选",
-  "Or have Studio make": "或者让 Studio 做",
+  "Or have Studio make": "或者让课程工坊做",
   "a mock exam": "一份模拟考试",
   "a formula sheet": "一页公式表",
   "my mistakes on one page": "一页我的错题",

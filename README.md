@@ -7,21 +7,15 @@
 
 <p align="center"><b>English</b> · <a href="README.zh-CN.md">简体中文</a></p>
 
-![A lesson in Throughline: the course route on the left, the current section with its goal, next step and a streamed lesson with citations](docs/images/lesson-en.png)
+![A lesson in Throughline: the course route on the left, and a lesson taught in steps, each citing its page](docs/images/lesson-en.png)
 
-Throughline organizes several PDFs, slide decks, Word documents and text notes into one source-linked route, then teaches it in your browser: chapter overviews, streaming lessons, questions about any passage, the original page beside the explanation, practice, and a saved place to resume.
+Throughline organizes several PDFs, slide decks, Word documents and text notes into one source-linked route, then teaches it in your browser: lessons in steps that cite their pages, key points, questions about any passage, the original page beside the explanation, practice checked part by part, review whenever you want it, and a saved place to resume. Codex itself works on the course beside it, in Studio.
 
 The teacher makes instructional judgments from your materials. The program validates state and references; it never decides on its own that you have understood something. Everything runs on your computer, with your own Codex as the teacher.
 
 ## Install
 
-You need Codex, signed in or set up with an API key (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)). Then paste this into Codex:
-
-```text
-Install https://github.com/keweijun/throughline
-```
-
-Or run the install script in a terminal. It installs [uv](https://docs.astral.sh/uv/) if you don't have it, which brings its own Python:
+Open a terminal (Terminal on macOS, PowerShell on Windows) and run the install script. It installs [uv](https://docs.astral.sh/uv/) if you don't have it, which brings its own Python:
 
 ```sh
 # macOS and Linux
@@ -33,11 +27,15 @@ curl -LsSf https://raw.githubusercontent.com/keweijun/throughline/stable/install
 irm https://raw.githubusercontent.com/keweijun/throughline/stable/install.ps1 | iex
 ```
 
-Either way the app is installed (no Node.js needed), the `$throughline` skill is added, your Throughline folder and a **Throughline** launcher in your app menu are created, and Throughline opens in your browser with a short welcome guide in the chat or terminal. Afterwards, `throughline` in a terminal opens it too. To **update**, paste `Update https://github.com/keweijun/throughline` into Codex or run the script again; your courses are kept. **Settings → About → Update** installs a newer version in one click: Codex runs the update in the background and Throughline comes back by itself.
+The script installs the app (no Node.js needed), adds the `$throughline` skill, creates your Throughline folder and a **Throughline** launcher in your app menu, and opens Throughline in your browser with a short welcome guide in the terminal. Afterwards, `throughline` in a terminal opens it too.
 
-### For Codex: installing or updating Throughline
+Throughline teaches with Codex (the desktop app or the [CLI](https://learn.chatgpt.com/docs/codex/cli)), signed in or set up with an API key. You can set Codex up before or after installing Throughline: while it is missing or not signed in, the library says what to do.
 
-When a user asks you to install or update Throughline, run these steps yourself, outside the sandbox (they need the network and write outside the workspace). The user should not have to type anything.
+To **update**, use **Settings → About → Update**: Codex installs the newer version in the background and Throughline comes back by itself. Running the install script again updates it too. Your courses are kept either way.
+
+### For Codex: updating Throughline
+
+When a user, or Throughline's one-click update, asks you to update Throughline, run these steps yourself, outside the sandbox (they need the network and write outside the workspace). The user should not have to type anything.
 
 1. If `throughline --version` already works, run `throughline stop` first. On Windows a running Throughline locks its own files and the upgrade would fail.
 
@@ -51,7 +49,7 @@ When a user asks you to install or update Throughline, run these steps yourself,
 
    If `throughline` is then not on PATH, run `uv tool update-shell` (or `pipx ensurepath`) and use the full path the installer printed for the next step.
 3. Run `throughline setup`, adding `--language zh-CN` if the user writes to you in Chinese. It is safe to repeat: it updates the skill and launcher, never touches existing courses, and opens Throughline in the browser when it is done.
-4. Show the user the welcome guide that setup prints, as written. After an update, just say which version is installed (`throughline --version`).
+4. Tell the user which version is now installed (`throughline --version`).
 
 `install.sh` and `install.ps1` run these same steps with uv; keep them in step with this list.
 
@@ -73,36 +71,37 @@ To uninstall, run `throughline stop`, then `uv tool uninstall throughline` (or `
 
 ## Create your first course
 
-After installing, Throughline opens in your browser on your course library, where **Studio**, a Codex chat inside Throughline, asks what you would like to learn:
+After installing, Throughline opens in your browser on your course library. **New course** asks what you would like to learn, and **Studio**, Codex working inside Throughline, takes it from there:
 
-1. Drop your PDFs or notes into Studio (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
+1. Drop your PDFs or notes onto the page (or name the folder they are in), and say in a sentence what you want to learn, for example "quantum mechanics up to perturbation theory, for my exam".
 2. Codex asks a few quick questions: your goal and deadline, how well you know each prerequisite it found in the files, and how much detail you want. Then it suggests a course name, copies your files into the Throughline folder, builds a route across them and tells you what still needs checking.
 3. When it is done, the course opens, with the same chat in its Studio. Next time, open Throughline from the **Throughline** launcher in your app menu.
+
+![All courses: the course to carry on with across the top, and a card for each of the others, each with the cover Codex chose for it](docs/images/library-en.png)
 
 Later courses work the same way: **New course** in the library, or `$throughline` in any Codex chat. If your Codex is too old for Studio, the library's buttons open a Codex chat with the request typed in instead.
 
 ## How it works
 
-Throughline is where you study, and where you make and change your courses with Codex.
+Each course has three places, side by side in the top bar: **Studio · Learn · Review**.
 
-- **Study in Throughline.** Open it from the **Throughline** launcher in your app menu (setup adds it), or run `throughline`. Lessons, questions and practice run Codex in the background, so you never need Codex open to study. The library tells you where the launcher is, can add it to your desktop, and says so if Codex can't answer.
-- **Change a course in Studio.** **Studio** (or press `d`), first in the top bar before Learn and Review, is a Codex chat inside Throughline with the same `$throughline` skill. Ask it to add a problem set, rebuild a chapter, check pages or teach a chapter more rigorously; attach or drop files, mention them with `@`, and approve what Codex asks. You can keep studying while it works: the top bar says when Studio needs you. **Add files in Studio** below the route and **Check this location in Studio** in the reader open it with the request filled in, and what you ask it to remember about how you like to be taught goes into the course memory.
-- **Start a course in the library.** **New course** on **All courses** opens the library's own Studio. Codex reads your files and builds the route, and the chat then moves into the new course by itself, which opens at its Studio. Each course is a card with a cover Codex chose for it, the subject's short name over a pattern; click the card to open the course, and **Add files** in its ⋯ menu opens that course's Studio with the request filled in. A Codex chat with `$throughline` works too, for example `$throughline add this problem set to quantum`.
+- **Studio** is Codex working on your course. Ask it to add a problem set, rebuild a chapter, check pages, teach a chapter more rigorously, or make you a mock exam or a formula sheet; attach or drop files, mention them with `@`, and approve what Codex asks. You can keep studying while it works: the top bar says when Studio needs you. Beside the chat stand the course's cover and goal, a strip of its chapters filled as you study, your Studio chats, and **How you're taught**: the preferences the teacher follows. Tell Studio how you like to be taught, and it is remembered for the course.
+- **Learn** is where lessons, questions and practice happen. They run Codex in the background, so you never need Codex open to study.
+- **Review** is where you go over what you have studied, whenever you like (below).
 
-![Studio: a Codex chat inside Throughline, asking a question before it adds a problem set](docs/images/studio-en.png)
+The library is **All courses**: the course you studied last leads with **Continue**, and every other course is a card with a cover Codex chose for it. A card's ⋯ menu has **Add files**, which opens that course's Studio with the request filled in, and Share, Rename, Archive and Delete. Open Throughline from the **Throughline** launcher in your app menu (setup adds it), or run `throughline`; the library says where the launcher is, can add it to your desktop, and says so if Codex can't answer.
 
-![All courses: the course to carry on with across the top, and a card for each of the others, each with the cover Codex chose for it](docs/images/library-en.png)
+![Studio: Codex has made a formula sheet for the course and says what it put on it](docs/images/studio-en.png)
 
-## Study
+## Learn
 
-- **Route and goal.** The left rail is the course route; each section shows its goal and the next thing to do.
-- **Lessons.** The first lesson of a chapter opens with an overview of the chapter; later sections open with a short bridge from the one before, then teach. Text streams in and is saved when complete; you can pause, ask for another pass, or have the section taught again as a new lesson.
-- **Side questions.** Select a sentence or formula and ask about it. The lesson keeps going unless you pause it. Questions that a later section answers properly are saved for that section.
+- **The route.** The left rail is the course: chapters, their sections, and how far you are ("Section 4 of 12"). A section opens with **About this section**: the question it answers, what you will be able to do, its steps and its sources.
+- **Lessons in steps.** The first lesson of a chapter opens with an overview of the chapter; later sections pick up from the one before. The teacher teaches a step at a time, often ending with a quick check, and **Continue** moves on. Text streams in and is saved when complete; you can pause, or have the section taught again as a new lesson with **Teach again…**.
+- **Key points.** Every section ends with its key points: the results, rules and methods to hold, each with when it holds and a common mistake, linked back to the step and page that taught it. A chapter's page gathers them.
+- **Questions on the side.** Select a sentence or formula, in a lesson or an exercise, and ask about it; the answer comes in the side panel and the lesson stays where it is. Questions that a later section answers properly are saved for that section.
 - **Sources.** Hover a citation to see the cited text; click it to open the exact page or line in the built-in reader. Unchecked sources stay marked "Not checked yet".
-- **Practice.** Exercises follow each lesson. Hints and solutions are always available, but help is recorded, so a helped answer is never counted as solved on your own. If the exercises don't suit you, ask for different ones and say what should change, or ask for another like one you just did.
-- **Where you are.** The top bar reads **All courses › your course**, with a menu to switch courses, then **Studio · Learn · Review**, the course's three places. Beside Studio stand the course's title and goal, a strip of its chapters filled as you study, your Studio chats and **How you're taught**, the preferences the teacher follows, each with a × to delete it; tell Studio how you like to be taught, and a preference the teacher suggests is asked right where it comes up.
+- **Practice.** Exercises follow each lesson and are checked part by part. **Hint**, **Key steps**, **Full solution** and **Ask about this** are always there, but help is recorded, so a helped answer never counts as solved on your own. **Another like this**, **Do later** and **Skip** are in an exercise's ⋯; if the exercises don't suit you, ask for different ones and say what should change.
 - **Help.** `?` shows what you can do in the app, the course and the section you're reading, with **Show me** to point at each control, and the keyboard shortcuts. The first time you meet something you can't see, like selecting a passage, a short tip says how it works.
-- **Review.** Whenever you like, **Review** asks for a few questions to answer from memory: quick ones you answer by choosing and written ones that connect ideas across sections. **Review for me** lets the teacher pick what you have gone longest without practising and what you missed before; or say what you want to review. Nothing comes due. Before a section that builds on something you studied a while ago, you are offered a short warm-up, and each chapter page offers an optional chapter quiz.
 
 <table>
   <tr>
@@ -111,11 +110,23 @@ Throughline is where you study, and where you make and change your courses with 
   </tr>
   <tr>
     <td align="center">The cited page, beside the lesson</td>
-    <td align="center">A side question about a passage</td>
+    <td align="center">A question about a passage</td>
   </tr>
 </table>
 
-The interface and new teaching default to English; switch to Simplified Chinese under Settings (the gear in the top bar) → Appearance → Language. Imported materials and earlier records keep their original language. More in [using the interface](docs/learning-ui.md).
+## Review
+
+Nothing comes due: **Review** is there whenever you want to go over what you have studied.
+
+- **Drill.** Say what to drill, or leave it empty and the teacher picks, mostly from what you missed and what you haven't practised for a while. Choose how it asks: **Quick questions**, **Explain it back**, **Oral quiz** or **Tell confusable ideas apart**. **Covering** narrows it to some chapters or sections. Ask about an answer or for more questions right there; sessions are kept to come back to.
+- **Read.** Your **Key points** for what you are reviewing, your **Mistakes** (what you answered and the feedback, kept with the date once you get it right), and the **sheets** Studio wrote for you, ready to print.
+- **Have Studio make it.** A mock exam, a formula sheet, or your mistakes on one page: Studio makes it from your key points and mistakes, a mock exam becomes a session you answer in Review, with marks, and a sheet appears under Read.
+
+Before a section that builds on something you studied a while ago, you are offered a short warm-up, and each chapter's page offers a drill of that chapter.
+
+![Review: a box to start a drill, then the key points, mistakes and a formula sheet to read, and earlier drill sessions](docs/images/review-en.png)
+
+The interface and new teaching default to English; switch to Simplified Chinese under Settings (the gear in the top bar) → Appearance → Language, where you can also choose light or dark and the text size for reading. Imported materials and earlier records keep their original language. **Settings → Activity** shows when you studied, as a calendar across all your courses. More in [using the interface](docs/learning-ui.md).
 
 ## Where things live
 

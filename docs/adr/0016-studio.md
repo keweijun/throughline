@@ -68,7 +68,7 @@ ADR 0004 left updating to a Codex chat because a deterministic updater would run
 
 A deterministic detached updater script was the earlier plan for this section. Codex in the background was chosen over it because Codex already adapts the install to how Throughline was installed (uv, pipx, pip, an editable or unknown installation) and to a broken PATH, which a script would have to anticipate case by case, and the README stays the only copy of the steps. The cost is that the update needs Codex signed in and takes a minute or two of model time.
 
-The first install still starts in Codex, since there is no app yet.
+The first install runs the install script in a terminal (ADR 0017), since there is no app yet and Codex may not be set up before Throughline is.
 
 ## Fallback and versions
 

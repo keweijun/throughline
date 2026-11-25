@@ -3,7 +3,7 @@
 # For the Chinese welcome guide, first run $env:THROUGHLINE_LANGUAGE = 'zh-CN'.
 # With options: & ([scriptblock]::Create((irm https://raw.githubusercontent.com/keweijun/throughline/stable/install.ps1))) -Language zh-CN -NoOpen
 #
-# The steps, the same as README "For Codex", install.sh and the one-click updater (#110); change them together:
+# The steps, the same as README "For Codex: updating Throughline", install.sh and the one-click updater (#110); change them together:
 #   1. install uv if it is missing (uv brings its own Python)
 #   2. stop a running Throughline: on Windows it locks its own files
 #   3. remove the pre-0.5.1 package name, codex-guided-learning
